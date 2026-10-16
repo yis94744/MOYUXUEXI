@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>13. 切换分支：在主干和分支间跳 | SVN 图形化实战</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 图形化实战</h1></div>
+  <div class="brand-sub">TortoiseSVN + VisualSVN · 全鼠标操作</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 准备</div>
+    <a href="01-tools.html">1. 认识你的两个图形工具</a>
+    <a href="02-first-checkout.html">2. 第一次检出：把代码拉到本地</a>
+    <a href="03-icons.html">3. 看懂图标角标与右键菜单</a>
+    <div class="grp">第二阶段 · 日常使用</div>
+    <a href="04-daily.html">4. 日常三件事：改、更、提</a>
+    <a href="05-status.html">5. 查看改动：哪些文件变了</a>
+    <a href="06-diff.html">6. 比对差异：到底改了哪几行</a>
+    <a href="07-add-delete.html">7. 新增、删除、重命名文件</a>
+    <a href="08-history.html">8. 查看历史：Log 对话框详解</a>
+    <a href="09-revert.html">9. 撤销：改错了怎么退回</a>
+    <div class="grp">第三阶段 · 进阶操作</div>
+    <a href="10-conflict.html">10. 冲突处理：两人改了同一处</a>
+    <a href="11-merge-tool.html">11. 合并编辑器：逐行选择保留谁</a>
+    <a href="12-branch.html">12. 建分支：开一条独立开发线</a>
+    <a href="13-switch.html" class="on">13. 切换分支：在主干和分支间跳</a>
+    <a href="14-merge.html">14. 合并分支：把改动并回主干</a>
+    <a href="15-revision-graph.html">15. 版本拓扑图：看清分支走向</a>
+    <div class="grp">第四阶段 · 属性与锁</div>
+    <a href="16-ignore.html">16. 忽略文件：让编译产物别再烦我</a>
+    <a href="17-properties.html">17. 属性对话框：设置文件行为</a>
+    <a href="18-lock.html">18. 文件锁：二进制文件独占编辑</a>
+    <div class="grp">第五阶段 · 服务端管理</div>
+    <a href="19-server.html">19. 服务端：VisualSVN 建仓库</a>
+    <a href="20-users.html">20. 用户与权限：谁能看谁能改</a>
+    <a href="21-backup.html">21. 备份与恢复：图形界面操作</a>
+    <div class="grp">第六阶段 · 效率技巧</div>
+    <a href="22-patch-export.html">22. 补丁与导出：不走仓库传代码</a>
+    <a href="23-settings.html">23. 设置面板：常用选项怎么调</a>
+    <a href="24-troubleshoot.html">24. 常见问题：报错怎么处理</a>
+    <a href="25-cheatsheet.html">25. 图形操作速查表</a>
+
+  </nav>
+</aside>
+<main>
+<div class="crumb">
+  <span class="stage">第三阶段 · 进阶操作</span>
+  <span class="sep">/</span>
+  <a href="index.html">总目录</a>
+  <span class="sep">/</span>
+  <span class="cur">第 13 节</span>
+</div>
+
+<h3 class="sec" id="s13"><span class="no">13</span>切换分支：在主干和分支间跳</h3>
+
+<p class="lead"> 分支建好之后，最自然的疑问是：<strong>我本地这份文件夹怎么跑到分支上去？</strong> 答案不是「再检出一次」，而是 <strong>Switch（切换）</strong>—— 同一份工作副本，手指一拨，就在主干和各个分支之间来回跳。
+</p>
+
+<div class="box key">
+  <span class="bt">Switch 到底改了什么？</span>
+  <p> 你的工作副本里，除了那些看得见的文件，还藏着一个 <code class="ic">.svn</code> 隐藏目录 （没有它，你的文件夹就只是一堆普通文件，SVN 也不认识它）。
+  </p>
+  <p> 这个目录里记着一件事：<strong>「这份工作副本对应的是仓库里的哪条路径」</strong>。 平时它指向主干。
+  </p>
+  <p> Switch 做的事情就一件：<strong>把这条记录改成新分支的路径，然后让文件内容追上那条分支的样子</strong>。 从这一刻起，你的提交都进新分支，更新也是从新分支拉—— 但在你眼里，还是<b>同一个文件夹、同一个路径</b>，什么都没挪窝。
+  </p>
+  <p><em>这就是为什么它比重新检出舒服：不用换目录、不用重配环境、IDE 里打开的项目也还在原地。</em></p>
+</div>
+
+<h4 class="sub">面对面看这个对话框</h4>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">Switch 对话框：告诉 SVN 从现在起跟着谁走</span><span class="fs">SWITCH</span></div>
+  <div class="sb"><img src="img/Switch.png" alt="Switch 切换对话框"></div>
+  <div class="cap">
+    这个对话框比 Branch/Tag 简单得多，一共就几个元素：<br><br>
+
+    <b>① <span class="k">To URL</span> · 目标地址</b>——<b>你要切到哪条路径去</b>。 这里填的是<strong>完整的仓库地址</strong>（比如 <code class="ic">https://服务器/svn/项目/branches/order-export</code>）， 不是像建分支那样填相对路径。<br>
+    <em>这一栏是整个对话框的核心，填对了就成功了一大半。</em><br><br>
+
+    <b>② <span class="k">...</span> · 浏览按钮</b>——在输入框旁边的这个小按钮，<b>点开就是仓库浏览器</b>。 可以在里面一层层展开目录，<strong>直接点选你要切过去的分支</strong>，地址会自动填进输入框。<br>
+    <b>推荐用它，而不是手打地址</b>：手打容易多一个斜杠、少一段路径， 而一旦切到错误的路径，你的下一堆提交可能就提交到不该去的地方了。<br><br>
+
+    <b>③ 输入框右侧的下拉箭头</b>——<strong>历史记录</strong>。 点开可以看到<b>你以前切换过的路径列表</b>。 如果你经常在固定的两个分支之间来回切，直接从这儿选最快，不用每次去浏览。<br><br>
+
+    <b>④ <span class="k">HEAD revision</span> 选项</b>——决定切过去之后<b>文件内容停在哪个版本</b>。 通常保持默认（对应最新版本）就行，切过去就是分支上最新的样子。<br>
+    <em>下面如果还有指定版本号的选项，那是给「我要把工作副本停在分支的某个历史版本上」这种特殊情况用的，日常用不到。</em><br><br>
+
+    <b>⑤ <span class="k">Show log</span> · 查看日志</b>——<b>点开目标路径的提交历史</b>。 它是用来「<strong>确认自己要切到哪儿</strong>」的： 对着日志看一眼这条分支最近的提交，就知道是不是你要找的那条—— 特别是分支名字起得比较像的时候，这一眼能避免切错。<br><br>
+
+    <b>⑥ 底部 <span class="k">OK</span> / <span class="k">Cancel</span></b>——确认或放弃。 点 OK 之后会有一个进度过程，<b>SVN 会把工作副本里的文件内容换成目标分支的样子</b>。 分支和主干差异大的时候，这个替换过程会杀掉几百上千个文件，属正常现象。
+  </div>
+</div>
+
+<h4 class="sub">实际操作步骤</h4>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">SWITCH</span>把工作副本拨到另一条线上</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">先处理掉手上的本地改动（最重要的一步）</span>
+      <span class="sc">在<b>工作副本的根文件夹</b>上右键（就是你想整份切过去的那一层）， 先看看有没有红色叹号的文件。<br>
+      <strong>有未提交的改动，先提交；不想要的，先撤销。</strong> 理由见下面橙色警告框。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">右键打开切换</span>
+      <span class="sc"><span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Switch...</span></span><br>
+      <em>注意是在文件夹上右键，不是在某个文件上——切换的作用范围是整个工作副本。</em></span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">用「...」浏览并选中目标分支</span>
+      <span class="sc">点输入框旁边的 <code class="ic">...</code> 按钮，在仓库浏览器里展开目录， <b>点中你要切过去的那条分支</b>，地址会自动填进 <code class="ic">To URL</code>。<br>
+      <em>不确定是不是这条？顺手点一下 <code class="ic">Show log</code>，看看它的提交记录对不对得上。</em></span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">确认地址，点 OK</span>
+      <span class="sc">最后再核对一遍 <code class="ic">To URL</code> 里的路径—— <strong>尤其是路径最后一段（分支名）</strong>。确认无误后点 <code class="ic">OK</code>。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">等待完成，注意看进度里的删除与新增</span>
+      <span class="sc">进度对话框里会滚动大量文件名。 <strong>「删除」不代表真的删了你的东西</strong>，只是把当前分支独有的文件撤走， 再把目标分支独有的文件放进来。别看到一堆删除就慌了。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">做完确认「我现在确实在目标分支上」</span>
+      <span class="sc">这一步别省。确认方法见下一小节。<br>
+      <strong>切换完之后，一切照旧——你只是从此在另一条线上干活了。</strong></span>
+    </div>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">切换前必须提交或撤销本地改动</span>
+  <p> 这是切换分支最容易踩的坑，而且后果不算小。
+  </p>
+  <p> <strong>问题出在哪</strong>：工作副本里那些你改了但还没提交的文件， 在你执行 Switch 的时候<em>不会消失</em>——SVN 会尽量把它们保留在原地， 然后把它们「套到」新分支的对应文件上去。
+  </p>
+  <p> 如果你的改动和新分支上的内容不冲突，表面上好像没事。但只要有一点交集，就会出现两种情况之一：</p>
+  <ul>
+    <li><strong>直接冲突</strong>——你现在得先解决冲突才能继续干活， 而这个冲突的起因完全是你自己「没提交就乱切」造成的，纯属自找麻烦。</li>
+    <li><strong>更糟的：悄悄跟着你跑了</strong>——你在主干改了一半的东西，现在是新分支上的未提交改动。 过一会儿你顺手提交，<b>就把主干那边的半成品提进了分支</b>。 这种问题往往过很久才被发现。</li>
+  </ul>
+  <p><strong>正确做法只有两个，没有第三种：</strong></p>
+  <ul>
+    <li>这些改动<b>要留</b> → <strong>先提交</strong>，提交完再切。</li>
+    <li>这些改动<b>不要了</b> → 先右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Revert...</span></span> 撤销掉，再切。</li>
+  </ul>
+  <p><em>如果实在拿不准改动要不要留，<b>切换到新分支之前先把文件夹整体复制一份到别处备份</b>，是最省心的办法。</em></p>
+</div>
+
+<h4 class="sub">怎么知道「我现在在哪个分支」</h4>
+
+<p> 切换完成之后，文件夹看起来一模一样，没有任何横幅提醒你在哪条线上。 这是切换功能让人心里没底的地方。有几个办法可以确认：
+</p>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:190px">方法</th><th style="width:180px">看哪里</th><th>说明</th></tr></thead>
+<tbody>
+  <tr>
+    <td><strong>看文件夹属性</strong></td>
+    <td>右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Properties</span></span></td>
+    <td>属性标签页里会显示这份工作副本关联的 <code class="ic">URL</code>， <b>那里面就写着 <code class="ic">/trunk</code> 还是 <code class="ic">/branches/xxx</code></b>。 路径最后一段就是答案。<em>这是最直接的确认方式。</em></td>
+  </tr>
+  <tr>
+    <td><strong>看日志路径</strong></td>
+    <td><span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Show log</span></span></td>
+    <td>日志窗口里会标明<b>你正在查看的路径</b>。 如果显示的路径是分支的地址，说明你就在分支上。 <em>同时也能看到这条分支自己的提交记录（不含主干的）。</em></td>
+  </tr>
+  <tr>
+    <td><strong>看提交对话框</strong></td>
+    <td>右键 → <code class="ic">SVN Commit...</code></td>
+    <td>提交时提交对话框里也会显示涉及的路径。 <b>提交前顺手瞥一眼</b>，确认提交目标是主干还是分支。</td>
+  </tr>
+  <tr>
+    <td><strong>看仓库浏览器</strong></td>
+    <td><span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Repo-browser</span></span></td>
+    <td>打开后对比一下本地文件夹结构和仓库里的哪条路径一致。 <em>笨但可靠，适合心里完全没底的时候。</em></td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box tip">
+  <span class="bt">养成一个小习惯：提交前看一眼路径</span>
+  <p> 切换分支最常见的翻车方式是：<strong>切完忘了自己在分支上，然后提交了一批本该进主干的改动</strong>。 提交对话框弹出时，里面会显示这次提交涉及的路径—— 只要养成「点 OK 之前扫一眼路径」的习惯，这类错误基本可以杜绝。
+  </p>
+  <p> <em>补救也不是不行：发现提交错地方了，去错误的路径上把那次提交撤销（反向合并），再切回去重新提交。 但远不如一开始就看清省事。</em>
+  </p>
+</div>
+
+<h4 class="sub">两种干活方式：切换，还是多检出几份？</h4>
+
+<p> 想同时在主干和分支上工作，有两种办法。它们没有绝对的好坏，看你的工作节奏。
+</p>
+
+<div class="duo">
+  <div>
+    <div class="dh">◈ 一份工作副本 + 随时 Switch</div>
+    <p><strong>优点</strong>：磁盘上只有一份文件，<b>省空间</b>； IDE 里只开一个项目，不用切来切去； 编译缓存、环境配置都只有一份，<b>不会出现「两个目录里的依赖版本不一致」这种怪问题</b>。</p>
+    <p><strong>缺点</strong>：<b>同一时刻只能待在一个分支上</b>。 想同时对照主干和分支的代码，就只能来回切； 每次切换都要替换文件内容，分支差异大的时候要等一阵； <b>切换期间本地编译产物、临时文件容易和另一条线的状态打架</b>。</p>
+    <p><strong>适合</strong>：手上同时只有一个任务，做完一个再切下一个； 磁盘空间紧张（大项目一份工作副本就好几个 G）的场景。</p>
+    <p><strong>最大的风险</strong>：忘切、切错——<em>所以每次动手前确认路径特别重要</em>。</p>
+  </div>
+  <div>
+    <div class="dh">◈ 检出多份工作副本，各管一条线</div>
+    <p><strong>优点</strong>：<b>主干和分支各有一个文件夹，彼此完全独立</b>， 想看哪边就看哪边，不用切换、不用等待； 一边在跑测试、一边在改代码互不干扰； <b>完全不会「忘记自己在哪条线上」</b>，因为文件夹名字就写着呢。</p>
+    <p><strong>缺点</strong>：<b>占磁盘</b>——两份工作副本就是两份完整的代码； IDE 要开两个项目，编译输出的产物也变成两份； 磁盘上容易出现两个相似的文件夹，<b>时间久了可能搞混</b>， 在一个里改了半天的东西跑到另一个里找。</p>
+    <p><strong>适合</strong>：长期并行维护（比如主干做新功能、同时维护一个已发布版本）； 需要频繁在两条线之间比对代码的场景。</p>
+    <p><strong>实用建议</strong>：<em>把工作副本目录命名成 <code class="ic">项目名-trunk</code>、 <code class="ic">项目名-hotfix-1.2.1</code>，一眼就能分辨。</em></p>
+  </div>
+</div>
+
+<div class="box ok">
+  <span class="bt">怎么选：按「你一天里切几次」来定</span>
+  <ul>
+    <li><strong>一天切一两次</strong>（上午收尾主干的事，下午做分支）——<b>用 Switch 就够了</b>，省空间也省事。</li>
+    <li><strong>一天切十几次</strong>（两边都要频繁改、频繁跑）——<b>检出两份更划算</b>，切换等待的时间比磁盘空间贵得多。</li>
+    <li><strong>两条线都要长期维护</strong>（如主干 + 已发布版本）——<b>必须两份</b>， 否则你会天天在等待文件替换和忘记切换之间反复折腾。</li>
+  </ul>
+  <p><em>两种方式可以混用：长期维护的用两份工作副本，临时试一下的分支用 Switch 切过去看一眼再切回来。</em></p>
+</div>
+
+<div class="box tip">
+  <span class="bt">Update 和 Switch 到底差在哪？一个改版本，一个改地址</span>
+  <p> 这两个操作在界面上挨得很近，但管的事完全不同：
+  </p>
+  <div class="tw">
+  <table>
+  <thead><tr><th style="width:170px">操作</th><th style="width:170px">改变的是什么</th><th>什么时候用</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Update</strong><br><span class="tagmini b">同一地址，换版本</span></td>
+      <td><strong>版本号</strong>：路径不变，还是同一条线</td>
+      <td>把别人在这条线上提交的新改动拉到本地。 <b>日常最常用</b>，一天要做很多次。<em>更新永远只在当前这条线内部走，不会把你带到别的分支去。</em></td>
+    </tr>
+    <tr>
+      <td><strong>Update to revision...</strong><br><span class="tagmini p">同一地址，停在旧版本</span></td>
+      <td><strong>版本号</strong>，但可以指定一个<b>历史版本</b></td>
+      <td>「我想看看这个文件上个月是什么样」。 之后工作副本会停在那个旧版本上，提交前通常要再更新回最新。<em>一般用来看旧代码、定位问题是哪次改动引入的。</em></td>
+    </tr>
+    <tr>
+      <td><strong>Switch...</strong><br><span class="tagmini y">换地址，跨分支</span></td>
+      <td><strong>URL 指向</strong>：工作副本改跟另一条线</td>
+      <td>从主干切到分支、从一个分支切到另一个分支、功能做完切回主干。 <b>这是本节讲的操作</b>，用得不频繁，但每次都要慎重。</td>
+    </tr>
+  </tbody>
+  </table>
+  </div>
+  <p> <strong>一句好记的话</strong>：<em>Update 是「同一条线往前走走」； Update to revision 是「同一条线往回看看」； Switch 是「换一条线走」。</em>
+  </p>
+  <p> <strong>为什么容易搞混</strong>：三个操作都会弹出进度框、都会替换本地文件，看起来差不多。 但搞错后果差别很大——<b>Update 用错顶多内容不对，重更一次就好； Switch 用错可能把提交送到错误的线上。</b>
+  </p>
+</div>
+
+<div class="box warn">
+  <span class="bt">切换之后，别忘了这几件事</span>
+  <ul>
+    <li><strong>先更新一次。</strong>切换只是把你的工作副本换成目标分支的<b>大致状态</b>， 切完顺手 <span class="mp">SVN Update</span> 一下，确保拿到的是最新内容。</li>
+    <li><strong>重新编译一次。</strong>切换过来的代码可能和之前差别很大， 旧的编译产物是过期的，<b>不重新编译就跑，看到的可能是假象</b>。</li>
+    <li><strong>IDE 可能需要刷新。</strong>项目文件都还在老位置，但内容变了； 有些 IDE 需要手动让它重新加载一下才能反映变化。</li>
+    <li><strong>清理掉未受控的临时文件。</strong>那些「不在版本库里、SVN 管不着」的文件（编译输出、日志、临时目录） 不会被切换过程处理，它们还是上一份工作的残留。<em>感觉不对劲时，先清一遍再编译。</em></li>
+  </ul>
+</div>
+
+
+<div class="pager">
+  <a href="12-branch.html"><span class="lbl">← 上一节</span><span class="ttl">12. 建分支：开一条独立开发线</span></a>
+  <a class="home" href="index.html"><span class="ttl">总目录</span></a>
+  <a class="next" href="14-merge.html"><span class="lbl">下一节 →</span><span class="ttl">14. 合并分支：把改动并回主干</span></a>
+</div>
+
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+<script src="assets/app.js"></script>
+</body>
+</html>

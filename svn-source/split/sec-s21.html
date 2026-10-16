@@ -1,0 +1,357 @@
+<h3 class="sec" id="s21"><span class="no">21</span>备份、恢复与仓库维护</h3>
+
+<p class="lead">
+  版本库是团队的<strong>全部历史资产</strong>。备份没做好，一次磁盘故障就能让几个月的工作归零。
+  SVN 提供了三种备份方式，各有适用场景——<strong>用错方式比不备份更危险</strong>。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 21-1　三种备份方式的差异与选型</span><span class="fs">Backup</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 470" width="980" height="470" role="img" aria-label="SVN 三种备份方式对比图">
+  <!-- 方式 1 -->
+  <rect x="24" y="30" width="300" height="200" rx="11" fill="rgba(126,231,135,.07)" stroke="#7ee787" stroke-width="1.5"/>
+  <text class="hd" x="44" y="56" fill="#7ee787">① hotcopy　物理热备</text>
+  <text class="tm" x="44" y="82" fill="#7ee787">svnadmin hotcopy /var/svn/repo \</text>
+  <text class="tm" x="44" y="102" fill="#7ee787">                 /backup/repo-$(date +%F)</text>
+
+  <line x1="44" y1="118" x2="304" y2="118" stroke="#30363d" stroke-width="1"/>
+
+  <text class="ts" x="44" y="142">✓ 速度最快（直接复制文件）</text>
+  <text class="ts" x="44" y="162">✓ 备份完整（含钩子、配置、锁）</text>
+  <text class="ts" x="44" y="182">✓ 可在线执行，不影响使用</text>
+  <text class="ts" x="44" y="202" fill="#ffa657">✗ 只能恢复到同版本 SVN（格式绑定）</text>
+  <text class="ts" x="44" y="222" fill="#ffa657">✗ 占用空间大（不压缩、不增量）</text>
+
+  <!-- 方式 2 -->
+  <rect x="340" y="30" width="300" height="200" rx="11" fill="rgba(88,166,255,.07)" stroke="#58a6ff" stroke-width="1.5"/>
+  <text class="hd" x="360" y="56" fill="#58a6ff">② dump/load　逻辑备份 ★推荐</text>
+  <text class="tm" x="360" y="82" fill="#58a6ff">svnadmin dump repo --file r.dump</text>
+  <text class="tm" x="360" y="102" fill="#58a6ff">svnadmin dump repo -r 1:100 \</text>
+  <text class="tm" x="360" y="122" fill="#58a6ff">  --incremental --file inc.dump</text>
+
+  <line x1="360" y1="138" x2="620" y2="138" stroke="#30363d" stroke-width="1"/>
+
+  <text class="ts" x="360" y="162">✓ 跨版本兼容（1.6 的库能还原到 1.14）</text>
+  <text class="ts" x="360" y="182">✓ 可压缩、可增量备份</text>
+  <text class="ts" x="360" y="202">✓ 可过滤（挑版本、去掉大文件）</text>
+  <text class="ts" x="360" y="222" fill="#ffa657">✗ 仓库大时耗时长，占 CPU</text>
+
+  <!-- 方式 3 -->
+  <rect x="656" y="30" width="300" height="200" rx="11" fill="rgba(210,168,255,.07)" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text class="hd" x="676" y="56" fill="#d2a8ff">③ svnrdump　远程 dump</text>
+  <text class="tm" x="676" y="82" fill="#d2a8ff">svnrdump dump https://svn/repo \</text>
+  <text class="tm" x="676" y="102" fill="#d2a8ff">  -r 1:HEAD --file remote.dump</text>
+
+  <line x1="676" y1="118" x2="936" y2="118" stroke="#30363d" stroke-width="1"/>
+
+  <text class="ts" x="676" y="142">✓ 无需登录服务器即可备份</text>
+  <text class="ts" x="676" y="162">✓ 适合托管仓库的异地备份</text>
+  <text class="ts" x="676" y="182">✓ 输出格式与 svnadmin dump 一致</text>
+  <text class="ts" x="676" y="202" fill="#ffa657">✗ 需要网络，大仓库慢</text>
+  <text class="ts" x="676" y="222" fill="#ffa657">✗ 需要认证凭据</text>
+
+  <!-- dump 文件格式 -->
+  <text class="hd" x="30" y="266" fill="#e3b341">dump 文件长什么样（纯文本，可读可编辑）</text>
+  <rect x="24" y="280" width="932" height="176" rx="10" fill="#0b0f14" stroke="#30363d" stroke-width="1.3"/>
+  <text class="tm2" x="44" y="304" fill="#7ee787">SVN-fs-dump-format-version: 2</text>
+  <text class="tm2" x="44" y="324"></text>
+  <text class="tm2" x="44" y="344" fill="#d2a8ff">UUID: 021a334f-9907-c84d-81c4-e10db7ecd948</text>
+  <text class="tm2" x="44" y="364"></text>
+  <text class="tm2" x="44" y="384" fill="#58a6ff">Revision-number: 1</text>
+  <text class="tm2" x="44" y="404">Prop-content-length: 133</text>
+  <text class="tm2" x="44" y="424">K 10</text>
+  <text class="tm2" x="64" y="442">svn:author</text>
+
+  <text class="ts" x="420" y="304" fill="#e3b341">格式说明：</text>
+  <text class="ts" x="420" y="328">• 头部声明格式版本和 UUID</text>
+  <text class="ts" x="420" y="352">• 每个版本以 Revision-number 开头</text>
+  <text class="ts" x="420" y="376">• K = key 长度 + 键名，V = value 长度 + 值</text>
+  <text class="ts" x="420" y="400">• 纯 ASCII 编码，理论上可以手改</text>
+  <text class="ts" x="420" y="424" fill="#7ee787">• 这正是「跨版本兼容」的原因：与底层存储格式解耦</text>
+</svg>
+  </div>
+</div>
+
+<div class="box err">
+  <span class="bt">最危险的错误：用 cp / 复制粘贴「备份」正在使用的仓库</span>
+  <p>直接 <code class="ic">cp -r /var/svn/repo /backup/</code> 或复制文件夹，
+  在仓库正被访问时可能<strong>复制到不一致的中间状态</strong>——
+  <code class="ic">db/</code> 里的 rev 文件和 <code class="ic">db/current</code> 对不上，
+  恢复后仓库无法使用，修复代价极高。</p>
+  <p><strong>唯一安全的手工复制方式是停服务后复制，或者用 <code class="ic">svnadmin hotcopy</code></strong>
+  （它会正确处理并发访问）。</p>
+</div>
+
+<h4 class="sub">方式一：hotcopy 完整热备</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">hotcopy 用法与自动备份脚本</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ---- 基础用法 ----</span>
+svnadmin hotcopy /var/svn/repo /backup/svn-repo-20261008
+
+<span class="c"># ---- 如果目标已存在（重复备份同一个位置）----</span>
+svnadmin hotcopy /var/svn/repo /backup/repo --clean-logs
+
+<span class="c"># ---- 自动备份脚本 ----</span>
+cat &gt; /usr/local/bin/svn-backup.sh &lt;&lt;<span class="s">'EOF'</span>
+#!/bin/bash
+set -euo pipefail
+
+SVN_ROOT=<span class="s">"/var/svn"</span>
+BACKUP_ROOT=<span class="s">"/backup/svn"</span>
+KEEP_DAYS=30
+DATE=$(date +%Y%m%d-%H%M%S)
+
+mkdir -p "$BACKUP_ROOT"
+
+for repo in "$SVN_ROOT"/*/; do
+  name=$(basename "$repo")
+  # 跳过非仓库目录
+  [ -f "$repo/format" ] || continue
+
+  dest="$BACKUP_ROOT/${name}-${DATE}"
+  echo "[$(date -Iseconds)] backing up $name -> $dest"
+
+  # hotcopy 热备
+  svnadmin hotcopy "$repo" "$dest" --clean-logs
+
+  # 打包压缩省空间
+  tar czf "${dest}.tar.gz" -C "$BACKUP_ROOT" "$(basename "$dest")"
+  rm -rf "$dest"
+
+  echo "[$(date -Iseconds)] done: ${dest}.tar.gz ($(du -h "${dest}.tar.gz" | cut -f1))"
+done
+
+# 清理过期备份
+find "$BACKUP_ROOT" -name "*.tar.gz" -mtime +${KEEP_DAYS} -delete
+echo "[$(date -Iseconds)] cleanup: removed backups older than ${KEEP_DAYS} days"
+EOF
+
+chmod +x /usr/local/bin/svn-backup.sh
+
+<span class="c"># ---- 加到 crontab，每天凌晨 2 点执行 ----</span>
+( crontab -l 2&gt;/dev/null; echo <span class="s">"0 2 * * * /usr/local/bin/svn-backup.sh >> /var/log/svn-backup.log 2>&1"</span> ) | crontab -</pre>
+</div>
+
+<h4 class="sub">方式二：dump / load 逻辑备份（推荐）</h4>
+
+<div class="box err">
+  <span class="bt">实测踩坑：PowerShell 重定向会生成 UTF-16 文件导致 dump 损坏</span>
+  <p>在 PowerShell 里执行 <code class="ic">svnadmin dump repo &gt; backup.dump</code>，
+  PowerShell 会用 <strong>UTF-16 LE</strong> 编码写文件，文件头变成 <code class="ic">FF FE FF FE 53 00...</code>（BOM + 宽字符），
+  结果 load 时报错：<code class="ic">svnadmin: E140001: Malformed dumpfile header</code>。</p>
+  <p><strong>正确做法（任选其一）：</strong></p>
+  <ul>
+    <li>用 svnadmin 内置参数：<code class="ic">svnadmin dump repo --file backup.dump</code>　<strong>← 推荐，跨平台一致</strong></li>
+    <li>用 cmd 的输入输出重定向：<code class="ic">cmd /c "svnadmin dump repo &gt; backup.dump"</code></li>
+    <li>改用 Git Bash / WSL</li>
+  </ul>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：正确的 dump 与文件头核对</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># ✗ 错误：PowerShell 的 > 重定向（会写成 UTF-16）</span>
+<span class="ps">$</span> <span class="cmd">svnadmin dump E:\repo -r 1:3 --incremental &gt; E:\inc.dump</span>
+<span class="ps">$</span> <span class="cmd">cmd /c "svnadmin load E:\repo-restored &lt; E:\inc.dump"</span>
+<span class="no">svnadmin: E140001: Malformed dumpfile header '?\FF?\FES'</span>
+<span class="no">↑ 文件头是 FF FE（UTF-16 BOM），SVN 解析不了</span>
+
+<span class="cmt"># ✓ 正确：用 --file 参数</span>
+<span class="ps">$</span> <span class="cmd">svnadmin dump E:\repo -r 1:3 --incremental --file E:\inc.dump</span>
+* Dumped revision 1.
+* Dumped revision 2.
+* Dumped revision 3.
+
+<span class="cmt"># 核对文件头（应该是 ASCII，不是 FF FE）</span>
+<span class="ps">$</span> <span class="cmd">$bytes = [System.IO.File]::ReadAllBytes("E:\inc.dump")[0..7]</span>
+<span class="ps">$</span> <span class="cmd">($bytes | % { $_.ToString('X2') }) -join ' '</span>
+<span class="ok">53 56 4E 2D 66 73 2D 64</span>
+<span class="cmt">↑ 53 56 4E 2D = "SVN-" 的 ASCII 编码，正确！</span>
+
+<span class="cmt"># 恢复到全新仓库</span>
+<span class="ps">$</span> <span class="cmd">svnadmin create E:\repo-restored</span>
+<span class="ps">$</span> <span class="cmd">cmd /c "svnadmin load E:\repo-restored &lt; E:\inc.dump"</span>
+------- Committed revision 1 &gt;&gt;&gt;
+------- Committed revision 2 &gt;&gt;&gt;
+------- Committed revision 3 &gt;&gt;&gt;
+
+<span class="cmt"># 验证恢复结果</span>
+<span class="ps">$</span> <span class="cmd">svn list -R file:///E:/repo-restored</span>
+branches/
+tags/
+trunk/
+trunk/README.md
+trunk/src/
+trunk/src/main.cs
+<span class="cmt">↑ 文件结构完整恢复</span></pre>
+  </div>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">dump / load 完整操作集</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ============ 全量备份 ============</span>
+svnadmin dump /var/svn/repo --file /backup/full.dump
+svnadmin dump /var/svn/repo --file /backup/full.dump --deltas   <span class="c"># 更小但恢复慢</span>
+
+<span class="c"># ============ 增量备份（推荐策略）============</span>
+<span class="c"># 第一次全量</span>
+svnadmin dump /var/svn/repo -r 1:1000 --incremental --file /backup/inc-0001-1000.dump
+
+<span class="c"># 之后每次只备份新增部分（假设上次到 r1000）</span>
+svnadmin dump /var/svn/repo -r 1001:HEAD --incremental --file /backup/inc-1001-$(svnlook youngest /var/svn/repo).dump
+
+<span class="c"># ============ 恢复：全量 ============</span>
+svnadmin create /var/svn/repo-new
+svnadmin load /var/svn/repo-new --file /backup/full.dump
+
+<span class="c"># ============ 恢复：全量 + 多个增量（必须按顺序！）============</span>
+svnadmin create /var/svn/repo-new
+svnadmin load /var/svn/repo-new --file /backup/full.dump
+for f in /backup/inc-*.dump; do
+  echo "loading $f"
+  svnadmin load /var/svn/repo-new --file "$f"
+done
+
+<span class="c"># ============ 恢复到指定版本 ============</span>
+svnadmin load /var/svn/repo-new --file /backup/full.dump \
+  --revision 500:1000        <span class="c"># 只加载 r500-r1000</span>
+
+<span class="c"># ============ 过滤历史（去掉敏感文件）============</span>
+svnadmin dump /var/svn/repo --file /backup/filtered.dump
+<span class="c"># 用 svndumpfilter 去掉某个目录的全部历史</span>
+svndumpfilter exclude /trunk/secret &lt; /backup/full.dump &gt; /backup/no-secret.dump
+svndumpfilter include /trunk/src &lt; /backup/full.dump &gt; /backup/only-src.dump
+
+<span class="c"># ============ 远程备份（无需登录服务器）============</span>
+svnrdump dump https://svn.example.com/repo --file /backup/remote.dump \
+  --username backup-bot --password "$SVN_PASS"
+svnrdump dump https://svn.example.com/repo -r 1001:HEAD --incremental \
+  --file /backup/remote-inc.dump
+
+<span class="c"># ============ 恢复时保留或改变 UUID ============</span>
+svnadmin load /var/svn/repo-new --file full.dump              <span class="c"># 默认保留原 UUID</span>
+svnadmin load /var/svn/repo-new --file full.dump --ignore-uuid  <span class="c"># 生成新 UUID</span>
+svnadmin setuuid /var/svn/repo-new &lt;新uuid&gt;                    <span class="c"># 事后改</span></pre>
+</div>
+
+<div class="box tip">
+  <span class="bt">备份策略建议（3-2-1 原则）</span>
+  <div class="tw" style="margin-top:10px">
+  <table>
+  <thead><tr><th>层次</th><th>做法</th><th>频率</th><th>保留</th></tr></thead>
+  <tbody>
+    <tr><td><strong>本地热备</strong></td><td><code class="ic">hotcopy</code> 到另一块磁盘</td><td>每天</td><td>7 天</td></tr>
+    <tr><td><strong>逻辑备份</strong></td><td><code class="ic">dump --incremental</code> 压缩后存储</td><td>每天增量 + 每周全量</td><td>30 天</td></tr>
+    <tr><td><strong>异地备份</strong></td><td>备份文件同步到异地/云存储</td><td>每周</td><td>1 年</td></tr>
+  </tbody>
+  </table>
+  </div>
+  <p style="margin-top:12px"><strong>最重要的规则：备份必须做恢复演练。</strong>
+  没验证过能恢复的备份，等于没有备份。建议每季度做一次完整的恢复演练，
+  记录耗时，确认 RTO（恢复时间目标）能满足业务要求。</p>
+</div>
+
+<h4 class="sub">仓库维护与健康检查</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">svnadmin 维护命令</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ---- 完整性与健康检查（定期跑，能提前发现磁盘问题）----</span>
+svnadmin verify /var/svn/repo
+<span class="c"># 输出：* Verified revision 1.  * Verified revision 2.  ...</span>
+
+<span class="c"># 检查指定范围（大仓库全量太久时）</span>
+svnadmin verify /var/svn/repo -r 1000:HEAD
+
+<span class="c"># ---- 查看仓库信息 ----</span>
+svnadmin info /var/svn/repo
+<span class="c"># Path / UUID / Revisions / Repository Format</span>
+<span class="c"># Compatible With Version / Filesystem Type / FSFS Sharded</span>
+
+<span class="c"># ---- 查看某个版本占用的磁盘空间（找大版本）----</span>
+svnadmin rev-size /var/svn/repo -r 520
+<span class="c"># 输出形如：   1542 bytes in revision 520</span>
+<span class="c"># 注意：-r 只接受【单个版本号】，不支持 1:HEAD 这样的区间</span>
+
+<span class="c"># 想扫描全部版本就得自己循环（配合 youngest 取最新版本号）</span>
+LAST=$(svnlook youngest /var/svn/repo)
+for r in $(seq 1 $LAST); do
+  printf "r%-6s %s\n" "$r" "$(svnadmin rev-size /var/svn/repo -r $r)"
+done | sort -t' ' -k3 -rn | head -10
+<span class="c"># 上面这段会列出占用空间最大的 10 个版本</span>
+
+<span class="c"># ---- 修改提交日志（需要 pre-revprop-change 钩子配合）----</span>
+svnadmin setlog /var/svn/repo -r 520 /path/to/newlog.txt
+<span class="c"># 位置参数是【文件】，不是 -m 消息；想绕过钩子检查加 --bypass-hooks</span>
+svnadmin setlog --bypass-hooks /var/svn/repo -r 520 /path/to/newlog.txt
+
+<span class="c"># ---- 整理仓库：删除无用数据、合并 rev 文件（大仓库定期做）----</span>
+svnadmin pack /var/svn/repo
+<span class="c"># FSFS 会把多个小版本合并成一个大文件，减少文件数</span>
+
+<span class="c"># ---- 冻结仓库（打包迁移用，冻结期间不可写）----</span>
+svnadmin freeze /var/svn/repo -- tar czf /backup/frozen.tar.gz
+svnadmin freeze /var/svn/repo -- rsync -av /var/svn/repo/ /backup/repo/
+
+<span class="c"># ---- 查看未完成的事务（钩子崩溃后可能残留）----</span>
+svnadmin lstxns /var/svn/repo
+svnadmin rmtxns /var/svn/repo <span class="s">"1-abc"</span>          <span class="c"># 清理单个</span>
+svnadmin rmtxns /var/svn/repo $(svnadmin lstxns /var/svn/repo)  <span class="c"># 清理全部（小心！）</span>
+
+<span class="c"># ---- 灾难恢复：仓库损坏后尝试修复 ----</span>
+svnadmin recover /var/svn/repo
+<span class="c"># 注意：recover 需要排他访问，建议先停服务</span>
+
+<span class="c"># ---- 升级仓库格式（换成新版 SVN 后）----</span>
+svnadmin upgrade /var/svn/repo
+
+<span class="c"># ---- 查看 revision 属性的历史变更 ----</span>
+svnadmin dump-revprops /var/svn/repo --file revprops.dump
+svnadmin list-dblogs /var/svn/repo        <span class="c"># 列出 Berkeley DB 日志（仅 bdb）</span>
+svnadmin list-unused-dblogs /var/svn/repo <span class="c"># 可安全删除的日志</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：verify、info、hotcopy</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 完整性校验</span>
+<span class="ps">$</span> <span class="cmd">svnadmin verify E:\repo</span>
+* Verified revision 8.
+* Verified revision 9.
+* Verified revision 10.
+* Verified revision 11.
+* Verified revision 12.
+<span class="cmt">（逐版本校验，全部通过则退出码 0）</span>
+
+<span class="cmt"># 仓库元信息</span>
+<span class="ps">$</span> <span class="cmd">svnadmin info E:\repo</span>
+Path: E:\repo
+UUID: <span class="cy">021a334f-9907-c84d-81c4-e10db7ecd948</span>   <span class="cmt">← 仓库唯一标识</span>
+Revisions: <span class="hl">21</span>
+Repository Format: 5
+Compatible With Version: 1.10.0
+Repository Capability: mergeinfo
+Filesystem Type: <span class="cy">fsfs</span>                        <span class="cmt">← 文件系统类型</span>
+Filesystem Format: 8
+FSFS Sharded: yes
+FSFS Shard Size: 1000
+
+<span class="cmt"># 热备</span>
+<span class="ps">$</span> <span class="cmd">svnadmin hotcopy E:\repo E:\repo-backup</span>
+* Copied revision 0.
+* Copied revision 1.
+...
+* Copied revision 12.
+
+<span class="cmt"># 验证备份可读</span>
+<span class="ps">$</span> <span class="cmd">svn info --show-item repos-uuid file:///E:/repo-backup</span>
+021a334f-9907-c84d-81c4-e10db7ecd948   <span class="cmt">← UUID 与原库一致，备份有效</span></pre>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     第 22 节：高级技巧
+     ========================================================================== -->

@@ -1,0 +1,214 @@
+<h3 class="sec" id="s1"><span class="no">1</span>SVN 是什么</h3>
+
+<p class="lead">
+  SVN（Subversion）是一个<strong>集中式版本控制系统</strong>。一句话概括它的作用：
+  把文件的每一次修改都记成一条不可篡改的历史，让多人协作时不互相覆盖、随时能回到过去。
+</p>
+
+<p>它要解决的核心问题只有三个，但每个都很要命：</p>
+
+<div class="grid3">
+  <div class="card blue">
+    <h6>① 覆盖问题</h6>
+    <p>两个人同时改同一个文件，后保存的把先保存的<strong>整个覆盖掉</strong>。SVN 通过「先更新再提交」的机制拦住这种情况。</p>
+  </div>
+  <div class="card pur">
+    <h6>② 回退问题</h6>
+    <p>改了三天发现方向全错，想退回上周五的状态。没有版本控制就只能靠手抄备份。</p>
+  </div>
+  <div class="card green">
+    <h6>③ 追责问题</h6>
+    <p>这行代码是谁写的、为什么这么写、当时跟着什么需求一起改的——<code class="ic">svn blame</code> 一行行告诉你。</p>
+  </div>
+</div>
+
+<h4 class="sub" id="s1-2">集中式的本质：一个中央仓库</h4>
+
+<p>
+  「集中式」这三个字是整个 SVN 设计的地基，理解了它就理解了 SVN 一半的行为。
+  它意味着：<strong>所有历史只存在一个地方</strong>——服务器上的那个仓库（Repository）。
+  每个开发者的电脑上只有一份「工作副本」（Working Copy），是某次快照的解压结果，<em>不含完整历史</em>。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 1-1　集中式 vs 分布式：历史存在哪里</span><span class="fs">Architecture</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 430" width="980" height="430" role="img" aria-label="集中式与分布式版本控制架构对比图">
+  <!-- 左面板 -->
+  <text class="tt" x="24" y="28">集中式（SVN）</text>
+  <text class="ts" x="24" y="49">历史唯一存在服务器；客户端只有工作副本</text>
+
+  <!-- 中央仓库 -->
+  <rect class="n-pur" x="140" y="76" width="190" height="76" rx="11"/>
+  <text class="hd" x="235" y="103" text-anchor="middle">中央仓库 Repository</text>
+  <text class="ts" x="235" y="123" text-anchor="middle">唯一权威 · 完整历史 · 全部版本号</text>
+  <text class="tm2" x="235" y="140" text-anchor="middle">svn://192.168.1.10/repo</text>
+
+  <!-- 客户端 -->
+  <rect class="c-gray" x="26" y="262" width="128" height="66" rx="9"/>
+  <text class="tx" x="90" y="287" text-anchor="middle">开发者 A</text>
+  <text class="ts" x="90" y="307" text-anchor="middle">工作副本（局部）</text>
+
+  <rect class="c-gray" x="176" y="262" width="128" height="66" rx="9"/>
+  <text class="tx" x="240" y="287" text-anchor="middle">开发者 B</text>
+  <text class="ts" x="240" y="307" text-anchor="middle">工作副本（局部）</text>
+
+  <rect class="c-gray" x="326" y="262" width="128" height="66" rx="9"/>
+  <text class="tx" x="390" y="287" text-anchor="middle">开发者 C</text>
+  <text class="ts" x="390" y="307" text-anchor="middle">工作副本（局部）</text>
+
+  <!-- 连线 -->
+  <path class="arwp" d="M92,262 L186,154"/>
+  <path class="arwp" d="M240,262 L240,154"/>
+  <path class="arwp" d="M388,262 L288,154"/>
+
+  <text class="tm2" x="252" y="200">svn update / commit</text>
+  <text class="ts" x="252" y="232">每次操作都要联网</text>
+
+  <!-- 断网提示 -->
+  <rect class="n-red" x="26" y="348" width="428" height="58" rx="9" stroke-dasharray="5 4"/>
+  <text class="hd" x="44" y="371" fill="#ff7b72">断网时：能改、能 diff，但无法提交、无法查历史</text>
+  <text class="ts" x="44" y="393">工作副本里只有 .svn 元数据，没有历史版本可回溯</text>
+
+  <!-- 分隔线 -->
+  <line x1="490" y1="16" x2="490" y2="410" stroke="#30363d" stroke-width="1.5" stroke-dasharray="6 5"/>
+
+  <!-- 右面板 -->
+  <text class="tt" x="516" y="28">分布式（Git / Mercurial）</text>
+  <text class="ts" x="516" y="49">每个人都有一份完整仓库，含全部历史</text>
+
+  <rect class="n-green" x="530" y="96" width="150" height="92" rx="11"/>
+  <text class="hd" x="605" y="122" text-anchor="middle">开发者 A</text>
+  <text class="ts" x="605" y="142" text-anchor="middle">完整仓库</text>
+  <text class="tm2" x="605" y="162" text-anchor="middle">含全部历史</text>
+
+  <rect class="n-green" x="716" y="96" width="150" height="92" rx="11"/>
+  <text class="hd" x="791" y="122" text-anchor="middle">开发者 B</text>
+  <text class="ts" x="791" y="142" text-anchor="middle">完整仓库</text>
+  <text class="tm2" x="791" y="162" text-anchor="middle">含全部历史</text>
+
+  <rect class="n-green" x="623" y="248" width="150" height="92" rx="11"/>
+  <text class="hd" x="698" y="274" text-anchor="middle">中央裸库（可选）</text>
+  <text class="ts" x="698" y="294" text-anchor="middle">仅作为交换点</text>
+  <text class="tm2" x="698" y="314" text-anchor="middle">非权威</text>
+
+  <!-- 双向箭头 -->
+  <path class="arwg" d="M680,134 L716,134"/>
+  <path class="arwg" d="M716,146 L680,146"/>
+  <path class="arwg" d="M791,188 L760,248"/>
+  <path class="arwg" d="M742,246 L686,190"/>
+
+  <text class="ts" x="530" y="378">离线也能提交、查历史、切分支</text>
+  <text class="ts" x="530" y="400">代价：概念多、学习曲线陡、大仓克隆慢</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>看图要点：</b>左边 SVN 的所有箭头都指向<strong>同一个中心</strong>——没有网络就没有版本历史可言。
+    右边每个节点自己就是一份完整仓库，节点之间是<strong>对等</strong>关系。
+    这张图解释了 SVN 的绝大部分「行为特性」：为什么提交要联网、为什么 <code class="ic">.svn</code> 目录不大、为什么分支那么轻量（服务端只记一条路径映射）。
+  </div>
+</div>
+
+<div class="box key">
+  <span class="bt">一个必须扭转的直觉</span>
+  <p>很多人以为 SVN 的分支是「复制一份代码」——<strong>恰恰相反</strong>。
+  在 SVN 里创建分支是<em>服务端一瞬间的元数据操作</em>，0 字节数据被复制。
+  第 11 节会用一张图彻底讲清楚这个「廉价复制」机制，这也是 SVN 分支比 Git 更「轻」的地方。</p>
+</div>
+
+<h4 class="sub" id="s1-3">SVN 与 Git 对照：该选谁</h4>
+
+<p>这是绕不开的一问。结论先给：<strong>SVN 没有死，它在特定场景下依然是最优解。</strong></p>
+
+<div class="tw">
+<table>
+<thead>
+  <tr><th>对比项</th><th>SVN（集中式）</th><th>Git（分布式）</th></tr>
+</thead>
+<tbody>
+  <tr>
+    <td>历史存放</td>
+    <td>只在服务器</td>
+    <td>每人一份完整副本</td>
+  </tr>
+  <tr>
+    <td>提交是否需联网</td>
+    <td><span class="tagmini r">需要</span> 每次 commit 都走网络</td>
+    <td><span class="tagmini g">不需要</span> 本地 commit，push 才联网</td>
+  </tr>
+  <tr>
+    <td>版本号</td>
+    <td><strong>全局递增整数</strong>（r1, r2, r3…）——好沟通</td>
+    <td>每对象一个 SHA-1 哈希——精确但难口述</td>
+  </tr>
+  <tr>
+    <td>分支成本</td>
+    <td>服务端几乎零成本；<strong>但切换要联网</strong></td>
+    <td>本地瞬时切换</td>
+  </tr>
+  <tr>
+    <td>权限粒度</td>
+    <td><span class="tagmini g">极细</span> 可精确到<strong>目录级读/写</strong></td>
+    <td>通常只能到仓库级</td>
+  </tr>
+  <tr>
+    <td>大文件 / 二进制</td>
+    <td><span class="tagmini g">友好</span> 支持 <code class="ic">svn lock</code> 独占锁</td>
+    <td>弱，需 LFS 外挂</td>
+  </tr>
+  <tr>
+    <td>部分检出</td>
+    <td><span class="tagmini g">原生支持</span> <code class="ic">--depth</code> 稀疏检出</td>
+    <td>需 sparse-checkout，较繁琐</td>
+  </tr>
+  <tr>
+    <td>学习曲线</td>
+    <td><span class="tagmini g">平缓</span> 约 15 个命令覆盖 95% 场景</td>
+    <td>陡峭，需理解暂存区、引用、rebase</td>
+  </tr>
+  <tr>
+    <td>目录结构</td>
+    <td><strong>约定俗成</strong> trunk/branches/tags，靠人遵守</td>
+    <td>内置分支模型</td>
+  </tr>
+  <tr>
+    <td>典型用户</td>
+    <td>企业内网、游戏美术、嵌入式、<br>需要精细权限的团队</td>
+    <td>开源社区、互联网研发</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="grid2">
+  <div class="card good">
+    <h6>选 SVN 的场景</h6>
+    <ul>
+      <li>项目里<strong>大量二进制资源</strong>（美术图、模型、音效）——Git 仓库会被撑爆</li>
+      <li>需要<strong>目录级权限隔离</strong>，比如外包只能看 <code class="ic">/trunk/art</code></li>
+      <li>团队成员<strong>非技术人员多</strong>，需要简单直白的模型</li>
+      <li>公司<strong>内网隔离</strong>，不希望完整代码库散落在每台电脑上</li>
+      <li>需要「版本号」这种<strong>人类可读</strong>的沟通语言（"你回退到 r1523 试试"）</li>
+    </ul>
+  </div>
+  <div class="card blue">
+    <h6>选 Git 的场景</h6>
+    <ul>
+      <li>以<strong>文本代码</strong>为主，需要高频分支、频繁试验</li>
+      <li>需要<strong>离线开发</strong>，或网络不稳定</li>
+      <li>依赖 <strong>PR / Code Review</strong> 工作流</li>
+      <li>参与<strong>开源协作</strong>，需要 fork + pull request</li>
+      <li>大量历史清理需求（rebase、squash、Cherry-pick）</li>
+    </ul>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">现实中两者常共存</span>
+  <p>很多游戏团队的做法是：<strong>美术资源用 SVN，程序代码用 Git</strong>，两边通过一个脚本同步。
+  这不是妥协，而是让每个工具做它最擅长的事。</p>
+</div>
+
+<!-- ==========================================================================
+     第 2 节：三层架构
+     ========================================================================== -->

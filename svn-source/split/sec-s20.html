@@ -1,0 +1,531 @@
+<h3 class="sec" id="s20"><span class="no">20</span>钩子脚本：让 SVN 按你的规矩办事</h3>
+
+<p class="lead">
+  钩子（Hook）是服务端在特定操作前后<strong>自动执行的脚本</strong>。
+  提交日志格式检查、自动发通知、触发 CI、防止误删——都靠它。
+  这是把 SVN 从「能用」变成「好用」的关键一步。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 20-1　九个钩子的触发时机</span><span class="fs">Hooks Timeline</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 460" width="980" height="460" role="img" aria-label="SVN 九个钩子触发时机图">
+  <!-- 时间段 -->
+  <text class="hd" x="30" y="26" fill="#8b949e">提交（commit）流程</text>
+
+  <!-- 时间轴 -->
+  <line x1="60" y1="70" x2="920" y2="70" stroke="#3d444d" stroke-width="2"/>
+
+  <!-- 阶段 -->
+  <rect class="n-blue" x="80" y="100" width="180" height="60" rx="9"/>
+  <text class="tx" x="170" y="126" text-anchor="middle">客户端发起提交</text>
+  <text class="ts" x="170" y="146" text-anchor="middle">传输文件数据</text>
+
+  <rect class="n-yellow" x="300" y="100" width="180" height="60" rx="9"/>
+  <text class="tx" x="390" y="126" text-anchor="middle">服务器创建事务</text>
+  <text class="ts" x="390" y="146" text-anchor="middle">（临时 tx）</text>
+
+  <rect class="n-red" x="520" y="100" width="180" height="60" rx="9"/>
+  <text class="tx" x="610" y="126" text-anchor="middle">校验事务</text>
+  <text class="ts" x="610" y="146" text-anchor="middle">日志/权限/格式</text>
+
+  <rect class="n-green" x="740" y="100" width="180" height="60" rx="9"/>
+  <text class="tx" x="830" y="126" text-anchor="middle">写入版本库</text>
+  <text class="ts" x="830" y="146" text-anchor="middle">生成新版本号</text>
+
+  <!-- 箭头 -->
+  <path class="arwb" d="M260,130 L300,130"/>
+  <path class="arwy" d="M480,130 L520,130"/>
+  <path class="arwr" d="M700,130 L740,130"/>
+
+  <!-- 钩子标注 -->
+  <path class="dash" d="M170,100 L170,76"/>
+  <circle cx="170" cy="70" r="6" fill="#58a6ff"/>
+  <text class="tm2" x="134" y="56" fill="#58a6ff">start-commit</text>
+
+  <path class="dash" d="M610,100 L610,76"/>
+  <circle cx="610" cy="70" r="6" fill="#ff7b72"/>
+  <text class="tm2" x="576" y="56" fill="#ff7b72">pre-commit</text>
+
+  <path class="dash" d="M830,100 L830,76"/>
+  <circle cx="830" cy="70" r="6" fill="#7ee787"/>
+  <text class="tm2" x="790" y="56" fill="#7ee787">post-commit</text>
+
+  <!-- 说明 -->
+  <rect x="80" y="176" width="400" height="100" rx="10" fill="rgba(88,166,255,.07)" stroke="#58a6ff" stroke-width="1.3"/>
+  <text class="hd" x="100" y="200" fill="#58a6ff">start-commit</text>
+  <text class="ts" x="100" y="222">在提交开始前触发，此时还不知道改了哪些文件。</text>
+  <text class="ts" x="100" y="242">参数：仓库路径，用户名</text>
+  <text class="ts" x="100" y="262">用途：拉黑某个用户、限制提交时段（如禁止周五上线）</text>
+
+  <rect x="500" y="176" width="420" height="100" rx="10" fill="rgba(255,123,114,.07)" stroke="#ff7b72" stroke-width="1.3"/>
+  <text class="hd" x="520" y="200" fill="#ff7b72">pre-commit　★ 最重要</text>
+  <text class="ts" x="520" y="222">提交被写入版本库之前的最后一道关卡。</text>
+  <text class="ts" x="520" y="242">参数：仓库路径，事务名（tx）</text>
+  <text class="ts" x="520" y="262" fill="#7ee787">返回非 0 → 提交被拒绝，错误信息回显给客户端</text>
+
+  <!-- 锁流程 -->
+  <text class="hd" x="30" y="308" fill="#8b949e">锁（lock）流程</text>
+  <line x1="60" y1="340" x2="920" y2="340" stroke="#3d444d" stroke-width="2"/>
+
+  <circle cx="200" cy="340" r="6" fill="#ffa657"/>
+  <text class="tm2" x="150" y="326" fill="#ffa657">pre-lock</text>
+  <circle cx="400" cy="340" r="6" fill="#7ee787"/>
+  <text class="tm2" x="355" y="326" fill="#7ee787">post-lock</text>
+  <circle cx="620" cy="340" r="6" fill="#ffa657"/>
+  <text class="tm2" x="570" y="326" fill="#ffa657">pre-unlock</text>
+  <circle cx="820" cy="340" r="6" fill="#7ee787"/>
+  <text class="tm2" x="775" y="326" fill="#7ee787">post-unlock</text>
+
+  <text class="ts" x="100" y="368">pre-lock / pre-unlock：决定「能不能加锁/解锁」——可用于防止抢锁</text>
+  <text class="ts" x="100" y="390">post-lock / post-unlock：加锁/解锁发生后 —— 可用于自动发邮件通知相关人</text>
+
+  <!-- revprop -->
+  <text class="hd" x="30" y="424" fill="#8b949e">日志修改流程</text>
+  <circle cx="200" cy="448" r="6" fill="#ffa657"/>
+  <text class="tm2" x="86" y="452" fill="#ffa657">pre-revprop-change</text>
+  <circle cx="520" cy="448" r="6" fill="#7ee787"/>
+  <text class="tm2" x="400" y="452" fill="#7ee787">post-revprop-change</text>
+  <text class="ts" x="640" y="452">默认不存在 = 所有 revprop 修改被禁止（安全默认值）</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>钩子部署的关键规则：</b>
+    ① 钩子文件必须放在 <code class="ic">{仓库}/hooks/</code> 目录下；
+    ② 必须<strong>去掉 <code class="ic">.tmpl</code> 后缀</strong>才会生效（<code class="ic">pre-commit.tmpl</code> → <code class="ic">pre-commit</code>）；
+    ③ Linux 上必须有<strong>可执行权限</strong>（<code class="ic">chmod +x</code>）；
+    ④ Windows 上要写成 <code class="ic">.bat</code> / <code class="ic">.cmd</code> / <code class="ic">.exe</code>。
+  </div>
+</div>
+
+<h4 class="sub" id="s20-2">pre-commit 实战：强制日志规范</h4>
+
+<div class="cards grid2">
+  <div class="card red">
+    <h6>需求</h6>
+    <p>团队里总有人写「fix」「update」「111」这种毫无信息量的提交日志，
+    或者干脆留空。事后查历史时完全看不懂。</p>
+    <p><strong>目标：强制提交日志至少 10 个字符，并且必须包含关联的任务号。</strong></p>
+  </div>
+  <div class="card green">
+    <h6>方案</h6>
+    <p>用 <code class="ic">pre-commit</code> 钩子，在提交写入前检查日志：
+    不符合规则就 <code class="ic">exit 1</code>，把错误信息回显给提交者。</p>
+    <p>关键工具：<code class="ic">svnlook log -t TXN 仓库</code> 读取本次提交的日志。</p>
+  </div>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">hooks/pre-commit　Linux / macOS 版本</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c">#!/bin/sh
+#############################################################################
+# pre-commit 钩子：强制提交日志规范
+#
+# 参数：
+#   $1 = 仓库路径
+#   $2 = 事务名（transaction，本次提交的临时 ID）
+#
+# 退出码：
+#   0 = 允许提交
+#   非 0 = 拒绝提交，stderr 的内容会回显给客户端
+#############################################################################</span>
+
+REPOS=<span class="s">"$1"</span>
+TXN=<span class="s">"$2"</span>
+
+<span class="c"># ---- 读取本次提交的日志 ----</span>
+LOGMSG=$(svnlook log -t <span class="s">"$TXN"</span> <span class="s">"$REPOS"</span>)
+
+<span class="c"># ---- 去掉首尾空白字符 ----</span>
+TRIMMED=$(echo <span class="s">"$LOGMSG"</span> | sed <span class="s">'s/^[[:space:]]*//;s/[[:space:]]*$//'</span>)
+
+<span class="c"># ---- 规则 1：日志不能为空 ----</span>
+<span class="k">if</span> [ -z <span class="s">"$TRIMMED"</span> ]; <span class="k">then</span>
+  echo <span class="s">""</span> &gt;&amp;2
+  echo <span class="s">"══════════════════════════════════════════════"</span> &gt;&amp;2
+  echo <span class="s">" 提交被拒绝：必须填写提交日志"</span> &gt;&amp;2
+  echo <span class="s">"══════════════════════════════════════════════"</span> &gt;&amp;2
+  echo <span class="s">" 原因：空的提交日志会让历史完全无法追溯。"</span> &gt;&amp;2
+  echo <span class="s">" 正确示例："</span> &gt;&amp;2
+  echo <span class="s">"   svn commit -m \"[PROJ-123] 修复登录接口空指针异常\""</span> &gt;&amp;2
+  echo <span class="s">""</span> &gt;&amp;2
+  exit 1
+<span class="k">fi</span>
+
+<span class="c"># ---- 规则 2：日志长度至少 10 个字符 ----</span>
+LEN=${#TRIMMED}
+<span class="k">if</span> [ <span class="s">"$LEN"</span> -lt 10 ]; <span class="k">then</span>
+  echo <span class="s">""</span> &gt;&amp;2
+  echo <span class="s">"══════════════════════════════════════════════"</span> &gt;&amp;2
+  echo <span class="s">" 提交被拒绝：提交日志太短（当前 $LEN 字符，最少 10 字符）"</span> &gt;&amp;2
+  echo <span class="s">"══════════════════════════════════════════════"</span> &gt;&amp;2
+  echo <span class="s">" 你的日志：$TRIMMED"</span> &gt;&amp;2
+  echo <span class="s">" 请说明「做了什么 + 为什么改」。"</span> &gt;&amp;2
+  echo <span class="s">""</span> &gt;&amp;2
+  exit 1
+<span class="k">fi</span>
+
+<span class="c"># ---- 规则 3：必须包含任务编号（[PROJ-数字] 格式，可按需调整）----</span>
+<span class="c"># 如需强制，取消下面的注释</span>
+<span class="c"># if ! echo "$TRIMMED" | grep -qE '\[[A-Z]+-[0-9]+\]'; then</span>
+<span class="c">#   echo "" >&amp;2</span>
+<span class="c">#   echo "提交被拒绝：日志必须包含任务编号，格式 [PROJ-123]" >&amp;2</span>
+<span class="c">#   echo "你的日志：$TRIMMED" >&amp;2</span>
+<span class="c">#   exit 1</span>
+<span class="c"># fi</span>
+
+<span class="c"># ---- 规则 4：禁止无意义日志（黑名单）----</span>
+<span class="k">case</span> <span class="s">"$(echo "$TRIMMED" | tr '[:upper:]' '[:lower:]')"</span> <span class="k">in</span>
+  fix|update|commit|test|111|aaa|test1|临时提交|修改|更新)
+    echo <span class="s">""</span> &gt;&amp;2
+    echo <span class="s">"提交被拒绝：'$TRIMMED' 是无意义日志，请描述具体改动内容"</span> &gt;&amp;2
+    exit 1
+    ;;
+<span class="k">esac</span>
+
+<span class="c"># ---- 规则 5：检查文件后缀黑名单（防止误传编译产物）----</span>
+CHANGED=$(svnlook changed -t <span class="s">"$TXN"</span> <span class="s">"$REPOS"</span>)
+<span class="k">if</span> echo <span class="s">"$CHANGED"</span> | grep -qE <span class="s">'\.(exe|dll|so|a|class|pyc|o|obj|log|tmp)$'</span>; <span class="k">then</span>
+  echo <span class="s">""</span> &gt;&amp;2
+  echo <span class="s">"提交被拒绝：检测到编译产物/临时文件，请勿提交这些内容"</span> &gt;&amp;2
+  echo <span class="s">"$(echo "$CHANGED" | grep -E '\.(exe|dll|so|a|class|pyc|o|obj|log|tmp)$')"</span> &gt;&amp;2
+  echo <span class="s">"建议：在 svn:ignore 中加入这些模式"</span> &gt;&amp;2
+  exit 1
+<span class="k">fi</span>
+
+<span class="c"># ---- 规则 6：禁止提交超大文件（比如大于 50MB）----</span>
+<span class="k">for</span> f in $(svnlook changed -t <span class="s">"$TXN"</span> <span class="s">"$REPOS"</span> | awk <span class="s">'{print $2}'</span>); <span class="k">do</span>
+  SIZE=$(svnlook filesize -t <span class="s">"$TXN"</span> <span class="s">"$REPOS"</span> <span class="s">"$f"</span> 2&gt;/dev/null || echo 0)
+  <span class="k">if</span> [ <span class="s">"$SIZE"</span> -gt 52428800 ]; <span class="k">then</span>
+    echo <span class="s">"提交被拒绝：文件 $f 大小 $(($SIZE/1024/1024))MB，超过 50MB 限制"</span> &gt;&amp;2
+    echo <span class="s">"大文件请使用独立的二进制仓库或制品库"</span> &gt;&amp;2
+    exit 1
+  <span class="k">fi</span>
+<span class="k">done</span>
+
+<span class="c"># ---- 全部通过 ----</span>
+exit 0</pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：钩子拦截提交</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 提交时用很短的日志</span>
+<span class="ps">$</span> <span class="cmd">svn commit -m "fix"</span>
+Sending        version.txt
+Transmitting file data .done
+Committing transaction...
+<span class="no">svn: E165001: Commit failed (details follow):</span>
+<span class="no">svn: E165001: Commit blocked by pre-commit hook (exit code 1) with output:</span>
+<span class="no">[pre-commit] REJECTED: log must be at least 10 chars. Got: fix</span>
+<span class="cmt">↑ 关键：钩子的 stderr 内容完整回显给了提交者</span>
+<span class="cmt">  客户端退出码 = 1</span>
+
+<span class="cmt"># 用合规的日志再提交</span>
+<span class="ps">$</span> <span class="cmd">svn commit -m "abcd efgh ij"</span>
+Transmitting file data .done
+Committing transaction...
+<span class="ok">Committed revision 19.</span>
+<span class="cmt">↑ 通过钩子检查，正常提交</span></pre>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">Windows 上写钩子的三个坑（全部实测踩过）</span>
+  <ol>
+    <li><strong>必须用 ASCII 无 BOM 编码写文件</strong> ——
+      如果用 UTF-8 with BOM 保存，CMD 会把 BOM 字节当成命令的一部分，
+      出现 <code class="ic">'∩╗┐@echo' is not recognized as an internal or external command</code> 这种莫名其妙的错误。
+      用 PowerShell 的话：<code class="ic">[System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::ASCII)</code></li>
+    <li><strong>批处理里的变量替换语法</strong> ——
+      <code class="ic">%LOG:~9%</code> 这种子串语法在普通批处理里可用，
+      但在 <code class="ic">if</code> 块内部会出问题，需要 <code class="ic">setlocal enabledelayedexpansion</code> + <code class="ic">!LOG:~9!</code>。
+      更稳妥的写法是<strong>避免在 if 块里做字符串操作</strong>。</li>
+    <li><strong>必须写到 stderr</strong> —— <code class="ic">echo 消息 1&gt;&amp;2</code>。
+      如果只写 stdout，有的 SVN 版本不会把内容回显给客户端，提交者只会看到「Commit blocked」而不知道原因。</li>
+  </ol>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bat</span><span class="fn">hooks/pre-commit.bat　Windows 版本</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">@echo off
+<span class="c">rem =====================================================================
+rem pre-commit 钩子（Windows）：强制提交日志规范
+rem 参数：%1 = 仓库路径    %2 = 事务名
+rem 注意：本文件必须保存为 ASCII 无 BOM 编码！
+rem =====================================================================</span>
+
+set REPOS=%1
+set TXN=%2
+set LOGFILE=%TEMP%\svn_precommit_%RANDOM%.txt
+
+<span class="c">rem ---- 读取本次提交的日志 ----</span>
+svnlook log "%REPOS%" -t "%TXN%" &gt; "%LOGFILE%"
+
+<span class="c">rem ---- 读入变量（只取第一行做长度判断）----</span>
+set LOG=
+for /f "usebackq delims=" %%a in ("%LOGFILE%") do set LOG=%%a
+
+del "%LOGFILE%" &gt;nul 2&gt;&amp;1
+
+<span class="c">rem ---- 规则 1：日志不能为空 ----</span>
+if "%LOG%"=="" (
+  echo. 1&gt;&amp;2
+  echo ============================================== 1&gt;&amp;2
+  echo  REJECTED: commit message is required. 1&gt;&amp;2
+  echo ============================================== 1&gt;&amp;2
+  echo  Example: svn commit -m "[PROJ-123] fix login NPE" 1&gt;&amp;2
+  echo. 1&gt;&amp;2
+  exit /b 1
+)
+
+<span class="c">rem ---- 规则 2：日志至少 10 个字符 ----</span>
+<span class="c">rem 通过「取第 10 个字符之后的子串是否为空」来判断长度</span>
+set TAIL=%LOG:~9%
+if "%TAIL%"=="" (
+  echo. 1&gt;&amp;2
+  echo ============================================== 1&gt;&amp;2
+  echo  REJECTED: log must be at least 10 chars. 1&gt;&amp;2
+  echo  Got: [%LOG%] 1&gt;&amp;2
+  echo ============================================== 1&gt;&amp;2
+  echo  Please describe WHAT you changed and WHY. 1&gt;&amp;2
+  echo. 1&gt;&amp;2
+  exit /b 1
+)
+
+<span class="c">rem ---- 规则 3：禁止无意义日志 ----</span>
+echo %LOG% | findstr /i /x "fix update commit test 111 aaa" &gt;nul
+if not errorlevel 1 (
+  echo REJECTED: '%LOG%' is a meaningless message. 1&gt;&amp;2
+  exit /b 1
+)
+
+<span class="c">rem ---- 规则 4：拒绝编译产物 ----</span>
+svnlook changed "%REPOS%" -t "%TXN%" | findstr /i /r "\.exe$ \.dll$ \.pyc$ \.class$ \.obj$ \.log$ \.tmp$" &gt;nul
+if not errorlevel 1 (
+  echo. 1&gt;&amp;2
+  echo REJECTED: build artifacts / temp files detected. 1&gt;&amp;2
+  echo Add them to svn:ignore instead of committing. 1&gt;&amp;2
+  exit /b 1
+)
+
+<span class="c">rem ---- 全部通过 ----</span>
+exit /b 0</pre>
+</div>
+
+<h4 class="sub" id="s20-3">其余八个钩子的实用脚本</h4>
+
+<div class="grid2">
+  <div class="card blue">
+    <h6>post-commit　提交后自动通知</h6>
+    <p>最常用的用途：提交后自动发邮件、触发 CI 构建、写审计日志。</p>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">hooks/post-commit</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">#!/bin/sh
+REPOS="$1"
+REV="$2"
+
+<span class="c"># 收集本次提交的信息</span>
+AUTHOR=$(svnlook author -r "$REV" "$REPOS")
+DATE=$(svnlook date -r "$REV" "$REPOS")
+LOG=$(svnlook log -r "$REV" "$REPOS")
+CHANGED=$(svnlook changed -r "$REV" "$REPOS")
+
+<span class="c"># ---- 1. 写审计日志 ----</span>
+{
+  echo "==================================================="
+  echo "Revision : $REV"
+  echo "Author   : $AUTHOR"
+  echo "Date     : $DATE"
+  echo "Message  : $LOG"
+  echo "Changed  :"
+  echo "$CHANGED"
+} &gt;&gt; /var/log/svn-commits.log
+
+<span class="c"># ---- 2. 发邮件通知（需装 mailutils）----</span>
+{
+  echo "提交版本：r$REV"
+  echo "提交者：$AUTHOR"
+  echo "时间：$DATE"
+  echo ""
+  echo "日志：$LOG"
+  echo ""
+  echo "变更文件："
+  echo "$CHANGED"
+} | mail -s "[SVN] r$REV by $AUTHOR" dev-team@example.com
+
+<span class="c"># ---- 3. 触发 CI 构建（调用 Jenkins/GitLab CI 的 webhook）----</span>
+curl -s -X POST "https://jenkins.example.com/job/myproject/build?token=BUILD_TOKEN" &gt;/dev/null 2&gt;&amp;1
+
+<span class="c"># post-commit 的返回值不影响提交（已经提交成功了）</span>
+exit 0</pre>
+    </div>
+  </div>
+
+  <div class="card pur">
+    <h6>pre-revprop-change　防止日志被改</h6>
+    <p>SVN 默认<strong>禁止</strong>修改版本库属性（包括提交日志），因为该钩子不存在。
+    想允许修改必须显式创建它并 <code class="ic">exit 0</code>；想禁止篡改就 <code class="ic">exit 1</code>。</p>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">方案 A：完全禁止修改（推荐）</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">#!/bin/sh
+<span class="c"># 拒绝一切 revprop 修改，保证历史不可篡改</span>
+echo "revision properties are immutable" &gt;&amp;2
+exit 1</pre>
+    </div>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">方案 B：只允许管理员改日志，且记录审计</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">#!/bin/sh
+REPOS="$1"; REV="$2"; USER="$3"
+PROPNAME="$4"; ACTION="$5"
+
+<span class="c"># 只允许修改 svn:log，不允许改 svn:author / svn:date</span>
+if [ "$PROPNAME" != "svn:log" ]; then
+  echo "only svn:log can be changed (attempted: $PROPNAME)" &gt;&amp;2
+  exit 1
+fi
+
+<span class="c"># 只允许 admin 用户</span>
+if [ "$USER" != "admin" ]; then
+  echo "only 'admin' can modify revision properties" &gt;&amp;2
+  exit 1
+fi
+
+<span class="c"># 记审计日志</span>
+OLD=$(svnlook propget -r "$REV" --revprop svn:log "$REPOS" 2&gt;/dev/null)
+echo "[$(date -Iseconds)] $USER modified svn:log of r$REV" &gt;&gt; /var/log/svn-revprop-audit.log
+echo "  old: $OLD" &gt;&gt; /var/log/svn-revprop-audit.log
+
+exit 0</pre>
+    </div>
+  </div>
+</div>
+
+<div class="tw">
+<table>
+<thead><tr><th>钩子</th><th>触发时机</th><th>参数</th><th>典型用途</th></tr></thead>
+<tbody>
+  <tr>
+    <td><code class="ic b">start-commit</code></td>
+    <td>提交开始前（还不知道改了哪些文件）</td>
+    <td><code class="ic">仓库 用户</code></td>
+    <td>拉黑用户、限制提交时段、检查用户是否有提交权限</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">pre-commit</code></td>
+    <td>提交写入前（<strong>最后一道关卡</strong>）</td>
+    <td><code class="ic">仓库 事务名</code></td>
+    <td><strong>日志规范检查</strong>、禁止提交编译产物、大文件拦截、代码风格检查</td>
+  </tr>
+  <tr>
+    <td><code class="ic g">post-commit</code></td>
+    <td>提交成功后</td>
+    <td><code class="ic">仓库 版本号</code></td>
+    <td>邮件通知、触发 CI、写审计日志、更新文档站</td>
+  </tr>
+  <tr>
+    <td><code class="ic y">pre-lock</code></td>
+    <td>加锁前</td>
+    <td><code class="ic">仓库 路径 用户 [注释] [force]</code></td>
+    <td>限制谁可以加锁、禁止抢占他人锁</td>
+  </tr>
+  <tr>
+    <td><code class="ic g">post-lock</code></td>
+    <td>加锁成功后</td>
+    <td><code class="ic">仓库 用户</code> (stdin 传路径列表)</td>
+    <td>通知相关人「某文件已被锁定」</td>
+  </tr>
+  <tr>
+    <td><code class="ic y">pre-unlock</code></td>
+    <td>解锁前</td>
+    <td><code class="ic">仓库 路径 用户 [token] [break-lock]</code></td>
+    <td>禁止强制解除他人锁</td>
+  </tr>
+  <tr>
+    <td><code class="ic g">post-unlock</code></td>
+    <td>解锁成功后</td>
+    <td><code class="ic">仓库 用户</code></td>
+    <td>通知「文件已释放，可以编辑了」</td>
+  </tr>
+  <tr>
+    <td><code class="ic y">pre-revprop-change</code></td>
+    <td>修改版本库属性前</td>
+    <td><code class="ic">仓库 版本号 用户 属性名 动作</code></td>
+    <td>防止日志被篡改；或仅允许管理员修改并审计</td>
+  </tr>
+  <tr>
+    <td><code class="ic g">post-revprop-change</code></td>
+    <td>修改版本库属性后</td>
+    <td><code class="ic">仓库 版本号 用户 属性名 动作</code></td>
+    <td>记录属性修改的审计日志、发通知</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：revprop 保护的两个方向</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># ===== 方向一：钩子返回 1 → 拒绝修改历史日志 =====</span>
+<span class="ps">$</span> <span class="cmd">svn propset --revprop -r 19 svn:log "篡改历史日志"</span>
+<span class="no">svn: E165001: Revprop change blocked by pre-revprop-change hook (exit code 1) with output:</span>
+<span class="no">[pre-revprop-change] REJECTED: revision properties are immutable.</span>
+<span class="cmt">↑ 历史不可篡改，符合审计要求</span>
+
+<span class="cmt"># ===== 方向二：钩子返回 0 → 允许修改 =====</span>
+<span class="cmt"># 把钩子内容改成：@echo off / exit /b 0</span>
+<span class="ps">$</span> <span class="cmd">svn propset --revprop -r 19 svn:log "Corrected commit message for r19"</span>
+<span class="ok">property 'svn:log' set on repository revision 19</span>
+
+<span class="cmt"># 验证修改生效</span>
+<span class="ps">$</span> <span class="cmd">svn log -r 19</span>
+------------------------------------------------------------------------
+r19 | kelang | 2026-10-08 11:14:04 | 1 line
+
+<span class="ok">Corrected commit message for r19</span>
+------------------------------------------------------------------------
+
+<span class="cmt"># ===== 未创建钩子时（默认状态）=====</span>
+<span class="ps">$</span> <span class="cmd">svn propset --revprop -r 20 svn:log "test"</span>
+<span class="no">svn: E165006: Repository has not been enabled to accept revision propchanges;</span>
+<span class="no">              ask the administrator to create a pre-revprop-change hook</span>
+<span class="cmt">↑ 这是 SVN 的安全默认值：没有钩子 = 不允许改</span></pre>
+  </div>
+</div>
+
+<div class="box key">
+  <span class="bt">钩子调试的三个建议</span>
+  <ol>
+    <li><strong>钩子里的输出一定要写到 stderr</strong>（<code class="ic">&gt;&amp;2</code>）。
+      写到 stdout 的内容在多数情况下不会回显给提交者。</li>
+    <li><strong>先在命令行手工测一遍</strong>再部署。比如测 pre-commit：
+      <div class="codewrap" style="margin:8px 0 0">
+        <div class="codehead"><span class="lang">bash</span><span class="fn">手工测试钩子</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 先制造一个事务（不提交）</span>
+svnmucc -U svn://localhost/repo mkdir /trunk/tmp <span class="c"># 或在客户端执行提交但取消</span>
+
+<span class="c"># 更实用的方式：直接手工调用钩子脚本</span>
+/var/svn/repo/hooks/pre-commit /var/svn/repo <span class="s">"1-abc"</span>
+echo $?   <span class="c"># 看退出码</span>
+
+<span class="c"># 查看某个事务的信息</span>
+svnlook changed -t <span class="s">"1-abc"</span> /var/svn/repo
+svnlook log -t <span class="s">"1-abc"</span> /var/svn/repo
+
+<span class="c"># 清理卡住的事务（钩子崩溃可能留下垃圾事务）</span>
+svnadmin lstxns /var/svn/repo
+svnadmin rmtxns /var/svn/repo <span class="s">"1-abc"</span></pre>
+      </div>
+    </li>
+    <li><strong>注意执行环境</strong>——钩子运行时的工作目录、<code class="ic">PATH</code>、环境变量与你登录时<strong>完全不同</strong>。
+      命令一定要写<strong>绝对路径</strong>（比如 <code class="ic">/usr/bin/svnlook</code> 而不是 <code class="ic">svnlook</code>），
+      否则会出现「我在终端能跑，钩子一跑就失败」。
+      更稳妥的做法是用 <code class="ic">hooks/hooks-env.tmpl</code> 配置环境变量。</li>
+  </ol>
+</div>
+
+<!-- ==========================================================================
+     第八阶段 · 第 21 节：备份与恢复
+     ========================================================================== -->

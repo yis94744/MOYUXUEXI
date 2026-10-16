@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4. 日常三件事：改、更、提 | SVN 图形化实战</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 图形化实战</h1></div>
+  <div class="brand-sub">TortoiseSVN + VisualSVN · 全鼠标操作</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 准备</div>
+    <a href="01-tools.html">1. 认识你的两个图形工具</a>
+    <a href="02-first-checkout.html">2. 第一次检出：把代码拉到本地</a>
+    <a href="03-icons.html">3. 看懂图标角标与右键菜单</a>
+    <div class="grp">第二阶段 · 日常使用</div>
+    <a href="04-daily.html" class="on">4. 日常三件事：改、更、提</a>
+    <a href="05-status.html">5. 查看改动：哪些文件变了</a>
+    <a href="06-diff.html">6. 比对差异：到底改了哪几行</a>
+    <a href="07-add-delete.html">7. 新增、删除、重命名文件</a>
+    <a href="08-history.html">8. 查看历史：Log 对话框详解</a>
+    <a href="09-revert.html">9. 撤销：改错了怎么退回</a>
+    <div class="grp">第三阶段 · 进阶操作</div>
+    <a href="10-conflict.html">10. 冲突处理：两人改了同一处</a>
+    <a href="11-merge-tool.html">11. 合并编辑器：逐行选择保留谁</a>
+    <a href="12-branch.html">12. 建分支：开一条独立开发线</a>
+    <a href="13-switch.html">13. 切换分支：在主干和分支间跳</a>
+    <a href="14-merge.html">14. 合并分支：把改动并回主干</a>
+    <a href="15-revision-graph.html">15. 版本拓扑图：看清分支走向</a>
+    <div class="grp">第四阶段 · 属性与锁</div>
+    <a href="16-ignore.html">16. 忽略文件：让编译产物别再烦我</a>
+    <a href="17-properties.html">17. 属性对话框：设置文件行为</a>
+    <a href="18-lock.html">18. 文件锁：二进制文件独占编辑</a>
+    <div class="grp">第五阶段 · 服务端管理</div>
+    <a href="19-server.html">19. 服务端：VisualSVN 建仓库</a>
+    <a href="20-users.html">20. 用户与权限：谁能看谁能改</a>
+    <a href="21-backup.html">21. 备份与恢复：图形界面操作</a>
+    <div class="grp">第六阶段 · 效率技巧</div>
+    <a href="22-patch-export.html">22. 补丁与导出：不走仓库传代码</a>
+    <a href="23-settings.html">23. 设置面板：常用选项怎么调</a>
+    <a href="24-troubleshoot.html">24. 常见问题：报错怎么处理</a>
+    <a href="25-cheatsheet.html">25. 图形操作速查表</a>
+
+  </nav>
+</aside>
+<main>
+<div class="crumb">
+  <span class="stage">第二阶段 · 日常使用</span>
+  <span class="sep">/</span>
+  <a href="index.html">总目录</a>
+  <span class="sep">/</span>
+  <span class="cur">第 4 节</span>
+</div>
+
+<h3 class="sec" id="s4"><span class="no">4</span>日常三件事：改、更、提</h3>
+
+<p class="lead">
+  前面三节都是准备。从这一节开始，是你<strong>每天真正要干的事</strong>：
+  更新（Update）、修改（Edit）、提交（Commit）。这三步走顺了，SVN 对你来说就已经会用了。
+</p>
+
+<div class="box key">
+  <span class="bt">为什么顺序不能反：先更新，再修改，最后提交</span>
+  <p>SVN 是<strong>集中式</strong>版本控制——所有人改的都是服务器上那<strong>同一份仓库</strong>。你本地这一份，只是它在你检出那一刻的<strong>快照</strong>；之后服务器上发生了什么，你不主动问，它不会告诉你。</p>
+  <ul>
+    <li><strong>不更新，就不知道别人改了什么。</strong>同事昨天的改动，今天不点更新，你本地还是老样子。</li>
+    <li><strong>不更新就提交，常常提交不上去。</strong>SVN 发现你要提交的文件在服务器上已经变了，会拦下来让你先更新。</li>
+    <li><strong>最麻烦的是「冲突」（Conflict）。</strong>你和同事改了同一个文件的同一处，更新时 SVN 没法替你决定留谁的，会把两边内容同时塞进文件里，等你手工挑。</li>
+  </ul>
+  <p>所以把这句话背下来：<strong>开工先更新，干活随便改，收工就提交</strong>。多花的十秒钟，能省掉后面半小时的冲突处理。</p>
+</div>
+
+<h4 class="sub">第一步：SVN Update（更新）</h4>
+
+<p>
+  更新的作用只有一个：<strong>把服务器上的新内容同步到本地</strong>。
+  别人提交的文件、新建的文件夹、删掉的东西，更新一次全部对齐。
+  <em>更新不会动你自己还没提交的修改</em>，除非你们改了同一处。
+</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">UPDATE</span>把服务器上的新版本拉到本地</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">对着你的项目文件夹（或里面任意子文件夹）点右键</span><span class="sc">对着<strong>文件夹</strong>更新是最常见的做法，一次把整个目录树对齐。只想更新某个子目录也可以，对着那个子文件夹右键即可。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">点菜单顶层的 SVN Update</span><span class="sc">它在右键菜单最上面、带 <code class="ic">SVN</code> 前缀的那一组里，不用展开 <code class="ic">TortoiseSVN</code> 子菜单。（对应的命令行是 <code class="ic">svn update</code>，但图形界面里你只需要点这一项。）</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">等进度对话框跑完</span><span class="sc">弹出的窗口会一行行列出「做了什么」，跑完标题会变成 <code class="ic">Finished!</code>。文件多、网速慢的时候会等一会儿，别急着点取消。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">看窗口底部两行信息</span><span class="sc">一行是<strong>传输量与耗时</strong>，一行是<strong>这次更新涉及的条目数</strong>。更关键的是中间那条 <code class="ic">At revision: 版本号</code>——那是你本地现在所处的版本。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">点 OK 关闭，扫一眼文件夹角标</span><span class="sc">更新下来的文件角标是<strong>绿色对勾</strong>（和库一致）。如果看见<strong>黄色底的红叹号</strong>，说明撞上冲突了，请直接翻到第 10 节。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">什么时候该更新</span><span class="sc">至少三个时间点：<strong>每天开工第一件事</strong>、<strong>准备提交之前</strong>、<strong>同事说他刚提交完</strong>。平时想起来就点一下——更新是只读操作，点错了也不会弄坏东西。</span></div>
+  </div>
+</div>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">更新完成的进度对话框</span><span class="fs">Update Finished</span></div>
+  <div class="sb"><img src="img/UpdateFinished.png" alt="更新完成的进度对话框"></div>
+  <div class="cap">
+    窗口标题上的 <span class="k">TortoiseSVN Finished!</span> 表示活儿干完了。表头三列分别是 <b>Action（做了什么）</b>、<b>Path（对哪个路径做的）</b>、<b>Mime type（文件类型）</b>。<br><br>
+    <b>· Action 列</b>：<span class="k">Completed</span> 表示这一项已经处理完毕；<span class="k">External</span> 表示这是个「外部引用」目录，TortoiseSVN 连它一起更新了。<br>
+    <b>· Path 列</b>：被处理的路径。带 <span class="k">at revision: 1832</span> 后缀的，是这个目录被更新到的版本号；最下面那行 <span class="k">At revision: 20640</span> 是<strong>整个工作副本更新后的总版本号</strong>——记下它，将来要回退就靠这个号。<br><br>
+    <b>· 颜色是有含义的</b>（左侧那一栏的小色块）：<span class="tagmini p">紫</span> 新增 &nbsp; <span class="tagmini b">蓝</span> 更新 &nbsp; <span class="tagmini g">绿</span> 合并成功 &nbsp; <span class="tagmini r">亮红</span> 冲突 &nbsp; 黑 其他动作。这张图里全是黑色的 <span class="k">Completed</span> / <span class="k">External</span>，说明这一趟<strong>没有冲突、也没有需要合并的东西</strong>，是最顺利的情况。反过来，只要你看见<strong>亮红色</strong>的行，就要停下来处理冲突。<br><br>
+    <b>· 底部统计行</b>：<span class="k">215 kBytes transferred in 0 minute(s) and 38 second(s)</span> 是这次实际传输的<strong>数据量</strong>和<strong>耗时</strong>；再下面那行 <span class="k">Updated:4</span> 是这次更新涉及的<strong>条目数</strong>。数字小不代表出问题，只代表服务器上这段时间改得不多。<br><br>
+    <b>· 按钮</b>：<span class="k">Show log...</span> 可以直接跳到日志，看看这次更新到底带来了哪些提交；<span class="k">OK</span> 关闭窗口。
+  </div>
+</div>
+
+<h4 class="sub">第二步：修改文件</h4>
+
+<p>
+  这一步<strong>最简单</strong>：用你习惯的任何编辑器直接打开文件改，改完保存。
+  SVN 不需要你事先「打招呼」，不需要点任何按钮。
+</p>
+
+<div class="duo">
+  <div>
+    <div class="dh">✗ VSS 时代的老习惯</div>
+    <p>先找「检出为可写」，把文件变成可改状态</p>
+    <p>改之前先「独占签出」，怕别人也改</p>
+    <p>改完再执行一次「签入」把文件还回去</p>
+    <p style="margin-top:10px;color:#ff7b72">→ 在 SVN 里这些都是多余的，白折腾</p>
+  </div>
+  <div>
+    <div class="dh">✓ SVN 的正确做法</div>
+    <p>双击文件，直接改，<strong>保存</strong>——完事</p>
+    <p>改完文件角标会自动变成<strong>红色叹号</strong></p>
+    <p>谁改了什么，SVN 自己在后台记着呢</p>
+    <p style="margin-top:10px;color:#7ee787">→ 只有二进制文件（如设计稿、Office 文档）才需要事先加锁，见第 18 节</p>
+  </div>
+</div>
+
+<div class="iconrow">
+  <div class="ic-card"><img src="img/ModifiedIcon.png" alt="已修改角标"><span class="nm">ModifiedIcon</span><span class="ds">红色叹号：改过、还没提交</span></div>
+  <div class="ic-card"><img src="img/AddedIcon.png" alt="已添加角标"><span class="nm">AddedIcon</span><span class="ds">蓝色加号：新文件已 Add</span></div>
+  <div class="ic-card"><img src="img/DeletedIcon.png" alt="已删除角标"><span class="nm">DeletedIcon</span><span class="ds">红色叉：已标记删除</span></div>
+  <div class="ic-card"><img src="img/ConflictIcon.png" alt="冲突角标"><span class="nm">ConflictIcon</span><span class="ds">黄底红叹号：撞车了，要手工处理</span></div>
+</div>
+
+<div class="box tip">
+  <span class="bt">文件变成只读、改不动怎么办</span>
+  <p>如果你打开文件发现是只读的，多半是管理员给这类文件设了 <code class="ic">svn:needs-lock</code> 属性（典型的二进制文件防冲突手段）。</p>
+  <p>正确处理：<span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Get lock</span></span> 先加锁，文件就自动变可写；改完提交，锁自动释放。第 18 节会专门讲锁。</p>
+</div>
+
+<h4 class="sub">第三步：SVN Commit（提交）</h4>
+
+<p>
+  提交 = <strong>把你本地这些改动正式送进服务器</strong>，同时生成一个新的版本号。
+  这一步做完，同事更新一次就能看到你的成果。
+</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">COMMIT</span>把改动送上服务器</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">先更新一次（是的，又来一次）</span><span class="sc">提交前更新，是为了让 SVN 先发现冲突。冲突在提交前发现，处理时间成本最低；提交时才发现，往往要重来一遍。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">对着项目文件夹点右键</span><span class="sc">提交<strong>文件夹</strong>会把下面所有改动一起列出来，由你勾选；提交<strong>单个文件</strong>也行，但容易漏掉别的改动。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">点菜单顶层的 SVN Commit...</span><span class="sc">带 <code class="ic">SVN</code> 前缀那一组里的第二项，点它不会弹子菜单，直接打开提交对话框。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">在文件列表里勾选要提交的文件</span><span class="sc">默认<strong>全部勾选</strong>。逐个确认，把不该提交的（临时文件、调试代码、本地配置）<em>取消勾选</em>。看右下角统计，确认数字和你的预期一致。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">在 Message 里写清楚这次干了什么</span><span class="sc">这是<strong>必填</strong>的，也是给未来的自己和同事看的。写「改了什么 + 为什么改 + 影响哪里」，一两句话就够。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">点 OK，等进度对话框跑完</span><span class="sc">跑完会显示新的版本号。如果中途报错（比如提示需要先更新），<strong>先按提示更新，再重新提交</strong>，别硬来。</span></div>
+  </div>
+</div>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">提交对话框（点击图可放大）</span><span class="fs">Commit Dialog</span></div>
+  <div class="sb"><img src="img/Commit.png" alt="SVN 提交对话框"></div>
+  <div class="cap">
+    这就是你以后见得最多的窗口。从上往下逐块看：<br><br>
+    <b>① 标题栏</b>：<span class="k">D:\Development\SVN\TortoiseSVN - Commit - TortoiseSVN</span>。破折号前面是你<strong>正在提交的本地文件夹</strong>，<em>养成先扫一眼标题的习惯</em>——它能防止「对着错误的目录点了提交」。<br><br>
+    <b>② Commit to:</b>：这次提交要送到服务器上的<strong>哪个地址</strong>，形如 <span class="k">https://服务器/svn/项目名/trunk</span>，末尾那段就是仓库里的路径。<em>提交到错误分支，是新手最贵的一课。</em><br><br>
+    <b>③ Message 区</b>：<strong>提交说明，必填</strong>。输入框上面那个 <span class="k">Recent messages</span> 按钮，会把你<strong>以前写过的提交说明</strong>列出来，重复性的活儿（比如每次都是「更新文档配图」）直接翻出来改一改就行。框里已有的 <span class="k">this is the commit message</span> 是上一次写的内容，可以接着改。<br><br>
+    <b>④ Changes made</b>：这次提交涉及的<strong>文件列表</strong>，也就是「哪些文件会被交上去」。每一项前面都有<strong>勾选框</strong>，只有勾上的才会提交。表头写着 <span class="k">(double-click on file for diff)</span>：双击任意文件可以看它到底改了什么（第 6 节详讲）。列表里 <span class="k">(no changelist)</span> 这一行是分组标题，把文件按「变更列表」归组；平时不设置变更列表的话，文件都归在这一组下面。<br><br>
+    <b>⑤ Check: 后面的快速过滤链接</b>——文件多的时候靠它提效：<span class="k">All</span> 全选 &nbsp;/&nbsp; <span class="k">None</span> 全不选 &nbsp;/&nbsp; <span class="k">Non-versioned</span> 只看未纳入版本控制的 &nbsp;/&nbsp; <span class="k">Versioned</span> 只看已纳入版本控制的 &nbsp;/&nbsp; <span class="k">Added</span> 只看新加入的 &nbsp;/&nbsp; <span class="k">Deleted</span> 只看标记删除的。<br><br>
+    <b>⑥ 文件列表的右键菜单</b>（图中右侧展开的那一条）：<span class="k">Compare with base</span> 与库里的原始版本比对、<span class="k">Show differences as unified diff</span>、<span class="k">Revert...</span> 撤销这个文件的本地改动、<span class="k">Export...</span>、<span class="k">Update</span>、<span class="k">Update to revision...</span>、<span class="k">Show log</span>、<span class="k">Blame...</span> 逐行看是谁改的、<span class="k">Open</span> / <span class="k">Open with...</span>、<span class="k">Explore to</span> 打开所在文件夹、<span class="k">Delete</span>（红色，危险）、<span class="k">Get lock...</span>、<span class="k">Properties...</span>、<span class="k">Move to changelist</span> 等。<em>发现某个文件不该提交，不必关掉对话框，在这里直接 Revert 或取消勾选即可。</em><br><br>
+    <b>⑦ Show unversioned files</b>：勾上后，<strong>还没被 SVN 管起来的新文件</strong>也会出现在列表里。想顺手把新文件一起带上，就勾它——相当于在提交的同时做了「新增」（第 7 节讲）。它下面那行灰着的 <span class="k">Show externals from different repositories</span>，是给「外部引用」用的，日常不用管。<br><br>
+    <b>⑧ Keep locks</b>：勾上表示<strong>提交完不解锁</strong>。只有当你给文件加过锁、并且还想继续独占修改时才需要勾（第 18 节）。日常提交<strong>保持不勾</strong>。它下面的 <span class="k">Keep changelists</span> 是保留变更列表分组，同样按需使用。<br><br>
+    <b>⑨ 右下角统计</b>：<span class="k">0 files selected, 16 files total</span>——当前勾选了 0 个文件，列表里一共 16 个候选。<em>点 OK 之前一定看这里</em>：显示 0 说明你什么都没勾，点了也不会有任何东西提交上去；数字远大于预期，说明你勾多了，回去再筛一遍。<br><br>
+    <b>⑩ 底部按钮</b>：<span class="k">Show log</span> 看历史、<span class="k">OK</span> 开始提交、<span class="k">Cancel</span> 取消、<span class="k">Help</span> 帮助。
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">提交前必须做的两件事</span>
+  <ol>
+    <li><strong>先更新，再提交。</strong>更新的目的不是「拿别人的代码」，而是<strong>让 SVN 提前发现冲突</strong>。冲突在提交前发现，你还有时间从容处理；提交时被拦下，往往得从头再走一遍。</li>
+    <li><strong>Message 一定要写清楚。</strong>提交说明是写给三个月后的自己看的。当时觉得「一眼就懂」的简写，三个月后就是天书。团队里最好约定统一格式（比如带上任务单号）。</li>
+  </ol>
+</div>
+
+<div class="tw">
+  <table>
+    <thead>
+      <tr><th>提交说明的写法</th><th>例子</th><th>一个月后查历史的效果</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="tagmini r">差</span> 只写「改了」</td><td><code class="ic">改了一下</code></td><td>没人知道改了什么，等于没写</td></tr>
+      <tr><td><span class="tagmini y">中</span> 只说结果</td><td><code class="ic">修复登录问题</code></td><td>能看个大概，但不知道影响范围，不敢回退</td></tr>
+      <tr><td><span class="tagmini g">好</span> 改了什么 + 为什么 + 影响谁</td><td><code class="ic">登录：修复验证码过期后无法重发的问题（影响 Web 端）</code></td><td>一眼看懂，敢放心回退</td></tr>
+      <tr><td><span class="tagmini b">团队推荐</span> 带上任务单号</td><td><code class="ic">#1234 登录接口增加频率限制</code></td><td>能和任务系统对上号，追责与复盘都方便</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h4 class="sub">提交进度对话框</h4>
+
+<p>点下 OK 之后弹出的窗口，是<strong>提交是否成功</strong>的最终凭证。它跑完，才算真的提交完了。</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">提交进度对话框</span><span class="fs">Commit Progress</span></div>
+  <div class="sb"><img src="img/CommitProgress.png" alt="提交进度对话框"></div>
+  <div class="cap">
+    <b>· Action 列</b>：<span class="k">Command</span> 表示提交命令开始执行；<span class="k">Modified</span> 表示这个文件带着改动被送出；<span class="k">Sending content</span> 表示正在把文件内容上传上去；<span class="k">Completed</span> 配上下面的 <span class="k">At revision: 20640</span> 表示这趟提交<strong>成功了</strong>，并且服务器<strong>生成了新的版本号 20640</strong>。<br><br>
+    <b>· 颜色</b>：和更新对话框是同一套配色——紫=新增、蓝=更新、绿=合并成功、亮红=冲突、黑=其他。<br><br>
+    <b>· 底部统计</b>：<span class="k">49 kBytes transferred in 0 minute(s) and 9 second(s)</span> 是上传的数据量和耗时；<span class="k">Modified:3</span> 是这次提交里「已修改」类文件的个数。<br><br>
+    <b>· 按钮</b>：网络卡住时可以点 <span class="k">Cancel</span> 中断，但<strong>不要闲着没事去点它，更不要在跑到一半时强关窗口</strong>。<br><br>
+    <em>把这个新版本号记下来（本例是 20640），将来要回退时，它就是你的坐标。</em>
+  </div>
+</div>
+
+<div class="box ok">
+  <span class="bt">日常工作流口诀</span>
+  <p>开机先 <strong>Update</strong>，改完看<strong>角标</strong>；</p>
+  <p>提交前再 <strong>Update</strong>，<strong>Message</strong> 写清再点 OK；</p>
+  <p>看见<strong>新版本号</strong>，今天这活儿才算完。</p>
+</div>
+
+
+<div class="pager">
+  <a href="03-icons.html"><span class="lbl">← 上一节</span><span class="ttl">3. 看懂图标角标与右键菜单</span></a>
+  <a class="home" href="index.html"><span class="ttl">总目录</span></a>
+  <a class="next" href="05-status.html"><span class="lbl">下一节 →</span><span class="ttl">5. 查看改动：哪些文件变了</span></a>
+</div>
+
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+<script src="assets/app.js"></script>
+</body>
+</html>

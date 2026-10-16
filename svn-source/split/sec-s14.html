@@ -1,0 +1,160 @@
+<h3 class="sec" id="s14"><span class="no">14</span>标签与发布管理</h3>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">打标签的三种场景</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 【场景 1】发布正式版：从 trunk 打标签</span>
+svn copy ^/trunk ^/tags/v1.0.0 -m <span class="s">"发布 v1.0.0：从 trunk 打标签"</span>
+
+<span class="c"># 【场景 2】从修复分支打标签（发布了 hotfix）</span>
+svn copy ^/branches/release-1.0 ^/tags/v1.0.1 -m <span class="s">"发布 v1.0.1：包含紧急修复"</span>
+
+<span class="c"># 【场景 3】给历史版本补打标签（当时忘了打）</span>
+svn copy ^/trunk@520 ^/tags/v1.0.0-retro -m <span class="s">"补打 v1.0.0 标签（对应 r520）"</span>
+
+<span class="c"># 【验证】标签与 trunk 应该零差异</span>
+svn diff ^/tags/v1.0.0 ^/trunk --summarize
+<span class="c"># 无输出 = 完全一致</span>
+<span class="c"># 如果打标签后又往 trunk 提交了东西，这里就会显示出差异文件</span>
+
+<span class="c"># 【检出标签】发布构建用</span>
+svn checkout ^/tags/v1.0.0 release-1.0.0
+svn export ^/tags/v1.0.0 release-1.0.0    <span class="c"># 更干净，无 .svn</span>
+
+<span class="c"># 【删除标签】打错了</span>
+svn delete ^/tags/v1.0.0 -m <span class="s">"撤销误打的标签"</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：打标签并验证</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn copy file:///E:/repo/trunk file:///E:/repo/tags/v1.0-release -m "发布 v1.0：从 trunk 打标签"</span>
+Committing transaction...
+<span class="ok">Committed revision 21.</span>
+
+<span class="cmt"># 验证：标签与 trunk 零差异（刚刚打的，trunk 没变过）</span>
+<span class="ps">$</span> <span class="cmd">svn diff file:///E:/repo/tags/v1.0-release file:///E:/repo/trunk --summarize</span>
+<span class="dim">&lt;空输出 = 完全一致&gt;</span>
+
+<span class="cmt"># 递归列出标签内容</span>
+<span class="ps">$</span> <span class="cmd">svn list -R file:///E:/repo/tags/v1.0-release</span>
+art.psd
+bob-test/
+docs.md
+newfile.txt
+src/
+src/main.cs
+version.txt
+webapp/</pre>
+  </div>
+</div>
+
+<h4 class="sub">用 authz 强制标签只读</h4>
+
+<p>
+  前面说过 SVN 不会阻止你改标签。想真正锁死，靠 <strong>authz 权限文件</strong>——
+  这是 SVN 相对 Git 的一个优势：<strong>目录级权限</strong>。
+</p>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">ini</span><span class="fn">conf/authz　标签只读配置</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">[groups]
+admins = alice, bob          <span class="c"># 只有这两个人能改标签</span>
+devs   = carol, dave
+
+<span class="c"># 仓库根：默认无权限，逐条放开</span>
+[/]
+* =
+@admins = rw
+
+<span class="c"># 主干：开发全员可读写</span>
+[/trunk]
+@devs = rw
+@admins = rw
+
+<span class="c"># 分支：开发可读写</span>
+[/branches]
+@devs = rw
+@admins = rw
+
+<span class="c"># 标签：所有人只读，只有 admins 能写</span>
+[/tags]
+* = r
+@admins = rw</pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：权限配置生效，普通开发者写标签被拒</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># bob 属于 devs 组，不是 admins → 往 /tags 写会被拒</span>
+<span class="ps">$</span> <span class="cmd">svn mkdir --username bob --password bob123 svn://127.0.0.1/repo/tags/v2.0 -m "bob 写 tags"</span>
+<span class="no">svn: E220004: Access denied</span>
+
+<span class="cmt"># alice 属于 admins → 成功</span>
+<span class="ps">$</span> <span class="cmd">svn mkdir --username alice --password alice123 svn://127.0.0.1/repo/tags/v2.0 -m "alice 打标签"</span>
+Committing transaction...
+<span class="ok">Committed revision 15.</span>
+
+<span class="cmt"># bob 读 /trunk 是允许的（authz 里给了 r）</span>
+<span class="ps">$</span> <span class="cmd">svn list --username bob --password bob123 svn://127.0.0.1/repo/trunk</span>
+art.psd
+docs.md
+src/</pre>
+  </div>
+</div>
+
+<h4 class="sub">发布管理的实践建议</h4>
+
+<div class="grid2">
+  <div class="card blue">
+    <h6>标签命名要能排序</h6>
+    <p>用<strong>零填充</strong>让版本号能按字典序正确排序：</p>
+    <pre style="font-family:var(--mono);font-size:12.5px;color:var(--green);margin-top:8px">✓ v1.0.0 / v1.0.1 / v1.10.0
+✗ v1 / v1.2 / v1.10
+   （字典序里 v1.10 &lt; v1.2，会排错）</pre>
+    <p>语义化版本 <code class="ic">v主.次.修</code> 是目前最通用的约定。</p>
+  </div>
+  <div class="card pur">
+    <h6>标签里别再提交</h6>
+    <p>一旦打了标签，就该视为<strong>冻结的化石</strong>。发现 bug 怎么办？</p>
+    <ul>
+      <li>从该标签创建修复分支：<code class="ic">svn copy ^/tags/v1.0.0 ^/branches/hotfix-1.0.1</code></li>
+      <li>在分支上修，打完补丁再打新标签 <code class="ic">v1.0.1</code></li>
+      <li>这样 v1.0.0 永远是「当时发出去的那份」，可复现</li>
+    </ul>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">发布构建的标准脚本片段</span>
+  <div class="codewrap">
+    <div class="codehead"><span class="lang">bash</span><span class="fn">从标签构建发布包</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c">#!/usr/bin/env bash</span>
+<span class="c"># 从指定标签导出并构建发布包</span>
+set -euo pipefail
+
+TAG=<span class="s">"${1:-v1.0.0}"</span>
+REPO=<span class="s">"https://svn.example.com/repo"</span>
+BUILD=<span class="s">"./build-${TAG}"</span>
+
+<span class="c"># export 而非 checkout：产物里不含 .svn，可直接打包</span>
+svn export --force <span class="s">"${REPO}/tags/${TAG}"</span> <span class="s">"${BUILD}"</span> \
+  --username build-bot --password <span class="s">"${SVN_PASS}"</span> --non-interactive
+
+<span class="c"># 记录构建来源，便于事后追溯</span>
+cat &gt; <span class="s">"${BUILD}/BUILD-INFO.txt"</span> &lt;&lt;EOF
+tag          : ${TAG}
+built_at     : $(date -Iseconds)
+built_by     : $(whoami)
+svn_revision : $(svn info --show-item revision "${REPO}/tags/${TAG}")
+EOF
+
+tar czf <span class="s">"${TAG}.tar.gz"</span> -C <span class="s">"${BUILD}"</span> .
+echo <span class="s">"发布包已生成: ${TAG}.tar.gz"</span></pre>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     第六阶段 · 第 15 节：属性系统
+     ========================================================================== -->

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>15. 版本拓扑图：看清分支走向 | SVN 图形化实战</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 图形化实战</h1></div>
+  <div class="brand-sub">TortoiseSVN + VisualSVN · 全鼠标操作</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 准备</div>
+    <a href="01-tools.html">1. 认识你的两个图形工具</a>
+    <a href="02-first-checkout.html">2. 第一次检出：把代码拉到本地</a>
+    <a href="03-icons.html">3. 看懂图标角标与右键菜单</a>
+    <div class="grp">第二阶段 · 日常使用</div>
+    <a href="04-daily.html">4. 日常三件事：改、更、提</a>
+    <a href="05-status.html">5. 查看改动：哪些文件变了</a>
+    <a href="06-diff.html">6. 比对差异：到底改了哪几行</a>
+    <a href="07-add-delete.html">7. 新增、删除、重命名文件</a>
+    <a href="08-history.html">8. 查看历史：Log 对话框详解</a>
+    <a href="09-revert.html">9. 撤销：改错了怎么退回</a>
+    <div class="grp">第三阶段 · 进阶操作</div>
+    <a href="10-conflict.html">10. 冲突处理：两人改了同一处</a>
+    <a href="11-merge-tool.html">11. 合并编辑器：逐行选择保留谁</a>
+    <a href="12-branch.html">12. 建分支：开一条独立开发线</a>
+    <a href="13-switch.html">13. 切换分支：在主干和分支间跳</a>
+    <a href="14-merge.html">14. 合并分支：把改动并回主干</a>
+    <a href="15-revision-graph.html" class="on">15. 版本拓扑图：看清分支走向</a>
+    <div class="grp">第四阶段 · 属性与锁</div>
+    <a href="16-ignore.html">16. 忽略文件：让编译产物别再烦我</a>
+    <a href="17-properties.html">17. 属性对话框：设置文件行为</a>
+    <a href="18-lock.html">18. 文件锁：二进制文件独占编辑</a>
+    <div class="grp">第五阶段 · 服务端管理</div>
+    <a href="19-server.html">19. 服务端：VisualSVN 建仓库</a>
+    <a href="20-users.html">20. 用户与权限：谁能看谁能改</a>
+    <a href="21-backup.html">21. 备份与恢复：图形界面操作</a>
+    <div class="grp">第六阶段 · 效率技巧</div>
+    <a href="22-patch-export.html">22. 补丁与导出：不走仓库传代码</a>
+    <a href="23-settings.html">23. 设置面板：常用选项怎么调</a>
+    <a href="24-troubleshoot.html">24. 常见问题：报错怎么处理</a>
+    <a href="25-cheatsheet.html">25. 图形操作速查表</a>
+
+  </nav>
+</aside>
+<main>
+<div class="crumb">
+  <span class="stage">第三阶段 · 进阶操作</span>
+  <span class="sep">/</span>
+  <a href="index.html">总目录</a>
+  <span class="sep">/</span>
+  <span class="cur">第 15 节</span>
+</div>
+
+<h3 class="sec" id="s15"><span class="no">15</span>版本拓扑图：看清分支走向</h3>
+
+<p class="lead"> 分支一多，光看那一条条按时间排下来的日志列表就晕了—— 哪条分支是从哪一版分出去的、后来又合回哪儿了，光看列表根本理不清。 <strong>Revision graph（版本拓扑图）</strong>就是干这个的：把分支、标签、合并关系<b>画成一张图</b>，一眼看明白。
+</p>
+
+<div class="box key">
+  <span class="bt">为什么需要一个「图」</span>
+  <p> Show log 里的日志是<b>一条线</b>排下来的，它擅长回答「第几次提交改了什么」。 但分支让历史变成了<b>一棵树</b>，树形的东西用列表表示就是别扭：
+  </p>
+  <ul>
+    <li>列表里看不出<b>哪几个提交属于同一条分支</b>——它们只是众多条目中的几行。</li>
+    <li>列表里看不出<b>分支是从哪一版分出去的</b>。你只能靠翻记录、比对版本号去猜。</li>
+    <li>列表里看不出<b>某条分支合回主干没有</b>。合并记录在列表里只是又一次普通提交。</li>
+  </ul>
+  <p> <strong>版本拓扑图把这些关系画成了线和点。</strong> 它是「看历史整体形状」的工具，<em>不是用来读代码改动的</em>—— 日常提交看日志，理清分支关系看这张图。
+  </p>
+</div>
+
+<h4 class="sub">先把它打开</h4>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">GRAPH</span>打开版本拓扑图</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">在文件夹上右键</span>
+      <span class="sc">在任意一个受版本控制的文件夹上右键即可。 如果右键的是<b>子文件夹</b>，图会以那个子目录为中心来画（只看它自己的历史）。<br>
+      <em>想看整个项目的情况，就在工作副本的根目录上右键。</em></span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">打开拓扑图</span>
+      <span class="sc"><span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Revision graph</span></span><br>
+      <em>菜单项没有省略号（<code class="ic">...</code>），点下去会直接开始画图。</em></span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">等它算一会儿</span>
+      <span class="sc">第一次打开需要<b>从服务器读取提交历史并计算分支关系</b>， 项目历史长的话可能要等十几秒甚至更久，窗口底下会有进度提示。<br>
+      <strong>结果会被缓存下来</strong>，所以之后再打开就快多了。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">从左上角开始读这张图</span>
+      <span class="sc">图的布局通常<b>越靠上越新</b>（不同版本和设置可能不一样， 拿不准时看一下界面上的方向提示或节点上的版本号）。<br>
+      <em>第一眼看整体形状——有几条分支线、在哪儿分岔、在哪儿交汇。</em></span>
+    </div>
+  </div>
+</div>
+
+<h4 class="sub">面对面看这张图</h4>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">Revision graph：把分支和合并画成一张地图</span><span class="fs">REVISION GRAPH</span></div>
+  <div class="sb"><img src="img/revision-graph.png" alt="Revision graph 版本拓扑图"></div>
+  <div class="cap">
+    这张图第一次看会觉得花，但它的构成其实很单纯，<b>三种元素</b>而已：<br><br>
+
+    <b>① 方块节点 = 一次提交</b><br>
+    图上的每个方块代表版本库里的<b>一个版本</b>。 方块上通常写着版本号，鼠标停上去或点开会显示这次提交的说明、作者和时间。<br>
+    <em>有些版本会被省略掉不画（为了图不至于太长），界面上有开关控制「显示多少个节点」。</em><br><br>
+
+    <b>② 线条 = 历史的走向</b><br>
+    • <strong>竖直的连线</strong>：同一条线上前后相继的提交，就是「在主干上又提交了几次」这种。<br>
+    • <strong>分岔出去的一条支线</strong>：<b>这里创建了分支</b>。支线的起点那个节点，就是分出去时的那个版本—— <strong>「这条分支从哪一版分的」看这里就对了</strong>。<br>
+    • <strong>两条线重新汇合</strong>：<b>这里发生了合并</b>。汇合点的那个节点就是执行合并时产生的那次提交。<br><br>
+
+    <b>③ 颜色 = 区分不同的线</b><br>
+    不同的分支线会用<b>不同的颜色</b>画出来，方便你用眼睛跟着一条线走到底。 主干、各条分支、标签通常颜色不同（具体配色和版本、主题设置有关）。<br>
+    <em>颜色只是帮你区分「这是不同的线」，不要记「蓝色=主干」这种固定说法—— 换个仓库颜色可能就变了。</em><br><br>
+
+    <b>④ 合并关系用什么标出来</b><br>
+    分支合回主干时，图上会通过在两条线之间<b>连线</b>的方式表示出这种关系。 有些显示方式下会用<b>不同线型的线</b>（比如虚线）来画「合并产生的连线」， 和「普通的父子提交连线」区分开。<br>
+    <b>看到一条从分支线指向主干线的连线，那条分支就已经合回来了。</b><br>
+    <em>被合并过的版本在图上或提示信息里也可能带有标记，和日志里灰显已合并版本是一个道理。</em><br><br>
+
+    <b>⑤ 顶部的工具栏按钮</b>——图上方的按钮负责调整<b>看的方式</b>： 缩放（放大看清节点、缩小看全貌）、刷新、以及各种显示选项。 <b>基本操作在下一小节展开说。</b>
+  </div>
+</div>
+
+<h4 class="sub">图上的几个实用操作</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:180px">操作</th><th style="width:190px">怎么做</th><th>什么时候用</th></tr></thead>
+<tbody>
+  <tr>
+    <td><strong>放大 / 缩小</strong></td>
+    <td>工具栏上的缩放按钮， 或者按住 <kbd>Ctrl</kbd> 滚动鼠标滚轮</td>
+    <td><b>缩到最小看整体形状</b>——一共几条分支、什么走向； <b>放大看节点细节</b>——版本号和说明文字才看得清。<em>先小后大，是读这张图的顺序。</em></td>
+  </tr>
+  <tr>
+    <td><strong>拖动平移</strong></td>
+    <td>在空白处按住鼠标左键拖， 或用滚动条</td>
+    <td>图比窗口大的时候移动视野。项目历史长的时候图会很长，<b>顺着一条线拖下去看它最后到哪儿</b>。</td>
+  </tr>
+  <tr>
+    <td><strong>只看某一条分支</strong></td>
+    <td>在工具栏或显示选项里限制「显示哪些分支」， 也可以直接<b>点击某条线上的节点把它选中</b>，相关操作会围绕它展开</td>
+    <td>分支太多、图太乱的时候。<b>先只留下自己关心的那一条，看清它从哪来到哪去，再放开其他的。</b></td>
+  </tr>
+  <tr>
+    <td><strong>点击节点看详情</strong></td>
+    <td>单击一个方块节点</td>
+    <td>查看<b>这个版本是谁、什么时候、为什么提交的</b>。 判断「这条分支当初是干嘛的」最直接的依据，就是分岔点那个版本的说明。<em>所以建分支时写清楚说明很重要。</em></td>
+  </tr>
+  <tr>
+    <td><strong>和日志联动</strong></td>
+    <td>右键节点 → 选择查看日志类的选项 （菜单里有 <code class="ic">Show log</code> 这类的入口）</td>
+    <td><b>从「看形状」切到「看内容」</b>。 图上定位到可疑的分岔点，再跳进日志看那几次提交具体改了什么。<em>两个工具配合着用，效率最高。</em></td>
+  </tr>
+  <tr>
+    <td><strong>刷新</strong></td>
+    <td>工具栏上的刷新按钮</td>
+    <td>别人刚提交、或者你刚建了分支/合了并，图还是旧的。 <b>刷新一下才能看到最新状态。</b></td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box tip">
+  <span class="bt">最典型的两个用途</span>
+  <p> 这张图看起来是个「高级工具」，其实日常真正用它的场景就两个，而且都非常实用：
+  </p>
+  <p> <strong>用途一：搞清楚「这个功能是从哪个版本分出去的」</strong>
+  </p>
+  <ul>
+    <li>接手一个项目，看到有条叫 <code class="ic">order-export</code> 的分支，不知道它是什么时候、基于什么分出来的。</li>
+    <li>打开拓扑图，<b>顺着那条分支线往上找，找到它和主干分岔的那个点</b>——那就是它的起点。</li>
+    <li>点开那个节点看提交说明，通常就写着「从主干拉出分支，开始做订单导出功能」。</li>
+  </ul>
+  <p><em>比在日志里一页页翻、靠猜要快得多，而且不会猜错。</em></p>
+  <p> <strong>用途二：搞清楚「这个分支合回来没有」</strong>
+  </p>
+  <ul>
+    <li>要发版了，想知道某个功能到底进没进主干——如果没进，这次发版就会漏功能。</li>
+    <li>在图上找到那条分支线，<b>看它有没有一条连线回到主干线</b>。</li>
+    <li><strong>有连线回到主干 = 已经合过了</strong>；<b>线到某个节点就断了、没有汇合点 = 还没合回来</b>。</li>
+  </ul>
+  <p><em>这个判断在发版前检查时特别有价值——能避免「功能做完了却忘了合并」这种耽误发布的问题。</em></p>
+  <p> <strong>顺带一提</strong>：这张图也是理解「SVN 的合并追踪」最直观的地方—— 你能亲眼看到哪条线在什么时候汇入了哪条线，<b>哪些版本已经被合并覆盖过</b>。 前面几节讲的合并机制，在这里变成了看得见的东西。
+  </p>
+</div>
+
+<div class="box warn">
+  <span class="bt">读这张图时别踩的几个误解</span>
+  <ul>
+    <li><strong>图上的位置不完全等于时间顺序。</strong> 布局主要是为了<b>把分支关系画清楚</b>， 故意排成这个样子的。要确认先后，<b>看节点上的版本号</b>，不要只看它在图上偏上还是偏下。</li>
+    <li><strong>看不到某条分支，不代表它不存在。</strong> 图可能因为显示设置只画了一部分节点（比如只显示最近多少个）， 或者被过滤条件隐藏了。<em>看不到就检查一下显示选项，或者刷新一下。</em></li>
+    <li><strong>不显示合并连线，不代表没合并过。</strong> 显示方式是可调的，有些模式下合并关系不会画得很显眼。 <b>要确认有没有合并，去日志里对照更可靠。</b></li>
+    <li><strong>它只反映版本库里的真实历史。</strong> 本地未提交的改动、新建但还没提交的文件，都不会出现在图上。<em>别指望用它确认本地的工作状态，那是图标角标的活儿。</em></li>
+    <li><strong>第一次打开慢是正常的。</strong> 历史特别长的项目，算这张图可能要等一会儿，<b>耐心等进度跑完，别急着点关闭重开</b>。</li>
+  </ul>
+</div>
+
+<div class="grid2">
+  <div class="card blue">
+    <h6>什么时候该打开拓扑图</h6>
+    <ul>
+      <li>刚接手项目，想快速搞清分支结构</li>
+      <li>发版前确认所有该合的功能都合回主干了吗</li>
+      <li>要删一条分支，先确认它是不是真没用了（有没有还没合回来的东西）</li>
+      <li>发现主干上多了些不认识的改动，想追溯是哪儿来的</li>
+      <li>准备做一次大合并，先看看两条线分岔了多远</li>
+    </ul>
+  </div>
+  <div class="card pur">
+    <h6>什么时候用它反而绕远</h6>
+    <ul>
+      <li>只想看「昨天谁提交了什么」——<b>用 Show log 更快</b></li>
+      <li>想知道某个文件改了哪几行——<b>用比对（Diff）才对</b></li>
+      <li>只想提交自己手头的改动——<b>这事和图没关系</b></li>
+      <li>项目分支很少、一直只用主干——<b>图就是一条直线，没什么可看的</b></li>
+    </ul>
+  </div>
+</div>
+
+<div class="box ok">
+  <span class="bt">一张图帮你回答的三个问题</span>
+  <ul>
+    <li><strong>现在有哪些线在并行？</strong>——数一数图上有几条分支线。</li>
+    <li><strong>它们各自从哪来、到哪去了？</strong>——顺着线找分岔点和汇合点。</li>
+    <li><strong>该合的合了吗？</strong>——看有没有连线回到主干。</li>
+  </ul>
+  <p> 把这三点看明白，你就算真正掌握了团队的分支节奏。 <em>接下来的两节换个话题：讲怎么让那些不该进版本库的文件（编译产物、日志、IDE 配置）闭嘴。</em>
+  </p>
+</div>
+
+
+<div class="pager">
+  <a href="14-merge.html"><span class="lbl">← 上一节</span><span class="ttl">14. 合并分支：把改动并回主干</span></a>
+  <a class="home" href="index.html"><span class="ttl">总目录</span></a>
+  <a class="next" href="16-ignore.html"><span class="lbl">下一节 →</span><span class="ttl">16. 忽略文件：让编译产物别再烦我</span></a>
+</div>
+
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+<script src="assets/app.js"></script>
+</body>
+</html>

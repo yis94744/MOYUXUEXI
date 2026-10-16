@@ -1,0 +1,239 @@
+<h3 class="sec" id="s22"><span class="no">22</span>补丁与导出：不走仓库传代码</h3>
+
+<p class="lead">
+  绝大多数时候，代码的流转都是「提交 → 更新」这一条路。但总有些场合不适合走仓库：
+  <strong>你还没有账号、只想给同事看一处改动、要给客户发一份干净的代码、要把一批现成的文件一次性放上服务器</strong>。
+  这一节讲四个不依赖提交流程的传代码方式：补丁、应用补丁、导出、导入。
+</p>
+
+<div class="box key">
+  <span class="bt">四种方式的定位</span>
+  <p><strong>补丁（Patch）</strong>——把你的改动变成一个<strong>很小很轻的文本文件</strong>发给别人。对方能看到你改了哪几行、再决定要不要采纳。<em>适合「我还没有提交权限」或者「这个改动先给别人过一眼」。</em></p>
+  <p><strong>导出（Export）</strong>——从仓库里<strong>拷出一份干净的代码</strong>，不带任何 SVN 痕迹。<em>适合交给客户、打包发布、部署上线。</em></p>
+  <p><strong>导入（Import）</strong>——把一个现成的目录<strong>一次性放上仓库</strong>，不需要先检出。<em>适合把老项目、外包交付的文件搬进版本库。</em></p>
+  <p><strong>检出（Checkout）</strong>——本篇前面都在讲的那个，带版本控制能力的完整工作副本。<em>放在这里一起对比，是因为它和 Export 长得像、用途完全不同。</em></p>
+</div>
+
+<h4 class="sub">创建补丁：把改动变成一个文件</h4>
+
+<p>补丁文件本质上是一段<strong>记录了差异的纯文本</strong>：「第几行原来是这个、改成了那个」。它只有几 KB，用邮件、聊天工具、工单系统都能发，对方拿到后一键应用。</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">PATCH</span>把手上的改动做成补丁</div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">先确认你改了什么</span>
+    <span class="sc">对着工作副本文件夹右键 → <span class="mp"><span class="item">SVN Check for modifications</span></span>，看看列表里有哪些文件是「已修改」。<em>做补丁之前先看清楚范围，别把调试用的临时改动也包进去。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">在文件夹上右键，打开创建补丁</span>
+    <span class="sc">在你改过的<strong>文件夹</strong>上右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Create patch...</span></span>。也可以只对单个文件做——右键那个文件用同一个命令。<em>想一次包含多个文件，就在它们的共同父文件夹上操作。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">在文件列表里勾选要包含的改动</span>
+    <span class="sc">弹出的对话框里列出了所有有改动的文件，<strong>每个前面都有勾选框</strong>。只勾要做进补丁的那些，不想给别人的（本地配置、调试代码）把勾去掉。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">保存成一个 .patch 文件</span>
+    <span class="sc">点 <code class="ic">OK</code> 后选择保存位置和文件名。对话框里能直接选择保存成 <code class="ic">.patch</code> 或 <code class="ic">.diff</code> 格式，<strong>内容基本一样，挑一个就行</strong>。<em>把它和你的说明一起发出去。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">发的时候附上说明</span>
+    <span class="sc">补丁文件本身<strong>不包含「为什么改」</strong>，只有「改了什么」。发出去的时候一定配一句话讲清楚背景，否则对方只能靠读代码猜。<em>好的做法是在聊天里写清：改哪个模块、解决什么问题、要按哪个版本应用。</em></span>
+  </div></div>
+</div>
+
+<div class="box tip">
+  <span class="bt">补丁最适合的三个场景</span>
+  <p><strong>① 还没有提交权限。</strong>新人、外包、临时支援的同学，改完做成补丁发给负责人，由有权限的人应用后再提交——<strong>比开账号更轻，也更安全</strong>。</p>
+  <p><strong>② 改动需要先被评审。</strong>先做成补丁发给同事，他看清楚每一行再决定要不要收，相当于一次小型代码评审。</p>
+  <p><strong>③ 环境对不上时的应急交付。</strong>对方那边的版本和你这边不完全一致，发整个文件夹不现实，一个只含差异的小补丁是最合适的载体。</p>
+</div>
+
+<h4 class="sub">应用补丁：把别人发来的改动合进来</h4>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">APPLY</span>把收到的补丁应用到工作副本</div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">先更新到最新，再应用</span>
+    <span class="sc">对着工作副本右键 → <span class="mp"><span class="item">SVN Update</span></span>，把本地拉到最新。<em>补丁是<b>按行号定位</b>的，如果本地代码和做补丁时的版本差太多，就可能对不上，提前更新能大幅降低失败概率。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">在目标文件夹上右键，选择应用补丁</span>
+    <span class="sc">在你<strong>要应用改动的那个目录</strong>上右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Apply patch...</span></span>。<em>应用位置要选对：补丁里记录的是相对路径，根目录选错了会提示找不到文件。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">选中那个 .patch 文件</span>
+    <span class="sc">在文件对话框里浏览到补丁文件，选中打开。工具会立刻读一遍内容，<strong>把里面包含的文件列出来</strong>。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">逐项预览再决定</span>
+    <span class="sc">列表里每个文件都能双击查看差异——<strong>这一步别跳过</strong>，你是在把别人写的代码放进自己项目，值得看一眼。不要的文件可以在勾选框里去掉。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">点应用，然后检查结果</span>
+    <span class="sc">应用完成后回到资源管理器，看角标：<strong>被改过的文件应该变成红色叹号</strong>。打开文件通读一遍改动是否符合预期，再提交，并在 <code class="ic">Message</code> 里写清「应用自某某人的补丁」。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">如果有文件提示失败、打了叉</span>
+    <span class="sc">说明这一处的上下文和本地对不上（对方改的那几行你这边已经变过）。<strong>这时会出现类似冲突的标记，处理方式和第 10、11 节完全一样</strong>：打开文件或用合并工具逐处决定，改完右键 <code class="ic">Resolved</code>。</span>
+  </div></div>
+</div>
+
+<h4 class="sub">导出：拿一份干净的代码出来</h4>
+
+<p>导出和检出长得非常像——都是从一个地址把代码拉到本地一个文件夹。区别就一个，但这个区别决定了它们的用途：<strong>导出出来的副本里没有 <code class="ic">.svn</code> 目录，也不受版本控制。</strong></p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">EXPORT</span>从仓库导出一份干净代码</div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">在要放导出结果的位置右键</span>
+    <span class="sc">可以是一个普通文件夹，<strong>不需要是工作副本</strong>——这一点和检出不同，检出是在空文件夹上做的。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">选择导出命令</span>
+    <span class="sc">走 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Export...</span></span>，弹出导出对话框。在 <code class="ic">Repo-browser</code> 里浏览仓库时，对某个目录或文件同样能找到这个命令。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">填 URL 和导出目录</span>
+    <span class="sc">在 <code class="ic">URL of repository</code> 里填仓库地址（可以精确到某个子目录，比如只导出 <code class="ic">/trunk</code>），在下面的 <code class="ic">Export directory</code> 里选本地目标文件夹。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">选择要导出哪个版本</span>
+    <span class="sc">对话框下方是版本选择。<strong>日常发布就保持在最新状态</strong>；如果要给客户发「和上次发布完全一致的那一版」，就选中具体版本号，或者按日期选。<em>这是导出相比手工复制最大的价值：能精确定位到某一版。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">确定，检查导出的内容</span>
+    <span class="sc">完成后打开那个文件夹：<strong>能看到代码文件，看不到任何 <code class="ic">.svn</code> 隐藏目录，文件图标上也没有绿色对勾之类的角标</strong>，这就是一份干净的代码。打包压缩发给客户即可。</span>
+  </div></div>
+</div>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">Export 导出对话框</span><span class="fs">Export</span></div>
+  <div class="sb"><img src="img/ExportURL.png" alt="Export 导出对话框" class="mid"></div>
+  <div class="cap">
+    <b>① <span class="k">URL of repository</span> · 导出源</b>——要从哪里导。可以填仓库根、某个项目、甚至具体到某一个子目录。<strong>它会自动记住你上次使用的地址</strong>，所以连续的发布操作会很快。<br><br>
+    <b>② <span class="k">Export directory</span> · 导出到哪</b>——本地目标文件夹。<em>如果目标文件夹已经存在并且里面有东西，工具会提示覆盖，操作前先确认里面没有你要留的文件。</em><br><br>
+    <b>③ <span class="k">Export revision</span> · 导出哪个版本</b>——这是这个对话框里<b>最容易被忽略、也最有价值的一项</b>。默认是最新版本；下拉里可以选具体版本号或按日期。<strong>给客户的每一份交付，都建议在这里锁定成一个明确的版本号</strong>，这样将来出问题，你能一口气说清「发给客户的到底是哪一版」。<br><br>
+    <b>④ <span class="k">Revision</span> 旁的 Show log 按钮</b>——点它可以先打开日志看一遍，确认哪个版本才是你要的那一版，再回来填版本号。<em>先看日志再选版本，比凭记忆填数字靠谱。</em><br><br>
+    <b>⑤ <span class="k">Export unversioned files too</span></b>——如果导出源里混着一些尚未纳入版本控制的文件（<code class="ic">灰色问号</code>的那些），勾上这个能一并导出。<strong>一般不勾</strong>，因为没纳入版本控制的东西本来就不该出现在交付物里。<br><br>
+    <b>⑥ <span class="k">Omit externals</span></b>——外部引用是指「从别的仓库目录挂过来的内容」。勾上它就不去拉这部分。<em>大多数项目没有用到外部引用，这一项保持默认即可。</em>
+  </div>
+</div>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:150px">常见用途</th><th style="width:220px">为什么用 Export 而不是直接复制</th><th>怎么做</th></tr></thead>
+<tbody>
+  <tr><td><strong>给客户发代码</strong></td><td>工作副本里混着你的本地改动、调试文件、<code class="ic">.svn</code> 目录，直接打包发出去既不专业也可能漏了不该给的东西。</td><td>从仓库导出<strong>指定版本</strong>的 <code class="ic">/trunk</code>，压缩后发送。</td></tr>
+  <tr><td><strong>打包发布</strong></td><td>发布要用<strong>服务器上确定的某一版</strong>，不能用手上正在改的本地副本，否则出的包和别人看到的代码对不上。</td><td>导出发版那一版，再走你们的打包流程。</td></tr>
+  <tr><td><strong>部署到服务器</strong></td><td>部署机器上不需要做版本控制，多出来的 <code class="ic">.svn</code> 目录只是累赘，还会暴露仓库地址信息。</td><td>导出到部署目录，直接替换旧内容。</td></tr>
+  <tr><td><strong>做备份留底</strong></td><td>想要一份「某个时间点长什么样」的快照，看得见摸得着。</td><td>按日期导出，文件夹名带上日期，归档保存。</td></tr>
+</tbody>
+</table>
+</div>
+
+<h4 class="sub">导入：把现成的目录一次放进仓库</h4>
+
+<p>手上有一堆早就写好的文件，没有任何版本历史，想<strong>一次性搬上服务器</strong>。这时不需要先检出——直接导入就行。</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">IMPORT</span>把一个本地目录传进仓库</div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">整理好要导入的目录</span>
+    <span class="sc">把要传的文件都放到同一个文件夹里，<strong>先去干净里面的临时文件、编译产物、<code class="ic">.svn</code> 残留目录</strong>。<em>导进去容易，导错了要一个一个删。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">在本地那个目录上右键</span>
+    <span class="sc">对着要上传的<strong>本地文件夹</strong>右键（不是在仓库上），走 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Import...</span></span>，弹出导入对话框。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">填仓库里的目标地址</span>
+    <span class="sc">这是最关键的一格：<strong>填的是它在仓库里的落脚点</strong>。想把内容放进主干，就填到 <code class="ic">.../MyProject/trunk</code> 这一层；<em>填成仓库根的话，你文件夹里的东西会直接堆到 trunk 旁边，结构就乱了。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">确认目标目录不存在</span>
+    <span class="sc">导入要求<strong>目标路径在仓库里还不存在</strong>（或者是个空目录）。先用 <code class="ic">Repo-browser</code> 看一眼，确认你要填的位置是干净的。<em>位置已经用了，就先删除或换一个路径。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">填提交说明，确定</span>
+    <span class="sc">在 <code class="ic">Message</code> 里写清这是什么——比如「导入项目初始版本（来自旧共享盘）」。<strong>导入会产生一次提交，这句话就是整份初始历史的第一条记录</strong>，值得写明白。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">导入完，把本地目录变成工作副本</span>
+    <span class="sc">注意：<strong>导入只把文件传上去了，你本地这个文件夹还是没有版本控制的普通文件夹</strong>。想继续开发，就在旁边建一个空文件夹做一次检出，或者对着这个文件夹就地检出、把服务器内容拉下来对上。<em>两种方式都要保证以后的工作副本是那个检出出来的。</em></span>
+  </div></div>
+</div>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">Import 导入对话框</span><span class="fs">Import</span></div>
+  <div class="sb"><img src="img/Import.png" alt="Import 导入对话框" class="mid"></div>
+  <div class="cap">
+    <b>① <span class="k">URL of repository</span> · 传到哪去</b>——仓库里的目标位置。<strong>这一格填错是导入最常见的错误</strong>：填得太浅，内容会散落在不该在的层级；填得太深，你要的位置上会凭空多套一层文件夹。<em>填之前先用 <code class="ic">Repo-browser</code> 把目标路径看一遍。</em><br><br>
+    <b>② <span class="k">Import Message</span> · 说明文字</b>——这次导入的提交信息。写得具体一点，将来别人查历史时能看懂这批东西的来历。<br><br>
+    <b>③ 上方的 <span class="k">Import directory</span> 提示</b>——它告诉你当前要从哪个本地目录导入内容。确认这个目录选对了：<strong>它是你在资源管理器里右键的那一个</strong>。<br><br>
+    <b>④ <span class="k">Include ignored files</span></b>——默认情况下，被「忽略属性」排除掉的文件（编译产物、临时文件）<b>不会</b>被导进去，这正是你想要的。只有在你确实想把它们也传上去时才勾选。<br><br>
+    <b>⑤ <span class="k">Depth</span> 深度选项</b>——决定导进去多少层。一般保持完整递归（把整个目录树都传），除非你只想导入最外面一层。<br><br>
+    <b>⑥ 完成之后的进度窗口</b>——导入会像提交一样显示一个进度列表，每个文件前面有 <span class="k">A</span>（新增）之类的标记。<strong>看到全部完成、没有错误行，才算真的传上去了。</strong>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">导入之后别忘了做检出</span>
+  <p>新手最容易卡在这里：导入成功了，于是在<strong>原来那个文件夹</strong>里继续改代码，结果怎么改都提交不了——因为<strong>那个文件夹从头到尾都不是工作副本</strong>，SVN 只是借用它把文件读了一遍传上去而已。</p>
+  <p>正确的做法二选一：<strong>① 在旁边建个新文件夹</strong>，对着仓库地址做一次检出，以后就在那个检出目录里干活（目录名可以带个后缀区分，比如 <code class="ic">MyProject-wc</code>）；<strong>② 就地检出</strong>——在那个文件夹上直接对同一地址做检出，把服务器上的内容拉下来覆盖对齐，之后它才变成真正的工作副本。</p>
+</div>
+
+<h4 class="sub">Checkout / Export / Import 到底差在哪</h4>
+
+<div class="duo">
+  <div>
+    <div class="dh">✗ 常见误解</div>
+    <p><strong>「导出和检出不是一样吗？都是把代码拉到本地。」</strong>——不一样。导出的副本<strong>不受版本控制</strong>：没有角标、没有右键菜单、改完也不能提交。它只是一个快照。</p>
+    <p><strong>「导出比检出快，那平时都用导出好了。」</strong>——导出出来的东西<strong>改不了、也更新不了</strong>，你在里面写一天代码，最后没有任何办法安全地送回服务器。</p>
+    <p><strong>「导入就是把文件夹复制到服务器上。」</strong>——导入只会传上去，<strong>你本地那个文件夹不会因此变成工作副本</strong>，它在 SVN 眼里仍然是「外人」。</p>
+    <p><strong>「补丁那么麻烦，不如直接把整个文件夹发过去。」</strong>——发整个文件夹对方没法看出你改了什么，也没法只收一部分，<b>而且容易把本地乱七八糟的东西一起发出去</b>。</p>
+  </div>
+  <div>
+    <div class="dh">✓ 正确理解</div>
+    <p><strong>Checkout = 领一份带管控权的工作副本。</strong>你要长期在这里干活，改、更、提都在里面发生。</p>
+    <p><strong>Export = 取一份定格的快照。</strong>它是一次性的交付物，给出去之后<strong>和仓库再无关系</strong>。用完就归档，不要在里面开发。</p>
+    <p><strong>Import = 单向送货上门。</strong>只负责把本地的既成内容放上服务器，<strong>放完还要另外检出才能继续开发</strong>。</p>
+    <p><strong>Patch = 只发送差异。</strong>体积小、可审阅、可挑选，<strong>是「没有权限」和「需要评审」两种场景的标准做法</strong>。</p>
+  </div>
+</div>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:190px">对比项</th><th style="width:190px">Checkout 检出</th><th style="width:190px">Export 导出</th><th>Import 导入</th></tr></thead>
+<tbody>
+  <tr><td><strong>方向</strong></td><td>仓库 → 本地</td><td>仓库 → 本地</td><td><strong>本地 → 仓库</strong></td></tr>
+  <tr><td><strong>结果带版本控制吗</strong></td><td><strong>带。</strong>有角标、有右键菜单、能提交更新</td><td><strong>不带。</strong>就是个普通文件夹</td><td>上传后就结束了，本地<strong>不会</strong>因此被管控</td></tr>
+  <tr><td><strong>有 .svn 目录吗</strong></td><td>每个文件夹里都有</td><td><strong>没有</strong>，完全干净</td><td>不涉及（是往上传）</td></tr>
+  <tr><td><strong>能选版本吗</strong></td><td>能，可检出某一版或某一分支</td><td>能，而且<strong>强烈建议锁定版本</strong></td><td>不适用（就是当前这份内容）</td></tr>
+  <tr><td><strong>典型用途</strong></td><td>日常开发、拉分支、换机器重建环境</td><td>给客户、打包发布、部署、归档快照</td><td>老项目入库、外包交付入库、批量初始化</td></tr>
+  <tr><td><strong>用完还要做什么</strong></td><td>直接开始改代码</td><td><strong>别在里面改</strong>，它是交付物，改了就白导</td><td><strong>另外做一次检出</strong>，才能继续开发</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:310px">我的目的</th><th style="width:170px">该用哪个操作</th><th>备注</th></tr></thead>
+<tbody>
+  <tr><td>我要长期在这个项目上写代码</td><td><strong>Checkout</strong></td><td>在空文件夹上做，得到工作副本。</td></tr>
+  <tr><td>我要给客户发一份代码</td><td><strong>Export</strong></td><td>选好版本号，导出的绝对干净。</td></tr>
+  <tr><td>我要打一个发布包</td><td><strong>Export</strong></td><td>从发版那一版导出，再走打包流程。</td></tr>
+  <tr><td>我要把一批现成的文件传上服务器</td><td><strong>Import</strong></td><td>不用先检出，但导完要另外检出。</td></tr>
+  <tr><td>我改了代码，但还没有提交权限</td><td><strong>Create patch</strong></td><td>把补丁发给有权限的人代为提交。</td></tr>
+  <tr><td>同事发来一个补丁，我要合进来</td><td><strong>Apply patch</strong></td><td>先 Update，再预览，最后应用。</td></tr>
+  <tr><td>我只想看看别人改了什么，不动本地</td><td><strong>Show log / Repo-browser</strong></td><td>纯查看，不产生任何本地变化（第 8 节）。</td></tr>
+  <tr><td>我要回到某个历史版本</td><td><strong>Update to revision</strong></td><td>不是导出也不是检出，见第 9 节。</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="box ok">
+  <span class="bt">什么时候用哪个：一句话版本</span>
+  <p><strong>要在这里干活</strong> → 检出（Checkout）；<strong>要交出去一份</strong> → 导出（Export）；<strong>要把现成的搬上库</strong> → 导入（Import）；<strong>只想传我改的那几行</strong> → 补丁（Patch）。</p>
+  <p><em>记住这四句，日常遇到的场景基本都能对上号。分不清的时候回来把上面的表看一眼就行。</em></p>
+</div>

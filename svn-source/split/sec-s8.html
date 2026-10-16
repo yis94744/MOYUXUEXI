@@ -1,0 +1,322 @@
+<h3 class="sec" id="s8"><span class="no">8</span>日常开发循环与 diff / log 进阶</h3>
+
+<p class="lead">
+  单人开发、多人协作、紧急修复——所有场景最后都收敛成同一个循环：
+  <strong>update → 改 → status → diff → update → commit</strong>。
+  这一节把循环里的 <code class="ic">update</code>、<code class="ic">log</code>、<code class="ic">diff</code> 三个命令挖到底。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 8-1　多人协作的日常循环与冲突预防</span><span class="fs">Daily Loop</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 400" width="980" height="400" role="img" aria-label="SVN 多人协作日常循环图">
+  <!-- 中央循环 -->
+  <circle cx="240" cy="200" r="105" fill="none" stroke="#30363d" stroke-width="2" stroke-dasharray="6 5"/>
+  <text class="hd" x="240" y="118" text-anchor="middle" fill="#58a6ff">日常循环</text>
+
+  <!-- 四个节点 -->
+  <rect class="c-blue" x="176" y="86" width="128" height="38" rx="8"/>
+  <text class="tm" x="240" y="110" text-anchor="middle">svn update</text>
+
+  <rect class="c-green" x="306" y="182" width="128" height="38" rx="8"/>
+  <text class="tm" x="370" y="206" text-anchor="middle">编辑代码</text>
+
+  <rect class="c-orange" x="176" y="278" width="128" height="38" rx="8"/>
+  <text class="tm" x="240" y="302" text-anchor="middle">svn diff</text>
+
+  <rect class="c-pur" x="48" y="182" width="128" height="38" rx="8"/>
+  <text class="tm" x="112" y="206" text-anchor="middle">svn commit</text>
+
+  <!-- 循环箭头 -->
+  <path class="arwb" d="M306,110 C350,124 372,150 372,182"/>
+  <path class="arwg" d="M370,220 C370,254 348,278 306,296"/>
+  <path class="arwo" d="M176,296 C132,278 112,254 112,220"/>
+  <path class="arwp" d="M112,182 C112,150 132,124 176,110"/>
+
+  <text class="tm2" x="352" y="152">改</text>
+  <text class="tm2" x="352" y="268">查</text>
+  <text class="tm2" x="128" y="268">提</text>
+  <text class="tm2" x="128" y="152">更</text>
+
+  <!-- 右侧：预防冲突 -->
+  <rect x="500" y="40" width="452" height="146" rx="11" fill="rgba(126,231,135,.07)" stroke="#7ee787" stroke-width="1.4"/>
+  <text class="hd" x="522" y="66" fill="#7ee787">缩短「持有时间」是避免冲突的唯一办法</text>
+  <text class="ts" x="522" y="92">冲突的产生条件：</text>
+  <text class="tx" x="538" y="114">① 你改了一个文件，② 同事也改了同一个文件，</text>
+  <text class="tx" x="538" y="136">③ 同事先提交了，④ 你 update 时撞上他的改动。</text>
+  <text class="ts" x="522" y="162">持有时间越长（比如三天不提交），撞车概率越高。</text>
+  <text class="ts" x="522" y="182" fill="#7ee787">对策：小步提交，一个功能一提交，别攒。</text>
+
+  <!-- 右下 -->
+  <rect x="500" y="200" width="452" height="146" rx="11" fill="rgba(255,123,114,.07)" stroke="#ff7b72" stroke-width="1.4"/>
+  <text class="hd" x="522" y="226" fill="#ff7b72">每天开工第一件事：update</text>
+  <text class="ts" x="522" y="252">很多人习惯「想起来才更新」，这会导致：</text>
+  <text class="tx" x="538" y="274">• 本地基线与服务器越来越远</text>
+  <text class="tx" x="538" y="296">• 一次 update 拉回几百个改动，冲突爆炸</text>
+  <text class="tx" x="538" y="318">• 提交时发现文件全「过期」，被迫先合并</text>
+  <text class="ts" x="522" y="342" fill="#7ee787">习惯：开始写代码前 update，写完提交前再 update 一次。</text>
+
+  <!-- 底部提示 -->
+  <rect x="30" y="346" width="440" height="42" rx="9" fill="rgba(210,168,255,.07)" stroke="#d2a8ff" stroke-width="1.2"/>
+  <text class="ts" x="50" y="372">循环里没有「先提交再更新」这个顺序 —— 顺序反了就会冲突。</text>
+</svg>
+  </div>
+</div>
+
+<h4 class="sub" id="s8-2">update：不只是「拉代码」</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">update 的高级用法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">svn update                          <span class="c"># 把整个工作副本更新到 HEAD</span>
+svn update src/                     <span class="c"># 只更新某个目录</span>
+svn update README.md config.json    <span class="c"># 只更新指定文件</span>
+svn update -r 100                   <span class="c"># 更新到指定版本 r100（不是最新）</span>
+svn update --revision PREV          <span class="c"># 回退到上一个版本（常用！）</span>
+svn update --revision BASE          <span class="c"># 回到工作副本的基准版本（丢弃所有更新）</span>
+
+<span class="c"># 冲突处理策略（重要，脚本里必用）</span>
+svn update --accept postpone        <span class="c"># 冲突了就放着，产生冲突标记（默认行为）</span>
+svn update --accept mine-full       <span class="c"># 冲突时全用我的</span>
+svn update --accept theirs-full     <span class="c"># 冲突时全用服务器的</span>
+svn update --accept mine-conflict   <span class="c"># 只在本文件的冲突块用我的</span>
+svn update --accept theirs-conflict <span class="c"># 只在冲突块用服务器的</span>
+svn update --accept base            <span class="c"># 丢弃双方改动，回到原始版本</span>
+
+<span class="c"># 其他常用</span>
+svn update --force                  <span class="c"># 强制覆盖，即使有未版本控制的同名文件</span>
+svn update --ignore-ancestry        <span class="c"># 忽略祖先关系，直接覆盖（慎用）</span>
+svn update --set-depth infinity .   <span class="c"># 把稀疏工作副本变回完整（第 22 节）</span>
+svn update --non-interactive        <span class="c"># 脚本必备，遇冲突不卡住等输入</span></pre>
+</div>
+
+<div class="box warn">
+  <span class="bt">脚本里必须加 --non-interactive 和 --accept</span>
+  <p>SVN 默认遇到冲突会<strong>弹出交互式选择菜单</strong>，等待你输入字母。
+  在 CI / 定时任务 / 批处理脚本里，这会让进程<em>永久挂起</em>。</p>
+  <p>本教程在实测阶段就踩过这个坑——一个看似简单的 update 命令阻塞了 120 秒后被强制中断。
+  正确写法：</p>
+  <div class="codewrap">
+    <div class="codehead"><span class="lang">bash</span><span class="fn">CI 里的安全写法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">svn update --non-interactive --accept postpone
+svn commit -m <span class="s">"auto build"</span> --non-interactive</pre>
+  </div>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：update 输出的字母含义</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn update</span>
+Updating '.':
+<span class="hl">A</span>    bob-test                        <span class="cmt">← 服务器新增的，添加到本地</span>
+<span class="hl">U</span>    src\main.cs                     <span class="cmt">← 文件被更新（Updated）</span>
+<span class="hl">D</span>    old-file.txt                    <span class="cmt">← 服务器删除了，本地也删掉</span>
+<span class="hl">G</span>    config.json                     <span class="cmt">← 自动合并成功（merGed），无冲突！</span>
+<span class="no">C</span>    README.md                       <span class="cmt">← 冲突（Conflicted），需要人工介入</span>
+Updated to revision 12.
+
+<span class="cmt"># 输出字母速查</span>
+<span class="dim">A</span> Added     服务器上新增的条目
+<span class="dim">U</span> Updated   内容是服务器的版本（本地没改过）
+<span class="dim">D</span> Deleted   服务器上删除了
+<span class="dim">G</span> merGed    本地和服务器都改了，SVN 自动合并成功
+<span class="dim">C</span> Conflicted 自动合并失败，产生冲突，必须人工解决
+<span class="dim">E</span> Existed   已存在（通常是添加时同名文件在）</pre>
+  </div>
+</div>
+
+<h4 class="sub">log：查历史，但有个大坑</h4>
+
+<div class="box err">
+  <span class="bt">实测踩坑：svn log -l 1 显示的不是最新提交！</span>
+  <p>这是 SVN 新手最困惑的行为之一。<code class="ic">svn log</code> 默认<strong>从工作副本的 BASE 版本开始往回走</strong>，
+  而不是从服务器的最新版本。<strong>如果你很久没 update 过，log 给你看的就是「你本地那个古老时间点」的历史。</strong></p>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：这个坑长什么样</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 工作副本停在 r9，但服务器上已经有 r10 了</span>
+<span class="ps">$</span> <span class="cmd">svn log -l 1</span>
+------------------------------------------------------------------------
+<span class="hl">r9</span> | kelang | 2026-10-08 11:02:52 | 1 line
+<span class="cmt">↑ 显示的是 r9 而不是 r10！</span>
+<span class="cmt">  因为 log 从工作副本 BASE（r9）开始往回数</span>
+
+<span class="cmt"># 正确写法一：显式指定从 HEAD 开始</span>
+<span class="ps">$</span> <span class="cmd">svn log -r HEAD -l 1</span>
+------------------------------------------------------------------------
+<span class="ok">r10</span> | kelang | 2026-10-08 11:02:58 | 1 line
+<span class="cmt">↑ 这才是服务器上真正的最后一次提交</span>
+
+<span class="cmt"># 正确写法二：先 update 再 log</span>
+<span class="ps">$</span> <span class="cmd">svn update; svn log -l 1</span>
+Updating '.':
+At revision <span class="hl">10</span>.
+------------------------------------------------------------------------
+<span class="ok">r10</span> | kelang | 2026-10-08 11:02:58 | 1 line
+
+<span class="cmt"># 正确写法三：用 URL 而不是工作副本路径</span>
+<span class="ps">$</span> <span class="cmd">svn log -l 1 file:///E:/repo/trunk</span>
+<span class="cmt">URL 形式默认从 HEAD 开始，没有这个坑</span></pre>
+  </div>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">log 的完整用法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">svn log                              <span class="c"># 全部历史（从 BASE 往回），大仓库会刷屏</span>
+svn log -l 10                        <span class="c"># 只看最近 10 条</span>
+svn log -r HEAD -l 1                 <span class="c"># 看服务器最新那一条（避开 BASE 坑）</span>
+svn log -r 5:10                      <span class="c"># 指定区间</span>
+svn log -r <span class="s">"{2026-10-01}:{2026-10-08}"</span>  <span class="c"># 按日期区间（1.8+）</span>
+svn log -r <span class="s">"{2026-10-01}:HEAD"</span>
+
+<span class="c"># 输出控制</span>
+svn log -q                           <span class="c"># 只要版本号/作者/时间，不要日志正文</span>
+svn log -v                           <span class="c"># 显示每次提交具体改了哪些路径（重要！）</span>
+svn log --xml                        <span class="c"># XML 格式，给脚本解析用</span>
+svn log -g                           <span class="c"># 显示合并追踪信息（Merged via: rXX）</span>
+svn log --search <span class="s">"修复登录"</span>          <span class="c"># 按关键字搜日志（1.8+）</span>
+svn log --diff                       <span class="c"># 直接带上 diff 内容，非常直观</span>
+
+<span class="c"># 看某个文件的完整历史（含重命名追踪）</span>
+svn log -v src/main.cs
+svn log --stop-on-copy               <span class="c"># 追到创建该分支的那次提交就停（分析分支起点）</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：svn log -v 显示变更的路径</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn log -v -l 1</span>
+------------------------------------------------------------------------
+r2 | kelang | 2026-10-08 10:56:03 +0800 | 1 line
+<span class="hl">Changed paths:</span>
+   <span class="ok">A</span> /trunk/README.md             <span class="cmt">← A=Added U=Updated D=Deleted R=Replaced</span>
+   <span class="ok">A</span> /trunk/src
+   <span class="ok">A</span> /trunk/src/main.cs
+
+初始化项目结构与说明文档
+------------------------------------------------------------------------
+
+<span class="cmt"># 路径首字母含义（和 status 的字母不同！）</span>
+<span class="dim">A</span> 新增   <span class="dim">M</span> 修改   <span class="dim">D</span> 删除
+<span class="dim">R</span> 替换（删除+新增同名）  <span class="dim">C</span> 复制  <span class="dim">G</span> 属性改动
+
+<span class="cmt"># 用 -g 看合并关系，这一步是理解分支的关键</span>
+<span class="ps">$</span> <span class="cmd">svn log -g -l 4</span>
+------------------------------------------------------------------------
+r8 | kelang | 2026-10-08 11:01:15 | 1 line
+合并 feature-login 分支（冲突已解决）
+------------------------------------------------------------------------
+<span class="hl">r6</span> | kelang | 2026-10-08 10:59:05 | 1 line
+<span class="cy">Merged via: r8</span>                    <span class="cmt">← 关键！这个提交通过 r8 被合并进来了</span>
+分支：新增登录功能说明
+------------------------------------------------------------------------
+<span class="hl">r5</span> | kelang | 2026-10-08 10:58:59 | 1 line
+<span class="cy">Merged via: r8</span>
+从 trunk 创建 feature-login 分支
+------------------------------------------------------------------------</pre>
+  </div>
+</div>
+
+<div class="box key">
+  <span class="bt">-g 是分支调试的杀手锏</span>
+  <p><code class="ic">svn log -g</code> 会显示 <code class="ic">Merged via: rXX</code> 标记，
+  告诉你「这个分支上的提交是被哪个主干版本合并进去的」。
+  分支合并出问题时，这条命令能瞬间定位是哪一步合漏了。</p>
+</div>
+
+<h4 class="sub">diff：三种比较维度</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">diff 的三种比较对象</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 【维度一】工作副本 vs BASE —— 看我自己改了什么（最常用）</span>
+svn diff
+<span class="c"># 等价于 svn diff -r BASE，BASE 就是最近一次 update 拿到的那份</span>
+
+<span class="c"># 【维度二】任意两个版本之间 —— 看别人/历史改了什么</span>
+svn diff -r 5:8
+svn diff -r 5:HEAD
+svn diff -c 8                  <span class="c"># 只看 r8 这一次提交引入的改动（= -r 7:8 的简写）</span>
+svn diff -r <span class="s">"{2026-10-01}:HEAD"</span>
+
+<span class="c"># 【维度三】URL 之间 —— 比较分支/标签</span>
+svn diff file:///repo/trunk file:///repo/branches/feature
+svn diff ^/trunk ^/branches/feature        <span class="c"># 用 ^ 简写仓库根（工作副本内可用）</span>
+
+<span class="c"># 输出控制（很实用）</span>
+svn diff --summarize           <span class="c"># 只列文件名，不要内容（大改动时先扫一遍）</span>
+svn diff --git                  <span class="c"># 1.9+ 支持的 git 风格 diff，方便贴到别处</span>
+svn diff --diff-cmd meld        <span class="c"># 调用外部图形化对比工具</span>
+svn diff --internal-diff        <span class="c"># 强制用内置引擎（当外部工具配置出错时救急）</span>
+svn diff --no-diff-added        <span class="c"># 新增文件不显示全部内容（新增大文件时避免刷屏）</span>
+
+<span class="c"># 保存为补丁文件</span>
+svn diff &gt; my.patch
+svn diff --file my.patch        <span class="c"># 等价写法，Windows PowerShell 下推荐这个</span>
+
+<span class="c"># 应用补丁</span>
+svn patch my.patch
+svn patch my.patch --dry-run    <span class="c"># 试运行，不实际改动（先验证再应用）</span>
+svn patch --reverse-diff my.patch  <span class="c"># 反向应用（撤销补丁）</span>
+
+<span class="c"># 用第三方 diff 工具（配置在 ~/.subversion/config 的 diff-cmd）</span>
+svn diff --diff-cmd diff -x <span class="s">"-u"</span></pre>
+</div>
+
+<div class="box warn">
+  <span class="bt">Windows PowerShell 下重定向会毁掉补丁文件</span>
+  <p>实测踩过的坑：在 PowerShell 里执行 <code class="ic">svn diff &gt; my.patch</code>，
+  PowerShell 默认用 <strong>UTF-16 LE 编码</strong>写文件，结果补丁开头多了 <code class="ic">FF FE</code> BOM 字节，
+  用 <code class="ic">svn patch</code> 应用时会报 <code class="ic">Malformed dumpfile header</code> 之类的解析错误。</p>
+  <p><strong>解决方案（三选一）：</strong></p>
+  <ul>
+    <li>用内置参数：<code class="ic">svn diff --file my.patch</code>（推荐，跨平台一致）</li>
+    <li>用 cmd 重定向：<code class="ic">cmd /c "svn diff &gt; my.patch"</code></li>
+    <li>改用 Git Bash / WSL 执行命令</li>
+  </ul>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：diff 生成补丁并应用</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 1. 产生一个改动</span>
+<span class="ps">$</span> <span class="cmd">Set-Content src\main.cs "class Main { /* patched */ }"</span>
+
+<span class="cmt"># 2. 生成补丁（用 --file 避开编码坑）</span>
+<span class="ps">$</span> <span class="cmd">svn diff --file E:\my.patch</span>
+
+<span class="cmt"># 3. 补丁内容</span>
+<span class="ps">$</span> <span class="cmd">Get-Content E:\my.patch</span>
+Index: src/main.cs
+===================================================================
+--- src/main.cs     (revision 17)
++++ src/main.cs     (working copy)
+@@ -1 +1 @@
+<span class="no">-</span>﻿class Main {}
+<span class="ok">+</span>class Main { /* patched */ }
+
+<span class="cmt"># 4. 撤销改动，再从补丁恢复</span>
+<span class="ps">$</span> <span class="cmd">svn revert src\main.cs</span>
+Reverted 'src\main.cs'
+
+<span class="ps">$</span> <span class="cmd">svn patch E:\my.patch</span>
+<span class="hl">U</span>         src\main.cs
+<span class="cmt">          ↑ U = Updated，补丁成功应用</span>
+
+<span class="cmt"># 5. 验证内容确实恢复了</span>
+<span class="ps">$</span> <span class="cmd">Get-Content src\main.cs</span>
+class Main { /* patched */ }        <span class="cmt">← 补丁内容已生效</span></pre>
+  </div>
+  <p><code class="ic">svn patch</code> 的返回值很直观：
+  <code class="ic">U</code> 表示更新成功，<code class="ic">A</code> 表示新增了文件，<code class="ic">D</code> 表示删除了文件，
+  <code class="ic">C</code> 表示补丁上下文对不上、需要人工处理，
+  <code class="ic">G</code> 表示自动合并成功。</p>
+</div>
+
+<!-- ==========================================================================
+     第 9 节：撤销与回退
+     ========================================================================== -->

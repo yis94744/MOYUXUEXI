@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>16. 忽略文件：让编译产物别再烦我 | SVN 图形化实战</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 图形化实战</h1></div>
+  <div class="brand-sub">TortoiseSVN + VisualSVN · 全鼠标操作</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 准备</div>
+    <a href="01-tools.html">1. 认识你的两个图形工具</a>
+    <a href="02-first-checkout.html">2. 第一次检出：把代码拉到本地</a>
+    <a href="03-icons.html">3. 看懂图标角标与右键菜单</a>
+    <div class="grp">第二阶段 · 日常使用</div>
+    <a href="04-daily.html">4. 日常三件事：改、更、提</a>
+    <a href="05-status.html">5. 查看改动：哪些文件变了</a>
+    <a href="06-diff.html">6. 比对差异：到底改了哪几行</a>
+    <a href="07-add-delete.html">7. 新增、删除、重命名文件</a>
+    <a href="08-history.html">8. 查看历史：Log 对话框详解</a>
+    <a href="09-revert.html">9. 撤销：改错了怎么退回</a>
+    <div class="grp">第三阶段 · 进阶操作</div>
+    <a href="10-conflict.html">10. 冲突处理：两人改了同一处</a>
+    <a href="11-merge-tool.html">11. 合并编辑器：逐行选择保留谁</a>
+    <a href="12-branch.html">12. 建分支：开一条独立开发线</a>
+    <a href="13-switch.html">13. 切换分支：在主干和分支间跳</a>
+    <a href="14-merge.html">14. 合并分支：把改动并回主干</a>
+    <a href="15-revision-graph.html">15. 版本拓扑图：看清分支走向</a>
+    <div class="grp">第四阶段 · 属性与锁</div>
+    <a href="16-ignore.html" class="on">16. 忽略文件：让编译产物别再烦我</a>
+    <a href="17-properties.html">17. 属性对话框：设置文件行为</a>
+    <a href="18-lock.html">18. 文件锁：二进制文件独占编辑</a>
+    <div class="grp">第五阶段 · 服务端管理</div>
+    <a href="19-server.html">19. 服务端：VisualSVN 建仓库</a>
+    <a href="20-users.html">20. 用户与权限：谁能看谁能改</a>
+    <a href="21-backup.html">21. 备份与恢复：图形界面操作</a>
+    <div class="grp">第六阶段 · 效率技巧</div>
+    <a href="22-patch-export.html">22. 补丁与导出：不走仓库传代码</a>
+    <a href="23-settings.html">23. 设置面板：常用选项怎么调</a>
+    <a href="24-troubleshoot.html">24. 常见问题：报错怎么处理</a>
+    <a href="25-cheatsheet.html">25. 图形操作速查表</a>
+
+  </nav>
+</aside>
+<main>
+<div class="crumb">
+  <span class="stage">第四阶段 · 属性与锁</span>
+  <span class="sep">/</span>
+  <a href="index.html">总目录</a>
+  <span class="sep">/</span>
+  <span class="cur">第 16 节</span>
+</div>
+
+<h3 class="sec" id="s16"><span class="no">16</span>忽略文件：让编译产物别再烦我</h3>
+<p class="lead"> 编译出来的二进制文件、跑出来的日志、IDE 自动生成的配置——<strong>这些东西不该进版本库</strong>（体积大、每次编译都变、两个人一提交就打架）， 但它们会一直冒出来，赖在你的待提交列表里烦你。 这一节教你怎么让它们<strong>永久闭嘴</strong>。</p>
+<div class="box key"> <span class="bt">为什么这些文件不能提交</span>
+  <p> 刚接触版本控制的人常常想「全都提上去不就完了」。但有几类文件提上去纯粹是给自己和团队找麻烦：</p>
+  <ul>
+    <li><strong>编译产物</strong>（<code class="ic">bin</code>、<code class="ic">obj</code>、<code class="ic">target</code> 这类目录）—— 它们是<b>由源代码生成的</b>，只要有源码，谁都能重新编译出来，没必要存一份。 而且体积往往比源码大很多，会让仓库飞速膨胀。</li>
+    <li><strong>更麻烦的是：它们每次编译几乎都会变。</strong> 于是每个人的编译产物都不一样，你一更新就冲突，一冲突就是一堆没法合并的二进制文件，纯属浪费生命。</li>
+    <li><strong>IDE 的本地配置</strong>（<code class="ic">.vs</code>、<code class="ic">.idea</code>、<code class="ic">*.user</code>）—— 这些文件里存的是<b>你自己的个人设置</b>：窗口布局、最近打开的文件、本机的调试路径。 它本来就不该共享，提到了服务器上，别人一更新就被你的设置覆盖。</li>
+    <li><strong>运行时的日志和临时文件</strong>——程序跑一遍就变一次，提交它们等于把垃圾往仓库里倒。</li>
+  </ul>
+  <p> <strong>判断标准很简单：这个文件是不是「人能手工写出来的」？</strong> 是——进版本库；不是（机器生成的）——忽略它。</p>
+</div>
+<h4 class="sub">忽略规则到底是什么</h4>
+<p> 忽略有两种用法，区别只在<b>影响的范围有多大</b>：</p>
+<div class="tw">
+<table>
+<thead><tr><th style="width:180px">方式</th><th style="width:200px">影响范围</th><th>什么时候用</th></tr></thead>
+<tbody>
+  <tr>
+    <td><strong>Add to ignore list</strong><br><span class="tagmini b">单个文件</span></td>
+    <td><strong>只影响当前这个目录</strong>（和规则里写的范围）</td>
+    <td>在某个文件上右键用它，忽略这一个文件； 或者在目录里右键用它，忽略这个目录下的某类文件。<b>规则写在当前目录上，不往下管。</b></td>
+  </tr>
+  <tr>
+    <td><strong>Add to ignore list (recursively)</strong><br><span class="tagmini p">目录及所有子目录</span></td>
+    <td><strong>当前目录 + 它下面所有层级的子目录</strong></td>
+    <td>在目录上右键用它，<b>这一整棵树里同名的东西都被忽略</b>。 适合「凡叫 <code class="ic">bin</code> 的目录、不管在哪一层，一律别烦我」。</td>
+  </tr>
+</tbody>
+</table>
+</div>
+<p> 菜单里点忽略时，通常会让你选<b>忽略什么范围</b>——是忽略这一个具体文件， 还是忽略「所有这种扩展名的文件」。这个选择很关键，选错了要么没效果，要么误伤。</p>
+<div class="box tip"> <span class="bt">「忽略这个文件」和「忽略这种扩展名」怎么选</span>
+  <ul>
+    <li><strong>一个特定文件（如 <code class="ic">build.log</code>）</strong>——选「忽略这个文件」。 规则只会匹配这名字，不会影响别的。</li>
+    <li><strong>某一类文件（如所有 <code class="ic">.log</code>）</strong>——选「忽略这种扩展名」。 这样以后新冒出来的日志文件也自动被忽略，不用一个个加。<b>日志、临时文件用这种</b>。</li>
+    <li><strong>某个目录名（如 <code class="ic">bin</code>）</strong>——用带 <code class="ic">recursively</code> 的那种。 这样不管 <code class="ic">bin</code> 出现在项目里哪一层，都会被忽略掉。</li>
+  </ul>
+  <p><em>拿不准就先忽略「这个具体的文件」，影响面最小，不会误伤。</em></p>
+</div>
+<h4 class="sub">实际操作步骤</h4>
+<div class="ops">
+  <div class="otitle"><span class="badge">IGNORE</span>让这些文件从待提交列表里消失</div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">先在提交对话框里看清「烦人的是谁」</span>
+      <span class="sc">右键 → <code class="ic">SVN Commit...</code>，在弹出的提交对话框里看<b>未版本控制的文件列表</b>。 那些你每次都不想看见的名字，就是要忽略的目标。<br>
+      <em>先看清楚再动手，比事后一条条清理规则省事。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">关闭提交对话框</span>
+      <span class="sc">这一步只是「侦察」，别真提交。<b>取消掉对话框</b>，回到资源管理器。</span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">方法一：在具体文件上右键，忽略单个文件</span>
+      <span class="sc">直接在那个烦人的文件上右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Add to ignore list</span></span>。<br>
+      菜单展开后通常会有几个选项：<b>忽略这个具体的文件</b>，或者 <b>忽略所有这种扩展名的文件</b>。<br>
+      <em>这一步只影响当前目录，不会牵连别处。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">方法二：在目录上右键，整个目录树一起忽略</span>
+      <span class="sc">在那个目录（比如 <code class="ic">bin</code>）上右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Add to ignore list (recursively)</span></span>。<br>
+      <strong>注意菜单名后面带 <code class="ic">(recursively)</code></strong>，表示这个规则会<b>覆盖当前目录和它下面所有层级的子目录</b>。<br>
+      <em>适合「凡是编译输出目录，不管在哪一层都别烦我」这种需求。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">看文件角标的变化</span>
+      <span class="sc">忽略生效后，那些文件会<b>变成「已忽略」的状态</b>， 在提交列表里不再出现。<br>
+      <em>如果文件多，可能需要刷新一下资源管理器（按 <kbd>F5</kbd>）才能看到角标更新。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">检查一下规则去重</span>
+      <span class="sc">如果你反复对同一类文件点忽略，可能会攒下好几条重复或互相包含的规则。 打开属性看一眼（见下面截图说明），<b>太乱就编辑一下、合并成一条</b>。<br>
+      <em>规则不是越多越好，能覆盖需求的最少几条最舒服。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">提交这次属性改动</span>
+      <span class="sc"><strong>这一步很多人会漏。</strong> 忽略规则本身也是一次改动，必须<b>提交到服务器</b>， 才能对团队所有人生效。<br>
+      提交时文件夹会显示「已修改」状态——那是因为属性变了，正常现象。</span>
+    </div>
+  </div>
+</div>
+<h4 class="sub">面对面看：忽略规则存在哪儿</h4>
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">属性标签页：忽略规则的本质是一条属性</span><span class="fs">PROPERTIES</span></div>
+  <div class="sb"><img src="img/Properties.png" alt="属性标签页" class="mid"></div>
+  <div class="cap">
+    <b>怎么打开它</b>：在文件夹上右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Properties</span></span>（或者 <code class="ic">Show properties</code>）。 打开的窗口里有一排标签页，其中一个是<b>属性（properties）标签页</b>。<br><br>
+    <b>① 属性列表区</b>——这里列出这个文件夹上<b>所有附着的信息</b>。 忽略规则不是「一个开关」，而是<b>一条实实在在的记录</b>，名字叫 <code class="ic">svn:ignore</code>。 所以你在忽略时看到的那些选项，本质是在帮你写这条记录的<b>内容</b>。<br><br>
+    <b>② <span class="k">svn:ignore</span> 那一行</b>——点中它，下面的区域会显示它的值， 也就是<b>具体被忽略的名字列表</b>（一行一个名字，或者用通配符写的模式）。<br>
+    <em>看这里就能确认「到底忽略了什么」——比靠记忆猜靠谱得多。</em><br><br>
+    <b>③ 上方的操作按钮</b>：<br>
+    &nbsp;&nbsp;• <b><code class="ic">New...</code></b>——<b>手工新增一条属性</b>。 高级用法：如果你要忽略的东西很多，与其一个个右键点，不如直接在这儿手工写一条 <code class="ic">svn:ignore</code>， 一次性把名字都列上。<br>
+    &nbsp;&nbsp;• <b><code class="ic">Edit...</code></b>——<b>修改选中的属性</b>。 用来删掉忽略列表里已经不需要的那几行，或者补上漏掉的。<br>
+    &nbsp;&nbsp;• <b><code class="ic">Remove</code></b>——<b>彻底删掉这条属性</b>， 也就是「取消忽略」，之后那些文件又会重新出现在待提交列表里。<br><br>
+    <b>④ 别忘了它也要提交</b>——属性改了之后，文件夹会显示成「已修改」。 这<b>不是文件内容变了，是属性变了</b>。 <strong>必须提交，规则才会分享给团队。</strong>
+  </div>
+</div>
+<div class="box key"> <span class="bt">关键认知：忽略了什么，就存在这条属性里</span>
+  <p> 理解了「忽略 = 一条属性」，很多事情就顺了：</p>
+  <ul>
+    <li><strong>它是跟着版本走的。</strong>属性可以提交、可以更新、有历史记录—— 你能查到「是谁在什么时候加了这条忽略规则」。</li>
+    <li><strong>它是分目录的。</strong>属性写在哪个目录上，就只管那个目录（或者按你选的递归范围管下去）。 这也解释了为什么在子目录里忽略，根目录那边看不出变化。</li>
+    <li><strong>可以用 <code class="ic">Edit...</code> 直接改。</strong>不想一条条点右键的时候， 打开属性直接编辑那个名字列表，效率高得多。</li>
+    <li><strong>取消忽略就是删掉这一条。</strong>不是「勾掉」，而是用 <code class="ic">Remove</code> 把属性删掉。</li>
+  </ul>
+</div>
+<h4 class="sub">常见项目该忽略什么</h4>
+<p> 下面这份清单可以直接照着抄。原则都是同一条：<strong>机器生成的东西不进版本库</strong>。</p>
+<div class="tw">
+<table>
+<thead><tr><th style="width:150px">项目类型</th><th style="width:280px">建议忽略</th><th>为什么</th></tr></thead>
+<tbody>
+  <tr>
+    <td><strong>C# / .NET</strong></td>
+    <td><code class="ic">bin</code>、<code class="ic">obj</code>、<code class="ic">*.user</code>、<code class="ic">.vs</code></td>
+    <td><code class="ic">bin</code>/<code class="ic">obj</code> 是编译输出；<code class="ic">*.user</code> 存的是个人调试设置； <code class="ic">.vs</code> 是 Visual Studio 的本地缓存目录。<b>这些每次都变，提交了必然天天冲突。</b></td>
+  </tr>
+  <tr>
+    <td><strong>Java</strong></td>
+    <td><code class="ic">target</code>、<code class="ic">.idea</code></td>
+    <td>Maven 等构建工具的输出在 <code class="ic">target</code>； <code class="ic">.idea</code> 是 IntelliJ IDEA 的个人配置。<em>注意：团队如果共享统一的项目配置，可以只忽略里面部分子目录——这类项目建议先和团队确认。</em></td>
+  </tr>
+  <tr>
+    <td><strong>Node.js</strong></td>
+    <td><code class="ic">node_modules</code>、<code class="ic">dist</code></td>
+    <td><code class="ic">node_modules</code> 是<b>最典型的必须忽略项</b>——动辄几万个文件、几百兆， 而且装了哪些包完全由配置文件决定，别人自己装一遍就行。<code class="ic">dist</code> 是打包产物。</td>
+  </tr>
+  <tr>
+    <td><strong>Python</strong></td>
+    <td><code class="ic">__pycache__</code>、<code class="ic">.venv</code></td>
+    <td><code class="ic">__pycache__</code> 是解释器自动生成的字节码缓存， 一运行就变；<code class="ic">.venv</code> 是本机的虚拟环境目录，<b>绝对不能提交</b>（里面的路径是本机专属的）。</td>
+  </tr>
+  <tr>
+    <td><strong>通用 · 编辑器</strong></td>
+    <td><code class="ic">.vscode</code>（视团队约定）</td>
+    <td>如果团队不用它统一管理配置，就忽略掉。 <em>有些团队会特意保留部分配置文件来统一开发环境——这种情况要先问清楚。</em></td>
+  </tr>
+  <tr>
+    <td><strong>通用 · 临时文件</strong></td>
+    <td><code class="ic">*.log</code>、<code class="ic">*.tmp</code>、<code class="ic">*.bak</code></td>
+    <td>日志和临时文件没有共享价值，而且一直在变。<b>用扩展名的方式一次忽略掉整类。</b></td>
+  </tr>
+  <tr>
+    <td><strong>通用 · 编译产物</strong></td>
+    <td><code class="ic">*.dll</code>、<code class="ic">*.exe</code>、<code class="ic">*.pdb</code>、<code class="ic">*.class</code>、<code class="ic">*.o</code>、<code class="ic">*.obj</code>（C++）</td>
+    <td>由源码编译得到的二进制。<b>但注意</b>：如果项目里有<b>第三方提供的、没有源码的库文件</b>，那些是必须提交的—— <em>它们是「别人给你的成品」，不是「你自己编译出来的」。</em></td>
+  </tr>
+</tbody>
+</table>
+</div>
+<div class="box err"> <span class="bt">经典坑：目录名千万别带结尾斜杠</span>
+  <p> 这是忽略功能里最容易踩、又最不容易发现的坑。</p>
+  <p> <strong>要写 <code class="ic">build</code>，不要写 <code class="ic">build/</code>。</strong></p>
+  <p> 为什么？因为忽略规则里的名字是<b>按「文件或目录的名字」来匹配的</b>， 而不是按路径。你写 <code class="ic">build/</code> 的时候， SVN 会去找一个<strong>名字字面就叫做「build/」的东西</strong>—— 而实际上没有任何文件或目录的名字里带斜杠，所以这条规则<b>永远匹配不上任何东西</b>。</p>
+  <p> <strong>最坑的地方在于：它不会报错。</strong> 你写完规则，看着挺正常，那个目录照样出现在待提交列表里。 很多人会以为是软件没生效，反复重启、重装，其实只是多打了一个斜杠。</p>
+  <p><strong>正确的写法与错误的写法对比：</strong></p>
+  <div class="duo">
+    <div>
+      <div class="dh">✗ 错误写法</div>
+      <p><code class="ic">build/</code></p>
+      <p><code class="ic">obj/</code></p>
+      <p>看起来像「目录路径」，但匹配不上任何东西。<b>规则静默失效，你还找不到原因。</b></p>
+    </div>
+    <div>
+      <div class="dh">✓ 正确写法</div>
+      <p><code class="ic">build</code></p>
+      <p><code class="ic">obj</code></p>
+      <p>只写名字，不带任何路径符号。<b>这才是能匹配上的形式。</b></p>
+    </div>
+  </div>
+  <p> <em>同理，也别画蛇添足写完整路径（比如 <code class="ic">src/build</code>）——如果要限定某层目录， 正确做法是<b>在那个目录上单独设置忽略规则</b>，而不是在名字里写路径。</em></p>
+</div>
+<div class="box warn"> <span class="bt">忽略规则本身也要提交，否则只在你本机生效</span>
+  <p> 很多人以为「点了忽略就万事大吉」，然后发现同事的待提交列表里照样一堆垃圾文件。原因很简单：</p>
+  <p> <strong>忽略规则是一条属性，它和文件内容一样，需要提交才能分享出去。</strong></p>
+  <p> 不提交的后果：</p>
+  <ul>
+    <li>只有<b>你自己这台机器</b>上的工作副本知道「这些东西要忽略」。</li>
+    <li>同事那边该烦还是烦，每个人都要自己再点一遍忽略。</li>
+    <li>更糟的是——<b>别人很可能就顺手把那些编译产物提交上去了</b>。 因为他们不知道这是该忽略的东西，看到待提交列表里有，就一起提了。 仓库从此开始膨胀。</li>
+  </ul>
+  <p><strong>正确做法：</strong>设置好忽略规则之后，在文件夹上右键 → <code class="ic">SVN Commit...</code>， 在说明里写清<b>「添加忽略规则，忽略编译输出目录」</b>，连同规则一起提交上去。 <em>这样一条规则惠及全团队，一步到位。</em></p>
+</div>
+<div class="box tip"> <span class="bt">如果文件已经被 Add 过了，忽略是不起作用的</span>
+  <p> 这是另一个高频问题：<strong>你明明忽略了 <code class="ic">bin</code> 目录，可它还在待提交列表里赖着不走。</strong></p>
+  <p> <strong>原因</strong>：忽略规则只对「<b>还没被版本控制认领</b>」的文件有效。 一旦一个文件或目录<b>已经被加入（Add）到版本控制里</b>，它就属于版本库管了—— 忽略规则<b>管不到已经纳管的文件</b>。</p>
+  <p><strong>判断方法</strong>：看文件角标。已经纳管的文件有正常的版本控制角标（而不是灰色的「未版本控制」问号）。 如果那个目录图标是绿的、带对勾的，说明它早就在版本库里了。</p>
+  <p><strong>解决顺序（先移除，再忽略）：</strong></p>
+  <ol>
+    <li><strong>先把文件或目录从版本控制里移除</strong>—— 在它上面右键，找到删除（把内容从版本库里去掉）的那一项，执行它。</li>
+    <li><strong>这时候本地文件还在你的磁盘上</strong>，只是版本库不再管它了（这一步通常不会真删你的物理文件，但<b>稳妥起见先备份一份</b>）。</li>
+    <li><strong>然后再按这一节的方法设置忽略规则</strong>。</li>
+    <li><strong>提交</strong>——把「移除」和「忽略规则」一起提交上去。</li>
+  </ol>
+  <p> <em>顺序不能颠倒：先忽略后移除是没用的，因为规则对已纳管的文件不生效。 <b>正确的顺序永远是「先移除、再忽略、最后提交」。</b></em></p>
+</div>
+<div class="box ok"> <span class="bt">这一节的要点回顾</span>
+  <ul>
+    <li><strong>机器生成的东西不该进版本库</strong>——编译输出、日志、IDE 个人配置，提交了只会制造冲突和体积。</li>
+    <li><strong>两种忽略方式</strong>：单个文件的、和递归管整个目录树的（菜单名带 <code class="ic">recursively</code>）。</li>
+    <li><strong>规则的本质是 <code class="ic">svn:ignore</code> 属性</strong>，可以在属性标签页里看、改、删。</li>
+    <li><strong>目录名不要带结尾斜杠</strong>——写 <code class="ic">build</code> 而不是 <code class="ic">build/</code>，否则规则静默失效。</li>
+    <li><strong>规则一定要提交</strong>，否则只在你本机生效，别人照旧把垃圾提上去。</li>
+    <li><strong>已经 Add 过的文件忽略不了</strong>——要先把它从版本控制里移除，再设置忽略。</li>
+  </ul>
+  <p> 下一节换个角度看同一件事：<strong>忽略规则只是众多「属性」里的一个</strong>。 属性还能控制文件的很多其他行为——比如换行符怎么处理、要不要默认加锁。</p>
+</div>
+
+
+<div class="pager">
+  <a href="15-revision-graph.html"><span class="lbl">← 上一节</span><span class="ttl">15. 版本拓扑图：看清分支走向</span></a>
+  <a class="home" href="index.html"><span class="ttl">总目录</span></a>
+  <a class="next" href="17-properties.html"><span class="lbl">下一节 →</span><span class="ttl">17. 属性对话框：设置文件行为</span></a>
+</div>
+
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+<script src="assets/app.js"></script>
+</body>
+</html>

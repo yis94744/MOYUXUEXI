@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3. 看懂图标角标与右键菜单 | SVN 图形化实战</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 图形化实战</h1></div>
+  <div class="brand-sub">TortoiseSVN + VisualSVN · 全鼠标操作</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 准备</div>
+    <a href="01-tools.html">1. 认识你的两个图形工具</a>
+    <a href="02-first-checkout.html">2. 第一次检出：把代码拉到本地</a>
+    <a href="03-icons.html" class="on">3. 看懂图标角标与右键菜单</a>
+    <div class="grp">第二阶段 · 日常使用</div>
+    <a href="04-daily.html">4. 日常三件事：改、更、提</a>
+    <a href="05-status.html">5. 查看改动：哪些文件变了</a>
+    <a href="06-diff.html">6. 比对差异：到底改了哪几行</a>
+    <a href="07-add-delete.html">7. 新增、删除、重命名文件</a>
+    <a href="08-history.html">8. 查看历史：Log 对话框详解</a>
+    <a href="09-revert.html">9. 撤销：改错了怎么退回</a>
+    <div class="grp">第三阶段 · 进阶操作</div>
+    <a href="10-conflict.html">10. 冲突处理：两人改了同一处</a>
+    <a href="11-merge-tool.html">11. 合并编辑器：逐行选择保留谁</a>
+    <a href="12-branch.html">12. 建分支：开一条独立开发线</a>
+    <a href="13-switch.html">13. 切换分支：在主干和分支间跳</a>
+    <a href="14-merge.html">14. 合并分支：把改动并回主干</a>
+    <a href="15-revision-graph.html">15. 版本拓扑图：看清分支走向</a>
+    <div class="grp">第四阶段 · 属性与锁</div>
+    <a href="16-ignore.html">16. 忽略文件：让编译产物别再烦我</a>
+    <a href="17-properties.html">17. 属性对话框：设置文件行为</a>
+    <a href="18-lock.html">18. 文件锁：二进制文件独占编辑</a>
+    <div class="grp">第五阶段 · 服务端管理</div>
+    <a href="19-server.html">19. 服务端：VisualSVN 建仓库</a>
+    <a href="20-users.html">20. 用户与权限：谁能看谁能改</a>
+    <a href="21-backup.html">21. 备份与恢复：图形界面操作</a>
+    <div class="grp">第六阶段 · 效率技巧</div>
+    <a href="22-patch-export.html">22. 补丁与导出：不走仓库传代码</a>
+    <a href="23-settings.html">23. 设置面板：常用选项怎么调</a>
+    <a href="24-troubleshoot.html">24. 常见问题：报错怎么处理</a>
+    <a href="25-cheatsheet.html">25. 图形操作速查表</a>
+
+  </nav>
+</aside>
+<main>
+<div class="crumb">
+  <span class="stage">第一阶段 · 准备</span>
+  <span class="sep">/</span>
+  <a href="index.html">总目录</a>
+  <span class="sep">/</span>
+  <span class="cur">第 3 节</span>
+</div>
+
+<h3 class="sec" id="s3"><span class="no">3</span>看懂图标角标与右键菜单</h3>
+
+<p class="lead">
+  这一节是「认路」——把 TortoiseSVN 的界面元素全部认一遍。
+  认全之后，后面每一节你都能立刻知道该点哪里。
+</p>
+
+<h4 class="sub">文件夹的右键菜单（已版本控制）</h4>
+
+<p>这是你<strong>最常打交道的菜单</strong>。项目已经检出、正常工作中，就对着这个菜单操作。</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">工作副本文件夹的完整右键菜单</span><span class="fs">Context Menu · Directory</span></div>
+  <div class="sb"><img src="img/ContextMenuDirControl.png" alt="已版本控制文件夹右键菜单" class="mid"></div>
+  <div class="cap">
+    菜单分三层：<b>顶层常用命令</b>（带 SVN 前缀）+ <b>TortoiseSVN 子菜单</b>（全功能）+ <b>系统右键项</b>（下面的 Shell 部分）。
+    下面把每一项按用途分组讲清。
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="card blue">
+    <h6>顶层三个（最常用，少点一次）</h6>
+    <ul>
+      <li><strong>SVN Update</strong> —— 拉取别人的改动。每天开工第一件事。</li>
+      <li><strong>SVN Commit...</strong> —— 提交你自己的改动。干完活收尾。</li>
+      <li><strong>SVN Check for modifications</strong> —— 看看自己改了哪些文件，提交前自查用。</li>
+    </ul>
+  </div>
+  <div class="card pur">
+    <h6>TortoiseSVN 子菜单 · 查看类</h6>
+    <ul>
+      <li><strong>Show log</strong> —— 提交历史。查「这行代码谁写的」。</li>
+      <li><strong>Repo-browser</strong> —— 直接浏览服务器上的内容，不用检出。</li>
+      <li><strong>Revision graph</strong> —— 分支走向图，直观看出谁从哪分出去的。</li>
+      <li><strong>Properties</strong> —— 属性对话框（忽略规则、换行符、锁等）。</li>
+    </ul>
+  </div>
+  <div class="card warn">
+    <h6>TortoiseSVN 子菜单 · 修改类</h6>
+    <ul>
+      <li><strong>Add...</strong> —— 把新文件纳入版本控制。</li>
+      <li><strong>Delete</strong> —— 删除文件（走 SVN，保留历史记录）。</li>
+      <li><strong>Rename...</strong> —— 重命名（保留历史，别用系统的 F2）。</li>
+      <li><strong>Revert...</strong> —— 撤销本地改动，恢复原样。</li>
+      <li><strong>Clean up</strong> —— 工作副本卡住时的「万能修复」。</li>
+    </ul>
+  </div>
+  <div class="card good">
+    <h6>TortoiseSVN 子菜单 · 分支与合并</h6>
+    <ul>
+      <li><strong>Branch/tag...</strong> —— 创建分支或标签。</li>
+      <li><strong>Switch...</strong> —— 切换工作副本对应的分支。</li>
+      <li><strong>Merge...</strong> —— 把分支改动合并回来。</li>
+      <li><strong>Update to revision...</strong> —— 更新到指定版本（回看历史用）。</li>
+      <li><strong>Export...</strong> —— 导出干净副本（不含 .svn）。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">菜单太长？把它变短</span>
+  <p>如果你觉得右键菜单太啰嗦，可以让<strong>顶层那三个 SVN 项也收进子菜单</strong>：</p>
+  <p><span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Settings</span></span> → 左侧选 <strong>Context Menu</strong> → 在列表里取消勾选不想在顶层显示的项。</p>
+  <p>反过来，如果你想把某个子菜单项<strong>提到顶层</strong>，也在同一页设置（勾选即可）。</p>
+</div>
+
+<h4 class="sub">文件上的右键菜单</h4>
+
+<p>对着<strong>单个文件</strong>右键和对着文件夹右键，菜单略有不同。文件上多了一些文件专属的操作。</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">已版本控制文件的右键菜单</span><span class="fs">Context Menu · File</span></div>
+  <div class="sb"><img src="img/ContextMenuFileControl.png" alt="文件右键菜单" class="mid"></div>
+  <div class="cap">
+    和文件夹菜单的差异主要在：<br>
+    • 多了 <span class="k">Blame...</span>（逐行追责，看每行是谁改的）<br>
+    • 多了 <span class="k">Get lock</span>（给这个文件加锁）<br>
+    • 少了 Branch/tag、Switch、Merge、Clean up 等<b>只对目录有意义</b>的命令<br><br>
+    <b>原则</b>：分支、合并、清理这类操作对<b>文件夹</b>做；比对、追责、加锁对<b>文件</b>做。
+  </div>
+</div>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">未加入版本控制的文件（灰色问号角标）</span><span class="fs">Unversioned File</span></div>
+  <div class="sb"><img src="img/ContextMenuFileIgnore.png" alt="未版本控制文件菜单" class="mid"></div>
+  <div class="cap">
+    未版本控制的文件，TortoiseSVN 几乎不管它，菜单里只有几个选项。其中最有用的两项是：<br>
+    • <span class="k">Add...</span> —— 把它纳入版本控制（提交时才会带上它）<br>
+    • <span class="k">Add to ignore list</span> —— 忽略它（以后不再出现在待提交列表里，<b>编译产物就靠这个</b>）<br><br>
+    <b>记住这个规律</b>：文件还没被 SVN 管，就先 Add 或者 Ignore，二选一。
+  </div>
+</div>
+
+<h4 class="sub">拖动文件的特殊菜单</h4>
+
+<p>
+  还有一个不常被发现的技巧：<strong>用鼠标右键拖动文件</strong>到别的位置，
+  松手时会弹出一个菜单，里面多了 SVN 的专属选项。
+</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">右键拖动松手后的菜单</span><span class="fs">Right-drag Menu</span></div>
+  <div class="sb"><img src="img/right-drag-menu.png" alt="右键拖动菜单" class="small"></div>
+  <div class="cap">
+    用<strong>右键</strong>把文件拖到另一个文件夹，松手就会看到这个菜单。
+    里面的 <span class="k">SVN Move versioned files here</span> 才是正确的「移动」方式——
+    它会告诉 SVN「这是同一个文件换了位置」，<b>历史记录不会断</b>。
+    <br><br>
+    如果用普通的拖放（左键拖或系统剪切粘贴），SVN 会以为是「删了一个文件 + 加了一个新文件」，
+    查历史时就断了。
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">两条铁律：重命名和删除都要走 SVN</span>
+  <div class="duo" style="margin-top:10px">
+    <div>
+      <div class="dh">✗ 错误做法</div>
+      <p>按 <kbd>F2</kbd> 直接重命名文件</p>
+      <p>按 <kbd>Delete</kbd> 直接删文件</p>
+      <p>用 Ctrl+X / Ctrl+V 剪切粘贴</p>
+      <p>左键拖拽移动文件</p>
+      <p style="margin-top:10px;color:#ff7b72">→ SVN 会当成「删一个+加一个」，<strong>历史断掉</strong>，
+      查不到这个文件以前的样子</p>
+    </div>
+    <div>
+      <div class="dh">✓ 正确做法</div>
+      <p><span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Rename...</span></span></p>
+      <p><span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Delete</span></span></p>
+      <p><span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Cut</span></span> 后到目标位置 Paste</p>
+      <p>右键拖拽 → <strong>SVN Move versioned files here</strong></p>
+      <p style="margin-top:10px;color:#7ee787">→ 历史完整保留，随时能查出这个文件的前世今生</p>
+    </div>
+  </div>
+</div>
+
+<h4 class="sub">工作副本里的隐藏文件夹</h4>
+
+<p>
+  检出之后，你的项目文件夹里会多出一个<strong>隐藏的 <code class="ic">.svn</code> 文件夹</strong>
+  （每个子文件夹里也有）。
+  这是 SVN 的「大脑」——它记录着每个文件的原始版本、你改了哪些、哪些加了锁。
+</p>
+
+<div class="grid2">
+  <div class="card bad">
+    <h6>千万别做</h6>
+    <ul>
+      <li>手动删除 <code class="ic">.svn</code> 文件夹——<strong>工作副本立刻失效</strong>，只能重新检出</li>
+      <li>把整个项目文件夹压缩发给同事——他解压后 <code class="ic">.svn</code> 里的信息是错的，提交会出乱子</li>
+      <li>把 <code class="ic">.svn</code> 加进版本控制——它是本地元数据，不该提交</li>
+      <li>用「复制粘贴」把项目文件夹复制一份当第二个副本用</li>
+    </ul>
+  </div>
+  <div class="card good">
+    <h6>要做的事</h6>
+    <ul>
+      <li>想让同事拿到代码 → <strong>给他仓库地址</strong>，让他自己 Checkout</li>
+      <li>想要第二份副本 → <strong>再 Checkout 一次</strong>到别的文件夹</li>
+      <li>文件夹看起来坏了 → 先试 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Clean up</span></span></li>
+      <li>实在修不好 → 删掉整个文件夹，重新 Checkout（代码在服务器上，不会丢）</li>
+    </ul>
+  </div>
+</div>
+
+
+<div class="pager">
+  <a href="02-first-checkout.html"><span class="lbl">← 上一节</span><span class="ttl">2. 第一次检出：把代码拉到本地</span></a>
+  <a class="home" href="index.html"><span class="ttl">总目录</span></a>
+  <a class="next" href="04-daily.html"><span class="lbl">下一节 →</span><span class="ttl">4. 日常三件事：改、更、提</span></a>
+</div>
+
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+<script src="assets/app.js"></script>
+</body>
+</html>

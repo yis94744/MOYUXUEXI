@@ -1,0 +1,199 @@
+<h3 class="sec" id="s6"><span class="no">6</span>比对差异：到底改了哪几行</h3>
+
+<p class="lead">
+  「这个文件我改了什么？」和「同事这次提交改了什么？」——
+  这两个问题几乎每天都要回答一次。靠肉眼翻代码是体力活，SVN 有专门的<strong>比对工具</strong>替你把差异标出来。
+</p>
+
+<div class="box key">
+  <span class="bt">比对解决的是「信任」问题</span>
+  <ul>
+    <li><strong>提交前</strong>：你改了三个文件、上百行，其中可能混进了调试用的输出。双击看一眼差异，比通读一遍文件快十倍——<strong>改动的行会被染上颜色</strong>，扫一眼就知道。</li>
+    <li><strong>接别人的活时</strong>：同事说他「顺手优化了一下」。看他那次提交的差异，一分钟就能判断是「真顺手」还是「大重构」，从而决定要不要现在就更新。</li>
+    <li><strong>排查问题时</strong>：功能昨天还好好的，今天坏了。找出昨天到现在改了哪几行，范围立刻从「整个项目」缩小到「几条语句」。</li>
+  </ul>
+</div>
+
+<h4 class="sub">场景一：看自己的改动（提交前自查）</h4>
+
+<p>最常见的用法。<strong>在你的改动提交之前</strong>，把改过的文件和库里的原始版本对一遍。</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">DIFF</span>看自己改了什么</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">先打开「检查修改」对话框</span><span class="sc">右键项目文件夹 → 点顶层的 <code class="ic">SVN Check for modifications</code>（第 5 节）。列表里所有本地改动都会列出来。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">双击要确认的那个文件</span><span class="sc"><strong>双击列表里的文件名</strong>，比对工具就打开了。左右两边分别是你现在的版本和库里的版本，改动的行会<strong>高亮染色</strong>。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">也可以从提交对话框进去</span><span class="sc">在 <code class="ic">SVN Commit...</code> 的对话框里，文件列表表头就写着 <code class="ic">(double-click on file for diff)</code>——同样是双击，效果一样。发现不对的行可以就地取消勾选，不必关掉提交窗口。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">还可以从右键菜单直接比</span><span class="sc">对着某个已修改的文件右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Diff</span></span>，直接打开比对窗口，不用先进列表。右键菜单里还有一项 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Compare with previous revision</span></span>，是拿「上一次提交的版本」和「你现在的版本」比，效果一样。</span></div>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">比对的约定：左旧右新</span>
+  <p>所有比对窗口都遵循同一个约定：<strong>左边是旧版本，右边是新版本</strong>。看自己的改动时——左边是「库里原来的样子」，右边是「你改完的样子」。看历史提交时——左边是「这次提交之前」，右边是「这次提交之后」。</p>
+  <p>认清这个方向，就不会把「删掉」看成「新增」了。</p>
+</div>
+
+<h4 class="sub">场景二：看别人 / 历史的改动</h4>
+
+<p>想知道<strong>某一次提交到底动了什么</strong>，入口在日志窗口（Show log）里。这是排查「谁把这里改坏了」的标准路径。</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">LOG DIFF</span>看某一次提交改了什么</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">对着文件夹或文件点右键 → Show log</span><span class="sc"><span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Show log</span></span>，打开提交历史列表。对着<strong>文件</strong>打开，只看这个文件的历史；对着<strong>文件夹</strong>打开，看整个目录的历史。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">在上方的历史列表里点中某个版本</span><span class="sc">列表每行是一次提交：<strong>版本号、作者、时间、提交说明</strong>。想找某次改动，先靠提交说明筛——这也是第 4 节为什么强调 Message 要写清楚。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">看下方：这次提交改了哪些文件</span><span class="sc">选中版本后，窗口下方会列出<strong>这次提交涉及的文件清单</strong>，并标出每个文件是「修改」还是「新增」。一半情况下，看到这一步就够了。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">双击清单里的文件，看它的具体差异</span><span class="sc">这才真正打开比对窗口：左边是<strong>这次提交之前</strong>的版本，右边是<strong>这次提交之后</strong>的版本。同事改的那几行，一目了然。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">想比两个任意版本，用 Compare revisions</span><span class="sc">在历史列表里<kbd>Ctrl</kbd> 选中<strong>两个版本</strong>，右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Compare revisions</span></span>。适合回答「这两个版本之间一共改了什么」——比如「发版到现在都动了哪些文件」。</span></div>
+  </div>
+</div>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">比对两个版本：改了哪些文件</span><span class="fs">Compare Revisions</span></div>
+  <div class="sb"><img src="img/CompareRevisions.png" alt="比对两个版本" class="mid"></div>
+  <div class="cap">
+    <b>· Difference between</b>：这次比对的两个端点。上面那条是<strong>起点 URL</strong>，配的版本号 <span class="k">29240</span>；下面那条是<strong>终点 URL</strong>，配的版本号 <span class="k">29243</span>。两个地址通常一样（同一个路径的不同版本），不一样则说明是跨路径比对（比如分支比主干）。<br>
+    中间那个<strong>上下箭头的蓝色按钮</strong>可以<strong>对调起点和终点</strong>——对调之后，「Added（新增）」会变成「Deleted（删除）」。当你看不清某个文件到底是加进来的还是删掉的，点它对调一下就有答案。<br><br>
+    <b>· Filter paths</b>：文件多的时候在这里输入关键字，快速筛出你要找的那个路径。<br><br>
+    <b>· 结果列表</b>，两列：<br>
+    <span class="k">File</span>：文件路径，前面的彩色小图标和角标是同一套语义。<br>
+    <span class="k">Action</span>：这次比对的起止版本之间，这个文件<strong>发生了什么</strong>——<span class="k">Modified (content)</span> 内容被改、<span class="k">Added (content)</span> 新增、<span class="k">Normal (property)</span> 内容没变但属性变了。<br><br>
+    <em>这个列表本身还不是「逐行差异」，它回答的是「哪些文件变了」。想看清具体改了哪几行，还要在列表里<strong>双击某个文件</strong>，才会打开左右并排的比对窗口。</em>
+  </div>
+</div>
+
+<h4 class="sub">文本比对：红删绿增黄改</h4>
+
+<p>双击之后打开的，就是 TortoiseMerge。它是<strong>文本文件专用</strong>的比对工具，也是你以后用得最多的一个窗口。</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">文本比对窗口（左右并排，中间有连接条）</span><span class="fs">TortoiseMerge · Two Pane</span></div>
+  <div class="sb"><img src="img/merge-two-pane.png" alt="TortoiseMerge 双栏比对"></div>
+  <div class="cap">
+    标题栏形如 <span class="k">文件名 - TortoiseMerge</span>。窗口分左右两栏，<strong>左旧右新</strong>。<br><br>
+    <b>· 左右两栏的标题</b>：这里是 <span class="k">文件名_new.cpp</span>（左）和 <span class="k">文件名_old.cpp</span>（右）。看自己的改动时，一般左边是库里的原始版本、右边是你改过的版本，<em>标题上的具体字样随比对来源不同而变化，认准「哪边是新的」就行。</em><br><br>
+    <b>· 行号</b>：两栏各自显示行号。行号对不上的地方，就是有增删的地方。<br><br>
+    <b>· 中间那条连接带</b>：把左边和右边的对应行连起来，能一眼看出「加了一行」还是「删了几行」。<br><br>
+    <b>· 颜色含义（重点）</b>：<br>
+    <span class="tagmini r">红</span> 这一行是<strong>删除</strong>的——旧版本里有，新版本里没了；通常只出现在左边。<br>
+    <span class="tagmini g">绿</span> 这一行是<strong>新增</strong>的——旧版本里没有，新版本里加上了；通常只出现在右边。<br>
+    <span class="tagmini y">黄</span> 这一行是<strong>改动</strong>的——左右两边都有对应行，但内容不一样；左右两栏都会标黄，方便你逐字对比。<br><br>
+    <em>扫一遍颜色分布就够了：全是黄色说明只是改了几行；大片红色集中在一侧，说明有大段内容被删掉了——这种情况值得停下来问一句为什么。</em><br><br>
+    <b>· 工具栏</b>：上一处/下一处差异的跳转箭头、合并与保存相关按钮、上下文的折叠展开。文件很长时，用<strong>跳转箭头</strong>依次跳到每一处差异，比滚动条拖动高效得多。<br><br>
+    <b>· 底部状态栏</b>：显示当前光标位置、编码（如 <span class="k">ASCII</span>）、以及当前处于哪一栏等信息。
+  </div>
+</div>
+
+<h4 class="sub">图片比对：用 TortoiseIDiff 看图形文件的差异</h4>
+
+<p>图片、设计稿这类<strong>二进制文件</strong>，没法一行行比。TortoiseSVN 的办法是：<strong>把两个版本并排摆出来</strong>给你用眼睛看，这就是 TortoiseIDiff。</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">图片比对工具（TortoiseIDiff）</span><span class="fs">TortoiseIDiff</span></div>
+  <div class="sb"><img src="img/TortoiseIDiff.png" alt="图片比对工具"></div>
+  <div class="cap">
+    窗口标题是 <span class="k">TortoiseIDiff</span>，顶部是菜单栏（<span class="k">File</span> / <span class="k">View</span> / <span class="k">?</span>）和一排工具栏按钮。<br><br>
+    <b>· 左右两块画布</b>：左边显示<strong>旧版本</strong>的图，右边显示<strong>新版本</strong>的图。画布上方有标题条，写明这一侧显示的是哪个版本，比如 <span class="k">Working Base, Revision -1</span>（库里的基准版本）和 <span class="k">Working Copy</span>（你本地现在这一份）。<br><br>
+    <b>· 为什么用并排而不是叠起来</b>：图片没有「行」的概念，并排显示让你直接用眼睛找不同；配合<strong>同步缩放和同步平移</strong>，两张图会一起动，只要盯着同一个位置看就行。<br><br>
+    <b>· 工具栏上那几个按钮</b>：调整显示比例的放大/缩小、让两张图<strong>对齐显示</strong>的选项，以及切换显示方式的按钮。<em>不用记具体图标形状——把鼠标停上去，工具提示会告诉你它叫什么。</em><br><br>
+    <b>· 什么时候会用到它</b>：改了 UI 切图、图标、示意图、设计稿之后，提交前用它扫一眼，确认改的是<strong>你打算改的那张</strong>，而不是手滑覆盖了别的图。二进制文件的改动没法回滚单行，看这一眼很值。<br><br>
+    <b>· 一个反过来的用处</b>：如果两张图并排看<strong>完全一样</strong>，但 SVN 说这个文件已修改——那多半是图片被别的软件重新保存过一遍，像素没变但文件字节变了。这种情况<strong>不要提交</strong>，用 Revert 把这种「假改动」撤掉（第 9 节）。
+  </div>
+</div>
+
+<h4 class="sub">文本比对 vs 图片比对：什么时候用哪个</h4>
+
+<div class="duo">
+  <div>
+    <div class="dh">◈ 比对文本：看「改了哪几行」</div>
+    <p><strong>适用</strong>：代码、配置文件、说明文档、脚本、XML/JSON 这类纯文本。</p>
+    <p><strong>工具</strong>：TortoiseMerge（双栏并排），差异按行染色。</p>
+    <p><strong>能回答</strong>：加了几行、删了几行、哪一行被改成什么样了。</p>
+    <p><strong>能做的动作</strong>：<strong>按行回滚</strong>——把其中某几行恢复成旧版本，其余改动保留（见下方技巧）。</p>
+    <p style="margin-top:10px;color:#58a6ff">→ 判据是「能不能按行读」</p>
+  </div>
+  <div>
+    <div class="dh">◈ 比对图片：看「是不是这张、变成什么样」</div>
+    <p><strong>适用</strong>：png/jpg/ico 等图片、设计稿、切图、示意图。</p>
+    <p><strong>工具</strong>：TortoiseIDiff（左右两块画布并排）。</p>
+    <p><strong>能回答</strong>：改的是不是我打算改的那张、视觉上有什么变化。</p>
+    <p><strong>做不到</strong>：<strong>逐行回滚</strong>——二进制文件没有「行」，只能整个文件撤销重来。</p>
+    <p style="margin-top:10px;color:#56d4dd">→ 判据是「打开就看见画面」</p>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">高手技巧：在比对窗口里按行回滚，只撤回一部分改动</span>
+  <p>这是比对工具最值钱的用法，很多人用了几年 SVN 都不知道。</p>
+  <p>场景：你改了一个文件，其中<strong>大部分改动是好的、想保留</strong>，但<strong>有几行是调试用的、或者改错了想退回去</strong>。正常情况下你得手工把这几行改回来——费时又容易改错。</p>
+  <p>更省事的做法：<strong>在比对窗口里，对着那几行做「回滚/恢复」操作</strong>（TortoiseMerge 里通过右键菜单或工具栏的对应按钮，把选中行恢复为旧版本的内容），然后保存。这样<strong>只有你指定的那几行被恢复成旧版本，其余改动原样保留</strong>。</p>
+  <p><strong>用之前注意两点</strong>：一、这是<strong>直接改你本地的文件</strong>，操作前先想清楚要保留哪些行；二、图片这类二进制文件<strong>没有这个能力</strong>，只能整个文件用 Revert 撤销。</p>
+</div>
+
+<h4 class="sub">对照表：什么场景用什么方式看差异</h4>
+
+<div class="tw">
+  <table>
+    <thead>
+      <tr><th>我想知道…</th><th>从哪里进</th><th>用什么工具</th><th>看到的结果</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>我刚改的文件，改了什么</td><td>检查修改对话框 → <strong>双击文件</strong></td><td>TortoiseMerge</td><td>旧版 vs 我现在的版本，逐行染色</td></tr>
+      <tr><td>某个文件改了什么（不打开列表）</td><td>文件右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Diff</span></span></td><td>TortoiseMerge</td><td>同上，直接跳进比对窗口</td></tr>
+      <tr><td>比现在的版本和上一次提交的区别</td><td>文件右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Compare with previous revision</span></span></td><td>TortoiseMerge</td><td>上一版本 vs 本地版本</td></tr>
+      <tr><td>同事那次提交改了什么文件</td><td>Show log → 选中版本 → 看下方文件清单</td><td>日志窗口</td><td>本次提交涉及的文件列表</td></tr>
+      <tr><td>同事那次提交的某个文件改了什么</td><td>Show log → 选中版本 → <strong>双击文件</strong></td><td>TortoiseMerge</td><td>提交前 vs 提交后，逐行染色</td></tr>
+      <tr><td>两个版本之间一共改了哪些文件</td><td>Show log → <kbd>Ctrl</kbd> 选中两个版本 → Compare revisions</td><td>比对结果列表</td><td>文件清单 + 每个文件的动作类型</td></tr>
+      <tr><td>这张图改了没有、改成什么样</td><td>检查修改对话框 → 双击图片文件</td><td>TortoiseIDiff</td><td>新旧两张图并排</td></tr>
+      <tr><td>某一行代码是谁改的</td><td>文件右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Blame...</span></span></td><td>Blame 视图</td><td>每行前面标出版本号与作者</td></tr>
+      <tr><td>整个分支和主干的差别</td><td>文件夹右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Revision graph</span></span> / Merge 向导的 <code class="ic">Test Merge</code></td><td>拓扑图 / 合并向导</td><td>分支走向，或合并会带来的改动预览</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="box warn">
+  <span class="bt">看差异时的三个提醒</span>
+  <ol>
+    <li><strong>差异是「和哪个版本比」决定的。</strong>同一个文件，和「上一次提交」比、和「三个月前的版本」比，结果完全不同。看到结论不对，先确认你比的是哪两个版本。</li>
+    <li><strong>比对窗口是只读的，除非你主动保存。</strong>但它一旦保存，改的就是你本地那个真实文件。所以：<strong>打开看没问题，动手改之前想清楚。</strong></li>
+    <li><strong>二进制文件不能逐行回滚。</strong>图片、Office 文档、压缩包这类文件，比对只能「并排看」，想撤回只能整个文件用 Revert（第 9 节）。</li>
+  </ol>
+</div>
+
+<div class="box ok">
+  <span class="bt">一句话记住</span>
+  <p><strong>提交前双击一眼，更新后双击一眼</strong>——这两个动作花不了半分钟，但能挡掉绝大多数「提交错了文件」和「不知道别人改了什么」的麻烦。</p>
+</div>

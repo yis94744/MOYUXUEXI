@@ -1,0 +1,168 @@
+<h3 class="sec" id="s2"><span class="no">2</span>第一次检出：把代码拉到本地</h3>
+
+<p class="lead">
+  「检出」（Checkout）是你和 SVN 的第一次接触：
+  把服务器上的项目<strong>完整复制一份</strong>到你电脑上，同时建立关联——
+  以后你改了文件，SVN 知道该往哪个服务器传。
+</p>
+
+<div class="box key">
+  <span class="bt">开始前你需要两样东西</span>
+  <ol>
+    <li><strong>仓库地址</strong>——形如 <code class="ic">https://svn.公司.com/svn/项目名</code>，找管理员要，或者在 VisualSVN 管理器里自己复制。</li>
+    <li><strong>一个空的本地文件夹</strong>——用来放项目。建议路径短、不带中文和空格，比如 <code class="ic">D:\work\MyProject</code>。</li>
+  </ol>
+</div>
+
+<h4 class="sub">操作步骤</h4>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">CHECKOUT</span>把代码拉到本地</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">在本地建一个空文件夹</span>
+      <span class="sc">比如在 D 盘建 <code class="ic">D:\work\MyProject</code>。
+      <em>注意：这个文件夹可以是空的，但不要在里面放任何文件。</em></span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">在这个文件夹上点右键</span>
+      <span class="sc">因为它是普通文件夹（还不是工作副本），菜单里只有少数几项。
+      如果嫌在文件夹内部右键不方便，也可以<strong>在文件夹的上一级、对着文件夹图标本身右键</strong>。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">选择「SVN Checkout...」</span>
+      <span class="sc">注意是在<strong>菜单顶层</strong>，带 <code class="ic">SVN</code> 前缀那一项，
+      不用展开 TortoiseSVN 子菜单。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">在弹出的对话框里填入仓库地址</span>
+      <span class="sc">见下方截图。绝大多数情况下，<strong>填完地址直接点 OK 就行</strong>，
+      其余选项保持默认。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">如果提示输入账号密码，填上并勾选保存</span>
+      <span class="sc">勾选「保存密码」后，以后每次提交都不用再输。
+      账号同样是找管理员要。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">等待进度条跑完</span>
+      <span class="sc">文件多的话会跑一会儿。完成后文件夹里就是完整的项目代码，
+      每个文件图标左下角会出现<strong>绿色对勾</strong>。</span>
+    </div>
+  </div>
+</div>
+
+<h4 class="sub">检出对话框逐项说明</h4>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">Checkout 对话框（点击图可放大）</span><span class="fs">Checkout Dialog</span></div>
+  <div class="sb"><img src="img/Checkout.png" alt="SVN Checkout 对话框"></div>
+  <div class="cap">
+    这个对话框只有几个地方需要你关心，从上到下：
+  </div>
+</div>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:180px">界面项</th><th>怎么填 / 什么意思</th></tr></thead>
+<tbody>
+  <tr>
+    <td><strong>URL of repository</strong><br><span style="color:#6e7681;font-size:12px">仓库地址</span></td>
+    <td><strong>唯一必填项。</strong>粘贴管理员给你的仓库地址，例如 <code class="ic">https://svn.abc.com/svn/MyProject/trunk</code>。
+    右边的下拉箭头<strong>保存你以前用过的地址</strong>，第二次检出直接选就行，不用重敲。</td>
+  </tr>
+  <tr>
+    <td><strong>Checkout directory</strong><br><span style="color:#6e7681;font-size:12px">检出到哪个目录</span></td>
+    <td>通常<strong>已经自动填好了</strong>（就是你右键的那个文件夹）。
+    如果填的目录不存在，SVN 会帮你自动创建。</td>
+  </tr>
+  <tr>
+    <td><strong>Checkout Depth</strong><br><span style="color:#6e7681;font-size:12px">检出深度</span></td>
+    <td><strong>保持默认的 Fully recursive</strong>（完全递归），把整个项目都拉下来。
+    只有当项目特别大、你只想拉一部分时，才需要改这里。</td>
+  </tr>
+  <tr>
+    <td><strong>Omit externals</strong><br><span style="color:#6e7681;font-size:12px">忽略外部引用</span></td>
+    <td><strong>默认不要勾。</strong>只有当项目引用了别处的公共库、而你不想一起拉下来时才勾选。
+    这个选项平时用不到。</td>
+  </tr>
+  <tr>
+    <td><strong>Revision</strong><br><span style="color:#6e7681;font-size:12px">版本</span></td>
+    <td><strong>保持勾选 HEAD revision</strong>（最新版本）。
+    只有需要看历史某个时间点的代码时，才选下面的 Revision 并填版本号。</td>
+  </tr>
+  <tr>
+    <td><strong>Choose items...</strong><br><span style="color:#6e7681;font-size:12px">选择要检出的内容</span></td>
+    <td>点开是个打勾列表，可以精细挑选要哪些文件夹。
+    <strong>平时用不到</strong>，大项目里配合稀疏检出才用。</td>
+  </tr>
+  <tr>
+    <td><strong>OK / Cancel / Help</strong></td>
+    <td>确认、取消、帮助。<strong>填完地址直接点 OK</strong>。</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<h4 class="sub">检出完成后会发生什么</h4>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">检出进度对话框</span><span class="fs">Progress</span></div>
+  <div class="sb"><img src="img/CommitProgress.png" alt="进度对话框" class="mid"></div>
+  <div class="cap">
+    点 OK 后会弹出这个进度窗口，列出每个被拉下来的文件。
+    <b>颜色不是随便标的</b>：<br>
+    <span class="k">紫色</span> = 新增到你本地（Add）　
+    <span class="k">蓝色</span> = 更新已有文件（Update）　
+    <span class="k">深红色</span> = 删除（Delete）　
+    <span class="k">黑色</span> = 其他<br><br>
+    最后一行的<b>统计信息</b>——“Added: 12, Updated: 3”这种——可以按 <kbd>Ctrl</kbd>+<kbd>C</kbd> 复制下来发给同事。
+    窗口底部有 <b>OK</b> 按钮，点掉就完成了。
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">一个项目可以被检出几次？</span>
+  <p><strong>随便几次。</strong>同一个仓库地址可以检出到多个不同文件夹，
+  它们互相独立。这在两个场景下很有用：</p>
+  <ul>
+    <li><strong>同时看两个分支</strong>——一份检出主干、一份检出分支，并排对比。</li>
+    <li><strong>搞坏了重来</strong>——把出问题的文件夹删掉，重新检出一次，比修复快得多。</li>
+  </ul>
+  <p>但要注意：<strong>不要把一个文件夹既当工作副本、又手动复制给别人</strong>，
+  复制出来的副本里的 <code class="ic">.svn</code> 信息会打架。给别人就是给仓库地址，让他自己检出。</p>
+</div>
+
+<div class="box warn">
+  <span class="bt">别把整个仓库根目录检出来</span>
+  <p>如果管理员给你的是 <code class="ic">https://svn.abc.com/svn/MyProject</code>（不带 <code class="ic">/trunk</code>），
+  检出来会包含 <strong>trunk、branches、tags 全部内容</strong>——所有分支和所有历史标签都拉一遍，可能几个 GB。</p>
+  <p>正确做法：检出时<strong>在地址后面补上 <code class="ic">/trunk</code></strong>，只要主干：</p>
+  <ul>
+    <li>要主干 → <code class="ic">.../MyProject/trunk</code></li>
+    <li>要某个分支 → <code class="ic">.../MyProject/branches/分支名</code></li>
+    <li>要某个发布版 → <code class="ic">.../MyProject/tags/v1.0.0</code></li>
+  </ul>
+</div>

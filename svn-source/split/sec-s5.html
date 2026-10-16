@@ -1,0 +1,149 @@
+<h3 class="sec" id="s5"><span class="no">5</span>标准目录结构 trunk / branches / tags</h3>
+
+<p>
+  SVN <strong>强制不了一个仓库长什么样</strong>——你完全可以把所有文件堆在根目录。
+  但社区有一套沿用二十年的约定，几乎所有团队都这么干，你最好也这么干。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 5-1　标准目录结构与其用途</span><span class="fs">Layout</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 460" width="980" height="460" role="img" aria-label="SVN 标准目录结构图">
+  <!-- 仓库根 -->
+  <rect class="c-gray" x="30" y="30" width="200" height="44" rx="9"/>
+  <text class="tm" x="130" y="58" text-anchor="middle">repo/</text>
+
+  <!-- 三条主干 -->
+  <path class="bd2" d="M130,74 L130,104"/>
+  <path class="bd2" d="M130,104 L90,104 L90,132"/>
+  <path class="bd2" d="M130,104 L130,132"/>
+  <path class="bd2" d="M130,104 L170,104 L170,132"/>
+
+  <rect class="n-blue" x="30" y="132" width="120" height="40" rx="8"/>
+  <text class="tm" x="90" y="158" text-anchor="middle" fill="#58a6ff">trunk/</text>
+
+  <rect class="n-green" x="176" y="132" width="130" height="40" rx="8"/>
+  <text class="tm" x="241" y="158" text-anchor="middle" fill="#7ee787">branches/</text>
+
+  <rect class="n-orange" x="322" y="132" width="130" height="40" rx="8"/>
+  <text class="tm" x="387" y="158" text-anchor="middle" fill="#ffa657">tags/</text>
+
+  <!-- trunk 展开 -->
+  <path class="bd2" d="M90,172 L90,200"/>
+  <rect class="c-gray" x="20" y="200" width="150" height="180" rx="9"/>
+  <text class="tm" x="38" y="224">src/</text>
+  <text class="tm" x="38" y="248">docs/</text>
+  <text class="tm" x="38" y="272">tests/</text>
+  <text class="tm" x="38" y="296">build.xml</text>
+  <text class="tm" x="38" y="320">README.md</text>
+  <line x1="32" y1="336" x2="158" y2="336" stroke="#30363d" stroke-width="1"/>
+  <text class="tm2" x="38" y="358">随时可提交</text>
+  <text class="tm2" x="38" y="374" fill="#7ee787">主线开发区</text>
+
+  <!-- branches 展开 -->
+  <path class="bd2" d="M241,172 L241,200"/>
+  <rect class="c-gray" x="188" y="200" width="170" height="180" rx="9"/>
+  <text class="tm" x="206" y="224">feature-login/</text>
+  <text class="tm" x="206" y="248">bugfix-1024/</text>
+  <text class="tm" x="206" y="272">release-2.0/</text>
+  <text class="tm" x="206" y="296">hotfix-crash/</text>
+  <line x1="200" y1="314" x2="346" y2="314" stroke="#30363d" stroke-width="1"/>
+  <text class="tm2" x="206" y="336">长期维护的并行开发线</text>
+  <text class="tm2" x="206" y="356">用完可以保留也可以删</text>
+  <text class="tm2" x="206" y="374" fill="#7ee787">分支上提交不影响 trunk</text>
+
+  <!-- tags 展开 -->
+  <path class="bd2" d="M387,172 L387,200"/>
+  <rect class="c-gray" x="366" y="200" width="180" height="180" rx="9"/>
+  <text class="tm" x="384" y="224">v1.0.0/</text>
+  <text class="tm" x="384" y="248">v1.1.0/</text>
+  <text class="tm" x="384" y="272">v2.0.0-rc1/</text>
+  <line x1="378" y1="290" x2="534" y2="290" stroke="#30363d" stroke-width="1"/>
+  <text class="tm2" x="384" y="312">发布快照，理论上只读</text>
+  <text class="tm2" x="384" y="332">本质仍是分支（见第 14 节）</text>
+  <text class="tm2" x="384" y="352">靠约定而非权限保证只读</text>
+  <text class="tm2" x="384" y="374" fill="#7ee787">可用 authz 强制只读</text>
+
+  <!-- 右侧：为什么需要 -->
+  <rect x="586" y="30" width="366" height="200" rx="11" fill="rgba(88,166,255,.07)" stroke="#58a6ff" stroke-width="1.5"/>
+  <text class="hd" x="608" y="56" fill="#58a6ff">为什么必须有 branches/ 和 tags/</text>
+  <text class="ts" x="608" y="82">SVN 的合并依赖「版本号区间」计算</text>
+  <text class="ts" x="608" y="104">合并时需要回答两个问题：</text>
+  <text class="tx" x="624" y="128">① 这个分支是从哪个点分出去的？</text>
+  <text class="tx" x="624" y="150">② 哪些提交还没合过来？</text>
+  <text class="ts" x="608" y="176">标准结构让这两个问题有确定的答案，</text>
+  <text class="ts" x="608" y="196">合并才能自动化（第 13 节详解 mergeinfo）</text>
+
+  <rect x="586" y="246" width="366" height="134" rx="11" fill="rgba(255,123,114,.07)" stroke="#ff7b72" stroke-width="1.5"/>
+  <text class="hd" x="608" y="272" fill="#ff7b72">不这么做的后果</text>
+  <text class="ts" x="608" y="296">• 合并时得手工指定 -r 区间，极易漏合</text>
+  <text class="ts" x="608" y="318">• 无法用 svn copy 快速建分支</text>
+  <text class="ts" x="608" y="340">• 新人接手时完全看不懂目录</text>
+  <text class="ts" x="608" y="362">• 权限无法按目录粒度配置</text>
+
+  <!-- 底部注释 -->
+  <rect x="20" y="400" width="932" height="48" rx="10" fill="rgba(126,231,135,.06)" stroke="#7ee787" stroke-width="1.2"/>
+  <text class="ts" x="40" y="422">约定俗成不等于必须。小型项目（单人或两三人）完全可以只用 trunk，等团队规模上来再补 branches/tags ——</text>
+  <text class="ts" x="40" y="441">但<tspan fill="#7ee787" font-weight="700">千万别等到需要发版时才想起来，那时补结构要重排全部历史路径，很痛。</tspan></text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>一句话记忆：</b><code class="ic">trunk</code> 是主干（当前开发线），<code class="ic">branches</code> 是岔路（并行开发），
+    <code class="ic">tags</code> 是路标（发布快照）。三者都是<strong>普通目录</strong>，SVN 不赋予它们任何特殊含义，
+    特殊含义完全来自团队约定与合并工具。<em>这一点和 Git 的 tag 是「特殊对象」有本质区别。</em>
+  </div>
+</div>
+
+<h4 class="sub">一次性建好结构</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">建立标准三段式结构</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 注意：-m 是必填的提交日志，即使只是建目录也要写</span>
+svn mkdir file:///var/svn/repo/trunk   \
+          file:///var/svn/repo/branches \
+          file:///var/svn/repo/tags     \
+          -m <span class="s">"建立标准目录结构"</span>
+
+<span class="c"># 如果用的是 svn:// 协议，URL 换成对应形式</span>
+<span class="c"># svn mkdir svn://192.168.1.10/repo/trunk -m "..."</span>
+
+<span class="c"># 验证一下（不需要检出就能看）</span>
+svn list file:///var/svn/repo
+<span class="c"># branches/</span>
+<span class="c"># tags/</span>
+<span class="c"># trunk/</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：一次建三个目录只消耗一个版本号</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn mkdir https://.../trunk .../branches .../tags -m "建立标准目录结构"</span>
+Committing transaction...
+<span class="ok">Committed revision 1.</span>   <span class="cmt">← 三条路径合并成一次提交，只占一个版本号</span>
+
+<span class="ps">$</span> <span class="cmd">svn list --verbose file:///C:/Work/svn-demo/repo</span>
+      <span class="hl">1</span> kelang              <span class="dim">10 08 10:55</span> <span class="cy">./</span>
+      <span class="hl">1</span> kelang              <span class="dim">10 08 10:55</span> <span class="cy">branches/</span>
+      <span class="hl">1</span> kelang              <span class="dim">10 08 10:55</span> <span class="cy">tags/</span>
+      <span class="hl">1</span> kelang              <span class="dim">10 08 10:55</span> <span class="cy">trunk/</span>
+<span class="cmt">   ↑ 版号   ↑ 提交者        ↑ 时间       ↑ 路径</span>
+
+<span class="ps">$</span> <span class="cmd">svn list --verbose file:///C:/Work/svn-demo/repo/trunk</span>
+      <span class="hl">1</span> kelang              <span class="dim">10 08 10:55</span> <span class="cy">./</span>
+<span class="cmt">   ↑ 空目录只显示一个点（代表目录自身），这是正常的</span></pre>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">svn mkdir 有两种用法，别混了</span>
+  <ul>
+    <li><code class="ic">svn mkdir URL -m "..."</code> → <strong>直接在服务端建</strong>，立刻产生一个新版本号。适合批量初始化。</li>
+    <li><code class="ic">svn mkdir 目录名</code>（本地路径）→ <strong>在本地建目录并标记为待添加</strong>，之后还需要 <code class="ic">svn commit</code> 才生效。</li>
+  </ul>
+  <p>同理，<code class="ic">svn delete</code> / <code class="ic">svn copy</code> / <code class="ic">svn move</code> 也都支持「URL 形式」和「本地路径形式」两种，行为差异一致。</p>
+</div>
+
+<!-- ==========================================================================
+     第三阶段 · 第 6 节：第一次完整上手
+     ========================================================================== -->

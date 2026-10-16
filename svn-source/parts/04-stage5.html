@@ -1,0 +1,825 @@
+<!-- ==========================================================================
+     第五阶段 · 第 11 节：分支的本质
+     ========================================================================== -->
+<h3 class="sec" id="s11"><span class="no">11</span>分支的本质：一次廉价的复制</h3>
+
+<p class="lead">
+  如果你只从 Git 过来，SVN 的分支概念会让你困惑三分钟，然后突然豁然开朗。
+  核心只有一句话：<strong>SVN 里的分支就是一个普通目录，复制它只花 0 字节。</strong>
+</p>
+
+<h4 class="sub">「复制」在 SVN 里意味着什么</h4>
+
+<p>
+  传统理解里，复制一个 5GB 的目录要占 5GB 空间、花几分钟。
+  但在 SVN 里，<code class="ic">svn copy</code> 创建分支是<em>瞬间完成</em>的，仓库几乎不增长。为什么？
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 11-1　廉价复制：分支为什么不占空间</span><span class="fs">Cheap Copy</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 470" width="980" height="470" role="img" aria-label="SVN 廉价复制原理图">
+  <!-- 上：复制前 -->
+  <text class="hd" x="30" y="30" fill="#8b949e">svn copy 之前</text>
+
+  <rect class="c-blue" x="30" y="46" width="180" height="54" rx="9"/>
+  <text class="tm" x="120" y="70" text-anchor="middle">/trunk/</text>
+  <text class="tm2" x="120" y="90" text-anchor="middle">指向 r8 的节点树</text>
+
+  <!-- 树结构 -->
+  <rect class="c-gray" x="30" y="120" width="180" height="34" rx="7"/>
+  <text class="tm2" x="120" y="142" text-anchor="middle">src/</text>
+  <rect class="c-gray" x="30" y="160" width="180" height="34" rx="7"/>
+  <text class="tm2" x="120" y="182" text-anchor="middle">docs/</text>
+  <rect class="c-gray" x="30" y="200" width="180" height="34" rx="7"/>
+  <text class="tm2" x="120" y="222" text-anchor="middle">README.md</text>
+
+  <path class="bd2" d="M120,100 L120,120"/>
+  <path class="bd2" d="M120,154 L120,160"/>
+  <path class="bd2" d="M120,194 L120,200"/>
+
+  <!-- 实际数据 -->
+  <rect class="n-green" x="270" y="120" width="240" height="114" rx="10"/>
+  <text class="hd" x="290" y="146" fill="#7ee787">实际的数据块（只存一份）</text>
+  <text class="tm2" x="290" y="170">db/revs/8/...</text>
+  <text class="tm2" x="290" y="192">src/main.cs 的内容</text>
+  <text class="tm2" x="290" y="214">docs/guide.md 的内容</text>
+
+  <path class="bd2" d="M210,150 L270,160"/>
+  <text class="ts" x="214" y="144">节点指向数据</text>
+
+  <!-- 命令行 -->
+  <rect x="560" y="46" width="392" height="76" rx="10" fill="rgba(210,168,255,.07)" stroke="#d2a8ff" stroke-width="1.3"/>
+  <text class="tm" x="580" y="76" fill="#d2a8ff">svn copy ^/trunk ^/branches/feature -m "建分支"</text>
+  <text class="ts" x="580" y="102">执行时间：毫秒级。仓库增长：几百字节元数据。</text>
+
+  <!-- 下：复制后 -->
+  <text class="hd" x="30" y="278" fill="#7ee787">svn copy 之后（r9）</text>
+
+  <rect class="c-blue" x="30" y="296" width="180" height="54" rx="9"/>
+  <text class="tm" x="120" y="320" text-anchor="middle">/trunk/</text>
+  <text class="tm2" x="120" y="340" text-anchor="middle">仍指向 r8 节点树</text>
+
+  <rect class="c-pur" x="270" y="296" width="180" height="54" rx="9"/>
+  <text class="tm" x="360" y="320" text-anchor="middle">/branches/feature/</text>
+  <text class="tm2" x="360" y="340" text-anchor="middle">也指向 r8 节点树</text>
+
+  <path class="arwp" d="M210,323 L270,323"/>
+  <text class="ts" x="240" y="315" text-anchor="middle" fill="#d2a8ff">copy</text>
+
+  <!-- 共享数据 -->
+  <rect class="n-green" x="520" y="296" width="432" height="118" rx="10"/>
+  <text class="hd" x="540" y="322" fill="#7ee787">共享同一份数据，没有复制任何内容</text>
+  <text class="ts" x="540" y="346">两个目录的节点树里，每个文件条目都指向同一个内容校验和。</text>
+  <text class="ts" x="540" y="368">SVN 的存储层是按「内容寻址」的：相同内容的文件永远只存一份。</text>
+  <text class="ts" x="540" y="390" fill="#7ee787">所以：分支 100 个 = 数据仍然只有 1 份。</text>
+  <text class="ts" x="540" y="408">只有当你修改了分支里的文件，那一份新内容才会被写入。</text>
+
+  <path class="bd2" d="M360,350 L520,340"/>
+
+  <!-- 与 Git 对比 -->
+  <rect x="30" y="378" width="466" height="74" rx="10" fill="rgba(88,166,255,.07)" stroke="#58a6ff" stroke-width="1.3"/>
+  <text class="hd" x="50" y="402" fill="#58a6ff">这和 Git 的思路其实一样</text>
+  <text class="ts" x="50" y="424">Git 用「提交对象 + 指向它的引用」实现廉价分支；</text>
+  <text class="ts" x="50" y="444">SVN 用「目录节点树 + 共享内容寻址」实现廉价复制。</text>
+
+  <text class="ts" x="520" y="440" fill="#ffa657">区别在于：Git 分支切换在本地瞬间完成，SVN 切换要联网。</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>一句话总结：</b>SVN 的分支就是<strong>仓库里多了一个目录</strong>，内容是原目录的「快捷方式式引用」。
+    这解释了两个常见疑问：① 为什么建分支要联网，因为要在服务器上提交一次；
+    ② 为什么分支多了仓库也不膨胀，因为没改的文件共享同一份数据。
+  </div>
+</div>
+
+<div class="box key">
+  <span class="bt">分支和标签，在 SVN 里技术上完全一样</span>
+  <p>这是一个必须点破的事实：<strong>SVN 的 tag 不是特殊对象，它就是一个用 <code class="ic">svn copy</code> 复制出来的目录。</strong>
+  和 branch 唯一的区别是——<em>约定上</em>你认为它是「发布快照」而不该再改。</p>
+  <p>SVN 不会阻止你往 <code class="ic">/tags/v1.0/</code> 里提交代码，它照样接受。
+  想真正实现「标签只读」，得靠 <strong>authz 权限控制</strong>（第 19 节会给完整配置）。</p>
+</div>
+
+<!-- ==========================================================================
+     第 12 节：创建与切换分支
+     ========================================================================== -->
+<h3 class="sec" id="s12"><span class="no">12</span>创建、切换与管理分支</h3>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 12-1　分支的三种工作模式</span><span class="fs">Branching Modes</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 470" width="980" height="470" role="img" aria-label="SVN 分支工作模式对比图">
+  <!-- 模式 1 -->
+  <text class="hd" x="30" y="28" fill="#58a6ff">模式 A：一个工作副本，用 switch 切换（推荐）</text>
+  <rect x="24" y="40" width="300" height="128" rx="10" fill="rgba(88,166,255,.06)" stroke="#58a6ff" stroke-width="1.3"/>
+  <rect class="c-gray" x="42" y="58" width="120" height="42" rx="8"/>
+  <text class="tm" x="102" y="84" text-anchor="middle">wc/</text>
+  <text class="ts" x="176" y="76">同一个目录</text>
+  <text class="ts" x="176" y="96">URL 被切换</text>
+  <text class="tm" x="42" y="126" fill="#7ee787">svn switch ^/branches/feature</text>
+  <text class="tm" x="42" y="146" fill="#7ee787">svn switch ^/trunk</text>
+  <text class="ts" x="42" y="162">优点：省磁盘、IDE 配置不用重配</text>
+
+  <!-- 模式 2 -->
+  <text class="hd" x="348" y="28" fill="#7ee787">模式 B：多份工作副本并排</text>
+  <rect x="342" y="40" width="300" height="128" rx="10" fill="rgba(126,231,135,.06)" stroke="#7ee787" stroke-width="1.3"/>
+  <rect class="c-gray" x="360" y="58" width="126" height="42" rx="8"/>
+  <text class="tm" x="423" y="84" text-anchor="middle">wc-trunk/</text>
+  <rect class="c-gray" x="498" y="58" width="126" height="42" rx="8"/>
+  <text class="tm" x="561" y="84" text-anchor="middle">wc-feature/</text>
+  <text class="tm" x="360" y="126" fill="#7ee787">svn checkout ^/trunk wc-trunk</text>
+  <text class="tm" x="360" y="146" fill="#7ee787">svn checkout ^/branches/f wc-feature</text>
+  <text class="ts" x="360" y="162">优点：可同时对比、可同时编译</text>
+
+  <!-- 模式 3 -->
+  <text class="hd" x="666" y="28" fill="#d2a8ff">模式 C：稀疏工作副本</text>
+  <rect x="660" y="40" width="292" height="128" rx="10" fill="rgba(210,168,255,.06)" stroke="#d2a8ff" stroke-width="1.3"/>
+  <text class="tm" x="678" y="66" fill="#d2a8ff">svn switch ^/branches/f --depth empty</text>
+  <text class="tm" x="678" y="88" fill="#d2a8ff">svn update --set-depth infinity src/</text>
+  <text class="ts" x="678" y="112">只把需要的子目录拉下来</text>
+  <text class="ts" x="678" y="134">适合超大仓库（美术资源库）</text>
+  <text class="ts" x="678" y="156" fill="#d2a8ff">第 22 节详解</text>
+
+  <!-- 分支图 -->
+  <text class="hd" x="30" y="212" fill="#e6edf3">分支的生命周期视图</text>
+  <line x1="60" y1="300" x2="940" y2="300" stroke="#58a6ff" stroke-width="3"/>
+  <text class="tm" x="60" y="330" fill="#58a6ff">trunk</text>
+
+  <!-- 分支分叉 -->
+  <path d="M300,300 C340,300 340,240 380,240" fill="none" stroke="#d2a8ff" stroke-width="3"/>
+  <line x1="380" y1="240" x2="700" y2="240" stroke="#d2a8ff" stroke-width="3"/>
+  <path d="M700,240 C740,240 740,300 780,300" fill="none" stroke="#d2a8ff" stroke-width="3"/>
+  <text class="tm" x="500" y="228" fill="#d2a8ff">branches/feature-login</text>
+
+  <!-- 关键节点 -->
+  <circle cx="300" cy="300" r="7" fill="#0d1117" stroke="#d2a8ff" stroke-width="3"/>
+  <text class="tm2" x="300" y="360" text-anchor="middle" fill="#d2a8ff">r5 建分支</text>
+
+  <circle cx="500" cy="240" r="7" fill="#0d1117" stroke="#d2a8ff" stroke-width="3"/>
+  <text class="tm2" x="500" y="196" text-anchor="middle" fill="#d2a8ff">r6 分支上提交</text>
+
+  <circle cx="480" cy="300" r="7" fill="#0d1117" stroke="#58a6ff" stroke-width="3"/>
+  <text class="tm2" x="480" y="360" text-anchor="middle" fill="#58a6ff">r7 主干并行开发</text>
+
+  <circle cx="780" cy="300" r="7" fill="#0d1117" stroke="#7ee787" stroke-width="3"/>
+  <text class="tm2" x="790" y="360" text-anchor="middle" fill="#7ee787">r8 合并回主干</text>
+
+  <!-- 合并箭头 -->
+  <path class="arwg" d="M700,240 C740,240 760,270 776,293" stroke="#7ee787" stroke-width="2.5"/>
+  <text class="tm2" x="836" y="256" fill="#7ee787">merge</text>
+
+  <!-- 说明 -->
+  <rect x="60" y="384" width="880" height="70" rx="10" fill="rgba(227,179,65,.07)" stroke="#e3b341" stroke-width="1.3"/>
+  <text class="hd" x="80" y="408" fill="#e3b341">分支不是必须「合回来」</text>
+  <text class="ts" x="80" y="430">长期维护分支（release-1.0）会一直存在，持续接收 hotfix；功能分支用完可以删掉（svn delete 那个目录即可）。</text>
+  <text class="ts" x="80" y="448">删除分支不影响历史——提交记录仍在仓库里，只是路径没了最新版本。</text>
+</svg>
+  </div>
+</div>
+
+<h4 class="sub">创建分支</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">建分支的五种写法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 【推荐】服务端直接复制，一次提交就完成，不需要工作副本</span>
+svn copy https://svn.example.com/repo/trunk \
+         https://svn.example.com/repo/branches/feature-login \
+         -m <span class="s">"从 trunk 创建 feature-login 分支"</span>
+
+<span class="c"># 【更短】在工作副本内用 ^ 表示仓库根</span>
+svn copy ^/trunk ^/branches/feature-login -m <span class="s">"创建分支"</span>
+
+<span class="c"># 【从历史版本建分支】—— 修复老版本的 bug 时很常用</span>
+svn copy ^/trunk@520 ^/branches/hotfix-crash -m <span class="s">"基于 r520 创建热修分支"</span>
+
+<span class="c"># 【本地复制 + 提交】需要工作副本，多一步</span>
+cd wc
+svn copy ^/trunk ^/branches/feature-local
+svn commit -m <span class="s">"创建 feature-local 分支"</span>
+
+<span class="c"># 【直接用 mkdir 建空分支】（不推荐，没有历史关联）</span>
+svn mkdir ^/branches/empty-branch -m <span class="s">"建空分支"</span>
+
+<span class="c"># 验证分支建好了</span>
+svn list ^/branches</pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：svn copy 建分支</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn copy file:///E:/repo/trunk file:///E:/repo/branches/feature-login -m "从 trunk 创建 feature-login 分支"</span>
+Committing transaction...
+<span class="ok">Committed revision 5.</span>
+<span class="cmt">   ↑ 一次提交，只占一个版本号</span>
+
+<span class="ps">$</span> <span class="cmd">svn list file:///E:/repo/branches</span>
+feature-login/</pre>
+  </div>
+</div>
+
+<h4 class="sub">switch：一个工作副本切成两个分支</h4>
+
+<p>
+  <code class="ic">svn switch</code> 是 SVN 里非常巧妙的一个命令：它<strong>保持本地文件不动</strong>，
+  只把「这个目录对应服务器上哪个 URL」这件事改掉，然后把差异同步过来。
+</p>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">switch 的用法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 切到分支</span>
+cd wc
+svn switch ^/branches/feature-login
+
+<span class="c"># 切完整 URL（等价）</span>
+svn switch https://svn.example.com/repo/branches/feature-login
+
+<span class="c"># 切回主干</span>
+svn switch ^/trunk
+
+<span class="c"># 切到某个历史版本（不是切分支，是把时间指针往回拨）</span>
+svn switch ^/trunk@520
+
+<span class="c"># 只切换某个子目录（局部切换）</span>
+svn switch ^/branches/feature-login/src src/
+
+<span class="c"># 常用选项</span>
+svn switch --ignore-ancestry ^/other-branch    <span class="c"># 忽略祖先关系直接覆盖内容</span>
+svn switch --relocate OLD_URL NEW_URL           <span class="c"># 仓库搬家了，改 URL 而不改内容</span>
+svn switch --accept postpone                    <span class="c"># 冲突策略</span>
+
+<span class="c"># 验证当前在哪个分支</span>
+svn info --show-item relative-url
+svn info | grep URL</pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：switch 到分支再切回</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 切到分支</span>
+<span class="ps">$</span> <span class="cmd">svn switch file:///E:/repo/branches/feature-login</span>
+At revision <span class="hl">5</span>.
+
+<span class="ps">$</span> <span class="cmd">svn info | Select-String 'URL|Relative URL'</span>
+URL: file:///E:/repo/<span class="cy">branches/feature-login</span>    <span class="cmt">← URL 变了</span>
+Relative URL: <span class="cy">^/branches/feature-login</span>
+
+<span class="cmt"># 在分支上工作并提交</span>
+<span class="ps">$</span> <span class="cmd">Add-Content README.md "## 登录功能（分支开发）"</span>
+<span class="ps">$</span> <span class="cmd">svn commit -m "分支：新增登录功能说明"</span>
+Sending        README.md
+Committing transaction...
+<span class="ok">Committed revision 6.</span>       <span class="cmt">← 提交进了分支，trunk 完全不受影响</span>
+
+<span class="cmt"># 切回主干（本地未提交的改动会自动带过去，可能产生冲突）</span>
+<span class="ps">$</span> <span class="cmd">svn switch file:///E:/repo/trunk</span>
+<span class="hl">U</span>    README.md               <span class="cmt">← U = 内容被更新成 trunk 的版本</span>
+Updated to revision 6.
+
+<span class="ps">$</span> <span class="cmd">svn info | Select-String 'URL'</span>
+URL: file:///E:/repo/<span class="cy">trunk</span></pre>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">switch 前务必把手头改动处理掉</span>
+  <p>如果工作副本里有大量未提交的修改，直接 switch 会让 SVN 试图把这些改动<strong>带到目标分支</strong>上。
+  如果两边差异大，会产生一堆莫名其妙的冲突。</p>
+  <p><strong>正确姿势：</strong>switch 之前先 <code class="ic">svn status</code> 确认干净，
+  或者 <code class="ic">svn commit</code> / <code class="ic">svn revert</code> 处理掉。</p>
+  <p>另外，实测证实：<strong>工作副本处于「混合版本」状态时执行 merge 会直接被拒绝</strong>
+  （<code class="ic">E195020: Cannot merge into mixed-revision working copy</code>），
+  switch 之后紧接着 merge 也容易踩这个坑，记得先 <code class="ic">svn update</code> 拉平。</p>
+</div>
+
+<!-- ==========================================================================
+     第 13 节：合并全流程
+     ========================================================================== -->
+<h3 class="sec" id="s13"><span class="no">13</span>合并全流程与 mergeinfo 机制</h3>
+
+<p class="lead">
+  合并是 SVN 里<strong>最容易出错、也最能体现集中式设计</strong>的部分。
+  它的核心难点在于：SVN 必须记住「哪些提交已经合过了」，否则每次合并都会重复应用同样的改动。
+  这个记忆装置叫 <code class="ic">svn:mergeinfo</code>。
+</p>
+
+<h4 class="sub" id="s13-2">mergeinfo：SVN 怎么知道该合什么</h4>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 13-1　mergeinfo 属性：合并的「记账本」</span><span class="fs">Mergeinfo</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 480" width="980" height="480" role="img" aria-label="SVN mergeinfo 合并记账机制图">
+  <!-- 左：第一次合并 -->
+  <text class="hd" x="30" y="28" fill="#58a6ff">第一次合并：SVN 计算需要合并的范围</text>
+  <rect x="24" y="40" width="452" height="180" rx="10" fill="rgba(88,166,255,.06)" stroke="#58a6ff" stroke-width="1.3"/>
+
+  <text class="ts" x="44" y="66">分支上发生了 r5, r6；主干上发生了 r7</text>
+
+  <!-- 时间轴 -->
+  <line x1="44" y1="104" x2="456" y2="104" stroke="#3d444d" stroke-width="2"/>
+  <circle cx="90" cy="104" r="10" fill="#0d1117" stroke="#d2a8ff" stroke-width="2"/>
+  <text class="tm" x="90" y="109" text-anchor="middle" fill="#d2a8ff">5</text>
+  <circle cx="170" cy="104" r="10" fill="#0d1117" stroke="#d2a8ff" stroke-width="2"/>
+  <text class="tm" x="170" y="109" text-anchor="middle" fill="#d2a8ff">6</text>
+  <circle cx="250" cy="104" r="10" fill="#0d1117" stroke="#58a6ff" stroke-width="2"/>
+  <text class="tm" x="250" y="109" text-anchor="middle" fill="#58a6ff">7</text>
+  <circle cx="330" cy="104" r="10" fill="#0d1117" stroke="#ff7b72" stroke-width="2"/>
+  <text class="tm" x="330" y="109" text-anchor="middle" fill="#ff7b72">8</text>
+
+  <text class="tm2" x="90" y="132" text-anchor="middle" fill="#d2a8ff">建分支</text>
+  <text class="tm2" x="170" y="132" text-anchor="middle" fill="#d2a8ff">分支提交</text>
+  <text class="tm2" x="250" y="132" text-anchor="middle" fill="#58a6ff">主干提交</text>
+  <text class="tm2" x="330" y="132" text-anchor="middle" fill="#ff7b72">合并提交</text>
+
+  <text class="tm" x="44" y="164" fill="#7ee787">$ svn merge ^/branches/feature-login</text>
+  <text class="ts" x="44" y="186">SVN 读了 mergeinfo，发现分支的 r5、r6 还没合过</text>
+  <text class="ts" x="44" y="206">于是「只」应用 r5 和 r6 的改动，跳过 r7（那是主干自己的）</text>
+
+  <!-- 右：mergeinfo 记录 -->
+  <text class="hd" x="504" y="28" fill="#d2a8ff">合并提交后，mergeinfo 被自动写入</text>
+  <rect x="498" y="40" width="456" height="180" rx="10" fill="rgba(210,168,255,.06)" stroke="#d2a8ff" stroke-width="1.3"/>
+
+  <text class="tm" x="518" y="70" fill="#d2a8ff">$ svn propget svn:mergeinfo .</text>
+  <rect x="518" y="84" width="416" height="52" rx="7" fill="#0b0f14" stroke="#3d444d" stroke-width="1"/>
+  <text class="tm" x="534" y="106" fill="#7ee787">/branches/feature-login:5-7</text>
+  <text class="tm2" x="534" y="126">↑ 已合并的版本区间</text>
+
+  <text class="ts" x="518" y="160">含义：来自 /branches/feature-login 的 r5 到 r7，</text>
+  <text class="ts" x="518" y="180">其改动已经全部被合并进当前目录。</text>
+  <text class="ts" x="518" y="204" fill="#7ee787">下次再合并同一分支时，SVN 会自动跳过这个区间。</text>
+
+  <!-- 第二次合并 -->
+  <text class="hd" x="30" y="258" fill="#7ee787">第二次合并：新提交才会被合</text>
+  <rect x="24" y="270" width="930" height="88" rx="10" fill="rgba(126,231,135,.06)" stroke="#7ee787" stroke-width="1.3"/>
+
+  <line x1="44" y1="316" x2="456" y2="316" stroke="#3d444d" stroke-width="2"/>
+  <circle cx="90" cy="316" r="9" fill="#0d1117" stroke="#d2a8ff" stroke-width="2"/>
+  <text class="tm" x="90" y="321" text-anchor="middle" fill="#d2a8ff">5</text>
+  <circle cx="170" cy="316" r="9" fill="#0d1117" stroke="#d2a8ff" stroke-width="2"/>
+  <text class="tm" x="170" y="321" text-anchor="middle" fill="#d2a8ff">6</text>
+  <circle cx="270" cy="316" r="9" fill="#0d1117" stroke="#e3b341" stroke-width="2.5"/>
+  <text class="tm" x="270" y="321" text-anchor="middle" fill="#e3b341">9</text>
+  <text class="tm2" x="270" y="342" text-anchor="middle" fill="#e3b341">分支上的新提交</text>
+
+  <text class="ts" x="330" y="304">第二次执行 svn merge ^/branches/feature-login</text>
+  <text class="ts" x="330" y="326" fill="#e3b341">→ mergeinfo 显示 5-7 已合，所以只应用 r9</text>
+  <text class="ts" x="330" y="348" fill="#7ee787">→ 合并后 mergeinfo 变成 /branches/feature-login:5-7,9</text>
+
+  <!-- 底部警告 -->
+  <rect x="24" y="378" width="930" height="90" rx="10" fill="rgba(255,123,114,.07)" stroke="#ff7b72" stroke-width="1.4"/>
+  <text class="hd" x="44" y="402" fill="#ff7b72">如果 mergeinfo 被破坏会怎样</text>
+  <text class="ts" x="44" y="424">• 重复合并：同一个改动被应用两次，代码里出现重复代码块，或产生莫名其妙的冲突</text>
+  <text class="ts" x="44" y="444">• 漏合并：mergeinfo 记录了一个其实没合成功的区间，后续再也不会重试</text>
+  <text class="ts" x="44" y="462" fill="#ff7b72">所以：合并必须提交（mergeinfo 才会写进仓库），不要把合并结果 revert 掉又不清理</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>核心记忆点：</b><code class="ic">svn:mergeinfo</code> 是一个<strong>目录级属性</strong>，
+    格式是 <code class="ic">/路径:版本区间</code>。它不是给人看的，是给 <code class="ic">svn merge</code> 自己看的。
+    <em>你不需要手动维护它，但你必须理解它，才能解释「为什么这次合并什么都没做」。</em>
+  </div>
+</div>
+
+<h4 class="sub">合并的标准流程（实测走通）</h4>
+
+<div class="steps">
+  <div class="stitle"><span class="badge">MERGE</span>从分支合并回主干的六步</div>
+  <div class="step">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">① 切到目标分支（要合进哪里）</span>
+      <span class="sc"><code class="ic">cd wc-trunk &amp;&amp; svn switch ^/trunk</code></span>
+    </div>
+  </div>
+  <div class="step">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">② 更新到最新 —— 这一步绝对不能省</span>
+      <span class="sc"><code class="ic">svn update</code>。
+      实测教训：如果工作副本处于混合版本，merge 会直接报 <code class="ic">E195020: Cannot merge into mixed-revision working copy</code> 拒绝执行。</span>
+    </div>
+  </div>
+  <div class="step">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">③ 确认工作副本干净</span>
+      <span class="sc"><code class="ic">svn status</code> 应该无输出。有未提交改动就先 commit 或 revert。</span>
+    </div>
+  </div>
+  <div class="step">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">④ 先干跑一遍，看清楚要合什么</span>
+      <span class="sc"><code class="ic">svn merge --dry-run ^/branches/feature-login</code>。
+      <code class="ic">--dry-run</code> 不会改动任何文件，只告诉你「将要做什么」。</span>
+    </div>
+  </div>
+  <div class="step">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">⑤ 正式合并，处理冲突</span>
+      <span class="sc"><code class="ic">svn merge ^/branches/feature-login</code>。
+      遇到 C 冲突就按第 10 节的方法解决；处理完 <code class="ic">svn resolve</code>。</span>
+    </div>
+  </div>
+  <div class="step">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">⑥ 提交 —— mergeinfo 就是这一步写进去的</span>
+      <span class="sc"><code class="ic">svn commit -m "合并 feature-login 分支到 trunk"</code>。
+      <strong>不提交，这次的合并记录（mergeinfo）就不会保存，下次会重复合并。</strong></span>
+    </div>
+  </div>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：完整的合并过程（含踩坑与修复）</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># ---- 场景准备 ----</span>
+<span class="cmt"># r5 建分支，r6 分支上提交登录功能，r7 主干并行改了主页</span>
+
+<span class="cmt"># 【踩坑 1】混合版本直接 merge → 被拒绝</span>
+<span class="ps">$</span> <span class="cmd">svn merge file:///E:/repo/branches/feature-login</span>
+<span class="no">svn: E195020: Cannot merge into mixed-revision working copy [6:7];</span>
+<span class="no">              try updating first</span>
+<span class="cmt">↑ 报错说得很明白：工作副本里同时存在 r6 和 r7 的节点</span>
+
+<span class="cmt"># 【修复】先 update 拉平</span>
+<span class="ps">$</span> <span class="cmd">svn update</span>
+Updating '.':
+At revision 7.
+
+<span class="cmt"># 【正式合并】</span>
+<span class="ps">$</span> <span class="cmd">svn merge file:///E:/repo/branches/feature-login</span>
+<span class="hl">--- Merging r5 through r7 into '.':</span>
+<span class="cmt">↑ SVN 自动算出区间：r5 到 r7（分支存在的全部版本）</span>
+<span class="no">C</span>    README.md
+<span class="hl">--- Recording mergeinfo for merge of r5 through r7 into '.':</span>
+<span class="hl"> U</span>   .
+<span class="cmt">↑ mergeinfo 属性已写入（还没提交）</span>
+
+<span class="no">svn: Merge conflict discovered in file 'README.md'.</span>
+<span class="cmt">  主干改了主页、分支改了登录，都动到 README → 冲突</span>
+
+<span class="cmt"># 【查看冲突状态和辅助文件】</span>
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="hl"> M</span>      .                              <span class="cmt">← 属性 M（mergeinfo 被改了）</span>
+<span class="no">C</span>       README.md
+<span class="no">?</span>       README.md.merge-left.r4          <span class="cmt">← merge 场景下辅助文件命名不同</span>
+<span class="no">?</span>       README.md.merge-right.r7
+<span class="no">?</span>       README.md.working
+<span class="hl">Summary of conflicts:</span>
+  <span class="no">Text conflicts: 1</span>
+
+<span class="cmt"># 【冲突内容：merge 的标记和 update 的不一样】</span>
+<span class="ps">$</span> <span class="cmd">cat README.md</span>
+版本B+C：合并后的最终内容
+<span class="hl">&lt;&lt;&lt;&lt;&lt;&lt;&lt; .working</span>
+## 主页改版（trunk 并行开发）
+<span class="hl">||||||| .merge-left.r4</span>
+<span class="hl">=======</span>
+## 登录功能（分支开发）
+<span class="hl">&gt;&gt;&gt;&gt;&gt;&gt;&gt; .merge-right.r7</span>
+<span class="cmt">↑ 注意三处差异：.working（我的）、.merge-left（共同祖先）、.merge-right（源的）</span>
+
+<span class="cmt"># 【mergeinfo 已记录】</span>
+<span class="ps">$</span> <span class="cmd">svn propget svn:mergeinfo .</span>
+<span class="ok">/branches/feature-login:5-7</span>
+
+<span class="cmt"># 【手工解决 → resolve → 提交】</span>
+<span class="ps">$</span> <span class="cmd">Set-Content README.md "版本最终：包含登录功能 + 主页改版"</span>
+<span class="ps">$</span> <span class="cmd">svn resolve --accept working -R .</span>
+<span class="ok">Merge conflicts in 'README.md' marked as resolved.</span>
+
+<span class="ps">$</span> <span class="cmd">svn commit -m "合并 feature-login 分支（冲突已解决）"</span>
+Sending        .
+Sending        README.md
+Transmitting file data .done
+Committing transaction...
+<span class="ok">Committed revision 8.</span>
+<span class="cmt">↑ 注意 Sending . 这一行 —— 提交的就是那个 mergeinfo 属性</span></pre>
+  </div>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：重复合并会被 mergeinfo 自动跳过</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 已经合并过了，再合一次会怎样？</span>
+<span class="ps">$</span> <span class="cmd">svn update</span>
+At revision 8.
+
+<span class="ps">$</span> <span class="cmd">svn merge file:///E:/repo/branches/feature-login</span>
+<span class="ok">--- Recording mergeinfo for merge of r8 into '.':</span>
+<span class="ok"> U</span>   .
+<span class="cmt">↑ 没有任何文件被改动！因为 mergeinfo 显示 r5-7 已经合过了</span>
+<span class="cmt">  它只把 r8 本身（那个合并提交）也记进 mergeinfo</span>
+
+<span class="cmt"># 对比：如果没有 mergeinfo 会怎样？</span>
+<span class="cmt"># 那 SVN 会重新应用 r5-r7 的所有改动，导致重复代码或假冲突</span>
+
+<span class="cmt"># 用 log -g 看合并图谱，验证合并关系被正确记录</span>
+<span class="ps">$</span> <span class="cmd">svn log -g -l 4</span>
+------------------------------------------------------------------------
+r8 | kelang | 11:01:15 | 1 line
+合并 feature-login 分支（冲突已解决）
+------------------------------------------------------------------------
+<span class="hl">r6</span> | kelang | 10:59:05 | 1 line
+<span class="cy">Merged via: r8</span>     <span class="cmt">← 关键！r6 是通过 r8 合并进来的</span>
+分支：新增登录功能说明
+------------------------------------------------------------------------
+<span class="hl">r5</span> | kelang | 10:58:59 | 1 line
+<span class="cy">Merged via: r8</span>
+从 trunk 创建 feature-login 分支
+------------------------------------------------------------------------</pre>
+  </div>
+</div>
+
+<h4 class="sub">merge 的四种用法</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">merge 进阶</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ---- 用法 1：同步分支（最常用）----</span>
+<span class="c"># 从 源URL 合并到 当前目录，SVN 自动算区间</span>
+svn merge ^/branches/feature-login
+
+<span class="c"># ---- 用法 2：只合并特定的几个提交 ----</span>
+svn merge -c 5,7,9 ^/branches/feature-login        <span class="c"># 挑着合（cherry-pick）</span>
+svn merge -c -10 .                                <span class="c"># 反向合并（撤销，见第 9 节）</span>
+
+<span class="c"># ---- 用法 3：合并指定版本区间 ----</span>
+svn merge -r 5:9 ^/branches/feature-login
+svn merge -r 9:5 .                                <span class="c"># 反向区间 = 撤销</span>
+
+<span class="c"># ---- 用法 4：两个 URL 之间的差异，不涉及祖先关系 ----</span>
+svn merge ^/trunk ^/branches/other-branch .
+<span class="c"># 甚至可以把两个不相关的目录的差异打进当前目录</span>
+svn merge --ignore-ancestry ^/trunk ^/vendor/lib .
+
+<span class="c"># ---- 关键选项 ----</span>
+svn merge --dry-run ^/branches/f            <span class="c"># 预演，不改动任何文件（强烈推荐先用）</span>
+svn merge --reintegrate ^/branches/f        <span class="c"># 1.8 前的「重新整合」，把分支整个合回并结束它</span>
+svn merge --accept postpone ^/branches/f    <span class="c"># 冲突策略</span>
+svn merge --record-only ^/branches/f        <span class="c"># 只记 mergeinfo，不改文件（高级技巧）</span>
+svn merge --depth infinity .                <span class="c"># 递归深度</span>
+svn merge --ignore-ancestry                 <span class="c"># 忽略祖先关系，纯内容 diff 后覆盖</span>
+svn merge -x --ignore-space-change ^/b      <span class="c"># 传给内部 diff 的参数</span></pre>
+</div>
+
+<div class="box key">
+  <span class="bt">--dry-run 是保命选项</span>
+  <p>合并是个复杂操作，<strong>永远先跑 <code class="ic">svn merge --dry-run</code></strong>。
+  它会完整地输出「将要做什么」（U / C / G / D 标记），但<strong>不修改任何文件</strong>。</p>
+  <p>如果 dry-run 的输出里出现你意料之外的 <code class="ic">C</code>，说明这次合并会冲突——
+  先去了解一下为什么，别硬着头皮上。</p>
+</div>
+
+<div class="box warn">
+  <span class="bt">merge 冲突的辅助文件命名与 update 不同</span>
+  <p>实测发现的细节差异：</p>
+  <div class="tw">
+  <table>
+  <thead><tr><th>场景</th><th>辅助文件命名</th><th>标记里的三栏</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code class="ic">svn update</code> 冲突</td>
+      <td><code class="ic">.mine</code> / <code class="ic">.r2</code> / <code class="ic">.r3</code></td>
+      <td><code class="ic">&lt;&lt;&lt;&lt;&lt;&lt;&lt; .mine</code> ／ <code class="ic">||||||| .r2</code> ／ <code class="ic">&gt;&gt;&gt;&gt;&gt;&gt;&gt; .r3</code></td>
+    </tr>
+    <tr>
+      <td><code class="ic">svn merge</code> 冲突</td>
+      <td><code class="ic">.working</code> / <code class="ic">.merge-left.r4</code> / <code class="ic">.merge-right.r7</code></td>
+      <td><code class="ic">&lt;&lt;&lt;&lt;&lt;&lt;&lt; .working</code> ／ <code class="ic">||||||| .merge-left.r4</code> ／ <code class="ic">&gt;&gt;&gt;&gt;&gt;&gt;&gt; .merge-right.r7</code></td>
+    </tr>
+  </tbody>
+  </table>
+  </div>
+  <p>含义完全对应：<code class="ic">.working</code> = 我的，<code class="ic">.merge-left</code> = 共同祖先，<code class="ic">.merge-right</code> = 要合进来的源。
+  <strong>解决方式和 update 冲突一模一样</strong>，只是文件名不同，别被绕晕。</p>
+</div>
+
+<h4 class="sub">分支开发完整工作流</h4>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 13-2　功能分支的完整生命周期（含双向同步）</span><span class="fs">Branch Workflow</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 380" width="980" height="380" role="img" aria-label="SVN 功能分支完整工作流程图">
+  <!-- 主干线 -->
+  <line x1="40" y1="300" x2="940" y2="300" stroke="#58a6ff" stroke-width="3"/>
+  <text class="tm" x="40" y="332" fill="#58a6ff">trunk</text>
+
+  <!-- 分支线 -->
+  <path d="M180,300 C210,300 210,170 240,170" fill="none" stroke="#d2a8ff" stroke-width="3"/>
+  <line x1="240" y1="170" x2="720" y2="170" stroke="#d2a8ff" stroke-width="3"/>
+  <path d="M720,170 C750,170 750,300 780,300" fill="none" stroke="#d2a8ff" stroke-width="3"/>
+  <text class="tm" x="420" y="158" fill="#d2a8ff">branches/feature-login</text>
+
+  <!-- 节点：建分支 -->
+  <circle cx="180" cy="300" r="8" fill="#0d1117" stroke="#d2a8ff" stroke-width="2.5"/>
+  <text class="tm2" x="180" y="272" text-anchor="middle" fill="#d2a8ff">① svn copy 建分支</text>
+
+  <!-- 节点：分支开发 -->
+  <circle cx="320" cy="170" r="8" fill="#0d1117" stroke="#d2a8ff" stroke-width="2.5"/>
+  <text class="tm2" x="320" y="146" text-anchor="middle" fill="#d2a8ff">② 在分支上开发提交</text>
+
+  <!-- 节点：主干推进 -->
+  <circle cx="400" cy="300" r="8" fill="#0d1117" stroke="#58a6ff" stroke-width="2.5"/>
+  <text class="tm2" x="400" y="272" text-anchor="middle" fill="#58a6ff">③ 主干也在推进</text>
+
+  <!-- 同步箭头（主干 → 分支）-->
+  <path class="arwy" d="M405,292 C420,230 400,200 420,178" stroke="#e3b341" stroke-width="2"/>
+  <text class="tm2" x="452" y="234" fill="#e3b341">④ svn merge ^/trunk（反向同步）</text>
+  <text class="tm2" x="452" y="254" fill="#e3b341">   把主干的新改动合进分支，减少最终冲突</text>
+
+  <!-- 节点：继续开发 -->
+  <circle cx="540" cy="170" r="8" fill="#0d1117" stroke="#d2a8ff" stroke-width="2.5"/>
+  <text class="tm2" x="540" y="146" text-anchor="middle" fill="#d2a8ff">⑤ 继续功能开发</text>
+
+  <!-- 合并回主干 -->
+  <path class="arwg" d="M720,178 C760,190 770,250 778,292" stroke="#7ee787" stroke-width="2.5"/>
+  <circle cx="780" cy="300" r="8" fill="#0d1117" stroke="#7ee787" stroke-width="2.5"/>
+  <text class="tm2" x="790" y="272" text-anchor="middle" fill="#7ee787">⑥ svn merge ^/branches/f</text>
+
+  <!-- 收尾 -->
+  <circle cx="880" cy="300" r="8" fill="#0d1117" stroke="#8b949e" stroke-width="2.5"/>
+  <text class="tm2" x="880" y="332" text-anchor="middle" fill="#8b949e">⑦ 删分支（可选）</text>
+
+  <!-- 顶部说明 -->
+  <rect x="40" y="28" width="900" height="80" rx="10" fill="rgba(227,179,65,.07)" stroke="#e3b341" stroke-width="1.3"/>
+  <text class="hd" x="60" y="52" fill="#e3b341">第 ④ 步「反向同步」是 SVN 分支实践中最容易被忽略的一步</text>
+  <text class="ts" x="60" y="76">如果分支存活很久（几周），主干上已经堆了大量改动。等到最后一次性合并时，冲突会非常恐怖。</text>
+  <text class="ts" x="60" y="98">正确做法：每隔几天在分支上执行 <tspan class="mono" fill="#7ee787">svn merge ^/trunk</tspan>，把主干进展持续吸收进来，让冲突「小步发生」。</text>
+
+  <!-- 删除分支 -->
+  <rect x="40" y="344" width="900" height="30" rx="8" fill="rgba(139,148,158,.07)" stroke="#8b949e" stroke-width="1.2"/>
+  <text class="ts" x="60" y="364">删除分支：<tspan class="mono" fill="#e6edf3">svn delete ^/branches/feature-login -m "功能已合并，删除分支"</tspan>　历史提交仍然保留在仓库中，可随时回溯。</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>实践建议：</b>功能分支的生命周期控制在 <strong>1-2 周内</strong>。
+    超过两周，「反向同步」的成本会快速上升。如果功能太大，就拆成多个小分支串行合并，而不是一个巨型分支拖三个月。
+  </div>
+</div>
+
+<!-- ==========================================================================
+     第 14 节：标签与发布
+     ========================================================================== -->
+<h3 class="sec" id="s14"><span class="no">14</span>标签与发布管理</h3>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">打标签的三种场景</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 【场景 1】发布正式版：从 trunk 打标签</span>
+svn copy ^/trunk ^/tags/v1.0.0 -m <span class="s">"发布 v1.0.0：从 trunk 打标签"</span>
+
+<span class="c"># 【场景 2】从修复分支打标签（发布了 hotfix）</span>
+svn copy ^/branches/release-1.0 ^/tags/v1.0.1 -m <span class="s">"发布 v1.0.1：包含紧急修复"</span>
+
+<span class="c"># 【场景 3】给历史版本补打标签（当时忘了打）</span>
+svn copy ^/trunk@520 ^/tags/v1.0.0-retro -m <span class="s">"补打 v1.0.0 标签（对应 r520）"</span>
+
+<span class="c"># 【验证】标签与 trunk 应该零差异</span>
+svn diff ^/tags/v1.0.0 ^/trunk --summarize
+<span class="c"># 无输出 = 完全一致</span>
+<span class="c"># 如果打标签后又往 trunk 提交了东西，这里就会显示出差异文件</span>
+
+<span class="c"># 【检出标签】发布构建用</span>
+svn checkout ^/tags/v1.0.0 release-1.0.0
+svn export ^/tags/v1.0.0 release-1.0.0    <span class="c"># 更干净，无 .svn</span>
+
+<span class="c"># 【删除标签】打错了</span>
+svn delete ^/tags/v1.0.0 -m <span class="s">"撤销误打的标签"</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：打标签并验证</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn copy file:///E:/repo/trunk file:///E:/repo/tags/v1.0-release -m "发布 v1.0：从 trunk 打标签"</span>
+Committing transaction...
+<span class="ok">Committed revision 21.</span>
+
+<span class="cmt"># 验证：标签与 trunk 零差异（刚刚打的，trunk 没变过）</span>
+<span class="ps">$</span> <span class="cmd">svn diff file:///E:/repo/tags/v1.0-release file:///E:/repo/trunk --summarize</span>
+<span class="dim">&lt;空输出 = 完全一致&gt;</span>
+
+<span class="cmt"># 递归列出标签内容</span>
+<span class="ps">$</span> <span class="cmd">svn list -R file:///E:/repo/tags/v1.0-release</span>
+art.psd
+bob-test/
+docs.md
+newfile.txt
+src/
+src/main.cs
+version.txt
+webapp/</pre>
+  </div>
+</div>
+
+<h4 class="sub">用 authz 强制标签只读</h4>
+
+<p>
+  前面说过 SVN 不会阻止你改标签。想真正锁死，靠 <strong>authz 权限文件</strong>——
+  这是 SVN 相对 Git 的一个优势：<strong>目录级权限</strong>。
+</p>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">ini</span><span class="fn">conf/authz　标签只读配置</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">[groups]
+admins = alice, bob          <span class="c"># 只有这两个人能改标签</span>
+devs   = carol, dave
+
+<span class="c"># 仓库根：默认无权限，逐条放开</span>
+[/]
+* =
+@admins = rw
+
+<span class="c"># 主干：开发全员可读写</span>
+[/trunk]
+@devs = rw
+@admins = rw
+
+<span class="c"># 分支：开发可读写</span>
+[/branches]
+@devs = rw
+@admins = rw
+
+<span class="c"># 标签：所有人只读，只有 admins 能写</span>
+[/tags]
+* = r
+@admins = rw</pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：权限配置生效，普通开发者写标签被拒</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># bob 属于 devs 组，不是 admins → 往 /tags 写会被拒</span>
+<span class="ps">$</span> <span class="cmd">svn mkdir --username bob --password bob123 svn://127.0.0.1/repo/tags/v2.0 -m "bob 写 tags"</span>
+<span class="no">svn: E220004: Access denied</span>
+
+<span class="cmt"># alice 属于 admins → 成功</span>
+<span class="ps">$</span> <span class="cmd">svn mkdir --username alice --password alice123 svn://127.0.0.1/repo/tags/v2.0 -m "alice 打标签"</span>
+Committing transaction...
+<span class="ok">Committed revision 15.</span>
+
+<span class="cmt"># bob 读 /trunk 是允许的（authz 里给了 r）</span>
+<span class="ps">$</span> <span class="cmd">svn list --username bob --password bob123 svn://127.0.0.1/repo/trunk</span>
+art.psd
+docs.md
+src/</pre>
+  </div>
+</div>
+
+<h4 class="sub">发布管理的实践建议</h4>
+
+<div class="grid2">
+  <div class="card blue">
+    <h6>标签命名要能排序</h6>
+    <p>用<strong>零填充</strong>让版本号能按字典序正确排序：</p>
+    <pre style="font-family:var(--mono);font-size:12.5px;color:var(--green);margin-top:8px">✓ v1.0.0 / v1.0.1 / v1.10.0
+✗ v1 / v1.2 / v1.10
+   （字典序里 v1.10 &lt; v1.2，会排错）</pre>
+    <p>语义化版本 <code class="ic">v主.次.修</code> 是目前最通用的约定。</p>
+  </div>
+  <div class="card pur">
+    <h6>标签里别再提交</h6>
+    <p>一旦打了标签，就该视为<strong>冻结的化石</strong>。发现 bug 怎么办？</p>
+    <ul>
+      <li>从该标签创建修复分支：<code class="ic">svn copy ^/tags/v1.0.0 ^/branches/hotfix-1.0.1</code></li>
+      <li>在分支上修，打完补丁再打新标签 <code class="ic">v1.0.1</code></li>
+      <li>这样 v1.0.0 永远是「当时发出去的那份」，可复现</li>
+    </ul>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">发布构建的标准脚本片段</span>
+  <div class="codewrap">
+    <div class="codehead"><span class="lang">bash</span><span class="fn">从标签构建发布包</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c">#!/usr/bin/env bash</span>
+<span class="c"># 从指定标签导出并构建发布包</span>
+set -euo pipefail
+
+TAG=<span class="s">"${1:-v1.0.0}"</span>
+REPO=<span class="s">"https://svn.example.com/repo"</span>
+BUILD=<span class="s">"./build-${TAG}"</span>
+
+<span class="c"># export 而非 checkout：产物里不含 .svn，可直接打包</span>
+svn export --force <span class="s">"${REPO}/tags/${TAG}"</span> <span class="s">"${BUILD}"</span> \
+  --username build-bot --password <span class="s">"${SVN_PASS}"</span> --non-interactive
+
+<span class="c"># 记录构建来源，便于事后追溯</span>
+cat &gt; <span class="s">"${BUILD}/BUILD-INFO.txt"</span> &lt;&lt;EOF
+tag          : ${TAG}
+built_at     : $(date -Iseconds)
+built_by     : $(whoami)
+svn_revision : $(svn info --show-item revision "${REPO}/tags/${TAG}")
+EOF
+
+tar czf <span class="s">"${TAG}.tar.gz"</span> -C <span class="s">"${BUILD}"</span> .
+echo <span class="s">"发布包已生成: ${TAG}.tar.gz"</span></pre>
+  </div>
+</div>

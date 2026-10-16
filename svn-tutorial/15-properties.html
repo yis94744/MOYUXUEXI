@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>15. 属性系统：SVN 的隐藏超能力 — SVN 完全教程</title>
+<style>
+
+/* ==========================================================================
+   设计令牌
+   ========================================================================== */
+:root{
+  --bg:#0d1117; --bg2:#161b22; --bg3:#1c2128; --bg4:#21262d;
+  --bd:#30363d; --bd2:#3d444d;
+  --tx:#e6edf3; --tx2:#c9d1d9; --tx3:#8b949e; --tx4:#6e7681;
+  --blue:#58a6ff; --blue2:#79c0ff; --green:#7ee787; --green2:#3fb950;
+  --orange:#ffa657; --red:#ff7b72; --purple:#d2a8ff; --cyan:#56d4dd;
+  --yellow:#e3b341;
+  --mono:"JetBrains Mono","Cascadia Code",Consolas,Monaco,"Courier New",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --rad:10px; --rad2:14px; --shadow:0 8px 24px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{background:var(--bg);color:var(--tx2);font-family:var(--sans);
+  font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+#prog{position:fixed;top:0;left:0;height:3px;width:0;z-index:999;
+  background:linear-gradient(90deg,var(--blue),var(--purple),var(--green));transition:width .1s linear}
+.wrap{display:flex;max-width:1600px;margin:0 auto;align-items:flex-start}
+
+/* ==========================================================================
+   侧边导航
+   ========================================================================== */
+aside{position:sticky;top:0;flex:0 0 300px;height:100vh;overflow-y:auto;
+  border-right:1px solid var(--bd);padding:26px 16px 80px;background:var(--bg)}
+aside::-webkit-scrollbar{width:8px}
+aside::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:4px}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.brand .dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;
+  background:linear-gradient(135deg,var(--blue),var(--purple))}
+.brand h1{font-size:15px;font-weight:700;color:var(--tx);letter-spacing:.2px}
+.brand-sub{font-size:12px;color:var(--tx4);margin:0 0 18px 21px;line-height:1.5}
+nav a{display:block;padding:6px 11px;margin:2px 0;font-size:13.5px;color:var(--tx3);
+  text-decoration:none;border-radius:7px;border-left:2px solid transparent;transition:all .14s;line-height:1.5}
+nav a:hover{background:var(--bg3);color:var(--tx)}
+nav a.h3{padding-left:24px;font-size:12.8px;color:var(--tx4)}
+nav a.on{background:var(--bg4);color:var(--blue);border-left-color:var(--blue);font-weight:600}
+nav .grp{margin:16px 0 6px 11px;font-size:11px;font-weight:700;color:var(--tx4);
+  text-transform:uppercase;letter-spacing:.9px}
+
+/* ==========================================================================
+   主体排版
+   ========================================================================== */
+main{flex:1;min-width:0;padding:44px 52px 140px;max-width:1180px}
+.hero{margin-bottom:46px;padding-bottom:30px;border-bottom:1px solid var(--bd)}
+.hero .tag{display:inline-block;font-size:11.5px;font-weight:700;color:var(--blue);
+  background:rgba(88,166,255,.13);border:1px solid rgba(88,166,255,.3);
+  padding:3px 11px;border-radius:20px;margin-bottom:16px;letter-spacing:.4px}
+.hero h2{font-size:34px;font-weight:800;color:var(--tx);line-height:1.25;margin-bottom:12px;
+  background:linear-gradient(135deg,#fff 30%,var(--blue) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-.5px}
+.hero p{font-size:15px;color:var(--tx3);max-width:860px}
+.hero .meta{display:flex;gap:22px;margin-top:20px;flex-wrap:wrap}
+.hero .meta div{font-size:12.5px;color:var(--tx4)}
+.hero .meta b{color:var(--tx2);font-weight:600}
+h3.sec{font-size:25px;font-weight:700;color:var(--tx);margin:66px 0 8px;
+  padding-top:8px;scroll-margin-top:20px;letter-spacing:-.3px}
+h3.sec::before{content:"";display:block;width:38px;height:3px;border-radius:2px;
+  background:linear-gradient(90deg,var(--blue),var(--purple));margin-bottom:16px}
+h3.sec .no{color:var(--blue);font-family:var(--mono);font-size:19px;font-weight:700;margin-right:8px}
+h4.sub{font-size:17.5px;font-weight:700;color:var(--tx);margin:36px 0 12px;scroll-margin-top:20px}
+h4.sub::before{content:"▍";color:var(--blue);margin-right:7px;font-size:14px}
+h5.mini{font-size:14.5px;font-weight:700;color:var(--blue2);margin:26px 0 10px}
+p{margin:12px 0;color:var(--tx2)}
+p.lead{font-size:16px;color:var(--tx3);margin:14px 0 22px}
+ul,ol{margin:12px 0 12px 24px}
+li{margin:6px 0}
+li::marker{color:var(--tx4)}
+strong{color:var(--tx);font-weight:700}
+em{color:var(--orange);font-style:normal;font-weight:600}
+a.ref{color:var(--blue2);text-decoration:none;border-bottom:1px dotted var(--bd2)}
+a.ref:hover{color:var(--cyan)}
+hr.sep{border:none;border-top:1px solid var(--bd);margin:38px 0}
+code.ic{font-family:var(--mono);font-size:13px;color:var(--orange);
+  background:rgba(110,118,129,.16);padding:2px 6px;border-radius:5px;
+  border:1px solid rgba(110,118,129,.22);white-space:nowrap}
+code.ic.b{color:var(--blue2)}
+code.ic.g{color:var(--green)}
+code.ic.p{color:var(--purple)}
+
+/* ==========================================================================
+   代码块
+   ========================================================================== */
+.codewrap{position:relative;margin:18px 0 22px;border-radius:var(--rad2);
+  border:1px solid var(--bd);background:#0b0f14;overflow:hidden;box-shadow:var(--shadow)}
+.codehead{display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px;background:var(--bg2);border-bottom:1px solid var(--bd);gap:10px}
+.codehead .lang{font-family:var(--mono);font-size:11.5px;font-weight:700;
+  color:var(--tx3);letter-spacing:.6px;text-transform:uppercase;white-space:nowrap}
+.codehead .fn{font-family:var(--mono);font-size:11.5px;color:var(--tx4);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;flex:1}
+.codehead .acts{display:flex;gap:7px;flex:0 0 auto}
+.codehead button{background:var(--bg4);border:1px solid var(--bd2);color:var(--tx3);
+  font-family:var(--sans);font-size:11.5px;padding:3px 10px;border-radius:6px;cursor:pointer;transition:all .14s}
+.codehead button:hover{background:var(--blue);color:#000;border-color:var(--blue)}
+.codehead button.ok{background:var(--green2);color:#000;border-color:var(--green2)}
+pre.code{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mono);
+  font-size:13.2px;line-height:1.68;tab-size:4}
+pre.code::-webkit-scrollbar{height:9px}
+pre.code::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+pre.code code{color:var(--tx2);white-space:pre;display:block}
+.k{color:#ff7b72}.t{color:#79c0ff}.s{color:#a5d6ff}.c{color:#8b949e;font-style:italic}
+.n{color:#79c0ff}.m{color:#d2a8ff}.a{color:#ffa657}.p{color:#8b949e}
+
+/* 终端输出块 —— 显示真实命令回显 */
+.term{margin:16px 0 20px;border-radius:var(--rad2);border:1px solid var(--bd);
+  background:#080b0f;overflow:hidden}
+.term .th{display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--bg2);
+  border-bottom:1px solid var(--bd);font-family:var(--mono);font-size:11.5px;color:var(--tx4)}
+.term .th .dotr{width:9px;height:9px;border-radius:50%;background:#ff5f57}
+.term .th .doty{width:9px;height:9px;border-radius:50%;background:#febc2e}
+.term .th .dotg{width:9px;height:9px;border-radius:50%;background:#28c840}
+.term pre{margin:0;padding:14px 16px;overflow-x:auto;font-family:var(--mono);
+  font-size:12.9px;line-height:1.7;color:#c9d1d9;white-space:pre}
+.term pre::-webkit-scrollbar{height:9px}
+.term pre::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+.term .ps{color:var(--green);font-weight:700}       /* 提示符 $ */
+.term .cmd{color:var(--tx)}                          /* 命令本体 */
+.term .cmt{color:var(--tx4);font-style:italic}       /* 注释 */
+.term .ok{color:var(--green)}                        /* 成功 */
+.term .no{color:var(--red)}                          /* 失败 */
+.term .hl{color:var(--yellow);font-weight:600}       /* 重点 */
+.term .dim{color:var(--tx4)}                         /* 弱化 */
+.term .cy{color:var(--cyan)}
+
+/* ==========================================================================
+   提示框
+   ========================================================================== */
+.box{margin:20px 0;padding:15px 18px 15px 46px;border-radius:var(--rad);
+  position:relative;font-size:14.3px;line-height:1.72;border:1px solid;border-left-width:3px}
+.box::before{position:absolute;left:15px;top:14px;font-size:16px;line-height:1}
+.box .bt{display:block;font-weight:700;margin-bottom:5px;font-size:13.5px}
+.box p{margin:6px 0;font-size:14.3px}
+.box ul,.box ol{margin:7px 0 7px 18px}
+.box li{margin:4px 0}
+.box.tip{background:rgba(88,166,255,.07);border-color:rgba(88,166,255,.28)}
+.box.tip::before{content:"★"}.box.tip .bt{color:var(--blue)}
+.box.warn{background:rgba(255,166,87,.07);border-color:rgba(255,166,87,.3)}
+.box.warn::before{content:"!"}.box.warn .bt{color:var(--orange)}
+.box.err{background:rgba(255,123,114,.07);border-color:rgba(255,123,114,.3)}
+.box.err::before{content:"X"}.box.err .bt{color:var(--red)}
+.box.ok{background:rgba(126,231,135,.07);border-color:rgba(126,231,135,.3)}
+.box.ok::before{content:"✓"}.box.ok .bt{color:var(--green)}
+.box.key{background:rgba(210,168,255,.07);border-color:rgba(210,168,255,.3)}
+.box.key::before{content:"◈"}.box.key .bt{color:var(--purple)}
+.box.termbox{background:rgba(86,212,221,.06);border-color:rgba(86,212,221,.28)}
+.box.termbox::before{content:"⌘"}.box.termbox .bt{color:var(--cyan)}
+
+/* ==========================================================================
+   表格
+   ========================================================================== */
+.tw{overflow-x:auto;margin:18px 0;border-radius:var(--rad);border:1px solid var(--bd)}
+table{width:100%;border-collapse:collapse;font-size:13.8px}
+thead th{background:var(--bg3);color:var(--tx);font-weight:700;text-align:left;
+  padding:11px 14px;border-bottom:1px solid var(--bd2);white-space:nowrap;font-size:13px;letter-spacing:.2px}
+tbody td{padding:9px 14px;border-bottom:1px solid rgba(48,54,61,.6);vertical-align:top;line-height:1.65}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:rgba(88,166,255,.045)}
+tbody td:first-child{color:var(--tx)}
+td .ic,th .ic{font-size:12.3px}
+.tagmini{display:inline-block;font-size:11px;padding:2px 7px;border-radius:5px;
+  font-weight:700;font-family:var(--mono);white-space:nowrap}
+.tagmini.g{background:rgba(126,231,135,.15);color:var(--green)}
+.tagmini.r{background:rgba(255,123,114,.15);color:var(--red)}
+.tagmini.y{background:rgba(227,179,65,.15);color:var(--yellow)}
+.tagmini.b{background:rgba(88,166,255,.15);color:var(--blue)}
+.tagmini.p{background:rgba(210,168,255,.15);color:var(--purple)}
+.tagmini.c{background:rgba(86,212,221,.15);color:var(--cyan)}
+
+/* ==========================================================================
+   步骤条
+   ========================================================================== */
+.steps{counter-reset:st;margin:20px 0;border:1px solid var(--bd);
+  border-radius:var(--rad2);overflow:hidden;background:var(--bg2)}
+.steps>.stitle{display:flex;align-items:center;gap:9px;padding:11px 16px;
+  background:linear-gradient(90deg,rgba(210,168,255,.11),transparent);
+  border-bottom:1px solid var(--bd);font-size:13.5px;font-weight:700;color:var(--purple)}
+.steps>.stitle .badge{background:var(--purple);color:#000;font-size:10.5px;
+  padding:2px 8px;border-radius:20px;letter-spacing:.4px;font-weight:800}
+.step{display:flex;gap:14px;padding:13px 16px;border-bottom:1px solid rgba(48,54,61,.55)}
+.step:last-child{border-bottom:none}
+.step:hover{background:rgba(210,168,255,.035)}
+.step .num{counter-increment:st;flex:0 0 26px;height:26px;border-radius:50%;
+  background:rgba(210,168,255,.14);border:1px solid rgba(210,168,255,.35);
+  color:var(--purple);font-family:var(--mono);font-size:12.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;margin-top:2px}
+.step .num::before{content:counter(st)}
+.step .body{flex:1;min-width:0;font-size:14px;line-height:1.7}
+.step .body .st{font-weight:700;color:var(--tx);display:block;margin-bottom:3px}
+.step .body .sc{color:var(--tx3);font-size:13.6px}
+.step .body .menu{font-family:var(--mono);font-size:12.8px;color:var(--yellow);
+  background:rgba(227,179,65,.1);border:1px solid rgba(227,179,65,.25);
+  padding:1px 7px;border-radius:5px;white-space:nowrap;display:inline-block;margin:1px 0}
+
+/* ==========================================================================
+   卡片
+   ========================================================================== */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}
+.card{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rad2);padding:16px 18px}
+.card h6{font-size:13.5px;font-weight:700;margin-bottom:9px;display:flex;
+  align-items:center;gap:7px;color:var(--tx)}
+.card ul{margin:8px 0 0 18px;font-size:13.6px}
+.card ul li{margin:5px 0}
+.card p{font-size:13.7px;margin:8px 0}
+.card.good{border-color:rgba(126,231,135,.32)}.card.good h6{color:var(--green)}
+.card.bad{border-color:rgba(255,123,114,.32)}.card.bad h6{color:var(--red)}
+.card.blue{border-color:rgba(88,166,255,.32)}.card.blue h6{color:var(--blue)}
+.card.warn{border-color:rgba(255,166,87,.32)}.card.warn h6{color:var(--orange)}
+.card.pur{border-color:rgba(210,168,255,.32)}.card.pur h6{color:var(--purple)}
+.card .big{font-family:var(--mono);font-size:22px;font-weight:800;color:var(--tx);
+  display:block;margin-bottom:4px;line-height:1.2}
+.card .cap{font-size:12.2px;color:var(--tx4)}
+
+/* ==========================================================================
+   图文（SVG 插图系统）—— 本教程的核心
+   ========================================================================== */
+.fig{margin:24px 0 26px;border:1px solid var(--bd);border-radius:var(--rad2);
+  background:linear-gradient(180deg,#0f141b,#0b0f14);overflow:hidden;box-shadow:var(--shadow)}
+.fig .fh{padding:10px 18px;background:var(--bg2);border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;gap:9px}
+.fig .fh .ic{color:var(--cyan);font-size:13px}
+.fig .fh .ft{font-size:13.2px;font-weight:700;color:var(--tx)}
+.fig .fh .fs{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--tx4);
+  letter-spacing:.5px;text-transform:uppercase}
+.fig .fb{padding:22px 18px 18px;overflow-x:auto}
+.fig .fb::-webkit-scrollbar{height:9px}
+.fig .fb::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+.fig svg{display:block;margin:0 auto;max-width:100%;height:auto}
+.fig .cap{padding:11px 18px 14px;font-size:13px;color:var(--tx3);border-top:1px solid rgba(48,54,61,.55);
+  line-height:1.7}
+.fig .cap b{color:var(--tx2)}
+/* SVG 通用类：所有插图复用，保证风格统一 */
+svg text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+svg .tt{font-size:14px;font-weight:700;fill:#e6edf3}
+svg .ts{font-size:12px;fill:#8b949e}
+svg .tx{font-size:12.5px;fill:#c9d1d9}
+svg .tm{font-size:12px;font-family:"JetBrains Mono",Consolas,monospace;fill:#e6edf3}
+svg .tm2{font-size:11px;font-family:"JetBrains Mono",Consolas,monospace;fill:#8b949e}
+svg .hd{font-size:11.5px;font-weight:700;fill:#e6edf3}
+svg .bd{fill:none;stroke:#30363d;stroke-width:1.5}
+svg .bd2{fill:none;stroke:#3d444d;stroke-width:1.5}
+svg .dash{fill:none;stroke:#3d444d;stroke-width:1.5;stroke-dasharray:5 4}
+svg .arw{fill:none;stroke:#8b949e;stroke-width:1.6;marker-end:url(#arw)}
+svg .arwb{fill:none;stroke:#58a6ff;stroke-width:1.8;marker-end:url(#arwb)}
+svg .arwg{fill:none;stroke:#7ee787;stroke-width:1.8;marker-end:url(#arwg)}
+svg .arwr{fill:none;stroke:#ff7b72;stroke-width:1.8;marker-end:url(#arwr)}
+svg .arwp{fill:none;stroke:#d2a8ff;stroke-width:1.8;marker-end:url(#arwp)}
+svg .arwy{fill:none;stroke:#e3b341;stroke-width:1.8;marker-end:url(#arwy)}
+svg .arw2{fill:none;stroke:#58a6ff;stroke-width:1.6;marker-end:url(#arwb);stroke-dasharray:6 4}
+svg .n-blue{fill:rgba(88,166,255,.10);stroke:#58a6ff;stroke-width:1.5}
+svg .n-green{fill:rgba(126,231,135,.10);stroke:#7ee787;stroke-width:1.5}
+svg .n-pur{fill:rgba(210,168,255,.10);stroke:#d2a8ff;stroke-width:1.5}
+svg .n-orange{fill:rgba(255,166,87,.10);stroke:#ffa657;stroke-width:1.5}
+svg .n-red{fill:rgba(255,123,114,.10);stroke:#ff7b72;stroke-width:1.5}
+svg .n-yellow{fill:rgba(227,179,65,.10);stroke:#e3b341;stroke-width:1.5}
+svg .n-cyan{fill:rgba(86,212,221,.10);stroke:#56d4dd;stroke-width:1.5}
+svg .n-gray{fill:rgba(139,148,158,.10);stroke:#8b949e;stroke-width:1.5}
+svg .c-blue{fill:#0f141b;stroke:#58a6ff;stroke-width:1.5}
+svg .c-green{fill:#0f141b;stroke:#7ee787;stroke-width:1.5}
+svg .c-pur{fill:#0f141b;stroke:#d2a8ff;stroke-width:1.5}
+svg .c-orange{fill:#0f141b;stroke:#ffa657;stroke-width:1.5}
+svg .c-red{fill:#0f141b;stroke:#ff7b72;stroke-width:1.5}
+svg .c-gray{fill:#161b22;stroke:#3d444d;stroke-width:1.5}
+svg .fill-blue{fill:#58a6ff}svg .fill-green{fill:#7ee787}svg .fill-pur{fill:#d2a8ff}
+svg .fill-orange{fill:#ffa657}svg .fill-red{fill:#ff7b72}svg .fill-cyan{fill:#56d4dd}
+svg .fill-yellow{fill:#e3b341}svg .fill-gray{fill:#8b949e}svg .fill-tx{fill:#e6edf3}
+svg .fill-dim{fill:#6e7681}
+svg .mono{font-family:"JetBrains Mono",Consolas,monospace}
+
+/* 图例 */
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0 4px;font-size:12.5px;color:var(--tx3)}
+.legend span{display:flex;align-items:center;gap:7px}
+.legend i{width:13px;height:13px;border-radius:4px;display:inline-block;flex:0 0 auto}
+
+/* ==========================================================================
+   键值对 / 输出面板
+   ========================================================================== */
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-family:var(--mono);
+  font-size:12.8px;margin:10px 0}
+.kv b{color:var(--tx2);font-weight:600}
+.kv span{color:var(--orange)}
+
+/* 对比双栏（好/坏） */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:20px 0;
+  border:1px solid var(--bd);border-radius:var(--rad2);overflow:hidden}
+.duo>div{padding:14px 16px}
+.duo>div:first-child{border-right:1px solid var(--bd);background:rgba(255,123,114,.045)}
+.duo>div:last-child{background:rgba(126,231,135,.045)}
+.duo .dh{font-size:12.5px;font-weight:800;margin-bottom:9px;letter-spacing:.3px}
+.duo>div:first-child .dh{color:var(--red)}
+.duo>div:last-child .dh{color:var(--green)}
+.duo pre{font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--tx2);
+  white-space:pre-wrap;margin:0;overflow-x:auto}
+
+footer{margin-top:90px;padding-top:28px;border-top:1px solid var(--bd);font-size:13px;color:var(--tx4)}
+footer b{color:var(--tx3)}
+#top{position:fixed;right:26px;bottom:26px;width:44px;height:44px;border-radius:50%;
+  background:var(--bg3);border:1px solid var(--bd2);color:var(--tx2);font-size:17px;
+  cursor:pointer;display:none;align-items:center;justify-content:center;
+  box-shadow:var(--shadow);transition:all .16s;z-index:50}
+#top:hover{background:var(--blue);color:#000;border-color:var(--blue)}
+#top.show{display:flex}
+
+@media(max-width:1220px){aside{display:none}main{padding:30px 26px 100px;max-width:100%}}
+@media(max-width:760px){
+  .grid2,.grid3,.grid4,.duo{grid-template-columns:1fr}
+  .duo>div:first-child{border-right:none;border-bottom:1px solid var(--bd)}
+  .hero h2{font-size:25px}h3.sec{font-size:20px}main{padding:22px 16px 80px}
+  body{font-size:15px}
+}
+
+
+/* ===== 单节文件附加样式：面包屑与翻页 ===== */
+.crumb{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:22px;
+  padding-bottom:14px;border-bottom:1px solid var(--bd);font-size:13px;color:var(--tx4)}
+.crumb .stage{font-size:11.5px;font-weight:700;color:var(--blue);
+  background:rgba(88,166,255,.13);border:1px solid rgba(88,166,255,.3);
+  padding:2px 10px;border-radius:20px;letter-spacing:.3px}
+.crumb .sep{color:var(--tx4);opacity:.5}
+.crumb .cur{color:var(--tx2)}
+.crumb a{color:var(--tx3);text-decoration:none;border-bottom:1px dotted var(--bd2)}
+.crumb a:hover{color:var(--blue)}
+.pager{display:flex;gap:14px;margin:64px 0 0;padding-top:26px;border-top:1px solid var(--bd)}
+.pager a{flex:1;display:block;padding:14px 18px;border:1px solid var(--bd);
+  border-radius:var(--rad2);text-decoration:none;transition:all .16s;background:var(--bg2);min-width:0}
+.pager a:hover{border-color:var(--blue);background:var(--bg3);transform:translateY(-2px)}
+.pager a .lbl{display:block;font-size:11.5px;color:var(--tx4);margin-bottom:5px;
+  letter-spacing:.4px;text-transform:uppercase}
+.pager a .ttl{display:block;font-size:14.5px;color:var(--tx);font-weight:700;
+  line-height:1.5;overflow:hidden;text-overflow:ellipsis}
+.pager a.next{text-align:right}
+.pager a.disabled{opacity:.35;pointer-events:none}
+.pager a.home{flex:0 0 130px;text-align:center;display:flex;align-items:center;justify-content:center}
+.pager a.home .ttl{font-size:13.5px;color:var(--blue2)}
+
+</style>
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 完全教程</h1></div>
+  <div class="brand-sub">图文详解版 · 基于 SVN 1.14 实测</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 认识 SVN</div>
+    <a href="01-intro.html">1. SVN 是什么</a>
+    <a href="02-architecture.html">2. 三层架构与通信协议</a>
+    <a href="03-install.html">3. 安装与环境准备</a>
+    <div class="grp">第二阶段 · 核心模型</div>
+    <a href="04-model.html">4. 仓库、版本号与工作副本</a>
+    <a href="05-layout.html">5. 标准目录结构</a>
+    <div class="grp">第三阶段 · 日常操作</div>
+    <a href="06-first-steps.html">6. 第一次完整上手：从零到提交</a>
+    <a href="07-status.html">7. status 状态码全解</a>
+    <a href="08-daily-loop.html">8. 日常开发循环与 diff / log 进阶</a>
+    <a href="09-rollback.html">9. 撤销与回退：五种后悔场景</a>
+    <div class="grp">第四阶段 · 冲突处理</div>
+    <a href="10-conflict.html">10. 冲突：产生、解剖与解决</a>
+    <div class="grp">第五阶段 · 分支与标签</div>
+    <a href="11-branch-essence.html">11. 分支的本质：一次廉价的复制</a>
+    <a href="12-branch-ops.html">12. 创建、切换与管理分支</a>
+    <a href="13-merge.html">13. 合并全流程与 mergeinfo 机制</a>
+    <a href="14-tags.html">14. 标签与发布管理</a>
+    <div class="grp">第六阶段 · 属性系统</div>
+    <a href="15-properties.html" class="on">15. 属性系统：SVN 的隐藏超能力</a>
+    <a href="16-locking.html">16. 锁机制：二进制文件的独占保护</a>
+    <div class="grp">第七阶段 · 服务端</div>
+    <a href="17-deploy-choice.html">17. 服务端部署：方案选型</a>
+    <a href="18-svnserve.html">18. svnserve 部署实战</a>
+    <a href="19-authz.html">19. 认证与权限：authz 精细控制</a>
+    <a href="20-hooks.html">20. 钩子脚本：让 SVN 按你的规矩办事</a>
+    <div class="grp">第八阶段 · 运维与进阶</div>
+    <a href="21-backup.html">21. 备份、恢复与仓库维护</a>
+    <a href="22-advanced.html">22. 高级技巧与效率提升</a>
+    <a href="23-troubleshooting.html">23. 故障排查速查</a>
+    <a href="24-cheatsheet.html">24. 命令速查表</a>
+    <a href="25-gui.html">25. 图形客户端与 IDE 集成</a>
+    <div class="grp">快速跳转</div>
+    <a href="index.html">总目录</a>
+
+  </nav>
+</aside>
+<main>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/>
+    </marker>
+    <marker id="arwb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/>
+    </marker>
+    <marker id="arwg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7ee787"/>
+    </marker>
+    <marker id="arwr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff7b72"/>
+    </marker>
+    <marker id="arwp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#d2a8ff"/>
+    </marker>
+    <marker id="arwy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#e3b341"/>
+    </marker>
+    <marker id="arwc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#56d4dd"/>
+    </marker>
+    <linearGradient id="g-blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#58a6ff" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#58a6ff" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-pur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d2a8ff" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#d2a8ff" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7ee787" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#7ee787" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-orange" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffa657" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#ffa657" stop-opacity=".04"/>
+    </linearGradient>
+  </defs>
+</svg>
+<div class="crumb">
+  <span class="stage">第六阶段 · 属性系统</span>
+  <span class="sep">/</span>
+  <a href="index.html">总目录</a>
+  <span class="sep">/</span>
+  <span class="cur">第 15 节</span>
+</div>
+
+<h3 class="sec" id="s15"><span class="no">15</span>属性系统：SVN 的隐藏超能力</h3>
+
+<p class="lead">
+  属性（Property）是 SVN 最被低估的功能。它们是<strong>附着在文件或目录上的键值对</strong>，
+  和文件内容一起被版本控制——但普通用户几乎从来不看它们。
+  掌握属性，你才能解锁忽略规则、关键字替换、外部引用、只读锁这些能力。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 15-1　属性：附着在版本控制对象上的元数据</span><span class="fs">Properties</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 440" width="980" height="440" role="img" aria-label="SVN 属性系统结构图">
+  <!-- 左：文件与属性的关系 -->
+  <text class="hd" x="30" y="28" fill="#58a6ff">属性附着在「版本控制的节点」上</text>
+
+  <rect class="c-blue" x="30" y="46" width="200" height="76" rx="10"/>
+  <text class="tm" x="130" y="72" text-anchor="middle">README.md</text>
+  <text class="ts" x="130" y="94" text-anchor="middle">（一个文件节点）</text>
+  <text class="ts" x="130" y="112" text-anchor="middle">内容 + 属性集合</text>
+
+  <path class="bd2" d="M130,122 L130,146"/>
+  <path class="bd2" d="M60,146 L200,146"/>
+  <path class="bd2" d="M60,146 L60,166"/>
+  <path class="bd2" d="M130,146 L130,166"/>
+  <path class="bd2" d="M200,146 L200,166"/>
+
+  <rect class="c-gray" x="24" y="166" width="120" height="52" rx="7"/>
+  <text class="tm2" x="84" y="186" text-anchor="middle">svn:mime-type</text>
+  <text class="tm2" x="84" y="206" text-anchor="middle">text/plain</text>
+
+  <rect class="c-gray" x="152" y="166" width="120" height="52" rx="7"/>
+  <text class="tm2" x="212" y="186" text-anchor="middle">svn:keywords</text>
+  <text class="tm2" x="212" y="206" text-anchor="middle">Id Rev Author</text>
+
+  <rect class="c-gray" x="280" y="166" width="120" height="52" rx="7"/>
+  <text class="tm2" x="340" y="186" text-anchor="middle">自定义属性</text>
+  <text class="tm2" x="340" y="206" text-anchor="middle">owner=team-alpha</text>
+
+  <!-- 目录属性 -->
+  <rect class="c-pur" x="30" y="250" width="200" height="76" rx="10"/>
+  <text class="tm" x="130" y="276" text-anchor="middle">src/  （目录节点）</text>
+  <text class="ts" x="130" y="298" text-anchor="middle">目录也有自己的属性</text>
+  <text class="ts" x="130" y="316" text-anchor="middle">和文件属性互不影响</text>
+
+  <path class="bd2" d="M130,326 L130,346"/>
+  <rect class="c-gray" x="24" y="346" width="176" height="52" rx="7"/>
+  <text class="tm2" x="112" y="366" text-anchor="middle">svn:ignore</text>
+  <text class="tm2" x="112" y="386" text-anchor="middle">*.log</text>
+
+  <rect class="c-gray" x="216" y="346" width="184" height="52" rx="7"/>
+  <text class="tm2" x="308" y="366" text-anchor="middle">svn:externals</text>
+  <text class="tm2" x="308" y="386" text-anchor="middle">^/trunk/webapp link</text>
+
+  <!-- 右：常用属性表 -->
+  <text class="hd" x="440" y="28" fill="#d2a8ff">SVN 内置属性（都以 svn: 开头）</text>
+  <rect x="434" y="42" width="520" height="356" rx="11" fill="rgba(210,168,255,.05)" stroke="#d2a8ff" stroke-width="1.3"/>
+
+  <text class="tm" x="454" y="70" fill="#7ee787">svn:ignore</text>
+  <text class="ts" x="620" y="70">目录级。忽略不追踪的文件（★ 最常用）</text>
+
+  <line x1="454" y1="82" x2="934" y2="82" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="454" y="104" fill="#7ee787">svn:keywords</text>
+  <text class="ts" x="620" y="104">文件级。把 $Id$ 等占位符替换成真实版本信息</text>
+
+  <line x1="454" y1="116" x2="934" y2="116" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="454" y="138" fill="#7ee787">svn:mime-type</text>
+  <text class="ts" x="620" y="138">文件级。告诉 SVN 这是文本还是二进制</text>
+
+  <line x1="454" y1="150" x2="934" y2="150" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="454" y="172" fill="#7ee787">svn:eol-style</text>
+  <text class="ts" x="620" y="172">文件级。统一换行符（跨平台协作必备）</text>
+
+  <line x1="454" y1="184" x2="934" y2="184" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="454" y="206" fill="#7ee787">svn:executable</text>
+  <text class="ts" x="620" y="206">文件级。标记可执行权限（Linux/macOS）</text>
+
+  <line x1="454" y1="218" x2="934" y2="218" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="454" y="240" fill="#7ee787">svn:externals</text>
+  <text class="ts" x="620" y="240">目录级。引入其他路径的内容（第 15.4 节）</text>
+
+  <line x1="454" y1="252" x2="934" y2="252" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="454" y="274" fill="#7ee787">svn:needs-lock</text>
+  <text class="ts" x="620" y="274">文件级。签出后只读，必须加锁才能改（第 16 节）</text>
+
+  <line x1="454" y1="286" x2="934" y2="286" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="454" y="308" fill="#7ee787">svn:mergeinfo</text>
+  <text class="ts" x="620" y="308">目录级。合并记账本，由 merge 自动维护</text>
+
+  <line x1="454" y1="320" x2="934" y2="320" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="454" y="342" fill="#ffa657">自定义属性</text>
+  <text class="ts" x="620" y="342">任意 name=value，如 owner / review-status</text>
+
+  <line x1="454" y1="354" x2="934" y2="354" stroke="#30363d" stroke-width="1"/>
+  <text class="ts" x="454" y="378" fill="#8b949e">属性也是版本控制的：改属性需要 commit，改属性也可能冲突</text>
+
+  <!-- 底部：操作命令 -->
+  <rect x="24" y="404" width="930" height="30" rx="8" fill="rgba(88,166,255,.06)" stroke="#58a6ff" stroke-width="1.2"/>
+  <text class="ts" x="44" y="424">四个操作命令：<tspan class="mono" fill="#7ee787">propset</tspan> 设置　<tspan class="mono" fill="#7ee787">propget</tspan> 读取　<tspan class="mono" fill="#7ee787">proplist</tspan> / <tspan class="mono" fill="#7ee787">proplist -v</tspan> 列出　<tspan class="mono" fill="#7ee787">propdel</tspan> 删除　<tspan class="mono" fill="#7ee787">propedit</tspan> 批量编辑</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>为什么要关心属性：</b>它们让 SVN 能适配各种工程需求——
+    让编译产物不污染状态输出、让源码里自动带上版本号、让美术源文件必须加锁才能改。
+    <strong>属性改动也要提交</strong>，这是很多人第一次遇到「明明没改文件，status 却显示 M」的原因。
+  </div>
+</div>
+
+<h4 class="sub">属性的增删改查（实测）</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">属性的四个基本操作</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ---- 查 ----</span>
+svn proplist README.md              <span class="c"># 列出属性名</span>
+svn proplist -v README.md           <span class="c"># 连值一起显示（-v = verbose）</span>
+svn propget svn:ignore .            <span class="c"># 读单个属性的值</span>
+svn proplist -v -R .                <span class="c"># 递归列出整个工作副本的属性</span>
+
+<span class="c"># ---- 增/改 ----</span>
+svn propset owner <span class="s">"team-alpha"</span> README.md      <span class="c"># 自定义属性</span>
+svn propset svn:ignore <span class="s">"*.log"</span> .               <span class="c"># 设置忽略规则（注意最后是目录）</span>
+
+<span class="c"># 从文件读入属性值（多行属性必须这样写）</span>
+svn propset svn:ignore --file ignore-list.txt .
+
+<span class="c"># ---- 删 ----</span>
+svn propdel owner README.md
+svn propdel svn:ignore . -R                    <span class="c"># 递归删除</span>
+
+<span class="c"># ---- 批量编辑（最方便的方式）----</span>
+svn propedit svn:ignore .                      <span class="c"># 会打开编辑器，一行一个模式</span>
+svn propedit svn:ignore . --editor-cmd <span class="s">"code --wait"</span>   <span class="c"># 指定编辑器</span>
+
+<span class="c"># ---- 提交属性改动 ----</span>
+svn commit -m <span class="s">"添加 owner 属性与 svn:ignore 忽略规则"</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：属性的设置与查询</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn propset owner "team-alpha" README.md</span>
+<span class="ok">property 'owner' set on 'README.md'</span>
+
+<span class="ps">$</span> <span class="cmd">svn propget owner README.md</span>
+team-alpha
+
+<span class="ps">$</span> <span class="cmd">svn proplist -v README.md</span>
+Properties on 'README.md':
+  <span class="hl">owner</span>
+    team-alpha
+
+<span class="cmt"># 设置 svn:ignore 后再看 status</span>
+<span class="ps">$</span> <span class="cmd">svn propset svn:ignore "*.log`nbuild`ntemp" .</span>
+<span class="ok">property 'svn:ignore' set on '.'</span>
+
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="hl"> M</span>      .                        <span class="cmt">← 注意！M 在【第二列】= 属性被修改</span>
+<span class="hl"> M</span>      README.md
+<span class="cmt">       ↑ 第一列的空格说明：文件【内容】没变，只有属性变了</span>
+
+<span class="ps">$</span> <span class="cmd">svn commit -m "添加 owner 属性与 svn:ignore 忽略规则"</span>
+Sending        .
+Sending        README.md
+Committing transaction...
+<span class="ok">Committed revision 9.</span></pre>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">属性冲突也会显示 C，且更隐蔽</span>
+  <p>如果两个人同时改了同一个文件的属性，update 时会产生<strong>属性冲突</strong>：
+  第 2 列显示 <code class="ic">C</code>，同时生成 <code class="ic">.prej</code> 文件（prej = property reject）。</p>
+  <p>处理方式：<code class="ic">svn resolve --accept working 文件名</code>，
+  然后查看 <code class="ic">.prej</code> 文件里记录的被拒绝的属性值，手工 <code class="ic">propset</code> 回去。</p>
+</div>
+
+<h4 class="sub" id="s15-2">svn:ignore　忽略规则</h4>
+
+<p>
+  这是<strong>使用频率最高的属性</strong>。目的是让 <code class="ic">svn status</code> 输出保持干净——
+  你不想每次都用眼睛过滤掉 <code class="ic">bin/</code>、<code class="ic">obj/</code>、<code class="ic">*.log</code>、<code class="ic">.vs/</code> 这些东西。
+</p>
+
+<div class="box err">
+  <span class="bt">实测踩坑：目录名后面加斜杠会失效</span>
+  <p>这是 <code class="ic">svn:ignore</code> 最经典的坑。很多人凭直觉写成 <code class="ic">build/</code>（带斜杠表示目录），
+  结果<strong>完全不生效</strong>——<code class="ic">svn status</code> 照样显示 <code class="ic">? build</code>。</p>
+  <p>原因：<code class="ic">svn:ignore</code> 的模式是<strong>文件名 glob</strong>，不是路径。它拿目录名 <code class="ic">build</code> 去匹配模式 <code class="ic">build/</code>（含斜杠），自然匹配不上。</p>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测对比：带斜杠 vs 不带斜杠</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># ✗ 错误写法：目录名带结尾斜杠</span>
+<span class="ps">$</span> <span class="cmd">svn propset svn:ignore "*.log`nbuild/`ntemp/" .</span>
+property 'svn:ignore' set on '.'
+
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="hl"> M</span>      .
+<span class="hl"> M</span>      README.md
+<span class="no">?</span>       <span class="no">build</span>                  <span class="cmt">← build 目录还是显示出来了！忽略没生效</span>
+
+<span class="cmt"># ✓ 正确写法：去掉结尾斜杠</span>
+<span class="ps">$</span> <span class="cmd">svn propset svn:ignore "*.log`nbuild`ntemp" .</span>
+
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="hl"> M</span>      .                        <span class="cmt">← build 和 debug.log 都消失了</span>
+<span class="hl"> M</span>      README.md
+
+<span class="cmt"># 确认被忽略的内容（排查问题时用）</span>
+<span class="ps">$</span> <span class="cmd">svn status --no-ignore</span>
+<span class="hl"> M</span>      .
+<span class="hl"> M</span>      README.md
+<span class="dim">I</span>       build                    <span class="cmt">← I = Ignored，被规则命中</span>
+<span class="dim">I</span>       debug.log</pre>
+  </div>
+</div>
+
+<h4 class="sub">忽略规则的三种层级</h4>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 15-2　三种忽略方式的作用范围</span><span class="fs">Ignore Layers</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 400" width="980" height="400" role="img" aria-label="SVN 忽略规则三个层级图">
+  <!-- 层级 1 -->
+  <rect x="24" y="30" width="300" height="150" rx="11" fill="rgba(88,166,255,.07)" stroke="#58a6ff" stroke-width="1.5"/>
+  <text class="hd" x="44" y="56" fill="#58a6ff">① 全局配置 global-ignores</text>
+  <text class="ts" x="44" y="80">作用范围：本机所有仓库</text>
+  <text class="ts" x="44" y="102">存在位置：~/.subversion/config</text>
+  <text class="ts" x="44" y="124">不会提交到仓库，纯个人设置</text>
+  <rect x="44" y="140" width="260" height="28" rx="6" fill="#0b0f14" stroke="#3d444d" stroke-width="1"/>
+  <text class="tm2" x="56" y="159">global-ignores = *.o *.lo .DS_Store</text>
+
+  <!-- 层级 2 -->
+  <rect x="340" y="30" width="300" height="150" rx="11" fill="rgba(210,168,255,.07)" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text class="hd" x="360" y="56" fill="#d2a8ff">② svn:ignore 属性（团队共享）</text>
+  <text class="ts" x="360" y="80">作用范围：设置它的那个目录，不递归</text>
+  <text class="ts" x="360" y="102">存储位置：版本库（会随 commit 共享）</text>
+  <text class="ts" x="360" y="124" fill="#7ee787">★ 团队协作应该用这个</text>
+  <rect x="360" y="140" width="260" height="28" rx="6" fill="#0b0f14" stroke="#3d444d" stroke-width="1"/>
+  <text class="tm2" x="372" y="159">svn propset svn:ignore "build" .</text>
+
+  <!-- 层级 3 -->
+  <rect x="656" y="30" width="298" height="150" rx="11" fill="rgba(255,166,87,.07)" stroke="#ffa657" stroke-width="1.5"/>
+  <text class="hd" x="676" y="56" fill="#ffa657">③ svn:global-ignores（1.8+，可继承）</text>
+  <text class="ts" x="676" y="80">作用范围：设置它的目录【及所有子目录】</text>
+  <text class="ts" x="676" y="102">存储位置：版本库（会随 commit 共享）</text>
+  <text class="ts" x="676" y="124" fill="#7ee787">★ 一次设置在仓库根，全仓生效</text>
+  <rect x="676" y="140" width="258" height="28" rx="6" fill="#0b0f14" stroke="#3d444d" stroke-width="1"/>
+  <text class="tm2" x="688" y="159">svn propset svn:global-ignores "*.log" .</text>
+
+  <!-- 对比表 -->
+  <rect x="24" y="200" width="930" height="186" rx="11" fill="#0b0f14" stroke="#30363d" stroke-width="1.3"/>
+  <text class="hd" x="44" y="226" fill="#e6edf3">三个层级的行为差异</text>
+
+  <line x1="44" y1="238" x2="934" y2="238" stroke="#3d444d" stroke-width="1"/>
+
+  <text class="hd" x="60" y="262" fill="#8b949e">特性</text>
+  <text class="hd" x="280" y="262" fill="#58a6ff">global-ignores</text>
+  <text class="hd" x="500" y="262" fill="#d2a8ff">svn:ignore</text>
+  <text class="hd" x="740" y="262" fill="#ffa657">svn:global-ignores</text>
+
+  <line x1="44" y1="274" x2="934" y2="274" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tx" x="60" y="296">是否提交</text>
+  <text class="ts" x="280" y="296">否（纯本地）</text>
+  <text class="ts" x="500" y="296" fill="#7ee787">是（团队共享）</text>
+  <text class="ts" x="740" y="296" fill="#7ee787">是（团队共享）</text>
+
+  <text class="tx" x="60" y="320">是否递归子目录</text>
+  <text class="ts" x="280" y="320">全部（所有仓库）</text>
+  <text class="ts" x="500" y="320" fill="#ff7b72">否（仅当前目录）</text>
+  <text class="ts" x="740" y="320" fill="#7ee787">是（含子目录）</text>
+
+  <text class="tx" x="60" y="344">典型用途</text>
+  <text class="ts" x="280" y="344">编辑器备份、OS 垃圾文件</text>
+  <text class="ts" x="500" y="344">某个目录下的编译产物</text>
+  <text class="ts" x="740" y="344">全仓统一的日志/临时文件</text>
+
+  <line x1="44" y1="358" x2="934" y2="358" stroke="#30363d" stroke-width="1"/>
+  <text class="ts" x="60" y="378" fill="#e3b341">优先级规则：更具体（更靠近文件）的规则生效。svn:ignore 会覆盖 global-ignores 中相同模式的判断。</text>
+
+  <!-- 底部命令 -->
+  <rect x="24" y="396" width="930" height="0" rx="0"/>
+  <text class="ts" x="44" y="16" fill="#8b949e">命令都是 propset，区别只在属性名</text>
+</svg>
+  </div>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">实用的 ignore 配置模板</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ===== 通用项目（C# / .NET / Visual Studio）=====</span>
+cat &gt; /tmp/ignore.txt &lt;&lt;<span class="s">'EOF'</span>
+*.log
+*.tmp
+*.user
+*.suo
+*.cache
+.vs
+bin
+obj
+packages
+TestResults
+<span class="s">EOF</span>
+svn propset svn:ignore --file /tmp/ignore.txt .
+
+<span class="c"># ===== Java / Maven =====</span>
+printf <span class="s">'%s\n'</span> target .idea <span class="s">'*.iml'</span> <span class="s">'*.class'</span> &gt; /tmp/jignore.txt
+svn propset svn:ignore --file /tmp/jignore.txt .
+
+<span class="c"># ===== Node.js =====</span>
+printf <span class="s">'%s\n'</span> node_modules dist build .cache <span class="s">'*.log'</span> .env &gt; /tmp/nignore.txt
+svn propset svn:ignore --file /tmp/nignore.txt .
+
+<span class="c"># ===== Python =====</span>
+cat &gt; /tmp/pyignore.txt &lt;&lt;<span class="s">'EOF'</span>
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.mypy_cache
+venv
+.venv
+*.egg-info
+<span class="s">EOF</span>
+svn propset svn:ignore --file /tmp/pyignore.txt .
+
+<span class="c"># ===== 游戏项目（美术资源库，加上全仓规则）=====</span>
+svn propset svn:global-ignores --file /tmp/ignore.txt .
+
+<span class="c"># 别忘了提交属性改动！</span>
+svn commit -m <span class="s">"配置 svn:ignore 忽略规则"</span>
+
+<span class="c"># ===== 验证 =====</span>
+svn status                       <span class="c"># 应该干净了</span>
+svn status --no-ignore           <span class="c"># 看看哪些被忽略了（确认没忽略错东西）</span>
+svn propget svn:ignore .         <span class="c"># 确认规则内容</span></pre>
+</div>
+
+<div class="box tip">
+  <span class="bt">万一某个文件已经被 svn add 了，ignore 就不起作用</span>
+  <p><code class="ic">svn:ignore</code> 只能影响<strong>未版本控制</strong>的文件。
+  如果一个文件已经 <code class="ic">svn add</code> 过（甚至连同父目录被添加了），
+  设置 ignore 后它<strong>依然会被跟踪</strong>。</p>
+  <p>解决方案：</p>
+  <ul>
+    <li>单独移除：<code class="ic">svn delete --keep-local 文件名</code>，然后提交</li>
+    <li>整个目录移除：<code class="ic">svn delete --keep-local bin</code>，文件保留在磁盘上，但不再被跟踪</li>
+    <li>然后设置 ignore 规则，两者配合才彻底干净</li>
+  </ul>
+</div>
+
+<h4 class="sub" id="s15-3">关键字替换与 MIME 类型</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">svn:keywords　让源码自动带上版本号</span><span class="acts"><button data-copy">复制</button></span></div>
+<pre class="code"><span class="c"># 在文件里放占位符（注意是 $ 包裹的关键字）</span>
+cat &gt; version.txt &lt;&lt;<span class="s">'EOF'</span>
+$Id$
+$Revision$
+$Author$
+$Date$
+$HeadURL$
+<span class="s">EOF</span>
+
+<span class="c"># 启用关键字替换（不设置的话，占位符永远不会变）</span>
+svn add version.txt
+svn propset svn:keywords <span class="s">"Id Revision Author Date HeadURL"</span> version.txt
+
+<span class="c"># 提交后，占位符会在【提交那一刻】被替换成真实值</span>
+svn commit -m <span class="s">"添加 version.txt 并启用关键字替换"</span>
+
+<span class="c"># 结果（不需要 update 就已经展开）</span>
+cat version.txt</pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：提交前 vs 提交后（注意展开时机）</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 提交前：占位符原样保留</span>
+<span class="ps">$</span> <span class="cmd">Get-Content version.txt</span>
+$Id$
+$Revision$
+$Author$
+$Date$
+
+<span class="ps">$</span> <span class="cmd">svn propset svn:keywords "Id Revision Author Date" version.txt</span>
+<span class="ok">property 'svn:keywords' set on 'version.txt'</span>
+
+<span class="ps">$</span> <span class="cmd">svn commit -m "添加 version.txt 并启用关键字替换"</span>
+Transmitting file data .done
+Committing transaction...
+Committed revision <span class="hl">18</span>.
+
+<span class="cmt"># ★ 关键：提交完成后【立刻】查看，占位符已经展开，无需 update</span>
+<span class="ps">$</span> <span class="cmd">Get-Content version.txt</span>
+<span class="ok">$Id: version.txt 18 2026-10-08 03:09:06Z kelang $</span>
+<span class="ok">$Revision: 18 $</span>
+<span class="ok">$Author: kelang $</span>
+<span class="ok">$Date: 2026-10-08 11:09:06 +0800 (周四, 08 10月 2026) $</span>
+<span class="cmt">↑ 全部被替换成真实版本信息了</span>
+
+<span class="cmt"># 提交时 SVN 先在本地展开关键字，再把结果送进仓库</span>
+<span class="cmt"># 所以展开发生在 commit 阶段，而不是后续的 update</span></pre>
+  </div>
+</div>
+
+<div class="tw">
+<table>
+<thead><tr><th>关键字</th><th>替换成什么</th><th>典型用途</th></tr></thead>
+<tbody>
+  <tr><td><code class="ic">$Revision$</code></td><td>版本号，如 <code class="ic">18</code></td><td>脚本里读版本号</td></tr>
+  <tr><td><code class="ic">$Author$</code></td><td>最后修改者用户名</td><td>文件头注释</td></tr>
+  <tr><td><code class="ic">$Date$</code></td><td>最后修改时间（含时区）</td><td>文件头注释</td></tr>
+  <tr><td><code class="ic">$Id$</code></td><td>「文件名+版本号+时间+作者」组合串</td><td><strong>最常用</strong>，一行包含全部信息</td></tr>
+  <tr><td><code class="ic">$Header$</code></td><td>含仓库 URL 的完整头部信息</td><td>需要溯源的场景</td></tr>
+  <tr><td><code class="ic">$HeadURL$</code></td><td>文件在仓库中的完整 URL</td><td>判断文件来自哪个分支</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="box err">
+  <span class="bt">关键字替换的四个陷阱（实测确认）</span>
+  <ol>
+    <li><strong>不设置 <code class="ic">svn:keywords</code> 属性，占位符永远不会变</strong>——
+      很多人以为 <code class="ic">$Id$</code> 是自动的，其实必须显式启用。而且<strong>属性本身也要提交</strong>，否则对别人无效。</li>
+    <li><strong>展开发生在 commit 那一刻，不是 update 时</strong>——
+      实测结果：文件里写着 <code class="ic">version=$Revision$</code>，
+      执行 <code class="ic">svn commit</code> 后<em>立刻</em>就变成了 <code class="ic">version=$Revision: 12 $</code>，
+      <strong>不需要</strong>再 <code class="ic">svn update</code>。
+      原因：提交时 SVN 会先在本地做关键字替换，再把替换后的内容送进仓库。</li>
+    <li><strong>所以提交后文件会「看起来被改过」</strong>——
+      <code class="ic">svn status</code> 可能显示 <code class="ic">M</code>，但那只是因为替换结果与 BASE 不同。
+      再次 <code class="ic">svn update</code> 后状态就会消失，属正常现象。</li>
+    <li><strong>属性必须与文件一起提交</strong>——
+      如果只提交了文件而忘了 <code class="ic">svn:keywords</code> 属性，别人拿到这份文件时不会有任何替换。</li>
+  </ol>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">svn:mime-type 与 svn:eol-style</span><span class="acts"><button data-copy">复制</button></span></div>
+<pre class="code"><span class="c"># ===== svn:mime-type：告诉 SVN 二进制还是文本 =====</span>
+<span class="c"># 为什么重要：SVN 对「文本」文件会尝试自动合并，对「二进制」直接报冲突</span>
+<span class="c"># 如果二进制文件被当成文本，自动合并会把它改坏！</span>
+
+svn propset svn:mime-type application/octet-stream logo.png
+svn propset svn:mime-type image/png logo.png
+svn propset svn:mime-type application/pdf manual.pdf
+svn propset svn:mime-type application/zip archive.zip
+
+<span class="c"># 批量给所有图片设置（Linux/macOS）</span>
+find . -name <span class="s">"*.png"</span> -o -name <span class="s">"*.jpg"</span> | xargs svn propset svn:mime-type image/png
+
+<span class="c"># 启用自动探测（1.5+，在 ~/.subversion/config 里）</span>
+<span class="c"># enable-auto-props = yes</span>
+<span class="c"># [auto-props]</span>
+<span class="c"># *.png = svn:mime-type=image/png</span>
+<span class="c"># *.jpg = svn:mime-type=image/jpeg</span>
+<span class="c"># *.pdf = svn:mime-type=application/pdf</span>
+
+<span class="c"># ===== svn:eol-style：统一换行符（跨平台协作关键）=====</span>
+<span class="c"># Windows 用 CRLF，Linux/macOS 用 LF，不统一会导致整个文件看起来全改了</span>
+svn propset svn:eol-style native   *.cs       <span class="c"># 各平台自动用本地风格（推荐）</span>
+svn propset svn:eol-style LF       *.sh       <span class="c"># 强制 LF（shell 脚本必须）</span>
+svn propset svn:eol-style CRLF     *.bat      <span class="c"># 强制 CRLF</span>
+
+<span class="c"># 批量给源码目录设置（推荐配置）</span>
+find src -name <span class="s">"*.cs"</span> | xargs svn propset svn:eol-style native
+find src -name <span class="s">"*.js"</span> | xargs svn propset svn:eol-style native
+svn commit -m <span class="s">"统一源码换行符为 eol-style=native"</span>
+
+<span class="c"># ===== svn:executable：可执行权限（Linux/macOS）=====</span>
+svn propset svn:executable on build.sh
+svn propdel svn:executable build.sh      <span class="c"># 取消</span></pre>
+</div>
+
+<div class="box tip">
+  <span class="bt">强烈建议：在 ~/.subversion/config 里配置 auto-props</span>
+  <p>手工给每个文件设属性太累了。配置 <code class="ic">auto-props</code> 后，
+  <code class="ic">svn add</code> 会<strong>自动</strong>按扩展名给新文件设好属性。
+  这是 SVN 提高效率最值得做的一次配置：</p>
+  <div class="codewrap">
+    <div class="codehead"><span class="lang">ini</span><span class="fn">~/.subversion/config（Windows: %APPDATA%\Subversion\config）</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">[miscellany]
+<span class="c"># 打开自动属性</span>
+enable-auto-props = yes
+
+<span class="c"># 全局忽略（个人习惯，不进仓库）</span>
+global-ignores = *.o *.lo *.la *.al .libs *.so *.so.[0-9]* *.a *.pyc *.pyo
+  __pycache__ *.rej *~ #*# .#* .*.swp .DS_Store [Tt]humbs.db
+  *.vs bin obj *.user *.suo
+
+[auto-props]
+<span class="c"># ---- 文本源码：统一换行符 ----</span>
+*.c     = svn:eol-style=native;svn:keywords=Id Revision Author Date
+*.h     = svn:eol-style=native;svn:keywords=Id Revision Author Date
+*.cpp   = svn:eol-style=native;svn:keywords=Id
+*.cs    = svn:eol-style=native;svn:keywords=Id
+*.java  = svn:eol-style=native;svn:keywords=Id
+*.py    = svn:eol-style=native;svn:keywords=Id
+*.js    = svn:eol-style=native;svn:keywords=Id
+*.ts    = svn:eol-style=native;svn:keywords=Id
+*.sh    = svn:eol-style=LF;svn:executable;svn:keywords=Id
+*.bat   = svn:eol-style=CRLF
+*.cmd   = svn:eol-style=CRLF
+*.xml   = svn:eol-style=native
+*.json  = svn:eol-style=native
+*.md    = svn:eol-style=native
+
+<span class="c"># ---- 二进制资源：标记 MIME，避免误合并 ----</span>
+*.png   = svn:mime-type=image/png
+*.jpg   = svn:mime-type=image/jpeg
+*.jpeg  = svn:mime-type=image/jpeg
+*.gif   = svn:mime-type=image/gif
+*.ico   = svn:mime-type=image/x-icon
+*.pdf   = svn:mime-type=application/pdf
+*.zip   = svn:mime-type=application/zip
+*.7z    = svn:mime-type=application/x-7z-compressed
+*.psd   = svn:mime-type=image/vnd.adobe.photoshop;svn:needs-lock=*
+*.max   = svn:mime-type=application/octet-stream;svn:needs-lock=*
+*.fbx   = svn:mime-type=application/octet-stream;svn:needs-lock=*
+*.unity = svn:mime-type=application/octet-stream;svn:needs-lock=*
+*.dll   = svn:mime-type=application/octet-stream
+*.exe   = svn:mime-type=application/octet-stream</pre>
+    </div>
+  </div>
+
+<h4 class="sub" id="s15-4">svn:externals　外部引用</h4>
+
+<p>
+  <code class="ic">svn:externals</code> 让一个目录<strong>自动包含另一个仓库路径的内容</strong>。
+  典型场景：多个项目共享一个公共库，或者美术资源和程序代码分仓库管理，但要放在一起用。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 15-3　svn:externals 的工作原理与两种引用方式</span><span class="fs">Externals</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 420" width="980" height="420" role="img" aria-label="SVN externals 外部引用原理图">
+  <!-- 左侧：工作副本 -->
+  <text class="hd" x="30" y="28" fill="#58a6ff">你的工作副本</text>
+  <rect class="n-blue" x="24" y="44" width="270" height="140" rx="11"/>
+  <text class="tm" x="44" y="70">wc/src/</text>
+  <text class="tm2" x="44" y="92">├── main.cs</text>
+  <text class="tm2" x="44" y="114">├── utils.cs</text>
+  <text class="tm2" x="44" y="136" fill="#58a6ff">└── webapp-link/   ← 外部引用</text>
+  <text class="tm2" x="60" y="158" fill="#8b949e">├── app/</text>
+  <text class="tm2" x="60" y="176" fill="#8b949e">└── index.html</text>
+
+  <rect x="24" y="200" width="270" height="86" rx="10" fill="#0b0f14" stroke="#3d444d" stroke-width="1.2"/>
+  <text class="tm2" x="40" y="224" fill="#d2a8ff">src 目录的 svn:externals：</text>
+  <text class="tm" x="40" y="248" fill="#7ee787">^/trunk/webapp webapp-link</text>
+  <text class="tm2" x="40" y="270" fill="#8b949e">↑URL来源　　　↑本地目录名</text>
+
+  <!-- 箭头 -->
+  <path class="arwp" d="M300,130 L370,130"/>
+  <text class="ts" x="335" y="120" text-anchor="middle">自动拉取</text>
+
+  <!-- 右侧：仓库 -->
+  <text class="hd" x="386" y="28" fill="#d2a8ff">服务器仓库</text>
+  <rect class="n-pur" x="380" y="44" width="250" height="140" rx="11"/>
+  <text class="tm2" x="400" y="70">^/trunk/src/</text>
+  <text class="tm2" x="400" y="92">^/trunk/webapp/   ← 被引用</text>
+  <text class="tm2" x="400" y="114">^/trunk/webapp/app/</text>
+  <text class="tm2" x="400" y="136">^/trunk/webapp/index.html</text>
+  <text class="ts" x="400" y="164" fill="#7ee787">update 时这些内容会被填进 webapp-link/</text>
+
+  <!-- 两种引用方式 -->
+  <rect x="656" y="44" width="298" height="140" rx="11" fill="rgba(126,231,135,.07)" stroke="#7ee787" stroke-width="1.4"/>
+  <text class="hd" x="676" y="70" fill="#7ee787">① 不固定版本（跟随最新）</text>
+  <text class="tm" x="676" y="96" fill="#7ee787">^/trunk/webapp webapp-link</text>
+  <text class="ts" x="676" y="120">每次 update 都拉最新版</text>
+  <text class="ts" x="676" y="140">适合：内部公共库，希望一直同步</text>
+  <text class="ts" x="676" y="162" fill="#ffa657">风险：对方改了不兼容的接口，你的构建会突然挂</text>
+
+  <rect x="656" y="200" width="298" height="140" rx="11" fill="rgba(255,166,87,.07)" stroke="#ffa657" stroke-width="1.4"/>
+  <text class="hd" x="676" y="226" fill="#ffa657">② 固定版本（推荐用于发布）</text>
+  <text class="tm" x="676" y="252" fill="#ffa657">^/trunk/webapp@520 webapp-link</text>
+  <text class="ts" x="676" y="276">永远拉 r520 那份内容</text>
+  <text class="ts" x="676" y="296">适合：第三方库、发布构建</text>
+  <text class="ts" x="676" y="318" fill="#7ee787">优点：可复现，别人改了不影响你</text>
+  <text class="ts" x="676" y="338">缺点：要手工升级 @520 这个数字</text>
+
+  <!-- 底部 -->
+  <rect x="24" y="302" width="620" height="102" rx="10" fill="rgba(255,123,114,.07)" stroke="#ff7b72" stroke-width="1.3"/>
+  <text class="hd" x="44" y="326" fill="#ff7b72">使用 externals 的注意事项</text>
+  <text class="ts" x="44" y="348">• 外部目录在 status 里显示为 <tspan class="mono" fill="#e6edf6">X</tspan>，它有自己的 .svn，提交要进到那个目录里做</text>
+  <text class="ts" x="44" y="370">• 父目录 commit 时不会带上外部目录的改动，容易漏提交</text>
+  <text class="ts" x="44" y="392">• CI 上必须用 <tspan class="mono" fill="#e6edf3">--ignore-externals</tspan> 或显式更新外部，否则可能构建出旧代码</text>
+
+  <line x1="380" y1="200" x2="380" y2="286" stroke="#3d444d" stroke-width="1"/>
+</svg>
+  </div>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">externals 完整用法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ---- 设置外部引用（注意：属性值是多行文本，用 propedit 最方便）----</span>
+cd wc
+svn propedit svn:externals src
+<span class="c"># 编辑器里逐行写，格式：URL 本地目录名</span>
+
+<span class="c"># 或者用单行 propset（多个引用用换行分隔）</span>
+svn propset svn:externals <span class="s">"^/trunk/webapp webapp-link"</span> src
+
+<span class="c"># 读取确认</span>
+svn propget svn:externals src
+
+<span class="c"># ---- 提交（属性改动必须提交，否则对别人无效）----</span>
+svn commit -m <span class="s">"为 src 添加 svn:externals 外部引用"</span>
+
+<span class="c"># ---- 更新时自动拉取外部内容 ----</span>
+svn update
+
+<span class="c"># ---- 控制 externals 行为 ----</span>
+svn update --ignore-externals        <span class="c"># 跳过外部引用（CI 里常用）</span>
+svn checkout --ignore-externals URL  <span class="c"># 检出时也不拉外部</span>
+svn export --ignore-externals URL    <span class="c"># 导出时不带外部</span>
+
+<span class="c"># ---- 在外部目录里提交（它有自己的 .svn）----</span>
+cd src/webapp-link
+svn status                <span class="c"># 这里看到的是 webapp 仓库的状态</span>
+svn commit -m <span class="s">"修改 webapp 内容"</span>
+
+<span class="c"># ---- 用 ^ 和 // 的语法（1.5+ 推荐）----</span>
+<span class="c"># ^/path        相对仓库根</span>
+<span class="c"># //host/path   相对服务器根（多仓库时用）</span>
+<span class="c"># ../path       相对父目录（易错，不推荐）</span>
+svn propset svn:externals <span class="s">"^/trunk/shared/common common"</span> src
+
+<span class="c"># ---- 删除某个外部引用 ----</span>
+svn propedit svn:externals src     <span class="c"># 删掉对应行</span>
+svn commit -m <span class="s">"移除过期的外部引用"</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：externals 生效过程</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn propset svn:externals "^/trunk/webapp webapp-link" src</span>
+<span class="ok">property 'svn:externals' set on 'src'</span>
+
+<span class="ps">$</span> <span class="cmd">svn propget svn:externals src</span>
+^/trunk/webapp webapp-link
+
+<span class="ps">$</span> <span class="cmd">svn commit -m "为 src 添加 svn:externals 外部引用"</span>
+Committing transaction...
+<span class="ok">Committed revision 17.</span>
+
+<span class="cmt"># 更新时自动拉取外部内容</span>
+<span class="ps">$</span> <span class="cmd">svn update</span>
+Updating '.':
+A    bob-test
+A    webapp
+A    webapp\app
+A    webapp\app\index.html
+Fetching external item into 'src\webapp-link':
+A    src\webapp-link\app
+A    src\webapp-link\app\index.html
+External at revision 17.
+<span class="cmt">↑ "Fetching external item" 就是它在拉外部内容</span>
+
+<span class="cmt"># 验证目录出现了</span>
+<span class="ps">$</span> <span class="cmd">Get-ChildItem src</span>
+webapp-link              <span class="cmt">← 外部引用的目录</span>
+main.cs
+
+<span class="cmt"># status 里显示 X（External）</span>
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="cy">X</span>       src\webapp-link</pre>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     第 16 节：锁机制
+     ========================================================================== -->
+
+<div class="pager">
+  <a href="14-tags.html"><span class="lbl">← 上一节</span><span class="ttl">14. 标签与发布管理</span></a>
+  <a class="home" href="index.html"><span class="ttl">总目录</span></a>
+  <a class="next" href="16-locking.html"><span class="lbl">下一节 →</span><span class="ttl">16. 锁机制：二进制文件的独占保护</span></a>
+</div>
+
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+
+<script>
+
+(function () {
+  'use strict';
+
+  /* ============================================================
+     1. 代码块增强：语法高亮 + 复制按钮 + 换行切换
+     ============================================================ */
+
+  // 极简高亮器：只处理注释、字符串、SVN 命令、选项
+  function escapeHtml(t) {
+    return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function highlight(code) {
+    var lines = code.split('\n');
+    var out = [];
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var indented = escapeHtml(line);
+
+      // 整行注释（# 或 rem 或 :: 开头）
+      if (/^\s*(#|rem\s|::)/i.test(line) && !/^\s*#!/.test(line)) {
+        out.push('<span class="c">' + indented + '</span>');
+        continue;
+      }
+
+      // 行内注释：找到未被引号包裹的 #
+      var result = '';
+      var inStr = false;
+      var strChar = '';
+      var commentStart = -1;
+
+      for (var j = 0; j < line.length; j++) {
+        var ch = line[j];
+        if (!inStr && (ch === '"' || ch === "'")) {
+          inStr = true;
+          strChar = ch;
+        } else if (inStr && ch === strChar) {
+          if (line[j - 1] !== '\\') inStr = false;
+        } else if (!inStr && ch === '#' && j > 0 && line[j - 1] === ' ' && /^\s*#/.test(line.slice(j)) === false) {
+          commentStart = j;
+          break;
+        }
+      }
+
+      var codePart = commentStart >= 0 ? line.slice(0, commentStart) : line;
+      var commentPart = commentStart >= 0 ? line.slice(commentStart) : '';
+      var esc = escapeHtml(codePart);
+
+      // 字符串
+      esc = esc.replace(/(&quot;[^&]*?&quot;|&#39;[^&]*?&#39;)/g, '<span class="s">$1</span>');
+      // 注释里的 svn 命令名（行首后的第一个词）
+      esc = esc.replace(/^(\s*)(svn|svnadmin|svnserve|svnlook|svndumpfilter|svnrdump|svnauthz|svnmucc|sc|find|curl|mail|tar|export|cd|set|echo|if|for|chmod|xargs|grep|awk|sudo)\b/,
+        '$1<span class="k">$2</span>');
+      // 长选项
+      esc = esc.replace(/(\s)(--?[a-zA-Z][a-zA-Z0-9-]*)/g, '$1<span class="a">$2</span>');
+      // 数字（版本号之类）
+      esc = esc.replace(/\b(r\d+)\b/g, '<span class="m">$1</span>');
+
+      result = esc;
+      if (commentPart) result += '<span class="c">' + escapeHtml(commentPart) + '</span>';
+      out.push(result);
+    }
+    return out.join('\n');
+  }
+
+  // 处理所有 codewrap 里的 pre.code
+  var wraps = document.querySelectorAll('.codewrap');
+
+  Array.prototype.forEach.call(wraps, function (wrap) {
+    var pre = wrap.querySelector('pre.code');
+    if (!pre) return;
+
+    // 如果代码块里已经有手工写好的语法着色 span，就原样保留，不再重复处理
+    var alreadyStyled = pre.querySelector('span');
+    if (!alreadyStyled) {
+      var raw = pre.textContent;
+      var codeEl = pre.querySelector('code') || pre;
+      codeEl.innerHTML = highlight(raw);
+    }
+
+    // 加复制按钮（若无）
+    var acts = wrap.querySelector('.acts');
+    if (acts && !acts.querySelector('[data-copy]')) {
+      var b = document.createElement('button');
+      b.setAttribute('data-copy', '');
+      b.textContent = '复制';
+      acts.appendChild(b);
+    }
+  });
+
+  // 复制功能
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('[data-copy]');
+    if (!btn) return;
+
+    var wrap = btn.closest('.codewrap') || btn.closest('.term');
+    if (!wrap) return;
+    var pre = wrap.querySelector('pre');
+    if (!pre) return;
+
+    var text = pre.textContent;
+
+    function done() {
+      btn.textContent = '已复制';
+      btn.classList.add('ok');
+      setTimeout(function () {
+        btn.textContent = '复制';
+        btn.classList.remove('ok');
+      }, 1400);
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text, done); });
+    } else {
+      fallback(text, done);
+    }
+  });
+
+  function fallback(text, done) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done();
+    } catch (err) { /* 静默失败 */ }
+  }
+
+  /* ============================================================
+     2. 进度条 + 回到顶部
+     ============================================================ */
+  var prog = document.getElementById('prog');
+  var topBtn = document.getElementById('top');
+
+  function onScroll() {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var pct = max > 0 ? (h.scrollTop || document.body.scrollTop) / max * 100 : 0;
+    if (prog) prog.style.width = pct + '%';
+    if (topBtn) {
+      if ((h.scrollTop || document.body.scrollTop) > 600) topBtn.classList.add('show');
+      else topBtn.classList.remove('show');
+    }
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  if (topBtn) {
+    topBtn.onclick = function () { window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  }
+
+  /* ============================================================
+     3. 导航高亮：滚动时自动标记当前小节
+     ============================================================ */
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll('#nav a'));
+  var sections = navLinks.map(function (a) {
+    var id = a.getAttribute('href');
+    return { el: id && id.length > 1 ? document.querySelector(id) : null, a: a };
+  }).filter(function (s) { return s.el; });
+
+  function highlightNav() {
+    var pos = window.scrollY + 140;
+    var current = null;
+    for (var i = 0; i < sections.length; i++) {
+      if (sections[i].el.offsetTop <= pos) current = sections[i];
+    }
+    navLinks.forEach(function (a) { a.classList.remove('on'); });
+    if (current) {
+      current.a.classList.add('on');
+      // 让当前项在侧栏可见
+      var box = current.a.parentElement;
+      if (box && box.scrollHeight > box.clientHeight) {
+        var aTop = current.a.offsetTop;
+        if (aTop < box.scrollTop || aTop > box.scrollTop + box.clientHeight - 60) {
+          box.scrollTop = aTop - box.clientHeight / 2;
+        }
+      }
+    }
+  }
+
+  window.addEventListener('scroll', highlightNav, { passive: true });
+  highlightNav();
+
+  /* ============================================================
+     4. 表格首列若为空白则隐藏（防止空单元格）
+     ============================================================ */
+  Array.prototype.forEach.call(document.querySelectorAll('table'), function (t) {
+    var firstTh = t.querySelector('thead th');
+    var firstTd = t.querySelector('tbody td');
+    if (firstTh && firstTd && !firstTh.textContent.trim() && !firstTd.textContent.trim()) {
+      Array.prototype.forEach.call(t.querySelectorAll('tr'), function (tr) {
+        var c = tr.querySelector('th, td');
+        if (c) c.style.display = 'none';
+      });
+    }
+  });
+
+})();
+
+</script>
+</body>
+</html>

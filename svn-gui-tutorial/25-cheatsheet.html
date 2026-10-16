@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>25. 图形操作速查表 | SVN 图形化实战</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 图形化实战</h1></div>
+  <div class="brand-sub">TortoiseSVN + VisualSVN · 全鼠标操作</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 准备</div>
+    <a href="01-tools.html">1. 认识你的两个图形工具</a>
+    <a href="02-first-checkout.html">2. 第一次检出：把代码拉到本地</a>
+    <a href="03-icons.html">3. 看懂图标角标与右键菜单</a>
+    <div class="grp">第二阶段 · 日常使用</div>
+    <a href="04-daily.html">4. 日常三件事：改、更、提</a>
+    <a href="05-status.html">5. 查看改动：哪些文件变了</a>
+    <a href="06-diff.html">6. 比对差异：到底改了哪几行</a>
+    <a href="07-add-delete.html">7. 新增、删除、重命名文件</a>
+    <a href="08-history.html">8. 查看历史：Log 对话框详解</a>
+    <a href="09-revert.html">9. 撤销：改错了怎么退回</a>
+    <div class="grp">第三阶段 · 进阶操作</div>
+    <a href="10-conflict.html">10. 冲突处理：两人改了同一处</a>
+    <a href="11-merge-tool.html">11. 合并编辑器：逐行选择保留谁</a>
+    <a href="12-branch.html">12. 建分支：开一条独立开发线</a>
+    <a href="13-switch.html">13. 切换分支：在主干和分支间跳</a>
+    <a href="14-merge.html">14. 合并分支：把改动并回主干</a>
+    <a href="15-revision-graph.html">15. 版本拓扑图：看清分支走向</a>
+    <div class="grp">第四阶段 · 属性与锁</div>
+    <a href="16-ignore.html">16. 忽略文件：让编译产物别再烦我</a>
+    <a href="17-properties.html">17. 属性对话框：设置文件行为</a>
+    <a href="18-lock.html">18. 文件锁：二进制文件独占编辑</a>
+    <div class="grp">第五阶段 · 服务端管理</div>
+    <a href="19-server.html">19. 服务端：VisualSVN 建仓库</a>
+    <a href="20-users.html">20. 用户与权限：谁能看谁能改</a>
+    <a href="21-backup.html">21. 备份与恢复：图形界面操作</a>
+    <div class="grp">第六阶段 · 效率技巧</div>
+    <a href="22-patch-export.html">22. 补丁与导出：不走仓库传代码</a>
+    <a href="23-settings.html">23. 设置面板：常用选项怎么调</a>
+    <a href="24-troubleshoot.html">24. 常见问题：报错怎么处理</a>
+    <a href="25-cheatsheet.html" class="on">25. 图形操作速查表</a>
+
+  </nav>
+</aside>
+<main>
+<div class="crumb">
+  <span class="stage">第六阶段 · 效率技巧</span>
+  <span class="sep">/</span>
+  <a href="index.html">总目录</a>
+  <span class="sep">/</span>
+  <span class="cur">第 25 节</span>
+</div>
+
+<h3 class="sec" id="s25"><span class="no">25</span>图形操作速查表</h3>
+
+<p class="lead">
+  前面二十四节讲的都是「为什么」和「怎么做」。这一节把它们压成几张表：
+  <strong>遇到事情不用翻前文，看一眼「我要做什么」那一栏，照着右边的菜单路径点就行。</strong>
+  建议把这一节单独打印出来贴在工位旁边——用熟了之后，你会发现常用的其实就那么七八个操作。
+</p>
+
+<div class="box key">
+  <span class="bt">怎么读下面这些表</span>
+  <ul>
+    <li>菜单路径一律写成这种形式：<span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Commit...</span></span>，意思是<strong>右键 → 展开 TortoiseSVN 子菜单 → 点 Commit...</strong>。</li>
+    <li>路径开头的「<strong>文件夹上右键</strong>」和「<strong>文件上右键</strong>」不一样，<em>选错对象菜单会对不上</em>，表里都标了。</li>
+    <li>顶层菜单里带 <code class="ic">SVN</code> 前缀的那几个（<code class="ic">SVN Update</code>、<code class="ic">SVN Commit...</code>、<code class="ic">SVN Check for modifications</code>）<strong>不用展开子菜单</strong>，右键就能直接点。</li>
+    <li>第三列「注意事项」<strong>比第一列的路径更重要</strong>——那些都是踩过坑才写下来的。</li>
+  </ul>
+</div>
+
+<h4 class="sub">核心操作速查</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:200px">我要做什么</th><th style="width:330px">右键菜单路径</th><th>注意事项</th></tr></thead>
+<tbody>
+  <tr><td><strong>检出代码</strong></td><td>空文件夹上右键 <span class="mp"><span class="item">SVN Checkout...</span></span></td><td>选一个<strong>专门的空文件夹</strong>，别和已有的东西混在一起。地址从服务器管理员那里要（第 19 节）。</td></tr>
+  <tr><td><strong>更新代码</strong><br><span class="tagmini b">每天开工第一件事</span></td><td>工作副本上右键 <span class="mp"><span class="item">SVN Update</span></span></td><td>动手改代码之前先更新，<strong>能省掉大部分冲突</strong>。提交前建议再更新一次。</td></tr>
+  <tr><td><strong>提交改动</strong></td><td>工作副本上右键 <span class="mp"><span class="item">SVN Commit...</span></span></td><td>勾选要提交的文件，<strong>Message 一定要写</strong>（写清改了什么、为什么）。别把调试用的临时改动一起提交。</td></tr>
+  <tr><td><strong>查看自己改了什么</strong><br><span class="tagmini b">提交前必做</span></td><td>工作副本上右键 <span class="mp"><span class="item">SVN Check for modifications</span></span></td><td>这个列表就是本次提交将要包含的内容。<strong>看完再提交，能避免误提交。</strong></td></tr>
+  <tr><td><strong>看某文件的改动历史</strong></td><td>文件上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Show log</span></span></td><td>上方选某个版本，下方列出它改了哪些文件；<strong>双击文件看差异</strong>。只关心这一个文件时，日志窗口里可以只看它的历史。</td></tr>
+  <tr><td><strong>比对两个版本</strong></td><td>右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Show log</span></span> → 选中两个版本 → 右键 <code class="ic">Compare revisions</code></td><td>会打开比对工具左右并排显示。<strong>按 <kbd>Ctrl</kbd> 或 <kbd>Shift</kbd> 可多选版本</strong>，选两个再比。</td></tr>
+  <tr><td><strong>新增文件</strong></td><td>新文件上右键 <span class="mp"><span class="item">Add</span></span></td><td>角标从灰色问号变成蓝色加号才算登记成功。<strong>提交时别漏了它所在的文件夹</strong>，否则可能提交不上去。</td></tr>
+  <tr><td><strong>删除文件</strong></td><td>文件上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Delete</span></span></td><td><strong>用这个菜单项删，不要直接在资源管理器里按 Delete</strong>。直接删只是本地少了个文件，SVN 那边还留着记录。</td></tr>
+  <tr><td><strong>重命名文件</strong></td><td>文件上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Rename</span></span></td><td><strong>千万不要用 <kbd>F2</kbd> 改名。</strong>那样 SVN 会以为「删了一个旧文件 + 加了一个新文件」，历史就断了。用菜单里的重命名才能保住历史。</td></tr>
+  <tr><td><strong>移动文件</strong></td><td><strong>按住右键拖动</strong>文件到目标位置，松手后选 <code class="ic">SVN Move versioned files here</code></td><td>一定要<strong>用右键拖、不要用左键拖</strong>，拖完在弹出的菜单里选带 SVN 字样那一项，才能保住历史。</td></tr>
+  <tr><td><strong>撤销本地改动</strong><br><span class="tagmini r">不可逆</span></td><td>文件上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Revert...</span></span></td><td><strong>Revert 不可逆</strong>，本地未提交的修改会直接消失（第 9 节）。动手前想清楚，大改动之前先提交一次。</td></tr>
+  <tr><td><strong>撤销已提交的改动</strong></td><td>右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Show log</span></span> → 选中那次提交 → 右键 <code class="ic">Revert changes from this revision</code> → 再提交</td><td>SVN 里<strong>历史不能真的抹掉</strong>，做法是「做一次反向修改再提交」。提交说明里写清「回退第 N 版」。<em>已经发给别人的版本别这么干。</em></td></tr>
+  <tr><td><strong>拉回历史版本</strong><br><span class="tagmini b">回看旧代码</span></td><td>右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Update to revision...</span></span></td><td>这是<strong>临时让本地回到某一版</strong>，看完记得再更新回最新。想永久回到旧版并留下记录，用上一行的做法。</td></tr>
+  <tr><td><strong>创建分支</strong></td><td>工作副本上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Branch/tag...</span></span></td><td>在 <code class="ic">To path</code> 里填分支路径（如 <code class="ic">/branches/dev-xxx</code>）。版本一般保持默认的最新即可（第 12 节）。</td></tr>
+  <tr><td><strong>切换分支</strong></td><td>工作副本上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Switch...</span></span></td><td>切换前<strong>先把当前分支的改动提交掉</strong>，否则容易带过去或冲突。切换后确认一下日志里的地址对不对（第 13 节）。</td></tr>
+  <tr><td><strong>合并分支</strong></td><td>目标分支的工作副本上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Merge...</span></span></td><td>先用 <strong>Test merge</strong> 预览一遍再真合并。合并完要<strong>提交</strong>才算完成（第 14 节）。</td></tr>
+  <tr><td><strong>创建标签</strong><br><span class="tagmini p">发版留底</span></td><td>工作副本上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Branch/tag...</span></span></td><td>和建分支是同一个对话框，只是路径填到 <code class="ic">/tags/v1.0</code>。<strong>标签目录通常设成只读，打完就别再改。</strong></td></tr>
+  <tr><td><strong>查看版本图</strong><br><span class="tagmini b">理清分叉关系</span></td><td>工作副本上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Revision graph</span></span></td><td>图上能看清分支从哪分出去、在哪合回来。<strong>看不明白先调设置里的分类模式</strong>（第 15、23 节）。</td></tr>
+  <tr><td><strong>忽略文件</strong><br><span class="tagmini b">编译产物别再烦我</span></td><td>未版本控制的文件/文件夹上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Add to ignore list</span></span></td><td>忽略规则是<strong>按后缀或按名字</strong>设的，加完记得<strong>提交</strong>，否则只在你本机生效（第 16 节）。</td></tr>
+  <tr><td><strong>查看/设置属性</strong></td><td>文件/文件夹上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Properties</span></span></td><td>能设换行风格、关键字替换、二进制文件类型等。<strong>属性改动也要提交才对别人生效</strong>（第 17 节）。</td></tr>
+  <tr><td><strong>加锁 / 解锁</strong></td><td>文件上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Get lock</span></span> / <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Release lock</span></span></td><td>用在<strong>不方便合并的二进制文件上</strong>（PSD、Excel）。收工就释放，别长期占着（第 18 节）。</td></tr>
+  <tr><td><strong>导出干净副本</strong><br><span class="tagmini c">不含版本控制</span></td><td>任意文件夹上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Export...</span></span></td><td>导出来的是<strong>没有 .svn 的干净代码</strong>，给客户、打包发布用它。<strong>别在导出目录里开发</strong>（第 22 节）。</td></tr>
+  <tr><td><strong>创建补丁</strong></td><td>改动所在的文件夹上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Create patch...</span></span></td><td>勾选要包含的改动，存成 <code class="ic">.patch</code>。适合<strong>还没有提交权限</strong>或需要先给同事评审的场景。</td></tr>
+  <tr><td><strong>应用补丁</strong></td><td>目标文件夹上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Apply patch...</span></span></td><td><strong>先 Update 再应用</strong>，失败率低很多。应用前逐项预览差异，别闭着眼睛点确定。</td></tr>
+  <tr><td><strong>清理工作副本</strong><br><span class="tagmini g">万能修复</span></td><td>工作副本上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Clean up</span></span></td><td>「已锁定」「角标不对」「状态混乱」都先做它。<strong>不改文件内容，放心点</strong>（第 24 节）。</td></tr>
+  <tr><td><strong>清除认证数据</strong><br><span class="tagmini y">换账号必备</span></td><td>右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Settings</span></span> → <code class="ic">Saved Data</code> → 认证数据那一行点 <code class="ic">Clear</code></td><td>改了密码却一直认证失败的<strong>第一解法</strong>。只清本机缓存，不动服务器、不动代码。</td></tr>
+  <tr><td><strong>浏览服务器仓库</strong><br><span class="tagmini b">不用检出就能看</span></td><td>任意位置右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Repo-browser</span></span></td><td>直接看仓库里的目录和文件，<strong>也能在里面下载文件、建目录、看历史</strong>。查一个文件、确认一个地址时最方便。</td></tr>
+  <tr><td><strong>看某一行是谁改的</strong></td><td>文件上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Blame</span></span></td><td>每行前面标出改它的版本号和作者。<strong>排查「这行代码什么时候变坏的」非常好用。</strong></td></tr>
+  <tr><td><strong>把整批文件传上仓库</strong></td><td>本地文件夹上右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Import...</span></span></td><td>传完本地文件夹<strong>不会</strong>变成工作副本，还要另外检出一次才能继续开发（第 22 节）。</td></tr>
+</tbody>
+</table>
+</div>
+
+<h4 class="sub">图标角标速查</h4>
+
+<p>角标是<strong>最省事的状态提示</strong>：不用打开任何窗口，扫一眼文件夹就知道有没有活儿没干完。</p>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:150px">图标</th><th style="width:170px">含义</th><th>该做什么</th></tr></thead>
+<tbody>
+  <tr><td><span class="tagmini g">绿色对勾</span> <code class="ic">Normal</code></td><td>和服务器完全一致</td><td><strong>什么都不用做。</strong>看到一片绿勾说明本地干净。</td></tr>
+  <tr><td><span class="tagmini r">红色叹号</span> <code class="ic">Modified</code></td><td>本地改过、还没提交</td><td>这是<strong>最常见的状态</strong>。改完、确认无误后提交它。</td></tr>
+  <tr><td><span class="tagmini b">蓝色加号</span> <code class="ic">Added</code></td><td>新增文件，已登记待提交</td><td>提交之后会变成绿色对勾。<strong>别只在本地加不上传。</strong></td></tr>
+  <tr><td><span class="tagmini p">灰色问号</span> <code class="ic">Unversioned</code></td><td>SVN 完全不认识它</td><td>要么右键 <code class="ic">Add</code> 纳入版本控制，要么 <code class="ic">Add to ignore list</code> 忽略掉。<strong>提交时它会被跳过。</strong></td></tr>
+  <tr><td><span class="tagmini r">红色叉号</span> <code class="ic">Deleted</code></td><td>已标记删除，还没提交</td><td>提交后服务器上也会删掉。<em>如果是误删，右键 Revert 就能恢复。</em></td></tr>
+  <tr><td><span class="tagmini y">黄色小锁</span> <code class="ic">Locked</code></td><td>文件被加了独占锁</td><td>是你加的——改完提交后释放；是别人加的——<strong>先沟通，别硬来</strong>。</td></tr>
+  <tr><td><span class="tagmini r">黄底红叹号</span> <code class="ic">Conflicted</code></td><td><strong>冲突</strong>，必须人工处理</td><td>按第 10、11 节解决，处理完右键 <code class="ic">Resolved</code>，再提交。<strong>这是唯一必须先解决才能提交的状态。</strong></td></tr>
+  <tr><td><span class="tagmini c">无角标</span> <code class="ic">Ignored / 空目录</code></td><td>被忽略的文件，或空文件夹</td><td>正常现象，<strong>不用管</strong>。如果该有角标却没有，见第 24 节「角标不显示」。</td></tr>
+  <tr><td><span class="tagmini y">只读图标</span> <code class="ic">ReadOnly</code></td><td>文件被设成了只读属性</td><td>常见于设了「必须先加锁才能改」的文件。<strong>先加锁再编辑</strong>（第 18 节）。</td></tr>
+</tbody>
+</table>
+</div>
+
+<h4 class="sub">对话框速查</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:230px">对话框名</th><th>什么时候会用到它</th></tr></thead>
+<tbody>
+  <tr><td><code class="ic">Checkout</code> <span class="tagmini b">检出</span></td><td>第一次从服务器把代码拉下来；换机器重建环境；拉一个新分支到本地。</td></tr>
+  <tr><td><code class="ic">Commit</code> <span class="tagmini g">提交</span></td><td>把本地改动上传到服务器。<strong>用得最多的一个对话框</strong>。</td></tr>
+  <tr><td><code class="ic">Show log</code> <span class="tagmini b">日志</span></td><td>看历史、看某次提交改了哪些文件、比对两个版本、回退某次提交。</td></tr>
+  <tr><td><code class="ic">Repo-browser</code> <span class="tagmini c">仓库浏览器</span></td><td>不检出就看仓库内容；确认目录结构；在服务器端建目录、传文件。</td></tr>
+  <tr><td><code class="ic">Revision graph</code> <span class="tagmini p">版本图</span></td><td>理清分支从哪来、合到哪去；给人解释版本是怎么走的。</td></tr>
+  <tr><td><code class="ic">Revert</code> <span class="tagmini r">撤销</span></td><td>放弃本地未提交的改动。<strong>不可逆，会列清楚要丢掉哪些文件。</strong></td></tr>
+  <tr><td><code class="ic">TortoiseMerge</code> <span class="tagmini y">合并工具</span></td><td>冲突处理；比对两个文件的差异（三栏解决冲突、双栏纯比对）。</td></tr>
+  <tr><td><code class="ic">Branch/tag</code> <span class="tagmini p">分支/标签</span></td><td>开一条新的开发线；给已发布的版本打一个标签留底。</td></tr>
+  <tr><td><code class="ic">Switch</code> <span class="tagmini b">切换</span></td><td>同一个工作副本换成另一个分支，不用重新检出。</td></tr>
+  <tr><td><code class="ic">Merge</code> <span class="tagmini c">合并</span></td><td>把分支上的改动并回主干，或把主干的改动同步到分支。</td></tr>
+  <tr><td><code class="ic">Clean up</code> <span class="tagmini g">清理</span></td><td>状态乱了、锁残留了、角标不对了——<strong>万能修复</strong>。</td></tr>
+  <tr><td><code class="ic">Export</code> <span class="tagmini c">导出</span></td><td>要一份不带版本控制的干净代码：交付、发布、部署、归档。</td></tr>
+  <tr><td><code class="ic">Import</code> <span class="tagmini c">导入</span></td><td>把一批现成文件一次性放上仓库，不需要先检出。</td></tr>
+  <tr><td><code class="ic">Create patch / Apply patch</code> <span class="tagmini y">补丁</span></td><td>没有提交权限时交付改动；接收别人发来的改动。</td></tr>
+  <tr><td><code class="ic">Properties</code> <span class="tagmini b">属性</span></td><td>设置换行风格、关键字替换、忽略规则、二进制文件类型。</td></tr>
+  <tr><td><code class="ic">Get lock</code> <span class="tagmini y">加锁</span></td><td>二进制文件独占编辑，防止两人同时改同一个 PSD、Excel。</td></tr>
+  <tr><td><code class="ic">Settings</code> <span class="tagmini b">设置</span></td><td>精简右键菜单、调角标、<strong>清除认证数据</strong>、更换比对工具。</td></tr>
+</tbody>
+</table>
+</div>
+
+<h4 class="sub">每天做什么，每周做什么</h4>
+
+<div class="grid2">
+  <div class="card good">
+    <h6>每天必做</h6>
+    <ul>
+      <li><strong>开工先更新。</strong>右键 <span class="mp"><span class="item">SVN Update</span></span>，把别人昨天的改动拉下来。<em>这一步省掉后面大部分冲突。</em></li>
+      <li><strong>改完先自查。</strong><span class="mp"><span class="item">SVN Check for modifications</span></span>，看清自己到底动了哪些文件。</li>
+      <li><strong>收工前提交。</strong>右键 <span class="mp"><span class="item">SVN Commit...</span></span>，<strong>Message 写清楚</strong>。别把没提交的活儿留在机器上过夜。</li>
+      <li><strong>提交前再更新一次。</strong>顺序是「更新 → 有冲突先解决 → 提交」，<em>反过来会让你反复撞同一个错。</em></li>
+      <li><strong>看到红色叹号就处理掉。</strong>攒着一堆未提交的改动，风险只会越滚越大。</li>
+    </ul>
+  </div>
+  <div class="card pur">
+    <h6>每周建议</h6>
+    <ul>
+      <li><strong>清一遍工作副本。</strong>右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Clean up</span></span>，把状态理顺、顺手收缩一下缓存。<em>项目大的话能省出可观空间。</em></li>
+      <li><strong>检查有没有长期占用的锁。</strong>同事加了锁没释放，会一直卡着别人。</li>
+      <li><strong>清理不用的工作副本。</strong>试探性检出、demo 分支用完就删掉。</li>
+      <li><strong>整理忽略规则。</strong>新出现的编译产物加进忽略列表，别让灰色问号越堆越多。</li>
+      <li><strong>看一眼仓库的历史。</strong>翻翻最近几十条提交，<em>了解团队在做什么、有没有人提交信息写得太随意。</em></li>
+    </ul>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">三条人人都该记住的红线</span>
+  <ul>
+    <li><strong>改名和移动一律用 SVN 菜单，不要用 <kbd>F2</kbd>、不要用左键拖。</strong>保住历史比省一次点击重要得多。</li>
+    <li><strong>提交前一定先更新。</strong>「先提后更」是最常见的自找麻烦。</li>
+    <li><strong>Revert 之前想清楚。</strong>它没有撤销键，丢掉的改动找不回来。大改动之前先提交一次做保险。</li>
+  </ul>
+</div>
+
+<div class="box key">
+  <span class="bt">团队协作约定模板（可以直接抄给团队）</span>
+  <p><strong>一、提交信息怎么写</strong></p>
+  <ul>
+    <li>格式：<code class="ic">【模块】一句话说清做了什么</code>，必要时再加一行补充原因。</li>
+    <li>好的例子：<code class="ic">【登录】修复验证码过期后无法重新获取的问题</code>。</li>
+    <li>坏的例子：<code class="ic">改了</code>、<code class="ic">更新</code>、<code class="ic">123</code>、一整片空白。<strong>这种提交等于没写</strong>，半年后谁也不知道当时干了什么。</li>
+    <li>一次提交只说一件事。<strong>不要为了「一起提交」把三个不相关的改动捆在一起</strong>，回退时会很痛苦。</li>
+  </ul>
+  <p><strong>二、目录怎么用</strong></p>
+  <ul>
+    <li><code class="ic">trunk</code>：所有人共用的主线，<strong>只放随时能跑的代码</strong>。</li>
+    <li><code class="ic">branches</code>：需要长期开发或改动较大的事，开分支做，做完合并回主干。</li>
+    <li><code class="ic">tags</code>：每个发布的版本打一个标签，<strong>只读，谁也不许改</strong>。</li>
+  </ul>
+  <p><strong>三、分支怎么命名</strong></p>
+  <ul>
+    <li>开发分支：<code class="ic">branches/dev-功能名-姓名缩写</code>，例如 <code class="ic">dev-login-zhangs</code>。</li>
+    <li>修复分支：<code class="ic">branches/fix-问题简述</code>，例如 <code class="ic">fix-excel-export</code>。</li>
+    <li>发布标签：<code class="ic">tags/v版本号</code>，例如 <code class="ic">v1.2.0</code>，和发布单上的号对齐。</li>
+    <li><strong>用英文小写加连字符</strong>，别用中文、空格和特殊符号。</li>
+  </ul>
+  <p><strong>四、什么时候提交</strong></p>
+  <ul>
+    <li><strong>做完一个能讲清楚的小事，就提交一次。</strong>一提交就是一张快照，粒度小才好回退。</li>
+    <li><strong>下班前把能提交的都提交掉。</strong>留在本机的改动没有任何保护。</li>
+    <li><strong>不要提交跑不起来的代码到主干。</strong>做一半的功能请放到分支里。</li>
+    <li><strong>不要提交编译产物、本地配置、密码和大文件。</strong>用忽略规则挡掉。</li>
+    <li><strong>提交前先更新，有冲突当场解决</strong>，不要等到第二天。</li>
+  </ul>
+  <p><strong>五、出问题找谁</strong></p>
+  <ul>
+    <li>状态类问题（锁定、角标、认证）自己先走<strong>万能三步</strong>（第 24 节）。</li>
+    <li>权限问题找服务器管理员（第 20 节）。</li>
+    <li>不确定的改动<strong>先做补丁、先沟通</strong>，不要赌一把直接提交主干。</li>
+  </ul>
+  <p><em>这份约定不用一次背下来。把它发到团队群里、贴在项目文档里，新同学入职时看一眼，能省掉后面几个月的来回解释。</em></p>
+</div>
+
+<div class="box ok">
+  <span class="bt">到这里，整套流程你都能用鼠标走完了</span>
+  <p>
+    二十五节走下来，从检出、日常提交、看历史、处理冲突、开分支合并，到服务端建仓库、配权限、做备份，
+    再到补丁、导出、设置和排错——<strong>所有这些操作都能在资源管理器右键和对话框里完成</strong>。
+  </p>
+  <p>剩下的事情只有一个：<strong>用起来。</strong>把这一节打印出来贴在旁边，前两周偶尔查一下，之后就是肌肉记忆了。</p>
+</div>
+
+
+<div class="pager">
+  <a href="24-troubleshoot.html"><span class="lbl">← 上一节</span><span class="ttl">24. 常见问题：报错怎么处理</span></a>
+  <a class="home" href="index.html"><span class="ttl">总目录</span></a>
+  <a class="next disabled"><span class="lbl">下一节 →</span><span class="ttl">已是最后一节</span></a>
+</div>
+
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+<script src="assets/app.js"></script>
+</body>
+</html>

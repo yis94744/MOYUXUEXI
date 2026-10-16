@@ -1,0 +1,244 @@
+<h3 class="sec" id="s18"><span class="no">18</span>svnserve 部署实战</h3>
+
+<h4 class="sub">第一步：创建仓库</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">建仓库</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 推荐目录规划</span>
+<span class="c"># /var/svn/            仓库根目录（svnserve -r 指向这里）</span>
+<span class="c"># /var/svn/repo        项目仓库</span>
+<span class="c"># /var/svn/backup      备份目录</span>
+
+sudo mkdir -p /var/svn
+sudo svnadmin create /var/svn/repo
+
+<span class="c"># 初始化标准结构（用 file:// 本地协议，无需服务）</span>
+svn mkdir file:///var/svn/repo/trunk \
+          file:///var/svn/repo/branches \
+          file:///var/svn/repo/tags \
+          -m <span class="s">"建立标准目录结构"</span>
+
+<span class="c"># 权限：svnserve 通常以特定用户运行</span>
+sudo chown -R svn:svn /var/svn
+sudo chmod -R 770 /var/svn</pre>
+</div>
+
+<h4 class="sub">第二步：配置 svnserve.conf</h4>
+
+<div class="box err">
+  <span class="bt">最常见的坑：配置项前面有空格 → 整个仓库无法访问（实测确认）</span>
+  <p><code class="ic">svnserve.conf</code> 的 ini 格式对<strong>前导空格极其敏感</strong>。
+  模板文件里所有配置项都是 <code class="ic"># 注释</code> 开头、前面带一个空格。
+  如果你只删掉 <code class="ic">#</code> 却<strong>留下了那个空格</strong>，配置解析会直接失败。</p>
+  <p>实测结果<strong>比「被忽略」更严重</strong>：svnserve 进程能正常启动、端口也处于监听状态，
+  但客户端一连接就报解析错误，<em>整个仓库彻底无法访问</em>：</p>
+  <div class="term" style="margin:12px 0 0">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">实测报错</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn list svn://127.0.0.1/repo/trunk</span>
+<span class="no">svn: E170013: Unable to connect to a repository at URL 'svn://127.0.0.1/repo/trunk'</span>
+<span class="no">svn: E200002: Error while parsing config file: /var/svn/repo/conf/svnserve.conf:</span>
+<span class="no">svn: E200002: line 1: Option expected</span>
+<span class="cmt">↑ "Option expected" 就是「这一行不是合法的配置项」</span>
+<span class="cmt">  排查时看到这个错误，第一件事就是检查行首有没有多余空格</span></pre>
+  </div>
+  <div class="duo" style="margin-top:12px">
+    <div>
+      <div class="dh">✗ 错误：行首有空格</div>
+<pre> <span style="color:#ff7b72">anon-access = none</span>
+ ↑ 前面有一个空格
+
+svn: E200002: line 1: Option expected
+<span style="color:#ff7b72">→ 整个仓库无法访问</span></pre>
+    </div>
+    <div>
+      <div class="dh">✓ 正确：顶格写</div>
+<pre><span style="color:#7ee787">anon-access = none</span>
+ ↑ 从第 1 列开始，不留空格
+
+配置生效，服务正常</pre>
+    </div>
+  </div>
+  <p style="margin-top:10px"><strong>快速自检命令：</strong>
+  <code class="ic">grep -n "^[[:space:]]\+[a-z-]\+ *=" conf/svnserve.conf</code> ——
+  能匹配到任何行，就说明有配置项前面带了空格。</p>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">ini</span><span class="fn">/var/svn/repo/conf/svnserve.conf</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">[general]
+<span class="c">### 匿名用户权限：none / read / write</span>
+<span class="c">### 生产环境一律用 none，强制登录</span>
+anon-access = none
+
+<span class="c">### 已认证用户的权限：read / write</span>
+auth-access = write
+
+<span class="c">### 账号密码文件（相对 conf 目录，或写绝对路径）</span>
+password-db = passwd
+
+<span class="c">### 权限控制文件（不写这行 = 所有登录用户都有全部权限！）</span>
+authz-db = authz
+
+<span class="c">### 认证域名称，会出现在客户端的密码缓存里</span>
+<span class="c">### 不同仓库应设不同 realm，否则凭据会串用</span>
+realm = SVN Demo Repository
+
+<span class="c">### 其他可选配置</span>
+<span class="c"># 强制要求客户端提供日志</span>
+# force-username-case = none
+<span class="c"># 密码存储方式（默认明文，可用 sasl 加密）</span>
+# use-sasl = false</pre>
+</div>
+
+<h4 class="sub">第三步：配置账号密码</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">ini</span><span class="fn">/var/svn/repo/conf/passwd</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">[users]
+<span class="c"># 格式：用户名 = 密码（明文）</span>
+alice = alice123
+bob   = bob123
+carol = carol123
+
+<span class="c">### 注意：passwd 是明文的，必须保护好文件权限</span>
+<span class="c">### sudo chmod 600 /var/svn/repo/conf/passwd</span>
+<span class="c">### 且不要放在 Web 可访问的目录下</span></pre>
+</div>
+
+<h4 class="sub">第四步：启动服务</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">启动与测试</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ---- 前台调试启动（第一次部署强烈建议这样）----</span>
+svnserve --foreground --root /var/svn --listen-port 3690
+<span class="c"># 另开一个终端测试，有问题立刻能在这里看到报错</span>
+
+<span class="c"># ---- 后台守护进程（生产环境）----</span>
+svnserve --daemon --root /var/svn --listen-port 3690 \
+         --log-file /var/log/svnserve.log \
+         --pid-file /var/run/svnserve.pid
+
+<span class="c"># ---- 指定监听地址（默认监听所有网卡 0.0.0.0）----</span>
+svnserve --daemon --root /var/svn --listen-host 192.168.1.10 --listen-port 3690
+
+<span class="c"># ---- 测试连接 ----</span>
+svn list svn://127.0.0.1/repo --username alice --password alice123
+
+<span class="c"># ---- 检查端口 ----</span>
+ss -tlnp | grep 3690
+netstat -ano | findstr 3690          <span class="c"># Windows</span>
+
+<span class="c"># ---- 停止服务 ----</span>
+kill $(cat /var/run/svnserve.pid)
+pkill svnserve                        <span class="c"># 简单粗暴</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：启动并验证认证</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 启动（Windows 上--daemon 需要简写 -d）</span>
+<span class="ps">$</span> <span class="cmd">svnserve -d -r E:\svn-demo --listen-port 3690</span>
+
+<span class="cmt"># 确认进程与端口</span>
+<span class="ps">$</span> <span class="cmd">Get-Process svnserve | Select Id,ProcessName</span>
+  Id ProcessName
+  -- -----------
+<span class="hl">27744</span> svnserve
+
+<span class="ps">$</span> <span class="cmd">netstat -ano | Select-String ':3690'</span>
+  TCP    0.0.0.0:3690    0.0.0.0:0    LISTENING    <span class="hl">27744</span>
+
+<span class="cmt"># ---- 匿名访问：被拒绝（anon-access = none）----</span>
+<span class="ps">$</span> <span class="cmd">svn list --non-interactive --no-auth-cache svn://127.0.0.1/repo</span>
+<span class="no">svn: E170001: Can't get password</span>
+<span class="cmt">↑ 服务器要求认证，但客户端没提供凭据</span>
+
+<span class="cmt"># ---- alice 认证：成功 ----</span>
+<span class="ps">$</span> <span class="cmd">svn list --username alice --password alice123 --no-auth-cache svn://127.0.0.1/repo</span>
+<span class="ok">branches/</span>
+<span class="ok">tags/</span>
+<span class="ok">trunk/</span>
+
+<span class="cmt"># ---- 错误密码：明确报错 ----</span>
+<span class="ps">$</span> <span class="cmd">svn list --username alice --password WRONG --non-interactive svn://127.0.0.1/repo</span>
+<span class="no">svn: E170001: Authentication error from server: Password incorrect</span></pre>
+  </div>
+</div>
+
+<h4 class="sub">第五步：注册为系统服务（生产环境必需）</h4>
+
+<div class="grid2">
+  <div class="card blue">
+    <h6>Linux：systemd</h6>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">ini</span><span class="fn">/etc/systemd/system/svnserve.service</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">[Unit]
+Description=Subversion protocol daemon
+After=network.target
+
+[Service]
+Type=forking
+<span class="c"># -d 守护模式, -r 仓库根目录</span>
+ExecStart=/usr/bin/svnserve --daemon \
+  --root /var/svn \
+  --pid-file /run/svnserve.pid
+ExecStop=/bin/kill -TERM $MAINPID
+Restart=on-failure
+User=svn
+Group=svn
+
+[Install]
+WantedBy=multi-user.target</pre>
+    </div>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">启用</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">sudo systemctl daemon-reload
+sudo systemctl enable svnserve
+sudo systemctl start svnserve
+sudo systemctl status svnserve</pre>
+    </div>
+  </div>
+  <div class="card green">
+    <h6>Windows：sc 注册服务</h6>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">cmd</span><span class="fn">注册为 Windows 服务</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">:: 注册（注意 daemon 模式在 Windows 上要加引号）
+sc create svnserve binPath= <span class="s">"\"C:\Program Files\Subversion\bin\svnserve.exe\" --service -r E:\svn"</span> displayname= <span class="s">"Subversion Server"</span> depend= Tcpip start= auto
+
+:: 启动
+sc start svnserve
+
+:: 查看状态
+sc query svnserve
+
+:: 删除服务
+sc delete svnserve</pre>
+    </div>
+    <div class="box warn" style="margin:10px 0 0">
+      <span class="bt">注意 sc 的参数格式</span>
+      <p><code class="ic">sc</code> 命令要求等号后面<strong>紧跟一个空格</strong>再跟值：
+      <code class="ic">binPath= "..."</code> 正确，<code class="ic">binPath="..."</code> 会失败。</p>
+    </div>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">防火墙记得放行 3690</span>
+  <div class="codewrap">
+    <div class="codehead"><span class="lang">bash</span><span class="fn">放行端口</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># Linux (firewalld)</span>
+sudo firewall-cmd --permanent --add-port=3690/tcp
+sudo firewall-cmd --reload
+
+<span class="c"># Linux (ufw)</span>
+sudo ufw allow 3690/tcp
+
+<span class="c"># Windows PowerShell（管理员）</span>
+New-NetFirewallRule -DisplayName <span class="s">"SVN Server"</span> -Direction Inbound -Protocol TCP -LocalPort 3690 -Action Allow</pre>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     第 19 节：认证与权限
+     ========================================================================== -->

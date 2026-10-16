@@ -1,0 +1,209 @@
+<h3 class="sec" id="s19"><span class="no">19</span>服务端：VisualSVN 建仓库</h3>
+
+<p class="lead">
+  前面十八节都站在客户端这一侧。这一节换到服务器那边，用 <strong>VisualSVN Server Manager</strong> 建出团队的第一个仓库。
+  服务端的东西<strong>只需要装一次、配一次</strong>——装好之后，建仓库、加用户、配权限、做备份，
+  全都在管理器的图形窗口里点鼠标完成，<em>不需要敲任何命令</em>。
+</p>
+
+<div class="box key">
+  <span class="bt">先建立一张心理地图</span>
+  <ul>
+    <li><strong>装在哪</strong>：VisualSVN Server 只装在<strong>团队共享的那台服务器</strong>上（或一台常年开机的开发机）。每个人自己电脑上装的是配套的客户端 TortoiseSVN。</li>
+    <li><strong>谁去动</strong>：通常只需要一个人——当初搭环境的那位。普通开发同学读这一节，主要是为了弄清「仓库地址到底是怎么来的」。</li>
+    <li><strong>多久动一次</strong>：建仓库、加人是低频操作，可能一年也就干几次。日常的改、更、提还是在客户端右键完成。</li>
+  </ul>
+  <p>所以后面三节（19、20、21）可以理解为<strong>「管服务器的人」的活</strong>，普通同学重点看「拿到仓库地址」那一段就够了。</p>
+</div>
+
+<h4 class="sub">打开服务器管理器</h4>
+
+<p>管理仓库的第一步是打开管理器。它是一个标准的 Windows 管理窗口，装完 VisualSVN Server 之后就有了，不用额外配置。</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">SERVER</span>把管理器打开</div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">远程登录到那台服务器</span>
+    <span class="sc">一般是远程桌面连上去，用<b>管理员账号</b>登录。<em>建仓库、改权限这类操作需要管理员身份，普通账号打开后很多东西是灰的。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">从开始菜单里找到 VisualSVN Server Manager</span>
+    <span class="sc">点 <span class="mp">开始 <span class="ar">→</span> <span class="item">VisualSVN Server Manager</span></span> 即可。<em>装完之后它通常就在开始菜单的最近使用里，不用每次翻。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">找不到快捷方式时，从管理控制台里加管理单元</span>
+    <span class="sc">管理器本身就是一个 Windows 管理控制台（MMC）的管理单元。如果开始菜单里没有，可以在服务器上打开系统的<strong>管理控制台</strong>，用 <code class="ic">Add/Remove Snap-in</code>（添加/删除管理单元）把 <code class="ic">VisualSVN Server</code> 加进来。<em>全程是勾选框，不用输入任何东西。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">以后直接从开始菜单进就行</span>
+    <span class="sc">第一次加好之后，平时就固定用开始菜单那个入口。<strong>只有这一个管理入口</strong>，所有服务端的操作都在这里面。</span>
+  </div></div>
+</div>
+
+<h4 class="sub">管理器界面长什么样</h4>
+
+<p>打开之后你会看到一个左右分栏的窗口。第一次看会觉得空，其实结构非常简单：<strong>左边是树，右边是详情，上面是工具栏</strong>。</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">VisualSVN Server Manager 主界面</span><span class="fs">Server Manager</span></div>
+  <div class="sb"><img src="img/RepoStatus.png" alt="VisualSVN Server Manager 主界面"></div>
+  <div class="cap">
+    <b>① 左侧树 · 管理器的导航区</b>——所有管理对象都挂在这里，根节点是 <span class="k">VisualSVN Server</span>，展开后是四个分支：<br>
+    • <span class="k">Repositories</span>：<b>所有仓库</b>都放在这个节点下面。团队有几个项目，这里就有几个子节点。右键这个节点可以新建仓库，右键某个仓库可以改属性、做备份。<br>
+    • <span class="k">Users</span>：<b>用户账号</b>。谁能连上你们的服务器，由这里的名单决定。<em>这是在服务器上建账号，客户端不需要各自注册。</em><br>
+    • <span class="k">Groups</span>：<b>用户组</b>。把用户按角色（开发、测试、外包）分好组，以后配权限时直接对着组配，不用一个一个点人名。<br>
+    • <span class="k">Jobs</span>：<b>定时任务</b>。最典型的就是每天自动备份仓库，建好之后服务器自己跑，不用你记得手动点。<br><br>
+    <b>② 右侧 · 详情区</b>——在左边选中什么，右边就显示什么。选中一个仓库时，这里会列出它的<strong>仓库地址（URL）、提交次数、占用大小</strong>这些信息。<em>想知道仓库现在多重、最近有没有人提交，看这一栏就够了，不用登录服务器翻文件夹。</em><br><br>
+    <b>③ 顶部工具栏</b>——一排按钮，对应最常用的几个动作：<b>新建仓库</b>、<b>新建用户</b>、<b>新建用户组</b>等。这些按钮和右键菜单里的项目是<strong>同一套功能</strong>，习惯用哪个就用哪个。<br><br>
+    <b>④ 顶部菜单栏</b>——里面的 <span class="k">Action</span> 菜单同样装着新建、属性、备份这些命令，还有 <span class="k">View</span> 控制界面怎么显示。<em>找不到某个功能时，先翻一遍 Action 菜单。</em>
+  </div>
+</div>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:150px">左侧节点</th><th style="width:210px">它管什么</th><th>你这个角色会在这里做什么</th></tr></thead>
+<tbody>
+  <tr><td><code class="ic">Repositories</code></td><td>仓库的集合</td><td>建新仓库、看仓库大小、做备份、改权限。<strong>用得最多的一支</strong>。</td></tr>
+  <tr><td><code class="ic">Users</code></td><td>用户账号</td><td>新人入职加账号、离职停用账号、忘记密码时重置。</td></tr>
+  <tr><td><code class="ic">Groups</code></td><td>用户组</td><td>建「开发组」「外包组」这类角色组，配权限时按组来。</td></tr>
+  <tr><td><code class="ic">Jobs</code></td><td>定时任务</td><td>建每天自动备份的任务，这是<strong>整台服务器里最值得配的一项</strong>。</td></tr>
+</tbody>
+</table>
+</div>
+
+<h4 class="sub">创建你的第一个仓库</h4>
+
+<p>仓库（Repository）就是放代码的「总档案库」，所有版本历史都躺在里面。建仓库是这一个向导的事情，几步点完。</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">NEW</span>新建一个仓库</div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">在 Repositories 上右键</span>
+    <span class="sc">展开 <code class="ic">VisualSVN Server</code> 根节点，找到 <code class="ic">Repositories</code>，在上面右键。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">选择新建仓库</span>
+    <span class="sc">走 <span class="mp">Repositories <span class="ar">→</span> <span class="item">New</span> <span class="ar">→</span> <span class="item">Repository...</span></span>。工具栏上也有对应的按钮，效果一样。<em>注意别点到 <code class="ic">New User</code> 或 <code class="ic">New Group</code> 上去，那是加人的。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">给仓库起名</span>
+    <span class="sc">在 <code class="ic">Repository Name</code> 里填名字，比如 <code class="ic">MyProject</code>。<strong>这个名字会直接变成地址的一部分</strong>，所以用英文、别带空格，一看就知道是哪个项目最好。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">选择仓库类型</span>
+    <span class="sc">向导会问你要哪种文件系统类型。装完默认选中的就是推荐的 <code class="ic">FSFS</code>，<strong>没有特殊需求就别动它</strong>。<em>下一小节有对比表格。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">选择权限模式</span>
+    <span class="sc">这一步决定「这个仓库默认对谁开放」。团队内部使用就选按用户/组授权的那种，先建好仓库，<strong>具体谁能读谁能写，留到第 20 节统一配</strong>。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">下一步、完成</span>
+    <span class="sc">剩下几步是确认信息，一路点 <code class="ic">Next</code>、<code class="ic">Finish</code>。完成后左边 <code class="ic">Repositories</code> 下面<strong>立刻多出这个仓库节点</strong>，右边详情区会显示它的地址。</span>
+  </div></div>
+</div>
+
+<div class="box tip">
+  <span class="bt">仓库名 = 地址的一部分</span>
+  <p>这是最容易搞混的一点，记住这个对应关系：服务器上建的仓库叫 <code class="ic">MyProject</code>，那么它的地址就是 <code class="ic">https://服务器名/svn/MyProject</code>。建了第二个叫 <code class="ic">Tools</code>，地址就是 <code class="ic">https://服务器名/svn/Tools</code>。</p>
+  <p><strong>中间那段 <code class="ic">/svn/</code> 是服务器自动加上的固定前缀</strong>，不是你起的名字。<em>发地址给同事时一定要给完整的一整串，从 <code class="ic">https://</code> 开始复制，别自己手写。</em></p>
+</div>
+
+<h4 class="sub">仓库类型：FSFS 还是 VDFS</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:130px">类型</th><th style="width:180px">它是什么</th><th>什么时候选它</th></tr></thead>
+<tbody>
+  <tr><td><strong>FSFS</strong><br><span class="tagmini g">推荐</span></td><td>Subversion 标准的仓库存储方式，一个仓库就是服务器硬盘上的一个目录树。</td><td><strong>绝大多数团队都选它</strong>，也是向导里默认选中的那个。备份、迁移、排错都有现成的资料。</td></tr>
+  <tr><td><strong>VDFS</strong><br><span class="tagmini y">特殊</span></td><td>VisualSVN 自带的一种特殊仓库类型，面向「多台服务器之间互相同步」的场景。</td><td>只有当你们需要在<b>多台服务器上跑同一套仓库并保持同步</b>时才考虑。单机使用选它没有任何好处，反而更复杂。</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="box warn">
+  <span class="bt">类型选了就不好改</span>
+  <p>仓库类型是<strong>创建时定下来的</strong>，建完想换一般只能重新建一个再迁数据。拿不准的时候<strong>一律选 FSFS</strong>——这是标准做法，也是绝大多数教程和工具默认支持的路径。</p>
+</div>
+
+<h4 class="sub">建出标准目录结构：trunk / branches / tags</h4>
+
+<p>
+  空仓库刚建出来是<strong>什么都没有的</strong>。而团队协作约定俗成的做法是在仓库根下放三个目录：
+  <code class="ic">trunk</code>（主干，日常开发都在这里）、<code class="ic">branches</code>（分支，开独立开发线）、
+  <code class="ic">tags</code>（标签，记录已发布的版本）。这套结构不用检出到本地就能建，直接在服务器端用仓库浏览器完成最方便。
+</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">LAYOUT</span>在仓库里建三个目录</div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">在仓库上右键，打开仓库浏览器</span>
+    <span class="sc">在左边树里找到刚建好的仓库，右键 → <span class="mp"><span class="item">Repo-browser</span></span>。这个窗口和客户端里的 Repo-browser 是同一个东西，<em>区别是这里操作的是服务器本地，速度快，也不用先检出。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">在空白处右键新建文件夹</span>
+    <span class="sc">窗口右侧是当前仓库的内容，现在是空的。在空白区域右键 → <span class="mp"><span class="item">New</span> <span class="ar">→</span> <span class="item">Folder...</span></span>。<em>这一步和在自己的电脑上新建文件夹手感一样。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">依次建出三个目录</span>
+    <span class="sc">分别输入 <code class="ic">trunk</code>、<code class="ic">branches</code>、<code class="ic">tags</code>，一共建三次。<strong>名字必须严格一致</strong>——工具链和团队约定都按这三个名字来，拼错一个字母后面就会别扭。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">建在仓库根下，不要套一层</span>
+    <span class="sc">三个目录要<strong>直接位于仓库根</strong>，不要在它们外面再包一层项目名——因为仓库名本身已经承担了「项目」的角色。<em>正确的形式是 <code class="ic">/MyProject/trunk</code>，而不是 <code class="ic">/MyProject/MyProject/trunk</code>。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">关掉窗口，结构就生效了</span>
+    <span class="sc">每次新建文件夹都会产生一次提交，所以关掉浏览器之后，仓库里<strong>已经有这三个目录和对应的历史记录</strong>。同事这时候检出代码，就能直接看到标准的目录结构。</span>
+  </div></div>
+</div>
+
+<h4 class="sub">拿到仓库地址，发给同事</h4>
+
+<p>仓库建好了，接下来最要紧的一件事就是<strong>把地址准确地发出去</strong>。手抄容易错，让管理器帮你复制。</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">URL</span>复制仓库地址</div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">在仓库节点上右键</span>
+    <span class="sc">左边树里，在刚建好的仓库名上点右键。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">选择复制地址</span>
+    <span class="sc">点 <span class="mp"><span class="item">Copy URL to Clipboard</span></span>，完整地址就进剪贴板了。<em>比在右侧详情区用鼠标划选要靠谱得多。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">贴给同事，让他们检出</span>
+    <span class="sc">同事拿到这串地址后，在本机建一个空文件夹，右键 → <span class="mp"><span class="item">SVN Checkout...</span></span>，把地址粘进 <code class="ic">URL of repository</code>，一路确定就能拉到代码。<em>这就是第 2 节那套流程，地址正是从这里来的。</em></span>
+  </div></div>
+</div>
+
+<div class="box tip">
+  <span class="bt">不装客户端也能看代码</span>
+  <p>VisualSVN 自带一个 <strong>Web 界面</strong>。在任何一台机器的浏览器里输入仓库地址（<code class="ic">https://服务器名/svn/MyProject</code>），登录后就能<strong>逐层浏览目录、看文件内容、看每个文件的修改历史</strong>，连差异比对都能在网页上点出来。</p>
+  <p>它的用处：给<strong>只读的同事</strong>（产品、美术、领导）看代码和文档，不用教他们装客户端；自己在<strong>别人的电脑</strong>上临时查一个文件，不用装任何东西；手机、平板打开也能看，<em>出门在外应急查一下很方便</em>。</p>
+  <p><strong>但看归看</strong>：日常提交、更新还是老老实实用 TortoiseSVN，网页端不做开发。</p>
+</div>
+
+<div class="box warn">
+  <span class="bt">别去手动改仓库目录里的文件</span>
+  <p>仓库在服务器硬盘上确实是一个目录，你也能在文件管理器里翻到它。<strong>但绝对不要直接进去改、删、挪里面的文件</strong>——那里面存的是版本数据库，不是给你直接编辑的普通文件。</p>
+  <ul>
+    <li><strong>改文件</strong>：一律走客户端——检出到本地改完再提交，或直接在上面那个仓库浏览器里操作。</li>
+    <li><strong>删仓库</strong>：在管理器里右键删除，让它按流程清理，别去硬盘上直接删文件夹。</li>
+    <li><strong>改名/搬家</strong>：用管理器或右键菜单里的重命名、迁移功能，<em>手改目录名会让所有客户端的地址失效</em>。</li>
+    <li><strong>拷文件进去</strong>：想批量放代码就用客户端的 <code class="ic">Import</code>（第 22 节），别用复制粘贴。</li>
+  </ul>
+  <p><strong>一句话：服务器上的仓库目录只对 VisualSVN 自己有意义，人只管在图形界面里操作。</strong></p>
+</div>
+
+<div class="box ok">
+  <span class="bt">这一节做完，你应该有的东西</span>
+  <ul>
+    <li>服务器上跑着 VisualSVN Server，你能随时打开 <strong>VisualSVN Server Manager</strong>。</li>
+    <li><code class="ic">Repositories</code> 下面有一个命名清晰的仓库节点。</li>
+    <li>仓库里有 <code class="ic">trunk</code> / <code class="ic">branches</code> / <code class="ic">tags</code> 三个目录。</li>
+    <li>手上有一串 <code class="ic">https://</code> 开头的完整地址，可以发给同事了。</li>
+  </ul>
+  <p>接下来第 20 节讲怎么加人、怎么控制谁能看谁能改——<strong>在发给同事地址之前，最好先把权限配好</strong>，免得地址发出去谁都能连。</p>
+</div>

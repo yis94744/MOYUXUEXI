@@ -1,0 +1,259 @@
+<h3 class="sec" id="s9"><span class="no">9</span>撤销：改错了怎么退回</h3>
+
+<p class="lead"> 「改错了想退回去」听起来简单，但在 SVN 里要<strong>先分清退的是哪一种</strong>：是撤掉<strong>还没提交</strong>的本地改动， 还是撤掉<strong>已经提交上去</strong>的东西。这两件事用的功能完全不同，混着用会出事。
+</p>
+
+<div class="box warn"> <span class="bt">先记住这条分界线</span>
+  <div class="duo" style="margin-top:10px">
+    <div>
+      <div class="dh">还没提交 → Revert</div>
+      <p>改动只在你电脑上，服务器不知道。</p>
+      <p>用 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Revert...</span></span></p>
+      <p><strong>本地的修改直接丢掉</strong>，文件变回服务器上的样子。<b>操作前那次改动就没了。</b></p>
+    </div>
+    <div>
+      <div class="dh">已经提交 → 反向合并</div>
+      <p>改动已经在服务器上，同事可能已经拉走了。</p>
+      <p>用日志里的 <code class="ic">Revert changes from this revision</code></p>
+      <p><strong>历史不会被抹掉</strong>，而是<b>再提交一次</b>来抵消旧改动，相当于把刚才那笔操作倒过来做一遍。</p>
+    </div>
+  </div>
+  <p><strong>判断方法很简单</strong>：打开文件的右键菜单，如果修改还没提交（角标是红色叹号），就用 Revert；如果已经提交过了，就去 <code class="ic">Show log</code> 里做反向合并。</p>
+</div>
+
+<h4 class="sub">情形一：撤销还没提交的本地改动（Revert）</h4>
+
+<p>这是最常用的撤销。典型场景：改到一半发现方向错了、把代码改崩了懒得修、 本来只想试一下结果改乱了文件——<strong>直接退回服务器上的版本，从头再来</strong>。</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">REVERT</span>把本地改动退回原样</div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body"> <span class="st">对着改坏的文件（或文件夹）右键</span> <span class="sc">可以单选一个文件，也可以<strong>选中一批文件</strong>后右键，还可以直接对着整个文件夹右键——那样会把里面所有改动一次性撤掉。<em>建议先从小范围开始试。</em></span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body"> <span class="st">选择「TortoiseSVN → Revert...」</span> <span class="sc">注意菜单项后面有省略号，说明它<strong>会弹出对话框让你确认</strong>，不会右键一点就立刻生效。这是好事，给了你反悔的机会。</span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body"> <span class="st">在对话框里勾选要撤销的文件</span> <span class="sc">见下方截图。默认是<strong>全选</strong>，如果你只想撤掉其中几个文件，把不想撤的<strong>取消勾选</strong>即可。</span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body"> <span class="st">确认无误后点 OK</span> <span class="sc">点下去的一瞬间，<strong>本地那些未提交的修改就没了</strong>，文件内容变回和服务器一致。</span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body"> <span class="st">看一眼图标角标确认结果</span> <span class="sc">撤销成功后，文件的角标会从 <span class="tagmini r">红色叹号</span> 变回 <span class="tagmini g">绿色对勾</span>。<em>角标是绿的，就说明本地和服务器一模一样，没有待提交的东西了。</em></span>
+    </div>
+  </div>
+</div>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">Revert 撤销对话框（点击图可放大）</span><span class="fs">Revert Dialog</span></div>
+  <div class="sb"><img src="img/Revert.png" alt="TortoiseSVN Revert 对话框"></div>
+  <div class="cap"> 这个对话框不讲情面，所以要看清再点：<br><br> <b>① 文件列表（主体）</b>——列出所有<b>将被恢复原样</b>的文件。每一行前面有<b>勾选框</b>：<b>勾着 = 这次撤它</b>， 取消勾选 = 这次放过它、保留我的改动。<em>列表里的文件名要一个个看过去，尤其当你右键的是整个文件夹时。</em><br><br> <b>② 全选 / 全不选按钮</b>（<span class="k">Select / deselect all</span>）——一键勾上或清空全部勾选。 文件多的时候先用它清空，再单独勾那两三个要撤的，<b>比一个个点更快也更不容易漏</b>。<br><br>
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  <b>③ 勾选项</b>——对话框里还有几个关于「怎么撤」的选项，默认设置就是<b>最彻底、最常用的那种</b>（把文件恢复成服务器上的样子）。<em>不确定这些选项含义时，保持默认，不要乱动。</em><br><br> <b>④ OK / Cancel</b>——<b>OK 就是执行，执行即生效，没有第二步确认</b>；Cancel 则什么都不做，安全退出。<br><br> <b>一句话</b>：勾选决定撤哪些，OK 决定撤不撤。点 OK 之前，<b>再扫一遍列表里有没有你还要留着的文件</b>。
+  </div>
+</div>
+
+<div class="box err"> <span class="bt">Revert 不可逆：丢掉的改动找不回来</span>
+  <p>Revert 是把文件<strong>恢复成服务器上那一版</strong>。你本地那些没提交的修改，SVN 里<strong>没有任何副本</strong>——它本来就没上传过服务器，所以也没有历史可查。</p>
+  <p>点完 OK，那些改动就是<strong>永久消失</strong>：回收站里没有，日志里没有，谁也帮你恢复不了。</p>
+  <p><strong>点 OK 前问自己一句：这几个文件里，有没有我其实想留着的东西？</strong></p>
+  <p>另外注意一个常见的连锁反应：撤销之后文件回到了旧版本，如果你<b>之前基于新版本内容做了别的调整</b>，那些调整可能就对不上了，需要一起检查。</p>
+</div>
+
+<div class="box ok"> <span class="bt">撤销后怎么确认已经退回去了</span>
+  <ul>
+    <li><strong>看角标</strong>——从红色叹号变回绿色对勾，说明本地已和服务器一致。</li>
+    <li><strong>打开文件看一眼</strong>——最直接，也最可靠。</li>
+    <li><strong>右键 → <code class="ic">Check for modifications</code></strong>——列表里这个文件消失了，就说明它确实没有待提交的改动了。</li>
+  </ul>
+</div>
+
+<h4 class="sub">情形二：撤销已经提交上去的改动</h4>
+
+<p>提交之后才发现改错了，这时候<strong>不能再指望「撤掉」</strong>——那次提交已经在服务器上、也已经被别人拉到本地了。 正确的做法叫做<strong>反向合并</strong>（reverse merge）：让 SVN 把那次提交的改动<strong>倒着应用一遍</strong>， 再产生一次新的提交来抵消它。</p>
+
+<div class="box key"> <span class="bt">为什么历史不是「抹掉」，而是「抵消」</span>
+  <p>SVN 的版本历史是<strong>只增不改</strong>的：任何一次提交都会永久留在那里，没有任何图形界面的办法能让它凭空消失。</p>
+  <p>所以「撤销一次提交」实际上<strong>变成了一次新的提交</strong>——它的效果正好把之前的改动抵消掉。结果是：<b>文件内容回到了你想要的样子，历史里看得见「谁在什么时候撤销了哪次改动」</b>。</p>
+  <p><strong>这不是缺陷，而是特性</strong>：出问题时你能查出来「这行本来是对的，是后来被谁撤掉的」。</p>
+</div>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">REVERSE MERGE</span>撤销某一次已提交的改动</div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body"> <span class="st">对着相关文件夹右键 → Show log</span> <span class="sc">在日志里找到<b>那次要撤销的提交</b>。可以先看日志消息和日期对准，不确定就双击里面的文件，比对确认「就是这个版本改坏的」。</span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body"> <span class="st">在那一行上点右键</span> <span class="sc">弹出的菜单里找到 <span class="k">Revert changes from this revision</span>。<em>不同版本的措辞可能略有差别，但意思都是「把这次提交的改动倒回来」。</em></span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body"> <span class="st">确认对话框里的文件</span> <span class="sc">SVN 会列出这次要「倒回去」涉及的文件，让你过目一遍。<strong>没看清之前不要点确认。</strong></span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body"> <span class="st">完成后你的文件变成「已修改」状态</span> <span class="sc">这一步只是把改动<em>倒回来放在你的工作副本里</em>，角标变成 <span class="tagmini r">红色叹号</span>。<em>也就是说，真正生效还需要你提交一次。</em></span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body"> <span class="st">提交这次「撤销」</span> <span class="sc"><span class="mp">SVN Commit... <span class="ar">→</span></span> 在 <code class="ic">Message</code> 里写清楚，比如 <code class="ic">撤销 r1234 的错误改动，恢复原逻辑</code>。<em>说明里带上被撤销的版本号，将来别人查历史一眼就懂。</em></span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body"> <span class="st">提醒同事更新</span> <span class="sc">撤销也是一次改动，别人需要 <code class="ic">SVN Update</code> 才能拿到。如果这次撤销影响很大，<strong>在群里说一声</strong>，比事后解释省事得多。</span>
+    </div>
+  </div>
+</div>
+
+<h4 class="sub">情形三：只想看看旧版本，不想改任何东西</h4>
+
+<p>有时候你既不想撤本地改动，也不想撤销别人的提交，只是想<strong>确认一下「上个月那版是怎么写的」</strong>。 这种「只看不动」的需求有两种做法，都不会产生任何提交。</p>
+
+<h5 class="mini">做法 A：把文件夹临时拉回某个历史版本看</h5>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">VIEW</span>拉回历史版本查看，看完再拉回来</div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body"> <span class="st">对着文件夹右键 → Update to revision...</span> <span class="sc">在弹出的对话框里选择 <code class="ic">Revision</code>，并填入你想看的那一版版本号。版本号从 <code class="ic">Show log</code> 里查。</span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body"> <span class="st">此时文件夹内容变成那一版的样子</span>
+      <span class="sc">可以打开文件随便看、随便复制内容出来。<em>注意：这时候你的工作副本停留在旧版本上，角标显示方式会和平时不同。</em></span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body">
+      <span class="st">看完后必须「更新回来」</span>
+      <span class="sc">右键 → <span class="mp">SVN Update</span>（顶层那个，不带版本号），工作副本就会重新回到最新版本。
+      <strong>这一步别忘</strong>，否则你会拿着一个旧版本继续干活，提交时很容易造成莫名其妙的覆盖或冲突。</span>
+    </div>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">「拉回旧版本查看」的两个前提</span>
+  <ul>
+    <li><strong>先提交或先 Revert 你手上的改动</strong>。带着未提交的修改去切换版本，很容易搞出混乱状态。稳妥顺序是：先把手上的活儿处理干净，再回看历史。</li>
+    <li><strong>看完记得 Update 回来</strong>。忘了这一步，是新手最常踩的坑之一。</li>
+  </ul>
+  <p>如果只是想看看旧内容、不想动工作副本，那就用下面的做法 B。</p>
+</div>
+
+<h5 class="mini">做法 B：把历史版本另存到别处（完全不碰工作副本）</h5>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">SAVE AS</span>安全地取出一份旧版本</div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body">
+      <span class="st">右键 → Show log，找到那一版</span>
+      <span class="sc">在历史列表里选中你想取出的版本。</span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body">
+      <span class="st">右键 → Save revision to...</span>
+      <span class="sc">这个操作会把<b>那个版本的内容另存到你指定的文件夹</b>，<strong>你的工作副本完全不受影响</strong>，角标也不会变。<em>想对比两个版本的完整代码时，这个办法最干净。</em></span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body">
+      <span class="st">存出来的文件夹是「干净副本」</span>
+      <span class="sc">它不带 SVN 关联信息，就是一个普通文件夹，适合拿去给别人看、或者作为参照放在一旁。
+      <strong>不要在这个文件夹里改东西然后指望能提交</strong>——它不是工作副本。</span>
+    </div>
+  </div>
+</div>
+
+<h4 class="sub">一张表决定你用哪个</h4>
+
+<div class="tw"><table>
+<thead><tr><th style="width:230px">我想要……</th><th style="width:210px">用哪个操作</th><th>会不会留历史记录</th></tr></thead>
+<tbody>
+  <tr>
+    <td>改到一半不想改了，想恢复成服务器上的样子</td>
+    <td><strong>Revert</strong></td>
+    <td><strong>不会</strong>。这次改动从没提交过，服务器上什么都没有。<span class="tagmini r">注意不可逆</span></td>
+  </tr>
+  <tr>
+    <td>不小心把编译产物、临时文件也改乱了</td>
+    <td><strong>Revert</strong>（勾选那几个文件）</td>
+    <td><strong>不会</strong>。同理，未提交的改动不需要任何历史。</td>
+  </tr>
+  <tr>
+    <td>已经提交了，但提交内容写错/改错了，想撤掉</td>
+    <td><strong>日志里 Revert changes from this revision</strong> + 提交</td>
+    <td><strong>会</strong>。产生一次新的提交来抵消旧改动，历史里两条都在。</td>
+  </tr>
+  <tr>
+    <td>同事提交的某次改动把功能搞坏了，要退回去</td>
+    <td><strong>同上（反向合并）</strong>，然后提交</td>
+    <td><strong>会</strong>。而且能查到「谁在什么时候撤销了哪一次提交」，便于沟通。</td>
+  </tr>
+  <tr>
+    <td>只想看看旧版本长什么样，不动任何东西</td>
+    <td><strong>Save revision to...</strong></td>
+    <td><strong>不会</strong>。只是把内容另存一份，工作副本不受影响。</td>
+  </tr>
+  <tr>
+    <td>需要在旧版本上编译/运行验证一下，验证完再回来</td>
+    <td><strong>Update to revision...</strong>，完事再 Update</td>
+    <td><strong>不会</strong>。但<strong>别忘了最后更新回来</strong>。</td>
+  </tr>
+  <tr>
+    <td>想把整个项目退回到某个历史时间点</td>
+    <td>先 <strong>Save revision</strong> 看清那一版，再按需要一处处反向合并</td>
+    <td><strong>会</strong>（只要最后提交了）。大范围回退前，<strong>先跟同事打个招呼</strong>。</td>
+  </tr>
+</tbody></table></div>
+
+<div class="box tip">
+  <span class="bt">撤销之前，先做这两件事</span>
+  <ol>
+    <li><strong>把要撤的东西记下来</strong>。撤销前先在记事本里贴一下当前内容，或者干脆另存一份副本。这样万一撤错了，你还有底。</li>
+    <li><strong>先 Update 再撤销</strong>。撤销前更新一次，保证你是在最新版本上操作，避免和同事刚提交的改动撞车。</li>
+  </ol>
+  <p>已经提交过的改动被撤销后，<strong>记得在群里说一声</strong>——同事手上的文件需要有新版本才能对上，一声通知能省掉一堆疑惑。</p>
+</div>

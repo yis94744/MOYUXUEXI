@@ -1,0 +1,231 @@
+<h3 class="sec" id="s24"><span class="no">24</span>常见问题：报错怎么处理</h3>
+
+<p class="lead">
+  这一节<strong>按「症状」组织</strong>：你不用记住原因，只要在下面的表里找到
+  <strong>和你屏幕上看到的差不多</strong>的那一行，照着最后一栏做就行。
+  表格后面单独用一整块讲 <code class="ic">Clean up</code>——
+  它是这些办法里最通用、最能解决「说不清哪里坏了」的那一个。
+</p>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:230px">症状</th><th style="width:220px">原因</th><th>图形界面怎么解决</th></tr></thead>
+<tbody>
+  <tr>
+    <td><strong>右键菜单里找不到 Commit / Update</strong><br><em>只有 Checkout 和 Settings</em></td>
+    <td>这个文件夹<strong>还不是工作副本</strong>。它只是个普通文件夹，
+    SVN 不知道它和哪个仓库有关系。</td>
+    <td>在它上面右键 → <span class="mp"><span class="item">SVN Checkout...</span></span>，
+    填仓库地址检出一次。<strong>检出之后菜单才完整。</strong></td>
+  </tr>
+  <tr>
+    <td><strong>文件图标上没有绿色对勾等角标</strong></td>
+    <td>两种可能：<strong>①</strong> Windows 最多只显示十几个角标程序，
+    被网盘、云同步软件抢了名额；<strong>②</strong> 系统资源管理器需要重启。</td>
+    <td>先<strong>重启资源管理器</strong>（任务管理器里找到「Windows 资源管理器」重启它）。
+    还不行就调整图标覆盖设置里的优先级，让 SVN 排到前面（第 23 节）。</td>
+  </tr>
+  <tr>
+    <td><strong>提交时报「工作副本已锁定」</strong><br><code class="ic">is already locked</code></td>
+    <td>上一次操作（提交、清理、更新）<strong>被中途打断了</strong>——
+    关了窗口、断了网、断电，SVN 留下的锁标记没来得及清掉。</td>
+    <td>在工作副本上右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Clean up</span></span>，
+    勾上解除锁那一项，清理一次再提交。</td>
+  </tr>
+  <tr>
+    <td><strong>提交时报「文件已过期」</strong><br><code class="ic">out of date</code></td>
+    <td>在你编辑的这段时间里，<strong>别人先提交了同一个文件</strong>。
+    服务器拒绝让你覆盖别人的改动。</td>
+    <td>先 <span class="mp"><span class="item">SVN Update</span></span> 把别人的改动拉下来，
+    <strong>有冲突就先解决冲突</strong>（第 10 节），然后再提交。</td>
+  </tr>
+  <tr>
+    <td><strong>更新时出现冲突</strong><br>文件角标变成黄底红叹号</td>
+    <td>你和同事<strong>改了同一个文件的同一处</strong>，机器没法替你决定留谁。</td>
+    <td>按第 10、11 节的流程处理：用合并工具逐处决定，保存后右键
+    <code class="ic">Resolved</code>，再提交。</td>
+  </tr>
+  <tr>
+    <td><strong>提交时提示输入用户名密码，输了还是失败</strong></td>
+    <td>本机<strong>缓存着旧的凭据</strong>，正在用旧信息请求，
+    所以你输入的新密码根本没被用上。</td>
+    <td>右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Settings</span></span> →
+    <code class="ic">Saved Data</code> → 在认证数据那一行点 <code class="ic">Clear</code> →
+    确定，然后再操作一次。</td>
+  </tr>
+  <tr>
+    <td><strong>文件角标一直是灰色问号</strong></td>
+    <td>这个文件在项目文件夹里，但<strong>还没有被登记进版本控制</strong>，
+    提交时会被跳过。</td>
+    <td>对着它右键 → <span class="mp"><span class="item">Add</span></span>，
+    角标变成蓝色加号，再提交就会带上它。<em>记得同时提交它所在的文件夹。</em></td>
+  </tr>
+  <tr>
+    <td><strong>手滑把文件删掉了，想找回来</strong></td>
+    <td>删掉的只是本地副本，<strong>服务器上的版本一直都在</strong>。</td>
+    <td>对着<strong>被删文件所在的文件夹</strong>右键 → <span class="mp"><span class="item">SVN Update</span></span>，
+    它会重新被拉下来。<em>如果连文件夹一起删了，对上一级更新。</em></td>
+  </tr>
+  <tr>
+    <td><strong>Revert 之后后悔了</strong><br>本地改动没了</td>
+    <td><code class="ic">Revert</code> 是<strong>不可逆</strong>的，
+    它把文件恢复成服务器上的样子，你未提交的修改就此消失。</td>
+    <td>没有直接的撤销按钮，两条退路：
+    <strong>①</strong> 从日志里找到那个文件的某个历史版本，右键另存出来；
+    <strong>②</strong> 如果用过编辑器，去编译器的本地历史里找。
+    <em>最好还是养成「大改之前先提交一次」的习惯。</em></td>
+  </tr>
+  <tr>
+    <td><strong>磁盘空间越来越小</strong></td>
+    <td>工作副本里为每个文件留了一份<strong>原始副本</strong>用于比对，
+    加上历史缓存，项目一多占用就上来了。</td>
+    <td>右键 → <code class="ic">Clean up</code> 时勾上收缩原始副本那一项；
+    再清一清不用的工作副本；
+    <code class="ic">Settings → Saved Data</code> 里清理历史缓存。</td>
+  </tr>
+  <tr>
+    <td><strong>提交时提示「路径被拒绝」/ 没有权限</strong></td>
+    <td>你的账号<strong>对这条目录没有写权限</strong>，
+    或者权限刚被改过、你这边还缓存着旧状态。</td>
+    <td>先清除认证数据（同上一行），再确认账号在服务器上的权限（第 20 节）。
+    <em>有时是因为你在写 <code class="ic">tags</code> 这类被设成只读的目录。</em></td>
+  </tr>
+  <tr>
+    <td><strong>操作卡住不动，进度条一直转</strong></td>
+    <td>服务器连不上、网络中断，或者仓库地址已经变了。</td>
+    <td>关掉进度窗口重试一次；还不行就用 <code class="ic">Clean up</code> 清一遍，
+    然后确认网络和地址是否有效。<em>必要时用 Repo-browser 先试试能不能连上服务器。</em></td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box tip">
+  <span class="bt">先分清「报错的类型」，能省一半时间</span>
+  <ul>
+    <li><strong>提示「已锁定」「已过期」</strong>——状态问题，用 <code class="ic">Clean up</code> 或
+    <code class="ic">Update</code> 能解决大部分。</li>
+    <li><strong>提示「认证失败」「没有权限」</strong>——凭据或权限问题，<strong>先清认证数据</strong>再想别的。</li>
+    <li><strong>菜单少了、角标没了</strong>——本机环境问题：不是工作副本，或者资源管理器需要重启。</li>
+    <li><strong>提示「冲突」</strong>——这是正常业务流程，按第 10、11 节处理，不是故障。</li>
+  </ul>
+  <p><strong>别在没看懂提示的时候反复点重试</strong>，那只会让状态更乱。</p>
+</div>
+
+<h4 class="sub">Clean up：一个能修很多问题的万能操作</h4>
+
+<p>
+  它是 TortoiseSVN 里<strong>使用价值最高的一个功能</strong>：
+  不改变文件内容，只把工作副本的内部状态「梳理一遍」。
+  遇到说不出原因的怪现象，先做一次它总是没错的。
+</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">FIX</span>做一次 Clean up</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">在出问题的文件夹上右键</span>
+      <span class="sc">右键<strong>工作副本的根目录</strong>，也就是你当初检出的那个文件夹。
+      <em>在子文件夹上做也行，但范围大一点更彻底。</em></span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">选择 Clean up</span>
+      <span class="sc">走 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Clean up</span></span>，
+      弹出清理对话框。<strong>它不会弹什么警告</strong>，是个很轻的操作，放心点。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">按需要勾选下面的选项</span>
+      <span class="sc">默认已经勾上了最常用的几项。
+      不确定的时候<strong>直接保持默认</strong>，先点确定跑一次看看。
+      <em>各项的含义见下面的截图解说。</em></span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">点确定，等它跑完</span>
+      <span class="sc">大项目可能要几十秒。跑完之后：
+      <strong>锁定的文件可以提交了、角标该更新的更新了、缓存也瘦身了。</strong>
+      <em>做完再试一次刚才失败的操作。</em></span>
+    </div>
+  </div>
+</div>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">Clean up 清理对话框</span><span class="fs">Clean up</span></div>
+  <div class="sb"><img src="img/Cleanup.png" alt="Clean up 清理对话框" class="mid"></div>
+  <div class="cap">
+    这个对话框很简单，上面是当前处理的路径，下面是几个勾选项。
+    <b>搞不清要勾哪个就全保持默认，它们都是安全操作。</b><br><br>
+
+    <b>① <span class="k">Clean up working copy status</span> · 清理工作副本状态</b>——
+    最核心的一项，<strong>默认就勾着</strong>。
+    它把工作副本的内部记录和磁盘上的实际情况对齐：
+    <em>那些「明明文件在、SVN 却说不在」的矛盾，就是靠它消除的。</em><br><br>
+
+    <b>② <span class="k">Break locks</span> · 解除锁定</b>——
+    清掉因为操作中断而残留的锁标记。
+    <strong>「工作副本已锁定 / is already locked」这个报错，就是冲它来的</strong>，
+    遇到那个错误时确认这一项被勾上，跑一次就能继续提交。<br><br>
+
+    <b>③ <span class="k">Fix time stamps</span> · 修正时间戳</b>——
+    让文件的时间戳反映的改动时间更准确，
+    这样「这个文件到底有没有被改过」的判断就不会出错。
+    <em>它解决的是「文件明明改过、角标却一直是绿勾」这类问题。</em><br><br>
+
+    <b>④ <span class="k">Vacuum pristine copies</span> · 收缩原始副本</b>——
+    TortoiseSVN 会在工作副本里保存每个文件<strong>从服务器取下来时的原始版</strong>，
+    用于比对和撤销。时间长了这些副本会有一堆碎片，白占空间。
+    勾上它会把这块存储压紧，<strong>是「磁盘越用越小」的主要对策</strong>。<br><br>
+
+    <b>⑤ <span class="k">Refresh shell overlays</span> · 刷新图标角标</b>——
+    清理完顺便通知资源管理器重新读一遍状态。
+    <strong>角标显示不对时很有用</strong>，勾上它省得你还得手动重启资源管理器。<br><br>
+
+    <em>顺序上没什么讲究，一次全勾上跑一遍也无妨。真要有人问「Clean up 怎么用」，
+    答案就是：把最常用的那几个勾上，点确定。</em>
+  </div>
+</div>
+
+<h4 class="sub">万能三步</h4>
+
+<div class="box ok">
+  <span class="bt">出了怪问题，按这三步走一遍</span>
+  <p><strong>① 先 Clean up。</strong>不加思考地先做一次清理，把工作副本的状态梳理回正常。<em>这一步能解决大部分「莫名其妙」的问题，而且不会有任何副作用。</em></p>
+  <p><strong>② 再 Update。</strong>对着工作副本右键 → <code class="ic">SVN Update</code>，把本地和服务器对齐。<em>很多「提交失败」「文件过期」其实是本地落后于服务器。</em></p>
+  <p><strong>③ 还不行就删掉重新检出。</strong>把出问题的那个文件夹整个删掉，再对着仓库地址检出一次。<strong>代码在服务器上，一个字都不会丢</strong>——这一步听起来粗暴，但它是解决顽固问题最可靠、最省时间的办法。<em>重新检出通常几分钟，比研究半天报错快得多。</em></p>
+  <p><strong>这三步的顺序是有道理的</strong>：从最轻、最安全的一步开始，一步步加大力度；不要一上来就删掉重来，也不要为了一个小锁问题折腾一小时。</p>
+</div>
+
+<div class="box warn">
+  <span class="bt">重新检出之前，先把没提交的改动存出来</span>
+  <p>第三步「删掉重新检出」有一个<strong>前提：你本地没有还没提交的重要改动</strong>。因为一删，那些改动就随之消失了——它们从没到过服务器，谁也救不回来。</p>
+  <p>所以动手之前，先做这两件事：<strong>① 看一看自己改了什么</strong>——右键 → <span class="mp"><span class="item">SVN Check for modifications</span></span>，确认列表里到底有哪些文件没提交；<strong>② 把这些改动存出来，最稳妥的方式是用补丁</strong>——在改动所在的文件夹上右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Create patch...</span></span>，把它保存成一个 <code class="ic">.patch</code> 文件放到工作副本外面（比如桌面）。<em>做完这一步，你的心血就有了一个独立的载体，删文件夹、重新检出都不再有任何风险。</em></p>
+  <p><strong>把顺序记牢：先看改动 → 先做补丁 → 再删 → 再检出。</strong>补丁怎么用、怎么在重新检出之后应用回来，第 22 节有完整流程。</p>
+</div>
+
+<div class="box tip">
+  <span class="bt">报错信息其实很好用，别不看就点掉</span>
+  <p>TortoiseSVN 的报错窗口通常分两截：<strong>上面一行是人话的概述，下面一大段是详细内容</strong>。很多人被下面那段吓到，其实你要看的正是它。</p>
+  <p><strong>① 粗读第一行</strong>就能对上本节表格里的一行——「已锁定」「已过期」「认证失败」这些关键词就在那里。</p>
+  <p><strong>② 看看有没有具体的文件路径。</strong>往往是<strong>某一个特定文件</strong>出了问题，而不是整个项目。找到那个文件单独处理，比对着整个项目折腾快得多。</p>
+  <p><strong>③ 看不懂就把整段复制下来</strong>，连同「我正在做什么操作」一起发给同事或搜索。<em>在群里只说「提交失败」，别人没法帮你；贴上原文，十有八九一眼就有人认出来。</em></p>
+</div>
+
+<div class="box key">
+  <span class="bt">这四句话能挡住九成的坑</span>
+  <p><strong>出错先用万能三步：</strong>Clean up → Update → 重新检出。<strong>认证怪问题先清数据：</strong><code class="ic">Settings → Saved Data → 清除认证数据</code>。</p>
+  <p><strong>重来之前先留补丁：</strong>没提交的改动，只有补丁能替你保住。<strong>看不懂就贴原文：</strong>报错的文字比你的描述精确一百倍。</p>
+  <p><em>把这一节当成工具书：出问题时不用从头读，直接找和屏幕上一模一样的那一行。</em></p>
+</div>

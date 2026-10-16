@@ -1,0 +1,1039 @@
+<!-- ==========================================================================
+     第八阶段 · 第 21 节：备份与恢复
+     ========================================================================== -->
+<h3 class="sec" id="s21"><span class="no">21</span>备份、恢复与仓库维护</h3>
+
+<p class="lead">
+  版本库是团队的<strong>全部历史资产</strong>。备份没做好，一次磁盘故障就能让几个月的工作归零。
+  SVN 提供了三种备份方式，各有适用场景——<strong>用错方式比不备份更危险</strong>。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 21-1　三种备份方式的差异与选型</span><span class="fs">Backup</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 470" width="980" height="470" role="img" aria-label="SVN 三种备份方式对比图">
+  <!-- 方式 1 -->
+  <rect x="24" y="30" width="300" height="200" rx="11" fill="rgba(126,231,135,.07)" stroke="#7ee787" stroke-width="1.5"/>
+  <text class="hd" x="44" y="56" fill="#7ee787">① hotcopy　物理热备</text>
+  <text class="tm" x="44" y="82" fill="#7ee787">svnadmin hotcopy /var/svn/repo \</text>
+  <text class="tm" x="44" y="102" fill="#7ee787">                 /backup/repo-$(date +%F)</text>
+
+  <line x1="44" y1="118" x2="304" y2="118" stroke="#30363d" stroke-width="1"/>
+
+  <text class="ts" x="44" y="142">✓ 速度最快（直接复制文件）</text>
+  <text class="ts" x="44" y="162">✓ 备份完整（含钩子、配置、锁）</text>
+  <text class="ts" x="44" y="182">✓ 可在线执行，不影响使用</text>
+  <text class="ts" x="44" y="202" fill="#ffa657">✗ 只能恢复到同版本 SVN（格式绑定）</text>
+  <text class="ts" x="44" y="222" fill="#ffa657">✗ 占用空间大（不压缩、不增量）</text>
+
+  <!-- 方式 2 -->
+  <rect x="340" y="30" width="300" height="200" rx="11" fill="rgba(88,166,255,.07)" stroke="#58a6ff" stroke-width="1.5"/>
+  <text class="hd" x="360" y="56" fill="#58a6ff">② dump/load　逻辑备份 ★推荐</text>
+  <text class="tm" x="360" y="82" fill="#58a6ff">svnadmin dump repo --file r.dump</text>
+  <text class="tm" x="360" y="102" fill="#58a6ff">svnadmin dump repo -r 1:100 \</text>
+  <text class="tm" x="360" y="122" fill="#58a6ff">  --incremental --file inc.dump</text>
+
+  <line x1="360" y1="138" x2="620" y2="138" stroke="#30363d" stroke-width="1"/>
+
+  <text class="ts" x="360" y="162">✓ 跨版本兼容（1.6 的库能还原到 1.14）</text>
+  <text class="ts" x="360" y="182">✓ 可压缩、可增量备份</text>
+  <text class="ts" x="360" y="202">✓ 可过滤（挑版本、去掉大文件）</text>
+  <text class="ts" x="360" y="222" fill="#ffa657">✗ 仓库大时耗时长，占 CPU</text>
+
+  <!-- 方式 3 -->
+  <rect x="656" y="30" width="300" height="200" rx="11" fill="rgba(210,168,255,.07)" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text class="hd" x="676" y="56" fill="#d2a8ff">③ svnrdump　远程 dump</text>
+  <text class="tm" x="676" y="82" fill="#d2a8ff">svnrdump dump https://svn/repo \</text>
+  <text class="tm" x="676" y="102" fill="#d2a8ff">  -r 1:HEAD --file remote.dump</text>
+
+  <line x1="676" y1="118" x2="936" y2="118" stroke="#30363d" stroke-width="1"/>
+
+  <text class="ts" x="676" y="142">✓ 无需登录服务器即可备份</text>
+  <text class="ts" x="676" y="162">✓ 适合托管仓库的异地备份</text>
+  <text class="ts" x="676" y="182">✓ 输出格式与 svnadmin dump 一致</text>
+  <text class="ts" x="676" y="202" fill="#ffa657">✗ 需要网络，大仓库慢</text>
+  <text class="ts" x="676" y="222" fill="#ffa657">✗ 需要认证凭据</text>
+
+  <!-- dump 文件格式 -->
+  <text class="hd" x="30" y="266" fill="#e3b341">dump 文件长什么样（纯文本，可读可编辑）</text>
+  <rect x="24" y="280" width="932" height="176" rx="10" fill="#0b0f14" stroke="#30363d" stroke-width="1.3"/>
+  <text class="tm2" x="44" y="304" fill="#7ee787">SVN-fs-dump-format-version: 2</text>
+  <text class="tm2" x="44" y="324"></text>
+  <text class="tm2" x="44" y="344" fill="#d2a8ff">UUID: 021a334f-9907-c84d-81c4-e10db7ecd948</text>
+  <text class="tm2" x="44" y="364"></text>
+  <text class="tm2" x="44" y="384" fill="#58a6ff">Revision-number: 1</text>
+  <text class="tm2" x="44" y="404">Prop-content-length: 133</text>
+  <text class="tm2" x="44" y="424">K 10</text>
+  <text class="tm2" x="64" y="442">svn:author</text>
+
+  <text class="ts" x="420" y="304" fill="#e3b341">格式说明：</text>
+  <text class="ts" x="420" y="328">• 头部声明格式版本和 UUID</text>
+  <text class="ts" x="420" y="352">• 每个版本以 Revision-number 开头</text>
+  <text class="ts" x="420" y="376">• K = key 长度 + 键名，V = value 长度 + 值</text>
+  <text class="ts" x="420" y="400">• 纯 ASCII 编码，理论上可以手改</text>
+  <text class="ts" x="420" y="424" fill="#7ee787">• 这正是「跨版本兼容」的原因：与底层存储格式解耦</text>
+</svg>
+  </div>
+</div>
+
+<div class="box err">
+  <span class="bt">最危险的错误：用 cp / 复制粘贴「备份」正在使用的仓库</span>
+  <p>直接 <code class="ic">cp -r /var/svn/repo /backup/</code> 或复制文件夹，
+  在仓库正被访问时可能<strong>复制到不一致的中间状态</strong>——
+  <code class="ic">db/</code> 里的 rev 文件和 <code class="ic">db/current</code> 对不上，
+  恢复后仓库无法使用，修复代价极高。</p>
+  <p><strong>唯一安全的手工复制方式是停服务后复制，或者用 <code class="ic">svnadmin hotcopy</code></strong>
+  （它会正确处理并发访问）。</p>
+</div>
+
+<h4 class="sub">方式一：hotcopy 完整热备</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">hotcopy 用法与自动备份脚本</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ---- 基础用法 ----</span>
+svnadmin hotcopy /var/svn/repo /backup/svn-repo-20261008
+
+<span class="c"># ---- 如果目标已存在（重复备份同一个位置）----</span>
+svnadmin hotcopy /var/svn/repo /backup/repo --clean-logs
+
+<span class="c"># ---- 自动备份脚本 ----</span>
+cat &gt; /usr/local/bin/svn-backup.sh &lt;&lt;<span class="s">'EOF'</span>
+#!/bin/bash
+set -euo pipefail
+
+SVN_ROOT=<span class="s">"/var/svn"</span>
+BACKUP_ROOT=<span class="s">"/backup/svn"</span>
+KEEP_DAYS=30
+DATE=$(date +%Y%m%d-%H%M%S)
+
+mkdir -p "$BACKUP_ROOT"
+
+for repo in "$SVN_ROOT"/*/; do
+  name=$(basename "$repo")
+  # 跳过非仓库目录
+  [ -f "$repo/format" ] || continue
+
+  dest="$BACKUP_ROOT/${name}-${DATE}"
+  echo "[$(date -Iseconds)] backing up $name -> $dest"
+
+  # hotcopy 热备
+  svnadmin hotcopy "$repo" "$dest" --clean-logs
+
+  # 打包压缩省空间
+  tar czf "${dest}.tar.gz" -C "$BACKUP_ROOT" "$(basename "$dest")"
+  rm -rf "$dest"
+
+  echo "[$(date -Iseconds)] done: ${dest}.tar.gz ($(du -h "${dest}.tar.gz" | cut -f1))"
+done
+
+# 清理过期备份
+find "$BACKUP_ROOT" -name "*.tar.gz" -mtime +${KEEP_DAYS} -delete
+echo "[$(date -Iseconds)] cleanup: removed backups older than ${KEEP_DAYS} days"
+EOF
+
+chmod +x /usr/local/bin/svn-backup.sh
+
+<span class="c"># ---- 加到 crontab，每天凌晨 2 点执行 ----</span>
+( crontab -l 2&gt;/dev/null; echo <span class="s">"0 2 * * * /usr/local/bin/svn-backup.sh >> /var/log/svn-backup.log 2>&1"</span> ) | crontab -</pre>
+</div>
+
+<h4 class="sub">方式二：dump / load 逻辑备份（推荐）</h4>
+
+<div class="box err">
+  <span class="bt">实测踩坑：PowerShell 重定向会生成 UTF-16 文件导致 dump 损坏</span>
+  <p>在 PowerShell 里执行 <code class="ic">svnadmin dump repo &gt; backup.dump</code>，
+  PowerShell 会用 <strong>UTF-16 LE</strong> 编码写文件，文件头变成 <code class="ic">FF FE FF FE 53 00...</code>（BOM + 宽字符），
+  结果 load 时报错：<code class="ic">svnadmin: E140001: Malformed dumpfile header</code>。</p>
+  <p><strong>正确做法（任选其一）：</strong></p>
+  <ul>
+    <li>用 svnadmin 内置参数：<code class="ic">svnadmin dump repo --file backup.dump</code>　<strong>← 推荐，跨平台一致</strong></li>
+    <li>用 cmd 的输入输出重定向：<code class="ic">cmd /c "svnadmin dump repo &gt; backup.dump"</code></li>
+    <li>改用 Git Bash / WSL</li>
+  </ul>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：正确的 dump 与文件头核对</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># ✗ 错误：PowerShell 的 > 重定向（会写成 UTF-16）</span>
+<span class="ps">$</span> <span class="cmd">svnadmin dump E:\repo -r 1:3 --incremental &gt; E:\inc.dump</span>
+<span class="ps">$</span> <span class="cmd">cmd /c "svnadmin load E:\repo-restored &lt; E:\inc.dump"</span>
+<span class="no">svnadmin: E140001: Malformed dumpfile header '?\FF?\FES'</span>
+<span class="no">↑ 文件头是 FF FE（UTF-16 BOM），SVN 解析不了</span>
+
+<span class="cmt"># ✓ 正确：用 --file 参数</span>
+<span class="ps">$</span> <span class="cmd">svnadmin dump E:\repo -r 1:3 --incremental --file E:\inc.dump</span>
+* Dumped revision 1.
+* Dumped revision 2.
+* Dumped revision 3.
+
+<span class="cmt"># 核对文件头（应该是 ASCII，不是 FF FE）</span>
+<span class="ps">$</span> <span class="cmd">$bytes = [System.IO.File]::ReadAllBytes("E:\inc.dump")[0..7]</span>
+<span class="ps">$</span> <span class="cmd">($bytes | % { $_.ToString('X2') }) -join ' '</span>
+<span class="ok">53 56 4E 2D 66 73 2D 64</span>
+<span class="cmt">↑ 53 56 4E 2D = "SVN-" 的 ASCII 编码，正确！</span>
+
+<span class="cmt"># 恢复到全新仓库</span>
+<span class="ps">$</span> <span class="cmd">svnadmin create E:\repo-restored</span>
+<span class="ps">$</span> <span class="cmd">cmd /c "svnadmin load E:\repo-restored &lt; E:\inc.dump"</span>
+------- Committed revision 1 &gt;&gt;&gt;
+------- Committed revision 2 &gt;&gt;&gt;
+------- Committed revision 3 &gt;&gt;&gt;
+
+<span class="cmt"># 验证恢复结果</span>
+<span class="ps">$</span> <span class="cmd">svn list -R file:///E:/repo-restored</span>
+branches/
+tags/
+trunk/
+trunk/README.md
+trunk/src/
+trunk/src/main.cs
+<span class="cmt">↑ 文件结构完整恢复</span></pre>
+  </div>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">dump / load 完整操作集</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ============ 全量备份 ============</span>
+svnadmin dump /var/svn/repo --file /backup/full.dump
+svnadmin dump /var/svn/repo --file /backup/full.dump --deltas   <span class="c"># 更小但恢复慢</span>
+
+<span class="c"># ============ 增量备份（推荐策略）============</span>
+<span class="c"># 第一次全量</span>
+svnadmin dump /var/svn/repo -r 1:1000 --incremental --file /backup/inc-0001-1000.dump
+
+<span class="c"># 之后每次只备份新增部分（假设上次到 r1000）</span>
+svnadmin dump /var/svn/repo -r 1001:HEAD --incremental --file /backup/inc-1001-$(svnlook youngest /var/svn/repo).dump
+
+<span class="c"># ============ 恢复：全量 ============</span>
+svnadmin create /var/svn/repo-new
+svnadmin load /var/svn/repo-new --file /backup/full.dump
+
+<span class="c"># ============ 恢复：全量 + 多个增量（必须按顺序！）============</span>
+svnadmin create /var/svn/repo-new
+svnadmin load /var/svn/repo-new --file /backup/full.dump
+for f in /backup/inc-*.dump; do
+  echo "loading $f"
+  svnadmin load /var/svn/repo-new --file "$f"
+done
+
+<span class="c"># ============ 恢复到指定版本 ============</span>
+svnadmin load /var/svn/repo-new --file /backup/full.dump \
+  --revision 500:1000        <span class="c"># 只加载 r500-r1000</span>
+
+<span class="c"># ============ 过滤历史（去掉敏感文件）============</span>
+svnadmin dump /var/svn/repo --file /backup/filtered.dump
+<span class="c"># 用 svndumpfilter 去掉某个目录的全部历史</span>
+svndumpfilter exclude /trunk/secret &lt; /backup/full.dump &gt; /backup/no-secret.dump
+svndumpfilter include /trunk/src &lt; /backup/full.dump &gt; /backup/only-src.dump
+
+<span class="c"># ============ 远程备份（无需登录服务器）============</span>
+svnrdump dump https://svn.example.com/repo --file /backup/remote.dump \
+  --username backup-bot --password "$SVN_PASS"
+svnrdump dump https://svn.example.com/repo -r 1001:HEAD --incremental \
+  --file /backup/remote-inc.dump
+
+<span class="c"># ============ 恢复时保留或改变 UUID ============</span>
+svnadmin load /var/svn/repo-new --file full.dump              <span class="c"># 默认保留原 UUID</span>
+svnadmin load /var/svn/repo-new --file full.dump --ignore-uuid  <span class="c"># 生成新 UUID</span>
+svnadmin setuuid /var/svn/repo-new &lt;新uuid&gt;                    <span class="c"># 事后改</span></pre>
+</div>
+
+<div class="box tip">
+  <span class="bt">备份策略建议（3-2-1 原则）</span>
+  <div class="tw" style="margin-top:10px">
+  <table>
+  <thead><tr><th>层次</th><th>做法</th><th>频率</th><th>保留</th></tr></thead>
+  <tbody>
+    <tr><td><strong>本地热备</strong></td><td><code class="ic">hotcopy</code> 到另一块磁盘</td><td>每天</td><td>7 天</td></tr>
+    <tr><td><strong>逻辑备份</strong></td><td><code class="ic">dump --incremental</code> 压缩后存储</td><td>每天增量 + 每周全量</td><td>30 天</td></tr>
+    <tr><td><strong>异地备份</strong></td><td>备份文件同步到异地/云存储</td><td>每周</td><td>1 年</td></tr>
+  </tbody>
+  </table>
+  </div>
+  <p style="margin-top:12px"><strong>最重要的规则：备份必须做恢复演练。</strong>
+  没验证过能恢复的备份，等于没有备份。建议每季度做一次完整的恢复演练，
+  记录耗时，确认 RTO（恢复时间目标）能满足业务要求。</p>
+</div>
+
+<h4 class="sub">仓库维护与健康检查</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">svnadmin 维护命令</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ---- 完整性与健康检查（定期跑，能提前发现磁盘问题）----</span>
+svnadmin verify /var/svn/repo
+<span class="c"># 输出：* Verified revision 1.  * Verified revision 2.  ...</span>
+
+<span class="c"># 检查指定范围（大仓库全量太久时）</span>
+svnadmin verify /var/svn/repo -r 1000:HEAD
+
+<span class="c"># ---- 查看仓库信息 ----</span>
+svnadmin info /var/svn/repo
+<span class="c"># Path / UUID / Revisions / Repository Format</span>
+<span class="c"># Compatible With Version / Filesystem Type / FSFS Sharded</span>
+
+<span class="c"># ---- 查看某个版本占用的磁盘空间（找大版本）----</span>
+svnadmin rev-size /var/svn/repo -r 520
+<span class="c"># 输出形如：   1542 bytes in revision 520</span>
+<span class="c"># 注意：-r 只接受【单个版本号】，不支持 1:HEAD 这样的区间</span>
+
+<span class="c"># 想扫描全部版本就得自己循环（配合 youngest 取最新版本号）</span>
+LAST=$(svnlook youngest /var/svn/repo)
+for r in $(seq 1 $LAST); do
+  printf "r%-6s %s\n" "$r" "$(svnadmin rev-size /var/svn/repo -r $r)"
+done | sort -t' ' -k3 -rn | head -10
+<span class="c"># 上面这段会列出占用空间最大的 10 个版本</span>
+
+<span class="c"># ---- 修改提交日志（需要 pre-revprop-change 钩子配合）----</span>
+svnadmin setlog /var/svn/repo -r 520 /path/to/newlog.txt
+<span class="c"># 位置参数是【文件】，不是 -m 消息；想绕过钩子检查加 --bypass-hooks</span>
+svnadmin setlog --bypass-hooks /var/svn/repo -r 520 /path/to/newlog.txt
+
+<span class="c"># ---- 整理仓库：删除无用数据、合并 rev 文件（大仓库定期做）----</span>
+svnadmin pack /var/svn/repo
+<span class="c"># FSFS 会把多个小版本合并成一个大文件，减少文件数</span>
+
+<span class="c"># ---- 冻结仓库（打包迁移用，冻结期间不可写）----</span>
+svnadmin freeze /var/svn/repo -- tar czf /backup/frozen.tar.gz
+svnadmin freeze /var/svn/repo -- rsync -av /var/svn/repo/ /backup/repo/
+
+<span class="c"># ---- 查看未完成的事务（钩子崩溃后可能残留）----</span>
+svnadmin lstxns /var/svn/repo
+svnadmin rmtxns /var/svn/repo <span class="s">"1-abc"</span>          <span class="c"># 清理单个</span>
+svnadmin rmtxns /var/svn/repo $(svnadmin lstxns /var/svn/repo)  <span class="c"># 清理全部（小心！）</span>
+
+<span class="c"># ---- 灾难恢复：仓库损坏后尝试修复 ----</span>
+svnadmin recover /var/svn/repo
+<span class="c"># 注意：recover 需要排他访问，建议先停服务</span>
+
+<span class="c"># ---- 升级仓库格式（换成新版 SVN 后）----</span>
+svnadmin upgrade /var/svn/repo
+
+<span class="c"># ---- 查看 revision 属性的历史变更 ----</span>
+svnadmin dump-revprops /var/svn/repo --file revprops.dump
+svnadmin list-dblogs /var/svn/repo        <span class="c"># 列出 Berkeley DB 日志（仅 bdb）</span>
+svnadmin list-unused-dblogs /var/svn/repo <span class="c"># 可安全删除的日志</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：verify、info、hotcopy</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 完整性校验</span>
+<span class="ps">$</span> <span class="cmd">svnadmin verify E:\repo</span>
+* Verified revision 8.
+* Verified revision 9.
+* Verified revision 10.
+* Verified revision 11.
+* Verified revision 12.
+<span class="cmt">（逐版本校验，全部通过则退出码 0）</span>
+
+<span class="cmt"># 仓库元信息</span>
+<span class="ps">$</span> <span class="cmd">svnadmin info E:\repo</span>
+Path: E:\repo
+UUID: <span class="cy">021a334f-9907-c84d-81c4-e10db7ecd948</span>   <span class="cmt">← 仓库唯一标识</span>
+Revisions: <span class="hl">21</span>
+Repository Format: 5
+Compatible With Version: 1.10.0
+Repository Capability: mergeinfo
+Filesystem Type: <span class="cy">fsfs</span>                        <span class="cmt">← 文件系统类型</span>
+Filesystem Format: 8
+FSFS Sharded: yes
+FSFS Shard Size: 1000
+
+<span class="cmt"># 热备</span>
+<span class="ps">$</span> <span class="cmd">svnadmin hotcopy E:\repo E:\repo-backup</span>
+* Copied revision 0.
+* Copied revision 1.
+...
+* Copied revision 12.
+
+<span class="cmt"># 验证备份可读</span>
+<span class="ps">$</span> <span class="cmd">svn info --show-item repos-uuid file:///E:/repo-backup</span>
+021a334f-9907-c84d-81c4-e10db7ecd948   <span class="cmt">← UUID 与原库一致，备份有效</span></pre>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     第 22 节：高级技巧
+     ========================================================================== -->
+<h3 class="sec" id="s22"><span class="no">22</span>高级技巧与效率提升</h3>
+
+<h4 class="sub">稀疏检出：只拉你要的那部分</h4>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 22-1　--depth 的四种取值</span><span class="fs">Depth</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 400" width="980" height="400" role="img" aria-label="SVN 稀疏检出 depth 取值图">
+  <!-- 目录树示意 -->
+  <text class="hd" x="30" y="28" fill="#e6edf3">仓库结构</text>
+  <text class="tm2" x="44" y="56">trunk/</text>
+  <text class="tm2" x="74" y="78">├── src/</text>
+  <text class="tm2" x="104" y="100">│   ├── main.cs</text>
+  <text class="tm2" x="104" y="122">│   └── utils.cs</text>
+  <text class="tm2" x="74" y="144">├── docs/</text>
+  <text class="tm2" x="104" y="166">│   └── guide.md</text>
+  <text class="tm2" x="74" y="188">├── art/</text>
+  <text class="tm2" x="104" y="210">│   └── huge-textures/  (5GB+)</text>
+  <text class="tm2" x="74" y="232">└── README.md</text>
+
+  <!-- 四种 depth -->
+  <rect class="n-blue" x="340" y="40" width="200" height="86" rx="10"/>
+  <text class="hd" x="360" y="64" fill="#58a6ff">--depth empty</text>
+  <text class="ts" x="360" y="86">只有目录本身</text>
+  <text class="ts" x="360" y="108">连文件名都不拉</text>
+
+  <rect class="n-green" x="560" y="40" width="200" height="86" rx="10"/>
+  <text class="hd" x="580" y="64" fill="#7ee787">--depth files</text>
+  <text class="ts" x="580" y="86">目录 + 文件</text>
+  <text class="ts" x="580" y="108">不要子目录内容</text>
+
+  <rect class="n-yellow" x="340" y="146" width="200" height="86" rx="10"/>
+  <text class="hd" x="360" y="170" fill="#e3b341">--depth immediates</text>
+  <text class="ts" x="360" y="192">目录 + 文件 + 子目录</text>
+  <text class="ts" x="360" y="214">但子目录内容为空</text>
+
+  <rect class="n-pur" x="560" y="146" width="200" height="86" rx="10"/>
+  <text class="hd" x="580" y="170" fill="#d2a8ff">--depth infinity</text>
+  <text class="ts" x="580" y="192">完全递归</text>
+  <text class="ts" x="580" y="214">默认值，全部拉下来</text>
+
+  <!-- 第五种取值 exclude，仅 set-depth 支持 -->
+  <rect class="n-red" x="30" y="146" width="290" height="86" rx="10"/>
+  <text class="hd" x="50" y="170" fill="#ff7b72">--set-depth exclude</text>
+  <text class="ts" x="50" y="192">第 5 种取值，<tspan fill="#e6edf3">只属于 --set-depth</tspan></text>
+  <text class="ts" x="50" y="214">把已检出的目录整个移除（不只是清空）</text>
+
+  <!-- 效果对比 -->
+  <rect x="340" y="256" width="620" height="126" rx="10" fill="#0b0f14" stroke="#30363d" stroke-width="1.3"/>
+  <text class="hd" x="360" y="280" fill="#7ee787">稀疏检出的实际效果</text>
+  <line x1="360" y1="292" x2="940" y2="292" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm2" x="360" y="314" fill="#7ee787">$ svn checkout ^/trunk wc --depth immediates</text>
+  <text class="ts" x="360" y="334">拉下来：trunk/ + README.md + src/ (空) + docs/ (空) + art/ (空)</text>
+  <text class="ts" x="360" y="354">省掉了：huge-textures 那 5GB 内容（但目录壳还在）</text>
+
+  <text class="tm2" x="360" y="376" fill="#7ee787">$ svn update --set-depth infinity src/   ← 按需拉取</text>
+
+  <!-- 左下 -->
+  <rect x="30" y="256" width="290" height="126" rx="10" fill="rgba(210,168,255,.07)" stroke="#d2a8ff" stroke-width="1.3"/>
+  <text class="hd" x="50" y="280" fill="#d2a8ff">典型场景</text>
+  <text class="ts" x="50" y="302">• 美术仓库超大，程序只</text>
+  <text class="ts" x="70" y="322">需要 src 目录</text>
+  <text class="ts" x="50" y="344">• CI 构建只需代码，</text>
+  <text class="ts" x="70" y="364">不需要美术资源</text>
+  <text class="ts" x="50" y="386">• 只想看某个分支的配置</text>
+</svg>
+  </div>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">稀疏检出实战</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ---- 检出时只拉一层 ----</span>
+svn checkout ^/trunk wc --depth immediates
+
+<span class="c"># ---- 事后按需加深某个子目录 ----</span>
+cd wc
+svn update --set-depth infinity src/      <span class="c"># src 完整拉下来</span>
+svn update --set-depth files docs/        <span class="c"># docs 只拉文件</span>
+
+<span class="c"># ---- 把整个工作副本变回完整 ----</span>
+svn update --set-depth infinity .
+
+<span class="c"># ---- 反过来：缩减已检出的目录（会删除本地文件！）----</span>
+svn update --set-depth empty art/         <span class="c"># 清空 art 目录内容，保留目录</span>
+svn update --set-depth exclude art/       <span class="c"># 整个目录从工作副本移除（更强）</span>
+
+<span class="c"># ---- 查看当前目录的深度设置 ----</span>
+svn info wc
+<span class="c"># 输出里有 Depth: immediates</span>
+
+<span class="c"># ---- 切换分支时保持稀疏 ----</span>
+svn switch ^/branches/feature-login --depth immediates
+
+<span class="c"># ---- 在稀疏工作副本里提交（只提交拉下来的部分）----</span>
+cd wc/src
+svn commit -m <span class="s">"只修改了 src 下的文件"</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：稀疏检出的效果</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 只拉一层</span>
+<span class="ps">$</span> <span class="cmd">svn checkout file:///E:/repo/trunk wc-sparse --depth immediates</span>
+Checked out revision <span class="hl">16</span>.
+<span class="cmt">↑ 只输出一行，没有逐个文件（因为子目录都没展开）</span>
+
+<span class="ps">$</span> <span class="cmd">Get-ChildItem wc-sparse | Select Name</span>
+.svn
+bob-test                  <span class="cmt">← 顶层条目都在</span>
+src
+webapp
+art.psd
+docs.md
+<span class="cmt">↑ 但子目录里面是空的 / 文件没拉下来</span>
+
+<span class="cmt"># 按需拉取 src 子目录</span>
+<span class="ps">$</span> <span class="cmd">svn update --set-depth infinity src</span>
+Updating 'src':
+<span class="ok">A</span>    src\main.cs
+Updated to revision 16.
+<span class="cmt">↑ 这时候才真正拉 src 里面的内容</span></pre>
+  </div>
+</div>
+
+<h4 class="sub">changelist：给改动分组</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">changelist 用法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ---- 创建变更列表并归类文件 ----</span>
+svn changelist doc-fix docs.md README.md
+svn changelist code-fix src/main.cs src/utils.cs
+svn changelist test-fix tests/*.cs
+
+<span class="c"># ---- 查看分组后的状态 ----</span>
+svn status
+<span class="c"># 输出会按 changelist 分组显示：</span>
+<span class="c"># --- Changelist 'doc-fix':</span>
+<span class="c"># M       docs.md</span>
+<span class="c"># --- Changelist 'code-fix':</span>
+<span class="c"># M       src/main.cs</span>
+
+<span class="c"># ---- 只提交某个列表 ----</span>
+svn commit --changelist doc-fix -m <span class="s">"文档修正：补充安装说明"</span>
+
+<span class="c"># ---- 只 diff 某个列表 ----</span>
+svn diff --changelist code-fix
+
+<span class="c"># ---- 从列表中移除 ----</span>
+svn changelist --remove src/main.cs
+svn changelist --remove --recursive .          <span class="c"># 全部移除</span>
+
+<span class="c"># ---- 典型用途：把「顺手改的东西」和「本次任务」分开提交 ----</span></pre>
+</div>
+
+<div class="box tip">
+  <span class="bt">changelist 是「小步提交」的助推器</span>
+  <p>很多人攒着一大堆改动一起提交，导致日志写不清、review 困难、回退时牵连太广。
+  changelist 让你能把「这次任务真正相关的改动」单独挑出来提交，
+  剩下的（比如顺手改的错别字、格式化的空行）放到下一个提交里。</p>
+</div>
+
+<h4 class="sub">其他实用技巧合集</h4>
+
+<div class="grid2">
+  <div class="card blue">
+    <h6>svn move：保留历史的重命名</h6>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">move vs 手工 mv</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ✓ 用 svn move（保留历史关联）</span>
+svn move old.cs new.cs
+<span class="c"># 执行后 status 会这样显示（实测）：</span>
+<span class="c">#   A  +    new.cs          ← 第4列的 + 表示「带复制的历史」</span>
+<span class="c">#        > moved from old.cs   ← 附加说明行（不在固定列位）</span>
+<span class="c">#   D       old.cs</span>
+<span class="c">#        > moved to new.cs</span>
+
+svn commit -m "重命名 old.cs 为 new.cs"
+<span class="c"># log -v 里会显示带来源的复制记录：</span>
+<span class="c">#    D /trunk/old.cs</span>
+<span class="c">#    A /trunk/new.cs (from /trunk/old.cs:21)</span>
+
+<span class="c"># ✗ 手工 mv（历史断开）</span>
+mv old.cs new.cs
+svn delete old.cs
+svn add new.cs
+<span class="c"># 历史里看成「删了一个 + 加了一个」，没有 from/to 的来源标注</span>
+
+<span class="c"># 查历史时：SVN 默认【就会】跟随复制历史，无需额外选项</span>
+svn log new.cs
+<span class="c"># 想「只看这个文件自己的历史、不追溯来源」才需要反转默认行为：</span>
+svn log --stop-on-copy new.cs
+
+<span class="c"># 目录也能移动</span>
+svn move src/ legacy-src/
+svn move ^/trunk/lib ^/branches/lib-experimental</pre>
+    </div>
+  </div>
+
+  <div class="card green">
+    <h6>svn blame：逐行追责</h6>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">blame 用法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 每一行前面标出：版本号 作者</span>
+svn blame README.md
+<span class="c">#      8     kelang  版本最终：包含登录功能</span>
+
+<span class="c"># 带日期</span>
+svn blame -v README.md
+
+<span class="c"># 换成 XML 便于脚本处理</span>
+svn blame --xml src/main.cs
+
+<span class="c"># 只看某个版本区间的责任</span>
+svn blame -r 10:20 src/main.cs
+
+<span class="c"># 忽略空白差异（格式化改动造成的假变更）</span>
+svn blame -x -w src/main.cs
+
+<span class="c"># 追查某一行是谁引入的</span>
+svn blame src/main.cs | grep "问题代码"</pre>
+    </div>
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="card pur">
+    <h6>svn cat / export：不落盘查看与导出</h6>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">用法</span><span class="acts"><button data-copy">复制</button></span></div>
+<pre class="code"><span class="c"># 直接看某个版本的某个文件（不检出）</span>
+svn cat -r 8 README.md
+svn cat -r 8 file:///repo/trunk/README.md
+
+<span class="c"># 导出干净副本（不含 .svn，可直接打包）</span>
+svn export ^/trunk release-build/
+svn export -r 520 ^/trunk release-r520/
+svn export ^/tags/v1.0.0 v1.0.0/
+svn export --force ^/trunk ./     <span class="c"># 覆盖已有目录</span>
+
+<span class="c"># export vs checkout 的选择</span>
+<span class="c"># export  → 构建产物、给别人一份、不打算提交</span>
+<span class="c"># checkout → 要提交、要更新、要 diff</span>
+
+<span class="c"># 用 export 避免 .svn 污染构建产物</span>
+svn export ^/tags/v2.0 ./dist &amp;&amp; cd dist &amp;&amp; make</pre>
+    </div>
+  </div>
+
+  <div class="card warn">
+    <h6>svn info --show-item：脚本友好输出</h6>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">等价于只取一个字段</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 只输出一个值，无需 grep/awk 解析</span>
+svn info --show-item revision
+<span class="c"># 20</span>
+
+svn info --show-item last-changed-revision
+svn info --show-item url
+svn info --show-item relative-url
+<span class="c"># ^/trunk</span>
+
+svn info --show-item repos-root-url
+svn info --show-item wc-root
+svn info --show-item kind
+svn info --show-item revision --no-newline    <span class="c"># 不带换行，方便拼字符串</span>
+
+<span class="c"># 脚本示例：拿到当前版本号做版本标记</span>
+REV=$(svn info --show-item last-changed-revision --no-newline)
+echo "BUILD_VERSION=1.0.0-r${REV}" &gt; version.env</pre>
+    </div>
+  </div>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">批量操作与自动化脚本</span><span class="acts"><button data-copy">复制</button></span></div>
+<pre class="code"><span class="c"># ---- 批量给新加入的文件设置 svn:eol-style ----</span>
+svn status | grep <span class="s">'^A'</span> | awk <span class="s">'{print $2}'</span> | \
+  xargs -I{} svn propset svn:eol-style native {}
+svn commit -m <span class="s">"统一新增文件的换行符属性"</span>
+
+<span class="c"># ---- 找出所有未加入版本控制的文件并批量添加 ----</span>
+svn status | grep <span class="s">'^?'</span> | awk <span class="s">'{print $2}'</span> | xargs svn add
+
+<span class="c"># ---- 批量解决冲突 ----</span>
+svn status | grep <span class="s">'^C'</span> | awk <span class="s">'{print $2}'</span> | \
+  xargs -I{} svn resolve --accept working {}
+
+<span class="c"># ---- 提交前自动检查：有没有残留冲突标记 ----</span>
+if grep -rn <span class="s">'^&lt;&lt;&lt;&lt;&lt;&lt;&lt;'</span> --include=<span class="s">"*.cs"</span> --include=<span class="s">"*.js"</span> . ; then
+  echo <span class="s">"发现未解决的冲突标记，请先处理！"</span>
+  exit 1
+fi
+
+<span class="c"># ---- 把工作副本恢复到干净状态（危险操作，谨慎）----</span>
+svn revert -R .
+svn cleanup
+svn status --no-ignore | grep <span class="s">'^?'</span> | awk <span class="s">'{print $2}'</span> | xargs rm -rf
+
+<span class="c"># ---- 找出最近一周的提交，生成变更报告 ----</span>
+svn log -r <span class="s">"{$(date -d '7 days ago' +%Y-%m-%d)}:HEAD"</span> -v &gt; weekly-changes.txt
+
+<span class="c"># ---- 统计每个人的提交次数 ----</span>
+svn log -q -r 1:HEAD | grep <span class="s">'^r'</span> | awk -F<span class="s">'|'</span> <span class="s">'{print $2}'</span> | \
+  tr -d <span class="s">' '</span> | sort | uniq -c | sort -rn
+
+<span class="c"># ---- 对比两个分支的差异清单 ----</span>
+svn diff ^/trunk ^/branches/feature --summarize
+
+<span class="c"># ---- 找出某个文件的所有修改者 ----</span>
+svn log -q src/main.cs | grep <span class="s">'^r'</span> | awk -F<span class="s">'|'</span> <span class="s">'{print $2}'</span> | sort -u</pre>
+</div>
+
+<div class="box tip">
+  <span class="bt">在 ~/.subversion/config 里值得改的几个默认值</span>
+  <div class="codewrap">
+    <div class="codehead"><span class="lang">ini</span><span class="fn">性能与体验优化</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">[helpers]
+<span class="c"># 图形化 diff 工具（配置后 svn diff --diff-cmd 可用）</span>
+diff-cmd = meld
+diff3-cmd = meld
+<span class="c"># 交互式冲突解决工具</span>
+merge-tool-cmd = meld
+
+[miscellany]
+enable-auto-props = yes
+global-ignores = *.o *.lo *.la *.al .libs *.so *.so.[0-9]* *.a *.pyc *.pyo
+  __pycache__ *.rej *~ #*# .#* .*.swp .DS_Store [Tt]humbs.db
+  *.vs bin obj *.user *.suo .idea *.iml node_modules
+
+[auto-props]
+<span class="c">（见第 15.3 节完整配置）</span>
+
+[tunnels]
+<span class="c"># 自定义隧道（比如通过跳板机访问）</span>
+<span class="c"># 用法：svn checkout svn+mycompany://path</span>
+mycompany = ssh -p 2222 -l svnuser relay.example.com
+
+[auth]
+<span class="c"># 凭据缓存方式：simple（明文，默认）/ windows-crypt / gnome-keyring</span>
+password-stores = windows-crypt
+store-passwords = yes
+store-auth-creds = yes</pre>
+    </div>
+  </div>
+
+<!-- ==========================================================================
+     第 23 节：故障排查
+     ========================================================================== -->
+<h3 class="sec" id="s23"><span class="no">23</span>故障排查速查</h3>
+
+<p class="lead">
+  这一节收录的都是<strong>实测踩过的真实错误</strong>，包含错误原文、根本原因和修复步骤。
+  遇到问题先在这里搜错误码。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 23-1　错误码速查：错误码前缀决定排查方向</span><span class="fs">Error Codes</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 420" width="980" height="420" role="img" aria-label="SVN 错误码分类速查图">
+  <!-- 分类 -->
+  <rect x="24" y="30" width="220" height="150" rx="10" fill="rgba(88,166,255,.07)" stroke="#58a6ff" stroke-width="1.4"/>
+  <text class="hd" x="44" y="54" fill="#58a6ff">E1xx</text>
+  <text class="ts" x="44" y="76">客户端 / 工作副本问题</text>
+  <line x1="44" y1="88" x2="224" y2="88" stroke="#30363d" stroke-width="1"/>
+  <text class="tm2" x="44" y="110" fill="#7ee787">E155004</text>
+  <text class="tm2" x="140" y="110">工作副本被锁</text>
+  <text class="tm2" x="44" y="132" fill="#7ee787">E155015</text>
+  <text class="tm2" x="140" y="132">冲突未解决</text>
+  <text class="tm2" x="44" y="154" fill="#7ee787">E155010</text>
+  <text class="tm2" x="140" y="154">节点不存在</text>
+  <text class="tm2" x="44" y="176" fill="#7ee787">E195020</text>
+  <text class="tm2" x="140" y="176">混合版本不能 merge</text>
+
+  <rect x="254" y="30" width="220" height="150" rx="10" fill="rgba(210,168,255,.07)" stroke="#d2a8ff" stroke-width="1.4"/>
+  <text class="hd" x="274" y="54" fill="#d2a8ff">E16xx</text>
+  <text class="ts" x="274" y="76">服务器端 / 钩子问题</text>
+  <line x1="274" y1="88" x2="454" y2="88" stroke="#30363d" stroke-width="1"/>
+  <text class="tm2" x="274" y="110" fill="#7ee787">E165001</text>
+  <text class="tm2" x="370" y="110">钩子拒绝提交</text>
+  <text class="tm2" x="274" y="132" fill="#7ee787">E165002</text>
+  <text class="tm2" x="370" y="132">钩子启动失败</text>
+  <text class="tm2" x="274" y="154" fill="#7ee787">E165006</text>
+  <text class="tm2" x="370" y="154">revprop 修改未启用</text>
+
+  <rect x="484" y="30" width="220" height="150" rx="10" fill="rgba(255,166,87,.07)" stroke="#ffa657" stroke-width="1.4"/>
+  <text class="hd" x="504" y="54" fill="#ffa657">E17xx</text>
+  <text class="ts" x="504" y="76">网络 / 认证问题</text>
+  <line x1="504" y1="88" x2="684" y2="88" stroke="#30363d" stroke-width="1"/>
+  <text class="tm2" x="504" y="110" fill="#7ee787">E170001</text>
+  <text class="tm2" x="600" y="110">认证失败</text>
+  <text class="tm2" x="504" y="132" fill="#7ee787">E170013</text>
+  <text class="tm2" x="600" y="132">连不上仓库</text>
+  <text class="tm2" x="504" y="154" fill="#7ee787">E175002</text>
+  <text class="tm2" x="600" y="154">HTTP 连接错误</text>
+
+  <rect x="714" y="30" width="240" height="150" rx="10" fill="rgba(255,123,114,.07)" stroke="#ff7b72" stroke-width="1.4"/>
+  <text class="hd" x="734" y="54" fill="#ff7b72">E2xxxx</text>
+  <text class="ts" x="734" y="76">权限 / 协议层问题</text>
+  <line x1="734" y1="88" x2="934" y2="88" stroke="#30363d" stroke-width="1"/>
+  <text class="tm2" x="734" y="110" fill="#7ee787">E220004</text>
+  <text class="tm2" x="834" y="110">权限被拒</text>
+  <text class="tm2" x="734" y="132" fill="#7ee787">E220001</text>
+  <text class="tm2" x="834" y="132">认证被拒</text>
+  <text class="tm2" x="734" y="154" fill="#7ee787">E200009</text>
+  <text class="tm2" x="834" y="154">提交失败（部分文件）</text>
+
+  <!-- 排查流程 -->
+  <text class="hd" x="30" y="212" fill="#e6edf3">通用排查流程</text>
+  <rect x="24" y="228" width="930" height="170" rx="11" fill="#0b0f14" stroke="#30363d" stroke-width="1.3"/>
+
+  <circle cx="60" cy="262" r="14" fill="#58a6ff"/>
+  <text class="tm" x="60" y="267" text-anchor="middle" fill="#0d1117" font-weight="700">1</text>
+  <text class="tx" x="86" y="258">看错误码前缀，确定问题层次</text>
+  <text class="ts" x="86" y="278">E1xxx → 本地问题；E16xx → 服务端/钩子；E17xx/E2xxxx → 网络或权限</text>
+
+  <circle cx="60" cy="308" r="14" fill="#7ee787"/>
+  <text class="tm" x="60" y="313" text-anchor="middle" fill="#0d1117" font-weight="700">2</text>
+  <text class="tx" x="86" y="304">先跑 svn cleanup + svn update</text>
+  <text class="ts" x="86" y="324">80% 的 E155xxx「工作副本卡住」类问题，这两步就解决了</text>
+
+  <circle cx="60" cy="354" r="14" fill="#d2a8ff"/>
+  <text class="tm" x="60" y="359" text-anchor="middle" fill="#0d1117" font-weight="700">3</text>
+  <text class="tx" x="86" y="350">用 svn info / svn status -u 确认状态</text>
+  <text class="ts" x="86" y="370">确认 URL 对不对、版本号是不是落后、有没有冲突残留</text>
+
+  <circle cx="60" cy="390" r="14" fill="#ffa657"/>
+  <text class="tm" x="60" y="395" text-anchor="middle" fill="#0d1117" font-weight="700">4</text>
+  <text class="tx" x="86" y="386">服务端问题看 svnserve 日志 + 手工跑钩子</text>
+  <text class="ts" x="86" y="406" fill="#7ee787">钩子相关的错误，90% 是「路径不对」或「没有执行权限」</text>
+</svg>
+  </div>
+</div>
+
+<h4 class="sub">工作副本类错误</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:23%">错误原文</th><th style="width:29%">原因</th><th>修复</th></tr></thead>
+<tbody>
+  <tr>
+    <td><code class="ic r">E155004<br>...is already locked<br>Run 'svn cleanup'</code></td>
+    <td>工作副本被锁。常见于：上次操作被强制中断、进程崩溃、磁盘满</td>
+    <td><code class="ic">svn cleanup</code>　—— 实测有效，一条命令解决。<br>如果 cleanup 也报错，检查是否还有 svn 进程在跑（<code class="ic">Get-Process svn</code> / <code class="ic">ps aux | grep svn</code>），杀掉后重试</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E155015<br>Aborting commit:<br>'xxx' remains in conflict</code></td>
+    <td>文件处于冲突状态（C），未调用 <code class="ic">svn resolve</code></td>
+    <td>解决冲突内容后：<br><code class="ic">svn resolve --accept working 文件名</code><br>然后提交</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E155010<br>The node 'xxx' was not found</code></td>
+    <td>操作了不存在的路径。常见于 <code class="ic">propset</code> 一个已被忽略/不存在的目录</td>
+    <td>先用 <code class="ic">svn status</code> 确认路径真实存在；<br>被忽略的目录需先 <code class="ic">svn add --no-ignore</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E195020<br>Cannot merge into<br>mixed-revision working copy</code></td>
+    <td>工作副本里不同节点处于不同版本（混合版本状态），merge 拒绝执行</td>
+    <td><code class="ic">svn update</code>　—— 实测这一步就能解决，然后再 merge</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E195006<br>'xxx' has local modifications --<br>commit or revert them first</code></td>
+    <td>对已修改的文件执行 <code class="ic">svn delete</code> / <code class="ic">switch</code> 等操作</td>
+    <td>先 <code class="ic">svn commit</code> 或 <code class="ic">svn revert</code>；<br>确需强制操作加 <code class="ic">--force</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E155007<br>'xxx' is not a<br>working copy</code></td>
+    <td>在非工作副本目录里执行了需要工作副本的命令</td>
+    <td>确认你在正确的目录（有 <code class="ic">.svn</code> 的地方）；<br>或用 URL 形式执行命令</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E200009<br>Some targets are<br>inaccessible</code></td>
+    <td>提交时某些文件不可访问（权限、被占用、路径过长）</td>
+    <td>检查文件是否被其他程序独占（比如 IDE、Excel 打开着）；<br>Windows 路径超 260 字符也可能触发</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E155036<br>The working copy is too old<br>(format N; need at least M)</code></td>
+    <td>工作副本格式比当前 SVN 客户端版本旧（比如从很老的 SVN 升级上来）</td>
+    <td>重新 <code class="ic">svn checkout</code>（最简单）；<br>或 <code class="ic">svn upgrade</code>（1.7+ 的旧工作副本可原地升级）</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：E155004 与 E195020 的完整现场</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># ===== E155004：工作副本被锁 =====</span>
+<span class="ps">$</span> <span class="cmd">svn patch E:\my.patch</span>
+<span class="no">svn: E155004: 'E:\svn-demo\wc' is already locked.</span>
+<span class="no">svn: E155004: Run 'svn cleanup' to remove locks (type 'svn help cleanup' for details)</span>
+
+<span class="ps">$</span> <span class="cmd">svn cleanup</span>
+<span class="dim">&lt;无输出 = 成功&gt;</span>
+<span class="ps">$</span> <span class="cmd">svn patch E:\my.patch</span>
+<span class="ok">U         src\main.cs</span>          <span class="cmt">← 恢复正常</span>
+
+<span class="cmt"># ===== E195020：混合版本不能 merge =====</span>
+<span class="ps">$</span> <span class="cmd">svn merge file:///E:/repo/branches/feature-login</span>
+<span class="no">svn: E195020: Cannot merge into mixed-revision working copy [6:7];</span>
+<span class="no">              try updating first</span>
+<span class="cmt">↑ 报错本身已经给出了解决方法："try updating first"</span>
+
+<span class="ps">$</span> <span class="cmd">svn update</span>
+Updating '.':
+At revision 7.                    <span class="cmt">← 拉平成单一版本</span>
+
+<span class="ps">$</span> <span class="cmd">svn merge file:///E:/repo/branches/feature-login</span>
+--- Merging r5 through r7 into '.':   <span class="cmt">← 成功执行</span></pre>
+  </div>
+</div>
+
+<h4 class="sub">服务端与钩子类错误</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:23%">错误原文</th><th style="width:29%">原因</th><th>修复</th></tr></thead>
+<tbody>
+  <tr>
+    <td><code class="ic r">E165001<br>Commit blocked by<br>pre-commit hook (exit code 1)</code></td>
+    <td>钩子主动拒绝了本次提交。这是<strong>预期行为</strong>，不是故障</td>
+    <td>看错误信息里钩子输出的原因（<code class="ic">with output:</code> 后面的内容），按提示修改提交内容或日志</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E165002<br>Failed to start<br>'xxx/pre-commit' hook</code></td>
+    <td>钩子文件存在但无法执行</td>
+    <td>检查三点：① Linux 上是否有 <code class="ic">chmod +x</code> 执行权限；
+      ② 首行 shebang 是否正确（<code class="ic">#!/bin/sh</code>）；
+      ③ Windows 上是否是 <code class="ic">.bat</code>/<code class="ic">.cmd</code> 且为 ASCII 无 BOM 编码</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E720005<br>Can't set process<br>'...' stdio pipes</code></td>
+    <td>钩子进程无法建立标准输入输出管道。<strong>常见于受限环境</strong>（安全软件拦截、容器权限不足、Windows 上的权限策略）</td>
+    <td>本教程实测时就遇到了这个：Windows 沙箱阻止了子进程管道创建。
+      解决：给 svnserve / 钩子进程足够权限，或把 svnserve 换成 Windows 服务方式运行</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E165006<br>Repository has not been<br>enabled to accept<br>revision propchanges</code></td>
+    <td>尝试修改提交日志，但没有 <code class="ic">pre-revprop-change</code> 钩子</td>
+    <td>这是 SVN 的<strong>安全默认值</strong>。要允许修改就创建该钩子并 <code class="ic">exit 0</code>；
+      要禁止篡改就创建并 <code class="ic">exit 1</code>（见第 20 节）</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E140001<br>Malformed dumpfile header</code></td>
+    <td>dump 文件格式错误。<strong>PowerShell 重定向写成 UTF-16</strong> 是实测高发原因</td>
+    <td>改用 <code class="ic">svnadmin dump --file xxx.dump</code>；<br>核对文件头前几字节应为 <code class="ic">53 56 4E 2D</code>（"SVN-"）</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E160013<br>File not found:<br>revision N, path '/x'</code></td>
+    <td>在指定版本里该路径不存在。常见于 peg revision 用错</td>
+    <td>用 <code class="ic">svn log -v</code> 确认路径在不同版本下的实际名字（重命名前后）；<br>peg 语法：<code class="ic">URL@PEG</code> 配合 <code class="ic">-r OP_REV</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E160020<br>File already exists</code></td>
+    <td>提交的路径已存在（比如建目录时名字重复）</td>
+    <td><code class="ic">svn list</code> 确认当前结构；换个名字或先删除已有路径</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E200030<br>Transaction is out of date</code></td>
+    <td>提交时事务已过期（你提交期间别人先提交了同一文件）</td>
+    <td><code class="ic">svn update</code> 后重新提交。<strong>这就是「先 update 再 commit」习惯的由来</strong></td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<h4 class="sub">网络与权限类错误</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:23%">错误原文</th><th style="width:29%">原因</th><th>修复</th></tr></thead>
+<tbody>
+  <tr>
+    <td><code class="ic r">E170001<br>Authentication error from<br>server: Password incorrect<br>或 Can't get password</code></td>
+    <td>认证失败。后半句不同含义不同：<br><code class="ic">Password incorrect</code> = 密码错；<br><code class="ic">Can't get password</code> = 客户端没提供凭据（且不能交互）</td>
+    <td>加 <code class="ic">--username xxx --password xxx</code>；<br>脚本里必须加 <code class="ic">--non-interactive</code>，否则会卡住等输入</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E170001<br>Authorization failed</code></td>
+    <td>认证通过了，但<strong>权限不足</strong>（authz 里没给你这个路径的权限）</td>
+    <td>用 <code class="ic">svnauthz access --username X --path /y authz</code> 查实际权限；<br>检查 authz 里 <code class="ic">[path]</code> 的路径基准是否写对（相对仓库根）</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E220004<br>Access denied</code></td>
+    <td>写操作被 authz 拒绝（比如往只读的 <code class="ic">/tags</code> 提交）</td>
+    <td>这是权限设计生效了。需要写权限就找管理员在 authz 里加对应组</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E170013<br>Unable to connect to a<br>repository at URL</code></td>
+    <td>连不上服务器。通常是网络/服务未启动/端口不通</td>
+    <td>逐步排查：<br>① 服务在跑吗 <code class="ic">ps aux | grep svnserve</code>；<br>② 端口通吗 <code class="ic">telnet host 3690</code>；<br>③ 防火墙放行了吗；<br>④ URL 拼写对吗（<code class="ic">svn://host/repo</code>，注意仓库名）</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E730061<br>Can't connect to host</code></td>
+    <td>TCP 层连接被拒绝（服务没监听、端口错、防火墙拦截）</td>
+    <td>同上一行。常见坑：svnserve 只监听了 <code class="ic">127.0.0.1</code>，外部连不上——用 <code class="ic">--listen-host 0.0.0.0</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E175002<br>HTTP 相关错误</code></td>
+    <td>Apache 配置问题、SSL 证书问题、代理拦截</td>
+    <td>检查 Apache 的 <code class="ic">error.log</code>；确认 <code class="ic">mod_dav_svn</code> 已加载；<br>自签名证书需配置信任或加 <code class="ic">--trust-server-cert</code></td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：认证与权限错误的精确区分</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># ---- 1. 密码错误 ----</span>
+<span class="ps">$</span> <span class="cmd">svn list --username alice --password WRONG --non-interactive svn://127.0.0.1/repo</span>
+<span class="no">svn: E170001: Authentication error from server: Password incorrect</span>
+<span class="cmt">↑ 关键字 "Password incorrect" —— 是密码问题，不是权限问题</span>
+
+<span class="cmt"># ---- 2. 没提供凭据（非交互模式）----</span>
+<span class="ps">$</span> <span class="cmd">svn list --non-interactive --no-auth-cache svn://127.0.0.1/repo</span>
+<span class="no">svn: E170001: Can't get password</span>
+<span class="cmt">↑ 关键字 "Can't get password" —— 客户端没有凭据可用</span>
+
+<span class="cmt"># ---- 3. 权限不足（认证过了但没权限）----</span>
+<span class="ps">$</span> <span class="cmd">svn list --username bob --password bob123 --non-interactive svn://127.0.0.1/repo</span>
+<span class="no">svn: E170001: Authorization failed</span>
+<span class="cmt">↑ 关键字 "Authorization failed" —— 是 authz 权限问题</span>
+
+<span class="cmt"># ---- 4. 写操作被拒 ----</span>
+<span class="ps">$</span> <span class="cmd">svn mkdir --username bob --password bob123 svn://127.0.0.1/repo/tags/v2.0 -m "test"</span>
+<span class="no">svn: E220004: Access denied</span>
+<span class="cmt">↑ bob 对 /tags 只有读权限，写被拒</span>
+
+<span class="cmt"># ---- 5. 连不上服务 ----</span>
+<span class="ps">$</span> <span class="cmd">svn list svn://127.0.0.1/repo</span>
+<span class="no">svn: E170013: Unable to connect to a repository at URL 'svn://127.0.0.1/repo'</span>
+<span class="no">svn: E730061: Can't connect to host '127.0.0.1': 由于目标计算机积极拒绝，无法连接。</span>
+<span class="cmt">↑ "积极拒绝" = 服务没在监听这个端口</span></pre>
+  </div>
+</div>
+
+<div class="box ok">
+  <span class="bt">「先 cleanup，再 update」—— 两条命令解决大部分问题</span>
+  <p>这不是玄学。绝大多数工作副本异常都是因为<strong>上一次操作被中断，留下了未清理的锁和中间状态</strong>。</p>
+  <div class="codewrap">
+    <div class="codehead"><span class="lang">bash</span><span class="fn">万能恢复三步</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 第 1 步：清理锁和中间状态</span>
+svn cleanup
+
+<span class="c"># 如果 cleanup 报错「还有进程在用」，先杀掉残留进程</span>
+<span class="c"># Linux:</span>
+pkill svn
+<span class="c"># Windows:</span>
+Get-Process svn -ErrorAction SilentlyContinue | Stop-Process -Force
+taskkill /F /IM TortoiseProc.exe     <span class="c"># 关掉卡住的 TortoiseSVN 对话框</span>
+
+<span class="c"># 第 2 步：重新同步</span>
+svn update
+
+<span class="c"># 第 3 步：看状态是否正常</span>
+svn status
+svn info
+
+<span class="c"># ---- 如果还是不行，最后手段（会丢失本地未提交改动！）----</span>
+svn revert -R .                      <span class="c"># 撤销所有本地修改</span>
+svn cleanup
+svn update
+<span class="c"># 或者：删掉工作副本重新检出（最彻底）</span>
+svn checkout <span class="s">"$(svn info --show-item url)"</span> wc-fresh</pre>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">重新检出前，先抢救未提交的改动</span>
+  <p>删掉工作副本是<strong>不可逆</strong>的。执行前务必：
+  ① <code class="ic">svn status</code> 看有没有未提交内容；
+  ② <code class="ic">svn diff --file rescue.patch</code> 把改动存成补丁；
+  ③ 把新文件（<code class="ic">?</code> 状态）复制到工作副本外面。</p>
+  <p>重新检出后再用 <code class="ic">svn patch rescue.patch</code> 把改动应用回来。</p>
+</div>

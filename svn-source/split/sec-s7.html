@@ -1,0 +1,346 @@
+<h3 class="sec" id="s7"><span class="no">7</span>status 状态码全解</h3>
+
+<p class="lead">
+  <code class="ic">svn status</code> 是 SVN 里<strong>使用频率最高</strong>的命令，也是信息密度最高的。
+  它的输出<strong>前七列每列一个字符宽</strong>，每列表示一种不同维度的状态。
+  很多人以为只有两列——这是最常见的误读，会导致完全相反的结论。
+</p>
+
+<div class="box key">
+  <span class="bt">先记住这个结论：status 有七列，不是两列</span>
+  <p>官方文档（<code class="ic">svn help status</code>）原文：<em>The first seven columns in the output are each one character wide</em>。
+  下面这七列各管一件事：内容、属性、工作副本锁、复制历史、切换/外部、仓库锁、树冲突。
+  用 <code class="ic">-u</code> 时还有<strong>第 9 列</strong>表示服务器是否有更新。</p>
+</div>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 7-1　status 输出的七列结构解剖（依据 svn help status 实测）</span><span class="fs">Output Anatomy</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 470" width="980" height="470" role="img" aria-label="svn status 输出七列结构解剖图">
+  <!-- 输出示例 -->
+  <rect class="c-gray" x="30" y="52" width="520" height="212" rx="10"/>
+  <text class="tm2" x="50" y="74">列号 1234567</text>
+  <text class="tm" x="50" y="98">M       README.md</text>
+  <text class="tm" x="50" y="122"> M      src/</text>
+  <text class="tm" x="50" y="146">A  +    newfile.txt</text>
+  <text class="tm" x="50" y="170">D       old.txt</text>
+  <text class="tm" x="50" y="194">C       conflict.md</text>
+  <text class="tm" x="50" y="218">?       untracked.log</text>
+  <text class="tm" x="50" y="242">!       missing.cs</text>
+
+  <!-- 列标注（精确到字符位） -->
+  <path class="arwy" d="M96,90 L215,470" stroke="#e3b341" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text class="tm2" x="100" y="86" fill="#e3b341">①</text>
+
+  <path class="arwc" d="M114,114 L262,470" stroke="#56d4dd" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text class="tm2" x="118" y="110" fill="#56d4dd">②</text>
+
+  <path class="arwg" d="M172,138 L309,470" stroke="#7ee787" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text class="tm2" x="176" y="134" fill="#7ee787">④</text>
+
+  <path class="arwp" d="M270,210 L356,470" stroke="#d2a8ff" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text class="tm2" x="274" y="206" fill="#d2a8ff">路径</text>
+
+  <!-- 七列定义 -->
+  <rect x="566" y="40" width="392" height="424" rx="11" fill="rgba(88,166,255,.05)" stroke="#58a6ff" stroke-width="1.3"/>
+
+  <text class="hd" x="586" y="64" fill="#e3b341">① 第 1 列：内容状态</text>
+  <text class="tm2" x="594" y="86">A 新增  M 修改  D 删除  R 替换</text>
+  <text class="tm2" x="594" y="104">C 冲突  ? 未跟踪  ! 缺失  I 忽略</text>
+  <text class="tm2" x="594" y="122">X 由 externals 创建的外部目录</text>
+  <text class="tm2" x="594" y="140">~ 类型不符（版本控制对象被占用）</text>
+
+  <line x1="586" y1="152" x2="938" y2="152" stroke="#30363d" stroke-width="1"/>
+
+  <text class="hd" x="586" y="174" fill="#56d4dd">② 第 2 列：属性状态</text>
+  <text class="tm2" x="594" y="196">M 属性被修改　C 属性冲突</text>
+
+  <line x1="586" y1="208" x2="938" y2="208" stroke="#30363d" stroke-width="1"/>
+
+  <text class="hd" x="586" y="230" fill="#8b949e">③ 第 3 列：工作副本写锁</text>
+  <text class="tm2" x="594" y="252">L 被另一个客户端锁定（正在操作）</text>
+
+  <line x1="586" y1="264" x2="938" y2="264" stroke="#30363d" stroke-width="1"/>
+
+  <text class="hd" x="586" y="286" fill="#7ee787">④ 第 4 列：是否带复制历史</text>
+  <text class="tm2" x="594" y="308">+ 提交时将创建副本（svn copy 过来的）</text>
+
+  <line x1="586" y1="320" x2="938" y2="320" stroke="#30363d" stroke-width="1"/>
+
+  <text class="hd" x="586" y="342" fill="#d2a8ff">⑤ 第 5 列：切换与文件外部</text>
+  <text class="tm2" x="594" y="364">S 该条目被 switch 到其他 URL</text>
+  <text class="tm2" x="594" y="382">X 由 externals 定义的版本控制文件</text>
+
+  <line x1="586" y1="394" x2="938" y2="394" stroke="#30363d" stroke-width="1"/>
+
+  <text class="hd" x="586" y="416" fill="#ffa657">⑥ 第 6 列：仓库独占锁</text>
+  <text class="tm2" x="594" y="438">K 本工作副本持有该锁（或锁已被偷/失效）</text>
+  <text class="ts" x="594" y="456" fill="#8b949e">加 -u 时：K 我持有 / O 他人持有 / T 被偷 / B 已失效</text>
+
+  <!-- 第7列与第9列 -->
+  <rect x="30" y="280" width="520" height="76" rx="10" fill="rgba(255,123,114,.06)" stroke="#ff7b72" stroke-width="1.3"/>
+  <text class="hd" x="50" y="304" fill="#ff7b72">⑦ 第 7 列：树冲突（tree conflict）</text>
+  <text class="ts" x="50" y="326">C 条目是树冲突的受害者。出现时下一行会多打印一条说明。</text>
+  <text class="ts" x="50" y="346" fill="#7ee787">例：!     C wc/qaz.c   ← 第1列!缺失 + 第7列C树冲突</text>
+
+  <rect x="30" y="368" width="520" height="96" rx="10" fill="rgba(86,212,221,.06)" stroke="#56d4dd" stroke-width="1.3"/>
+  <text class="hd" x="50" y="392" fill="#56d4dd">⑨ 第 9 列：服务器是否有更新（仅 -u）</text>
+  <text class="ts" x="50" y="414">* 服务器上有更新的版本存在</text>
+  <text class="ts" x="50" y="434">后面紧跟「工作版本号」「最后提交版本号」「作者」等变量宽字段，以空格分隔。</text>
+  <text class="ts" x="50" y="454" fill="#8b949e">末尾还会有一行：Status against revision: 981</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>最容易踩的坑：</b><code class="ic">M</code> 出现在第 1 列还是第 2 列，含义完全不同——
+    第 1 列是<strong>文件内容</strong>变了，第 2 列（前面有个空格）是<strong>属性</strong>变了。
+    同理 <code class="ic">X</code> 在第 1 列是「externals 创建的外部<strong>目录</strong>」，
+    在第 5 列是「externals 定义的版本控制<strong>文件</strong>」——两者都不是同一个意思。
+  </div>
+</div>
+
+<h4 class="sub">所有状态码实测</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">构造所有状态码并观察</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 在一个干净的工作副本里依次制造各种状态</span>
+
+<span class="c"># A —— 新增待提交（目录会递归展开成多行）</span>
+touch newfile.txt &amp;&amp; svn add newfile.txt
+mkdir src &amp;&amp; echo <span class="s">"code"</span> &gt; src/main.cs &amp;&amp; svn add src
+
+<span class="c"># M —— 修改已跟踪文件（第 1 列）</span>
+echo <span class="s">"append"</span> &gt;&gt; docs.md
+
+<span class="c"># M —— 修改属性（第 2 列！注意前导空格）</span>
+svn propset svn:ignore <span class="s">"*.log"</span> .
+
+<span class="c"># D —— 标记删除</span>
+svn delete test-hook.txt
+
+<span class="c"># ? —— 未版本控制</span>
+touch untracked.txt
+
+<span class="c"># ! —— 缺失（绕过 svn delete 直接删）</span>
+rm src/main.cs
+
+<span class="c"># I —— 被 svn:ignore 忽略（默认不显示）</span>
+touch debug.log
+
+<span class="c"># 一次性看全部</span>
+svn status
+svn status --no-ignore      <span class="c"># 连被忽略的也列出来</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：一次看全各种状态码</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="hl"> M</span>      .                  <span class="cmt">← 第2列 M：当前目录的【属性】被改了（设了 svn:ignore）</span>
+<span class="hl">M</span>       docs.md            <span class="cmt">← 第1列 M：文件【内容】已修改</span>
+<span class="ok">A</span>       newfile.txt        <span class="cmt">← 新增，等待提交</span>
+<span class="ok">A</span>       src                <span class="cmt">← 新增目录</span>
+<span class="ok">A</span>       src\main.cs        <span class="cmt">← 目录里的文件也被递归添加</span>
+<span class="no">D</span>       test-hook.txt      <span class="cmt">← 已用 svn delete 标记删除</span>
+<span class="no">?</span>       untracked.txt      <span class="cmt">← 未版本控制，提交时会被忽略</span>
+
+<span class="cmt"># 注意：debug.log 没有出现在上面 —— 它被 svn:ignore 规则挡住了</span>
+<span class="cmt"># 用 --no-ignore 让被忽略的也现形</span>
+<span class="ps">$</span> <span class="cmd">svn status --no-ignore</span>
+<span class="dim">I</span>       debug.log          <span class="cmt">← I = Ignored，被 svn:ignore 规则匹配</span>
+
+<span class="cmt"># 再看第2列的 M 具体改了什么属性</span>
+<span class="ps">$</span> <span class="cmd">svn propget svn:ignore .</span>
+*.log</pre>
+  </div>
+  <p><strong>这张输出值得多看两眼</strong>：第一行 <code class="ic">&nbsp;M&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.</code> 的 <code class="ic">M</code> 出现在<strong>第 2 列</strong>——
+  它表示「当前目录的属性被改了」，而不是「有文件内容被改了」。
+  如果你误读成第 1 列，就会以为某个文件被修改，从而找错方向。<br>
+  另外注意 <code class="ic">A&nbsp;&nbsp;src</code> 和 <code class="ic">A&nbsp;&nbsp;src\main.cs</code> 是两行——
+  添加目录时 SVN 会把里面的每个条目<strong>逐条列出</strong>，这是它的默认行为（可以用 <code class="ic">-q</code> 精简）。</p>
+</div>
+
+<h4 class="sub">状态码速查表</h4>
+
+<p>
+  下表列出<strong>第 1 列</strong>（内容状态）可能出现的主要取值。
+  另有几个只在特定列出现的标记，单独标注在「所在列」一栏。
+</p>
+
+<div class="tw">
+<table>
+<thead>
+  <tr><th>代码</th><th>所在列</th><th>英文</th><th>中文含义</th><th>怎么办</th></tr>
+</thead>
+<tbody>
+  <tr>
+    <td><span class="tagmini">无</span></td><td>1</td><td>—</td>
+    <td>干净，与 BASE 一致</td>
+    <td>无需处理</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini g">A</span></td><td>1</td><td>Added</td>
+    <td>已添加到版本控制，但还没提交</td>
+    <td><code class="ic">svn commit</code> 提交；<code class="ic">svn revert</code> 撤销添加</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini y">M</span></td><td><strong>1 或 2</strong></td><td>Modified</td>
+    <td>第 1 列 = 文件<strong>内容</strong>已修改<br>第 2 列 = <strong>属性</strong>已修改（内容没动）</td>
+    <td>提交；或 <code class="ic">svn revert</code> 丢弃修改</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini r">D</span></td><td>1</td><td>Deleted</td>
+    <td>已用 <code class="ic">svn delete</code> 标记删除，提交后真删</td>
+    <td>提交；或 <code class="ic">svn revert</code> 恢复文件</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini r">C</span></td><td>1 / 2 / 7</td><td>Conflicted</td>
+    <td>第 1 列 = 内容冲突<br>第 2 列 = 属性冲突<br>第 7 列 = <strong>树冲突</strong></td>
+    <td>编辑文件 → <code class="ic">svn resolve --accept working</code>（第 10 节）</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini c">?</span></td><td>1</td><td>Unversioned</td>
+    <td>未版本控制，SVN 完全不管它</td>
+    <td><code class="ic">svn add</code> 纳入；或写进 <code class="ic">svn:ignore</code> 让它闭嘴</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini r">!</span></td><td>1</td><td>Missing</td>
+    <td>文件被手工删除（脱离版本控制）</td>
+    <td><code class="ic">svn update</code> 找回；或 <code class="ic">svn delete --force</code> 补登记</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini">I</span></td><td>1</td><td>Ignored</td>
+    <td>匹配了忽略规则（默认不显示，需 <code class="ic">--no-ignore</code>）</td>
+    <td>无需处理；真想追踪就 <code class="ic">svn add --no-ignore</code></td>
+  </tr>
+  <tr>
+    <td><span class="tagmini p">R</span></td><td>1</td><td>Replaced</td>
+    <td>文件被删除后又新建了同名文件</td>
+    <td>正常<code class="ic">commit</code>；如需保留历史考虑 <code class="ic">svn move</code></td>
+  </tr>
+  <tr>
+    <td><span class="tagmini c">X</span></td><td><strong>1 或 5</strong></td><td>External</td>
+    <td>第 1 列 = <code class="ic">svn:externals</code> 创建的<strong>未版本控制目录</strong><br>
+        第 5 列 = <code class="ic">svn:externals</code> 定义的<strong>版本控制文件</strong></td>
+    <td>在父目录提交；外部内容本身单独管理</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini b">~</span></td><td>1</td><td>Obstructed</td>
+    <td>类型不符（SVN 认为是文件，磁盘上是目录，或反之）</td>
+    <td>删掉重来 / 改名，然后 <code class="ic">svn update</code></td>
+  </tr>
+  <tr>
+    <td><span class="tagmini g">S</span></td><td><strong>5</strong></td><td>Switched</td>
+    <td>该子目录被 <code class="ic">svn switch</code> 切到了别的 URL</td>
+    <td>正常现象；<code class="ic">svn info</code> 可看实际 URL</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini">L</span></td><td><strong>3</strong></td><td>Locked</td>
+    <td>工作副本被<strong>另一个 SVN 客户端</strong>锁定（正在执行操作）</td>
+    <td>等对方操作完；若进程已死，<code class="ic">svn cleanup</code></td>
+  </tr>
+  <tr>
+    <td><span class="tagmini y">K</span></td><td><strong>6</strong></td><td>Locked (repo)</td>
+    <td>条目在仓库中被独占锁保护，且<strong>锁由本工作副本持有</strong></td>
+    <td>正常，你持有锁；提交后自动释放</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini">O / T / B</span></td><td><strong>6</strong></td>
+    <td>—</td>
+    <td>仅 <code class="ic">-u</code> 时出现：<br><strong>O</strong> 锁被他人持有　<strong>T</strong> 我的锁被偷　<strong>B</strong> 我的锁已失效</td>
+    <td>O 需等待或沟通；T/B 说明锁状态异常，需重新加锁</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini c">+</span></td><td><strong>4</strong></td>
+    <td>History</td>
+    <td>提交时将创建带历史的副本（由 <code class="ic">svn copy</code> 产生）</td>
+    <td>正常，说明移动/复制的历史会被保留</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini c">*</span></td><td><strong>9</strong></td>
+    <td>Out of date</td>
+    <td>仅 <code class="ic">-u</code> 时出现：服务器上有更新的版本</td>
+    <td><code class="ic">svn update</code> 拉取最新</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box tip">
+  <span class="bt">怎么快速记住列号</span>
+  <p>不必死记。实战中只需要盯住<strong>前两列</strong>——它们覆盖了 95% 的日常判断。
+  第 3~7 列属于「出现时再去查」的类型。把 <code class="ic">svn help status</code> 的输出留着，
+  遇到不认识的字母搜一下就有答案。</p>
+</div>
+
+<h4 class="sub">!  缺失：最需要立刻处理的异常状态</h4>
+
+<p>
+  <code class="ic">!</code> 产生的原因只有一个：<strong>你绕过了 SVN 直接删文件</strong>——
+  用 <code class="ic">rm</code> / <code class="ic">del</code> / 在资源管理器里按 Delete。
+  SVN 的元数据里还记着这个文件，但磁盘上找不到了。
+</p>
+
+<div class="duo">
+  <div>
+    <div class="dh">✗ 错误做法：直接删文件</div>
+<pre>rm src/old.cpp
+
+$ svn status
+<span style="color:#ff7b72">!</span>       src/old.cpp
+<span style="color:#6e7681"># 状态异常，提交时会报错</span>
+
+$ svn commit -m "删除旧文件"
+<span style="color:#ff7b72">svn: E200009: Commit failed</span>
+<span style="color:#ff7b72">'src/old.cpp' is scheduled for addition,</span>
+<span style="color:#ff7b72">but is missing from the working copy</span></pre>
+  </div>
+  <div>
+    <div class="dh">✓ 正确做法：用 svn delete</div>
+<pre>svn delete src/old.cpp
+
+$ svn status
+<span style="color:#ffa657">D</span>       src/old.cpp
+<span style="color:#6e7681"># 状态正常，文件也从磁盘移除了</span>
+
+$ svn commit -m "删除旧文件"
+Deleting       src/old.cpp
+Committed revision 12.
+<span style="color:#7ee787"># 顺利提交，历史里留下了完整记录</span></pre>
+  </div>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：! 状态的两种补救方式</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 场景：误删了 src\main.cs</span>
+<span class="ps">$</span> <span class="cmd">Remove-Item src\main.cs -Force</span>
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="no">!</span>       src\main.cs
+
+<span class="cmt"># 补救方式一：我其实不想删 → update 找回来</span>
+<span class="ps">$</span> <span class="cmd">svn update</span>
+Updating '.':
+<span class="ok">Restored 'src\main.cs'</span>          <span class="cmt">← 从 pristine / 服务器恢复</span>
+At revision 17.
+
+<span class="cmt"># 补救方式二：确实要删 → 补一个登记动作</span>
+<span class="ps">$</span> <span class="cmd">svn delete --force old-file.txt</span>
+<span class="hl">D</span>         old-file.txt               <span class="cmt">← 即使文件已经不在，也能标记删除</span>
+
+<span class="cmt"># 补救方式三：批量处理一堆 ! （比如清空了一个目录）</span>
+<span class="ps">$</span> <span class="cmd">svn status | Select-String "^!" | % { svn delete --force $_.ToString().Substring(8).Trim() }</span></pre>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">铁律：删除文件永远用 svn delete，不要用 rm</span>
+  <p>同理，<strong>重命名永远用 <code class="ic">svn move</code>，不要用 <code class="ic">mv</code> / 右键重命名</strong>。
+  原因见第 22 节：<code class="ic">svn move</code> 会记录「这是同一次移动」，历史才不会断；
+  而 <code class="ic">mv</code> 在 SVN 看来是「删了一个文件 + 加了一个新文件」，追溯历史时会断掉。</p>
+</div>
+
+<!-- ==========================================================================
+     第 8 节：日常开发循环
+     ========================================================================== -->

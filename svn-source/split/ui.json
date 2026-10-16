@@ -1,0 +1,16 @@
+{
+  "brand": "SVN 完全教程",
+  "brandSub": "图文详解版 · 基于 SVN 1.14 实测",
+  "overview": "总目录",
+  "overviewEn": "Overview",
+  "section": "第",
+  "sectionEnd": "节",
+  "prev": "← 上一节",
+  "next": "下一节 →",
+  "first": "已是第一节",
+  "last": "已是最后一节",
+  "navGroup": "快速跳转",
+  "titleSuffix": " — SVN 完全教程",
+  "top": "回到顶部",
+  "footerHint": "本教程全部命令与输出基于 Subversion 1.14.5 真实环境实测。"
+}

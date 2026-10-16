@@ -1,0 +1,152 @@
+<h3 class="sec" id="s3"><span class="no">3</span>安装与环境准备</h3>
+
+<h4 class="sub">Windows：三种安装方式</h4>
+
+<div class="grid3">
+  <div class="card blue">
+    <h6>方式一：SlikSVN（只装命令行）</h6>
+    <p>最纯净，只有 <code class="ic">svn</code> 和 <code class="ic">svnadmin</code> 命令，安装包约 10MB。</p>
+    <p>适合：服务器、CI 机器、只要命令行的人。</p>
+    <p><a class="ref" href="https://sliksvn.com/download/" target="_blank" rel="noreferrer">sliksvn.com/download</a></p>
+  </div>
+  <div class="card pur">
+    <h6>方式二：VisualSVN Server</h6>
+    <p>一站式服务端，自带图形管理器 + Apache，Web 界面可视化管理仓库与用户。</p>
+    <p>适合：要搭服务器的 Windows 团队（<strong>推荐</strong>）。</p>
+    <p><a class="ref" href="https://www.visualsvn.com/server/download/" target="_blank" rel="noreferrer">visualsvn.com/server</a></p>
+  </div>
+  <div class="card green">
+    <h6>方式三：TortoiseSVN（图形外壳）</h6>
+    <p>集成到资源管理器右键菜单，不提供命令行工具（需勾选 <code class="ic">command line client tools</code>）。</p>
+    <p>适合：不习惯命令行的 GUI 用户。</p>
+    <p><a class="ref" href="https://tortoisesvn.net/downloads.html" target="_blank" rel="noreferrer">tortoisesvn.net</a></p>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">TortoiseSVN 安装时的一个坑</span>
+  <p>安装向导默认<strong>不勾选</strong>「command line client tools」。
+  如果你既想要右键菜单、又想在脚本里用 <code class="ic">svn</code> 命令，安装时必须手动选上这一项，
+  否则会在命令行里看到 <code class="ic">'svn' 不是内部或外部命令</code>。</p>
+</div>
+
+<h4 class="sub">Linux：包管理器一行搞定</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">安装客户端 + 服务端</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"># Debian / Ubuntu
+sudo apt update &amp;&amp; sudo apt install -y <span class="a">subversion</span>
+
+# RHEL / CentOS / Rocky
+sudo dnf install -y <span class="a">subversion</span>
+
+# 顺便装上命令行补全工具（强烈推荐，能补全子命令和参数）
+sudo apt install -y subversion-tools
+# 或
+sudo dnf install -y subversion-tools
+
+# 验证
+svn --version --quiet          <span class="c"># 只输出版本号，脚本里好用</span>
+svn --version -q               <span class="c"># 等价简写</span>
+which svn svnadmin svnserve svnlook</pre>
+</div>
+
+<h4 class="sub">macOS：Homebrew</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">macOS 安装</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># macOS 自带的是很老的 1.7/1.8，务必用 brew 装新的</span>
+brew install <span class="a">subversion</span>
+
+<span class="c"># 确认用到的是 brew 版本而不是系统自带</span>
+which svn
+<span class="c"># 期望输出：/opt/homebrew/bin/svn  （而不是 /usr/bin/svn）</span>
+
+<span class="c"># 如果还是系统的，把它加入 PATH 最前面</span>
+export PATH="/opt/homebrew/opt/subversion/bin:$PATH"</pre>
+</div>
+
+<h4 class="sub">验证安装：一个自检脚本</h4>
+
+<p>装完别急着往下走，先跑这个自检——它能一次性告诉你客户端、服务端工具、协议支持是否齐全。</p>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">check-svn.sh　自检脚本</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c">#!/usr/bin/env bash</span>
+<span class="c"># SVN 环境自检：确认客户端、服务端工具链、协议模块是否齐全</span>
+set -u
+
+echo <span class="s">"===== 1. 四个核心可执行文件 ====="</span>
+<span class="k">for</span> bin in svn svnadmin svnserve svnlook; <span class="k">do</span>
+  <span class="k">if</span> command -v <span class="s">"$bin"</span> &gt;/dev/null 2&gt;&amp;1; <span class="k">then</span>
+    printf <span class="s">"  [OK]   %-10s %s\n"</span> <span class="s">"$bin"</span> <span class="s">"$(command -v "$bin")"</span>
+  <span class="k">else</span>
+    printf <span class="s">"  [MISS] %-10s 未安装\n"</span> <span class="s">"$bin"</span>
+  <span class="k">fi</span>
+<span class="k">done</span>
+
+echo
+echo <span class="s">"===== 2. 客户端版本 ====="</span>
+svn --version --quiet
+
+echo
+echo <span class="s">"===== 3. 仓库访问模块（协议支持）====="</span>
+svn --version | grep -E <span class="s">'^\* ra_'</span> || echo <span class="s">"  (未检测到 ra_ 模块，异常)"</span>
+
+echo
+echo <span class="s">"===== 4. 服务端工具版本 ====="</span>
+svnadmin --version --quiet
+svnserve --version --quiet
+svnlook --version --quiet
+
+echo
+echo <span class="s">"===== 5. 可用子命令总数 ====="</span>
+printf <span class="s">"  svn      : %s 个\n"</span> <span class="s">"$(svn help | grep -cE '^   [a-z]')"</span>
+printf <span class="s">"  svnadmin : %s 个\n"</span> <span class="s">"$(svnadmin help | grep -cE '^   [a-z]')"</span>
+
+echo
+echo <span class="s">"自检完成。"</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：自检脚本在 SVN 1.14.5 上的输出</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">bash</span></div>
+<pre><span class="ps">$</span> <span class="cmd">bash check-svn.sh</span>
+===== 1. 四个核心可执行文件 =====
+  <span class="ok">[OK]</span>   svn        /usr/bin/svn
+  <span class="ok">[OK]</span>   svnadmin   /usr/bin/svnadmin
+  <span class="ok">[OK]</span>   svnserve   /usr/bin/svnserve
+  <span class="ok">[OK]</span>   svnlook    /usr/bin/svnlook
+
+===== 2. 客户端版本 =====
+<span class="hl">1.14.5</span>
+
+===== 3. 仓库访问模块（协议支持）=====
+<span class="ok">* ra_svn</span> : Module for accessing a repository using the svn network protocol.
+<span class="ok">* ra_local</span> : Module for accessing a repository on local disk.
+<span class="ok">* ra_serf</span> : Module for accessing a repository via WebDAV protocol using serf.
+
+===== 4. 服务端工具版本 =====
+1.14.5
+1.14.5
+1.14.5
+
+===== 5. 可用子命令总数 =====
+  svn      : <span class="hl">49</span> 个
+  svnadmin : <span class="hl">31</span> 个
+
+自检完成。</pre>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">Windows 用户注意路径写法</span>
+  <p>本教程的命令在 Windows PowerShell / CMD 与 Linux bash 下<strong>完全通用</strong>，
+  唯一要改的是本地路径：Windows 是 <code class="ic">E:\repo</code>，Linux 是 <code class="ic">/var/svn/repo</code>。
+  而 URL 里的本地路径<strong>必须</strong>写成 <code class="ic">file:///E:/repo</code> 这种形式（三斜杠 + 盘符 + 正斜杠）。</p>
+</div>
+
+<!-- ==========================================================================
+     第二阶段 · 第 4 节：仓库 / 版本号 / 工作副本
+     ========================================================================== -->

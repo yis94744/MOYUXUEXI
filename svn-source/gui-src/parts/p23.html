@@ -1,0 +1,222 @@
+<h3 class="sec" id="s23"><span class="no">23</span>设置面板：常用选项怎么调</h3>
+
+<p class="lead">
+  TortoiseSVN 的默认设置是按「大多数人的大多数场景」定的，但总有几项不合你的习惯：
+  右键菜单长得看不到底、换了账号一直提示认证失败、版本图认不出哪条是主干……
+  这些都藏在<strong>设置面板</strong>里，调一次长期受益。
+</p>
+
+<div class="box key">
+  <span class="bt">设置面板是全局的</span>
+  <p>这里的每一项都是<strong>对你本机所有项目生效</strong>的，不是针对某一个工作副本。
+  所以：</p>
+  <ul>
+    <li><strong>每台机器只调一次</strong>就够了，不用每个项目重配。</li>
+    <li><strong>只影响你自己</strong>，不会改变服务器上的任何东西，也不会影响同事。
+    <em>放心大胆地试——大不了改回来。</em></li>
+    <li><strong>建议先挑最影响日常的两三项改掉</strong>（精简右键菜单、清除认证数据），
+    其余的等真遇到问题了再回来翻。</li>
+  </ul>
+</div>
+
+<h4 class="sub">怎么打开设置</h4>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">SETTINGS</span>打开设置面板</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">在资源管理器的任意空白处右键</span>
+      <span class="sc">文件夹里的空白区域、桌面上、或者某个文件夹图标上都可以。
+      <strong>不需要是工作副本</strong>——设置面板在哪儿都能打开。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">进入 TortoiseSVN → Settings</span>
+      <span class="sc">走 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Settings</span></span>，
+      打开设置对话框。<em>这是所有本机选项的总入口，不认识的功能先来这里找。</em></span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">记住「左分类、右内容」的结构</span>
+      <span class="sc">左边是分类树，点哪个分类，右边就显示那一类的选项。
+      <strong>设置本身不是「一次性配完」的</strong>，遇到问题再回来翻对应的分类就行。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">改完一定要点确定</span>
+      <span class="sc">点 <code class="ic">OK</code> 或 <code class="ic">Apply</code> 才会生效。
+      <em>有些改动（尤其是图标覆盖相关）需要重启资源管理器、甚至重新登录才完全生效。</em></span>
+    </div>
+  </div>
+</div>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">设置面板主界面</span><span class="fs">Settings</span></div>
+  <div class="sb"><img src="img/SettingsMain.png" alt="TortoiseSVN 设置主界面" class="mid"></div>
+  <div class="cap">
+    <b>① 左侧 · 分类树</b>——设置按用途分成一组一组的分类，从上到下大致是：
+    常规（<span class="k">General</span>）、右键菜单（<span class="k">Context Menu</span>）、
+    图标覆盖（<span class="k">Icon Overlays</span>）、对话框（<span class="k">Dialogs</span>）、
+    比对工具（<span class="k">Diff Viewer</span>）、保存的数据（<span class="k">Saved Data</span>）、
+    外部程序（<span class="k">External Programs</span>）等等。
+    <strong>名字就是它管什么的直观说明</strong>，不用背。<br><br>
+
+    <b>② 右侧 · 选项区</b>——选中左侧某个分类后，这里显示它下面的全部选项：
+    下拉框、勾选框、文本框，改完点确定即可。
+    <em>选项比一屏多的时候，右边会有自己的滚动条。</em><br><br>
+
+    <b>③ 下方 · OK / Cancel / Apply</b>——
+    <b>Apply</b> 是「应用但不关窗」，适合连续调几项之后再一起确认；
+    <b>OK</b> 是应用并关闭。<strong>改完顺手点一下，别直接叉掉窗口</strong>——
+    那样改动不会保存。<br><br>
+
+    <b>④ 分类之间的跳转不用重开</b>——点左边另一项，右边立刻切过去，
+    所以「调图标覆盖顺带看一下比对工具」这类来回对比很方便。<br><br>
+
+    <em>小提示：不同版本里分类的排列和个别名称会略有差异，但「左边选类、右边选值」这个结构是不变的。</em>
+  </div>
+</div>
+
+<h4 class="sub">最值得改的几项</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:150px">分类</th><th style="width:210px">它管什么</th><th>值得动的地方</th></tr></thead>
+<tbody>
+  <tr>
+    <td><code class="ic">General</code><br><span class="tagmini b">常规</span></td>
+    <td>界面语言、日志显示的编码、更新相关的基础行为。</td>
+    <td><strong>语言不对</strong>（界面是英文想换中文，或反之）；
+    <strong>提交说明里中文显示成乱码</strong>时调整日志编码。</td>
+  </tr>
+  <tr>
+    <td><code class="ic">Context Menu</code><br><span class="tagmini b">右键菜单</span></td>
+    <td>哪些命令出现在右键菜单顶层，哪些收进 <code class="ic">TortoiseSVN</code> 子菜单，哪些干脆隐藏。</td>
+    <td><strong>菜单太长找不到常用项</strong>时，把天天用的往顶层提，
+    偶尔用的收进子菜单，从不用的直接隐藏。<em>见效最快的一项。</em></td>
+  </tr>
+  <tr>
+    <td><code class="ic">Icon Overlays</code><br><span class="tagmini b">图标覆盖</span></td>
+    <td>文件图标上的角标怎么显示：显示哪些状态、排除哪些目录、怎么算文件夹的状态。</td>
+    <td><strong>角标不显示或显示太慢</strong>时：把大而无用的目录（如编译输出目录）
+    排除掉，减少扫描量。</td>
+  </tr>
+  <tr>
+    <td><code class="ic">Dialogs</code><br><span class="tagmini b">对话框</span></td>
+    <td>各个对话框里的默认勾选状态：提交时默认勾什么、更新后是否自动关闭进度窗口等。</td>
+    <td>不想每次提交都重新勾一遍同样的选项——
+    <strong>把习惯的默认值固化下来</strong>。</td>
+  </tr>
+  <tr>
+    <td><code class="ic">Saved Data</code><br><span class="tagmini r">保存的数据</span></td>
+    <td>本机缓存的凭据、历史记录、URL 历史、日志缓存等。</td>
+    <td><strong>换账号、改密码后认证失败时清除认证数据</strong>——这是整个设置面板里使用频率最高的一格。</td>
+  </tr>
+  <tr>
+    <td><code class="ic">Diff Viewer</code><br><span class="tagmini b">比对工具</span></td>
+    <td>用哪个程序来做文件比对（默认是自带的 TortoiseMerge）。</td>
+    <td>团队统一用别的比对软件（如 Beyond Compare）时，
+    在这里替换成它，之后右键的比对都会走那个工具。</td>
+  </tr>
+  <tr>
+    <td><code class="ic">Revision Graph</code><br><span class="tagmini b">版本图</span></td>
+    <td>版本拓扑图怎么识别分支、怎么分类显示。</td>
+    <td><strong>版本图里一堆节点挤在一起、认不出 trunk/branches/tags</strong>时，
+    调整分类模式让图变得清爽。</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<h4 class="sub">图标覆盖：角标显示的控制台</h4>
+
+<p>
+  角标看着简单，背后是 TortoiseSVN 在<strong>实时扫描你的文件夹</strong>。
+  扫描范围太大，就会出现「角标半天才出来」「资源管理器明显卡顿」这类问题，
+  所以在图标覆盖里做取舍是值得的。
+</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">图标覆盖设置</span><span class="fs">Icon Overlays</span></div>
+  <div class="sb"><img src="img/SettingsOverlay.png" alt="图标覆盖设置" class="mid"></div>
+  <div class="cap">
+    <b>① 覆盖显示的范围</b>——可以选择角标在哪些位置生效（网络驱动器、可移动设备、本地磁盘）。
+    <strong>把用不上的类型去掉，能明显减少扫描负担</strong>。
+    <em>比如从不在网络盘上开发，就可以把对应项关掉。</em><br><br>
+
+    <b>② <span class="k">Exclude paths</span> · 排除路径</b>——这一栏比上面那栏更实用。
+    把<strong>不需要角标的目录</strong>填进去，TortoiseSVN 就不再扫描它们。
+    典型该排除的：编译输出目录、依赖包目录、日志目录、临时目录。
+    <em>大项目里这一项能省下大量时间。</em><br><br>
+
+    <b>③ <span class="k">Status cache</span> · 状态缓存</b>——角标之所以能立刻显示，
+    是因为后台有一份状态缓存。这里有几种缓存模式可选，
+    默认的自动模式对绝大多数人都是最优的。<strong>除非有明确理由，不要改它。</strong><br><br>
+
+    <b>④ <span class="k">Overlay handlers</span> · 角标样式</b>——
+    可以调整角标用哪一套图形、以及它们之间的优先级。
+    装了网盘、云同步之类的软件时，它们的角标会和 SVN 的抢位置，
+    <em>在这里可以调整优先级，做法见下面的常见问题。</em>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">高频需求一：右键菜单太长怎么精简</span>
+  <p>装完之后右键菜单里会多出一大串项目，很多你一年也用不上一次。<strong>精简它的入口在 <code class="ic">Context Menu</code> 分类里。</strong></p>
+  <p>菜单配置区通常分两栏——<strong>左边是「显示在顶层菜单」的项，右边是「收进 TortoiseSVN 子菜单」的项</strong>，中间用箭头按钮来回移动。</p>
+  <p><strong>把每天都要用的留在顶层</strong>：更新、提交、看改动；<strong>把偶尔用的移到子菜单</strong>：属性、加锁、导出、创建补丁；<strong>把基本不用的</strong>（比如与某类文件的关联操作）<strong>隐藏掉</strong>——这一项通常也在同一个界面里可以勾选控制。</p>
+  <p><strong>不要一次砍太狠</strong>。先把最没用的隐藏三五个，用一两周习惯了再继续调。<em>一个短菜单是你自己用得顺，不是越短越好。</em></p>
+</div>
+
+<div class="box tip">
+  <span class="bt">高频需求二：换了账号密码，一直提示认证失败</span>
+  <p>症状很典型：明明知道新密码是对的，输了还是失败；或者压根<strong>不弹输入框，直接报认证错误</strong>。原因几乎总是同一个——<strong>本机缓存着旧凭据，TortoiseSVN 拿着旧的去请求，服务器自然不认</strong>，你都没有机会输入新的，因为它根本没问。</p>
+  <p>解决办法：右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Settings</span></span> → 左侧选 <code class="ic">Saved Data</code> → 在 <code class="ic">Authentication data</code> 那一行点右边的 <code class="ic">Clear</code> 按钮 → 点 <code class="ic">OK</code> 关闭 → 回到工作副本做一次更新或提交，<strong>这时会重新弹出登录框</strong>，输入新账号密码即可。</p>
+  <p><em>顺手提醒：在同一页上还有 URL 历史、日志缓存之类的清理按钮。如果发现地址下拉框里堆着一堆早就废弃的地址，也可以在这里一起清掉。</em></p>
+</div>
+
+<h4 class="sub">外部程序：让 TortoiseSVN 用你熟悉的工具</h4>
+
+<p>
+  设置面板里的 <code class="ic">External Programs</code> 一栏，用来指定
+  「做某件事时该调哪个程序」。它涉及的场景不少，但平时基本不用动——
+  <strong>默认值已经把该配的配好了</strong>。
+</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">外部程序设置</span><span class="fs">External Programs</span></div>
+  <div class="sb"><img src="img/SettingsProgs.png" alt="外部程序设置" class="mid"></div>
+  <div class="cap">
+    这一页里排着好几组下拉框，每组对应一类操作要调用的程序：<br>
+    <b>① 合并工具</b>——解决冲突时用哪个程序打开。默认是自带的 <span class="k">TortoiseMerge</span>，用顺手了就别换。<br>
+    <b>② 比对工具</b>——比较两个版本时用哪个。<em>和上一页的 Diff Viewer 分类是同一件事的不同入口。</em><br>
+    <b>③ 差异查看 / 合并查看</b>——有的版本里把它们合并成一组。<strong>看你们团队的约定</strong>：如果全组都用某一个第三方工具，在这里统一指定，大家的操作体验一致。<br>
+    <b>④ 编辑器</b>——点「编辑」类命令时用哪个程序打开文件。想让双击行为符合习惯，就把它指到你常用的编辑器。<br><br>
+    <em>每一项后面通常都有一个浏览按钮，用文件对话框选程序，不用手写路径。改错了想恢复，把下拉框切回默认值即可。</em>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">改设置有两条底线</span>
+  <p><strong>一次只改一项，改完马上验证。</strong>同时改五六项，出问题时你没法判断是哪一项引起的。<em>尤其是图标覆盖和外部程序这两类，改完立刻打开一个工作副本看看效果。</em></p>
+  <p><strong>把「清除认证数据」当成日常操作，别当危险操作。</strong>它只清本机缓存的登录信息，<strong>不会动服务器上的任何数据，也不会动你的代码</strong>，清完之后下一次连接重新输一次密码而已。<em>遇到「明明密码对却连不上」，第一反应就应该是它。</em></p>
+</div>
+
+<div class="box ok">
+  <span class="bt">建议现在就去改的三项</span>
+  <p><strong>① 精简右键菜单</strong>（<code class="ic">Context Menu</code>）——把顶层只留下更新、提交、看改动这三四个，<em>每天都会受益。</em></p>
+  <p><strong>② 排除大目录的角标扫描</strong>（<code class="ic">Icon Overlays</code>）——把编译输出、依赖包目录加进排除列表，<em>资源管理器会明显轻快。</em></p>
+  <p><strong>③ 确认比对工具符合团队习惯</strong>（<code class="ic">Diff Viewer</code> / <code class="ic">External Programs</code>）——如果全组约定用同一个第三方工具，就都改成一致的，<em>免得别人说的画面你这边对不上。</em></p>
+  <p>其余的分类可以先放着，等真遇到对应问题再回来——<strong>设置面板不是让你一次背下来的东西。</strong></p>
+</div>

@@ -1,0 +1,131 @@
+<h3 class="sec" id="s17"><span class="no">17</span>服务端部署：方案选型</h3>
+
+<p class="lead">
+  服务端怎么搭，取决于三件事：<strong>要什么协议、要不要精细权限、运维能力如何</strong>。
+  这一节先把三条路线摊开对比，再手把手走一遍最常用的 <code class="ic">svnserve</code> 路线。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 17-1　三种部署方案的架构对比</span><span class="fs">Deployment</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 480" width="980" height="480" role="img" aria-label="SVN 三种服务端部署方案对比图">
+  <!-- 方案 A：svnserve -->
+  <text class="hd" x="30" y="30" fill="#d2a8ff">方案 A：svnserve（轻量，内网首选）</text>
+  <rect x="24" y="44" width="300" height="196" rx="11" fill="rgba(210,168,255,.06)" stroke="#d2a8ff" stroke-width="1.4"/>
+
+  <rect class="c-gray" x="44" y="64" width="120" height="40" rx="8"/>
+  <text class="tm2" x="104" y="89" text-anchor="middle">svn 客户端</text>
+
+  <path class="arwp" d="M164,84 L214,84"/>
+  <text class="tm2" x="189" y="74" text-anchor="middle">svn://3690</text>
+
+  <rect class="c-pur" x="214" y="64" width="92" height="40" rx="8"/>
+  <text class="tm2" x="260" y="89" text-anchor="middle">svnserve</text>
+
+  <path class="arwp" d="M260,104 L260,124"/>
+  <rect class="c-pur" x="192" y="124" width="136" height="38" rx="8"/>
+  <text class="tm2" x="260" y="148" text-anchor="middle">仓库 Repository</text>
+
+  <text class="ts" x="44" y="184">优点：</text>
+  <text class="ts" x="44" y="204">• 极简，一个进程搞定，无额外依赖</text>
+  <text class="ts" x="44" y="224">• 性能好（原生协议，开销小）</text>
+
+  <text class="ts" x="44" y="248" fill="#ffa657">局限：明文传输，无 SSL；认证靠 passwd 文件</text>
+
+  <!-- 方案 B：Apache -->
+  <text class="hd" x="340" y="30" fill="#58a6ff">方案 B：Apache + mod_dav_svn（企业首选）</text>
+  <rect x="334" y="44" width="300" height="196" rx="11" fill="rgba(88,166,255,.06)" stroke="#58a6ff" stroke-width="1.4"/>
+
+  <rect class="c-gray" x="354" y="64" width="120" height="40" rx="8"/>
+  <text class="tm2" x="414" y="89" text-anchor="middle">svn 浏览器 客户端</text>
+
+  <path class="arwb" d="M474,84 L524,84"/>
+  <text class="tm2" x="499" y="70" text-anchor="middle">https://443</text>
+  <text class="tm2" x="499" y="100" text-anchor="middle">SSL加密</text>
+
+  <rect class="c-blue" x="524" y="64" width="92" height="40" rx="8"/>
+  <text class="tm2" x="570" y="89" text-anchor="middle">Apache</text>
+
+  <path class="arwb" d="M570,104 L570,124"/>
+  <rect class="c-blue" x="502" y="124" width="136" height="38" rx="8"/>
+  <text class="tm2" x="570" y="148" text-anchor="middle">mod_dav_svn</text>
+
+  <path class="arwb" d="M570,162 L570,176"/>
+  <rect class="c-blue" x="502" y="176" width="136" height="38" rx="8"/>
+  <text class="tm2" x="570" y="200" text-anchor="middle">仓库</text>
+
+  <text class="ts" x="354" y="234">优点：HTTPS 加密、可接 AD/LDAP、走 80/443 过防火墙</text>
+
+  <!-- 方案 C：VisualSVN -->
+  <text class="hd" x="650" y="30" fill="#7ee787">方案 C：VisualSVN Server（Windows 图形化）</text>
+  <rect x="644" y="44" width="310" height="196" rx="11" fill="rgba(126,231,135,.06)" stroke="#7ee787" stroke-width="1.4"/>
+
+  <rect class="c-gray" x="664" y="64" width="120" height="40" rx="8"/>
+  <text class="tm2" x="724" y="89" text-anchor="middle">TortoiseSVN</text>
+
+  <path class="arwg" d="M784,84 L834,84"/>
+  <text class="tm2" x="809" y="74" text-anchor="middle">https://443</text>
+
+  <rect class="c-green" x="834" y="64" width="100" height="40" rx="8"/>
+  <text class="tm2" x="884" y="82" text-anchor="middle">VisualSVN</text>
+  <text class="tm2" x="884" y="98" text-anchor="middle">Server</text>
+
+  <rect class="c-green" x="812" y="124" width="122" height="90" rx="8"/>
+  <text class="tm2" x="873" y="148" text-anchor="middle">图形管理器</text>
+  <text class="tm2" x="873" y="170" text-anchor="middle">内嵌 Apache</text>
+  <text class="tm2" x="873" y="192" text-anchor="middle">Windows 认证集成</text>
+
+  <path class="arwg" d="M884,104 L884,124"/>
+
+  <text class="ts" x="664" y="234">优点：点鼠标就配好，无需手写配置；免费版够用</text>
+
+  <!-- 对比表 -->
+  <rect x="24" y="264" width="930" height="200" rx="11" fill="#0b0f14" stroke="#30363d" stroke-width="1.3"/>
+
+  <text class="hd" x="44" y="290" fill="#e6edf3">选型对照表</text>
+  <line x1="44" y1="302" x2="934" y2="302" stroke="#3d444d" stroke-width="1"/>
+
+  <text class="hd" x="60" y="326" fill="#8b949e">维度</text>
+  <text class="hd" x="250" y="326" fill="#d2a8ff">svnserve</text>
+  <text class="hd" x="450" y="326" fill="#58a6ff">Apache</text>
+  <text class="hd" x="660" y="326" fill="#7ee787">VisualSVN</text>
+
+  <line x1="44" y1="338" x2="934" y2="338" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tx" x="60" y="360">配置复杂度</text>
+  <text class="ts" x="250" y="360" fill="#7ee787">低（改 3 个文件）</text>
+  <text class="ts" x="450" y="360" fill="#ffa657">中（Apache 配置）</text>
+  <text class="ts" x="660" y="360" fill="#7ee787">极低（图形界面）</text>
+
+  <text class="tx" x="60" y="384">传输加密</text>
+  <text class="ts" x="250" y="384" fill="#ff7b72">无（需 SSH 隧道）</text>
+  <text class="ts" x="450" y="384" fill="#7ee787">原生 HTTPS</text>
+  <text class="ts" x="660" y="384" fill="#7ee787">原生 HTTPS</text>
+
+  <text class="tx" x="60" y="408">认证方式</text>
+  <text class="ts" x="250" y="408">passwd 文件</text>
+  <text class="ts" x="450" y="408">文件 / LDAP / AD</text>
+  <text class="ts" x="660" y="408">Windows 账号 / AD</text>
+
+  <text class="tx" x="60" y="432">精细权限（目录级）</text>
+  <text class="ts" x="250" y="432" fill="#7ee787">支持（authz）</text>
+  <text class="ts" x="450" y="432" fill="#7ee787">支持（authz）</text>
+  <text class="ts" x="660" y="432" fill="#7ee787">支持（图形配置）</text>
+
+  <text class="tx" x="60" y="456">适用规模</text>
+  <text class="ts" x="250" y="456">5-50 人内网团队</text>
+  <text class="ts" x="450" y="456">50 人以上 / 有合规要求</text>
+  <text class="ts" x="660" y="456">Windows 环境团队</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>决策建议：</b>内网小团队、追求省事 → <strong>svnserve</strong>；
+    需要加密或对接域账号、公司有安全审计 → <strong>Apache</strong>；
+    Windows 环境、没人愿意碰配置文件 → <strong>VisualSVN Server</strong>。
+    三者可以共存（比如内网用 svnserve，外网出口用 Apache），仓库目录是同一份。
+  </div>
+</div>
+
+<!-- ==========================================================================
+     第 18 节：svnserve 部署
+     ========================================================================== -->

@@ -1,0 +1,172 @@
+<h3 class="sec" id="s5"><span class="no">5</span>查看改动：哪些文件变了</h3>
+
+<p class="lead">
+  提交之前，你必须先回答一个问题：<strong>这次到底改了哪些文件？</strong>
+  凭记忆是靠不住的——你可能顺手改了个配置文件自己都忘了，也可能留了一堆临时文件在待提交列表里。
+  这一节讲的，就是提交前的那次「自查」。
+</p>
+
+<div class="box key">
+  <span class="bt">为什么要自查：两个真实存在的风险</span>
+  <ul>
+    <li><strong>漏提。</strong>该交的文件没交上去，同事更新完发现项目跑不起来，回头来找你——这种问题查起来极费时间。</li>
+    <li><strong>多提。</strong>把本机的调试配置、编译产物、临时备份文件一起交上去，轻则污染仓库，重则把别人的配置覆盖掉（尤其是那种「配置只该存在于本机」的文件）。</li>
+  </ul>
+  <p>自查一次只要十几秒，能挡掉这两类问题。所以<strong>每次提交前都扫一眼</strong>，慢慢就变成肌肉记忆了。</p>
+</div>
+
+<h4 class="sub">打开「检查修改」对话框</h4>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">CHECK</span>看看本地到底有哪些改动</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">对着项目文件夹（或子文件夹）点右键</span><span class="sc">对哪个文件夹右键，就检查哪个范围。<strong>对着项目根目录右键</strong>最稳妥，一次看全；只想看某个模块，就对着那个子文件夹右键。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">点菜单顶层的 SVN Check for modifications</span><span class="sc">在右键菜单<strong>最顶层</strong>、带 <code class="ic">SVN</code> 前缀的那一组里，位置和 <code class="ic">SVN Update</code>、<code class="ic">SVN Commit...</code> 挨着。这是唯一<strong>不会改动任何东西</strong>的操作，随便点，点错也没关系。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">看窗口中间的改动列表</span><span class="sc">每一行是一个文件，<strong>Status 列</strong>告诉你它怎么了，<strong>Text status 列</strong>告诉你内容有没有变。见下方截图逐列解说。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">想看某个文件具体改了什么，双击它</span><span class="sc">会立刻打开比对窗口，把<strong>你改的那几行</strong>标出来。不确定某个文件该不该提交时，双击看一眼最靠谱（第 6 节详讲）。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">想看服务器上有没有新东西，点 Check repository</span><span class="sc">默认这个窗口只反映<strong>本地</strong>状态——它不会主动连服务器。点一下 <code class="ic">Check repository</code> 按钮，它会去问服务器，把<strong>远程的状态</strong>也填进列表里。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">看右下角的统计和版本号</span><span class="sc">统计行把「多少个文件是正常的、多少个被改了、多少个冲突」一次列清。<strong>只要 <code class="ic">conflicted</code> 不是 0，就必须先处理冲突再提交。</strong></span></div>
+  </div>
+</div>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">检查修改对话框（Check for modifications）</span><span class="fs">Working Copy Status</span></div>
+  <div class="sb"><img src="img/RepoStatus.png" alt="检查修改对话框"></div>
+  <div class="cap">
+    窗口标题是 <span class="k">工作副本路径 - Working Copy - TortoiseSVN</span>，表示这是「当前工作副本的状态总览」。逐块看：<br><br>
+    <b>① 主体列表</b>，每行一个文件，列的含义分别是一—<br>
+    <span class="k">Path</span>：文件或目录在工作副本里的相对路径。前面那个小图标就是<strong>角标</strong>，一眼能看出是「已修改」还是「未版本控制」。<br>
+    <span class="k">Extension</span>：扩展名，用来快速判断这是代码、配置还是资源文件。<br>
+    <span class="k">Status</span>：这一项的<strong>总体状态</strong>，常见值有 <span class="k">normal</span>（正常）、<span class="k">modified</span>（已修改）、<span class="k">added</span>（已添加）、<span class="k">deleted</span>（已删除）、<span class="k">missing</span>（文件不见了）、<span class="k">conflicted</span>（冲突）、<span class="k">non-versioned</span>（未纳入版本控制）。<br>
+    <span class="k">Remote status</span>：<strong>服务器上</strong>这一项的状态。不点 <span class="k">Check repository</span> 时它多半是空的或 <span class="k">normal</span>。<br>
+    <span class="k">Text status</span>：<strong>文件内容</strong>有没有变。这里出现 <span class="k">modified</span> 说明内容确实被你改了。<br>
+    <span class="k">Property status</span>：文件的<strong>属性</strong>（比如忽略规则、换行符设置、锁）有没有变。内容没改但属性改了，这里也会显示 <span class="k">modified</span>。<br>
+    <span class="k">Remote text st...</span> / <span class="k">Remote property st...</span>：服务器端的内容与属性状态，右侧被窗口挡住了，横向拉一下就能看全。<br><br>
+    <b>② Items to show（显示哪些条目）</b>——这一组勾选框决定了列表里<strong>出现什么</strong>：<span class="k">Directories</span> 目录 &nbsp;/&nbsp; <span class="k">Files</span> 文件 &nbsp;/&nbsp; <span class="k">Unversioned</span> 未纳入版本控制的 &nbsp;/&nbsp; <span class="k">Unmodified</span> 没改动的 &nbsp;/&nbsp; <span class="k">Ignored</span> 被忽略的 &nbsp;/&nbsp; <span class="k">Properties</span> 属性变化 &nbsp;/&nbsp; <span class="k">Items in externals</span> 外部引用里的条目。<br>
+    <em>日常自查的推荐勾法是：勾 Files、Unversioned、Properties，取消 Unmodified 和 Ignored。</em>这样可以一次看到「改过的文件 + 冒出来的新文件」，既不会被几千个正常文件刷屏，也不会漏掉该 Add 的新文件。<br><br>
+    <b>③ 右下角统计区</b>——最该看的地方：<span class="k">normal=12010</span> 正常文件数 &nbsp; <span class="k">non-versioned=1</span> 未版本控制 &nbsp; <span class="k">modified=328</span> 已修改 &nbsp; <span class="k">added=10</span> 待添加 &nbsp; <span class="k">deleted=3</span> 待删除 &nbsp; <span class="k">conflicted=0</span> <strong>冲突数</strong> &nbsp; <span class="k">Switched=0</span> 被切换过的目录数。<br>
+    <em>提交前扫一眼这行：conflicted 必须是 0。</em><br><br>
+    <span class="k">Lowest shown revision: 9323</span> / <span class="k">Highest shown revision: 29019</span>：当前列表里出现的<strong>最低与最高版本号</strong>——数字不一样说明你的工作副本里混着不同版本的文件，这在刚更新完、或者只更新了部分目录时很常见。<br>
+    <span class="k">HEAD revision: 29337</span>：<strong>服务器当前的最新版本号</strong>。它比 Highest shown 大，就说明<strong>你落后了</strong>，该更新了。<br><br>
+    <b>④ 底部按钮</b>：<br>
+    <span class="k">Refresh</span> 重新收集一遍本地状态（比如你刚在别的窗口改完文件，点它刷新列表）。<br>
+    <span class="k">Check repository</span> 连服务器取远程状态，见下面的技巧。<br>
+    <span class="k">OK</span> 关闭窗口——它只是个查看器，点 OK 不会提交任何东西。
+  </div>
+</div>
+
+<h4 class="sub">状态字母与图标对照</h4>
+
+<p>列表里的 <code class="ic">Status</code> 一列，和文件角标是同一套语言。把下面这张表记住，一半的沟通成本就没了。</p>
+
+<div class="tw">
+  <table>
+    <thead>
+      <tr><th>状态</th><th>列表里的显示</th><th>文件角标</th><th>含义与该怎么办</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Normal</td><td><code class="ic">normal</code></td><td><span class="tagmini g">绿色对勾</span></td><td>和仓库完全一致。不用管。（勾了 Unmodified 才会出现在列表里）</td></tr>
+      <tr><td>Modified</td><td><code class="ic">modified</code></td><td><span class="tagmini r">红色叹号</span></td><td>内容被改了，还没提交。<strong>这是你主要的提交对象。</strong></td></tr>
+      <tr><td>Added</td><td><code class="ic">added</code></td><td><span class="tagmini b">蓝色加号</span></td><td>新文件已标记「要加入版本控制」，提交后才真正进仓库。见第 7 节。</td></tr>
+      <tr><td>Deleted</td><td><code class="ic">deleted</code></td><td><span class="tagmini r">红色叉</span></td><td>已标记删除，提交后才从仓库消失。<strong>用了系统的 Delete 键，这里不会出现这一项。</strong></td></tr>
+      <tr><td>Missing</td><td><code class="ic">missing</code></td><td>—</td><td>文件在磁盘上不见了，但 SVN 还认为它存在。多半是你用资源管理器直接删了它。</td></tr>
+      <tr><td>Conflicted</td><td><code class="ic">conflicted</code></td><td><span class="tagmini y">黄底红叹号</span></td><td><strong>发生了冲突</strong>，必须先解决再提交。见第 10 节。</td></tr>
+      <tr><td>Unversioned</td><td><code class="ic">non-versioned</code></td><td><span class="tagmini c">灰色问号</span></td><td>新文件，SVN 还不认识它。<strong>二选一：Add 纳入，或 Add to ignore list 忽略。</strong></td></tr>
+      <tr><td>Ignored</td><td><code class="ic">ignored</code></td><td>无角标（变淡）</td><td>按忽略规则被排除。默认不显示，勾了 <span class="k">Ignored</span> 才看得到。</td></tr>
+      <tr><td>Locked</td><td><code class="ic">locked</code></td><td><span class="tagmini y">黄色锁</span></td><td>被你或别人加了锁。别人加的锁只有 <span class="k">Get lock</span> 里的 steal 才能抢。见第 18 节。</td></tr>
+      <tr><td>Read only</td><td><code class="ic">read-only</code></td><td><span class="tagmini y">黄色锁/只读</span></td><td>文件属性里带了 <code class="ic">svn:needs-lock</code>，<strong>要先加锁才能改</strong>。</td></tr>
+      <tr><td>Switched</td><td><code class="ic">Switched</code></td><td>—</td><td>这个目录被切换到了别的分支/路径，和周围的文件不来自同一处。见第 13 节。</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h4 class="sub">状态图标一览</h4>
+
+<p>下面这些就是你在资源管理器里会看到的角标，以及列表里对应的图标。</p>
+
+<div class="iconrow">
+  <div class="ic-card"><img src="img/ModifiedIcon.png" alt="已修改"><span class="nm">ModifiedIcon</span><span class="ds">红色叹号：改了还没提交</span></div>
+  <div class="ic-card"><img src="img/AddedIcon.png" alt="已添加"><span class="nm">AddedIcon</span><span class="ds">蓝色加号：已 Add 待提交</span></div>
+  <div class="ic-card"><img src="img/DeletedIcon.png" alt="已删除"><span class="nm">DeletedIcon</span><span class="ds">红色叉：已标记删除</span></div>
+  <div class="ic-card"><img src="img/ConflictIcon.png" alt="冲突"><span class="nm">ConflictIcon</span><span class="ds">黄底红叹号：冲突，必须处理</span></div>
+  <div class="ic-card"><img src="img/UnversionedIcon.png" alt="未版本控制"><span class="nm">UnversionedIcon</span><span class="ds">灰色问号：SVN 还不认识它</span></div>
+  <div class="ic-card"><img src="img/IgnoredIcon.png" alt="已忽略"><span class="nm">IgnoredIcon</span><span class="ds">已按规则忽略，不再提示</span></div>
+  <div class="ic-card"><img src="img/LockedIcon.png" alt="已加锁"><span class="nm">LockedIcon</span><span class="ds">黄色锁：被别人或自己锁住</span></div>
+  <div class="ic-card"><img src="img/ReadOnlyIcon.png" alt="只读"><span class="nm">ReadOnlyIcon</span><span class="ds">只读：需先加锁才能改</span></div>
+</div>
+
+<div class="box tip">
+  <span class="bt">技巧：Shift + 点 Check repository，看「服务器上有但你没检出的文件」</span>
+  <p>正常点 <code class="ic">Check repository</code>，看到的是<strong>你本地已有文件</strong>的远程状态。如果同事刚往仓库里新增了一个目录，你本地根本还没有这个东西，普通视图里就看不到。</p>
+  <p>这时候：<strong>按住 <kbd>Shift</kbd> 不放，再点 <code class="ic">Check repository</code></strong>。它会额外把<strong>仓库里有、你本地没有的条目</strong>也列出来——相当于提前拿到了一份「更新后会多出什么」的清单。</p>
+  <p>用途很实在：对着清单判断<em>要不要现在就更新</em>，免得更新到一半被人打断、或者在一个大更新前毫无心理准备。</p>
+</div>
+
+<h4 class="sub">右键菜单里能做什么</h4>
+
+<p>在列表里对着某个文件点<strong>右键</strong>，常用操作都在这里——<strong>不用关掉窗口、不用回资源管理器</strong>，能省不少来回切换的动作。</p>
+
+<div class="grid2">
+  <div class="card blue">
+    <h6>查看类（不改动任何东西）</h6>
+    <ul>
+      <li><strong>Compare with base</strong> —— 和库里的原始版本比对，看自己改了哪几行</li>
+      <li><strong>Show log</strong> —— 直接跳到这个文件的提交历史</li>
+      <li><strong>Blame...</strong> —— 逐行显示每行代码是谁改的</li>
+      <li><strong>Open / Explore to</strong> —— 用默认程序打开，或跳到所在文件夹</li>
+      <li><strong>Properties...</strong> —— 查看这个文件的属性（忽略规则、锁等）</li>
+    </ul>
+  </div>
+  <div class="card warn">
+    <h6>修改类（会改变本地状态）</h6>
+    <ul>
+      <li><strong>Revert...</strong> —— 撤销这个文件的本地改动，<em style="color:#ffa657">不可逆，改了的东西直接没了</em></li>
+      <li><strong>Add...</strong> —— 把未版本控制的文件纳入版本控制（第 7 节）</li>
+      <li><strong>Add to ignore list</strong> —— 忽略它，以后不再出现在待提交列表</li>
+      <li><strong>Delete</strong> —— 标记删除（走 SVN，保留历史）</li>
+      <li><strong>Get lock</strong> —— 加锁，二进制文件防冲突用（第 18 节）</li>
+      <li><strong>Update</strong> —— 只更新这一个文件或目录</li>
+    </ul>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">两个容易踩的点</span>
+  <ol>
+    <li><strong>这个窗口的 OK 不是提交。</strong>它纯粹是个查看器，点 OK 只是关窗口。真正的提交要去 <span class="mp">SVN <span class="ar">→</span> <span class="item">Commit...</span></span>。很多人第一次看到这个窗口，会以为点 OK 就交上去了。</li>
+    <li><strong>列表里的 Revert 不可逆。</strong>本地那些还没提交的修改会<strong>直接消失</strong>，找不回来。对着一个刚改了两小时的文件手滑点下去，就只能重做了。第 9 节会专门讲撤销的正确姿势。</li>
+  </ol>
+</div>
+
+<div class="box ok">
+  <span class="bt">提交前的十秒自查清单</span>
+  <p>按这个顺序扫一遍，心里就有底了：</p>
+  <ol>
+    <li>列表里<strong>有没有我不认识的文件</strong>？（多半是编译产物或临时文件，该加忽略）</li>
+    <li>列表里<strong>有没有该在但没在的文件</strong>？（漏提了，或者忘了 Add）</li>
+    <li>右下角 <code class="ic">conflicted</code> 是不是 <strong>0</strong>？</li>
+    <li><code class="ic">HEAD revision</code> 比 <code class="ic">Highest shown revision</code> 大吗？大就<strong>先更新</strong>。</li>
+  </ol>
+</div>

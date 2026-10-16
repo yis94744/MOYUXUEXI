@@ -1,0 +1,182 @@
+<h3 class="sec" id="s2"><span class="no">2</span>三层架构与通信协议</h3>
+
+<p>
+  SVN 的所有命令都围绕三个东西转：<strong>仓库（Repository）→ 工作副本（Working Copy）→ 暂存区（其实是本地元数据）</strong>。
+  把下面这张图刻在脑子里，后面所有命令你都能猜到它作用在哪一层。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 2-1　SVN 三层架构与数据流向</span><span class="fs">Data Flow</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 470" width="980" height="470" role="img" aria-label="SVN 三层架构与数据流向图">
+  <!-- 层 1：仓库 -->
+  <rect x="30" y="26" width="920" height="118" rx="12" fill="url(#g-pur)" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text class="hd" x="52" y="52" fill="#d2a8ff">① 服务器端 · 仓库 Repository</text>
+  <text class="ts" x="52" y="72">唯一权威数据源，保存全部历史。物理上是一个目录，内含 db / conf / hooks / locks</text>
+
+  <rect class="c-pur" x="52" y="86" width="168" height="46" rx="8"/>
+  <text class="tm" x="136" y="106" text-anchor="middle">db/</text>
+  <text class="tm2" x="136" y="122" text-anchor="middle">版本数据（FSFS）</text>
+
+  <rect class="c-pur" x="238" y="86" width="168" height="46" rx="8"/>
+  <text class="tm" x="322" y="106" text-anchor="middle">conf/</text>
+  <text class="tm2" x="322" y="122" text-anchor="middle">认证 · 权限</text>
+
+  <rect class="c-pur" x="424" y="86" width="168" height="46" rx="8"/>
+  <text class="tm" x="508" y="106" text-anchor="middle">hooks/</text>
+  <text class="tm2" x="508" y="122" text-anchor="middle">提交前后触发脚本</text>
+
+  <rect class="c-pur" x="610" y="86" width="168" height="46" rx="8"/>
+  <text class="tm" x="694" y="106" text-anchor="middle">locks/</text>
+  <text class="tm2" x="694" y="122" text-anchor="middle">锁数据</text>
+
+  <rect class="c-pur" x="796" y="86" width="134" height="46" rx="8"/>
+  <text class="tm" x="863" y="106" text-anchor="middle">format</text>
+  <text class="tm2" x="863" y="122" text-anchor="middle">仓库格式版本</text>
+
+  <!-- 层 2：协议 -->
+  <rect class="n-cyan" x="30" y="176" width="920" height="62" rx="12"/>
+  <text class="hd" x="52" y="202" fill="#56d4dd">② 通信层 · 访问协议（RA 模块）</text>
+  <text class="ts" x="52" y="222">svn 客户端通过 URL 协议前缀自动选择对应模块，三种协议对应三种部署形态</text>
+
+  <text class="tm" x="330" y="204" text-anchor="middle">file:///</text>
+  <text class="tm" x="490" y="204" text-anchor="middle">svn://</text>
+  <text class="tm" x="650" y="204" text-anchor="middle">http://</text>
+  <text class="tm" x="806" y="204" text-anchor="middle">svn+ssh://</text>
+
+  <!-- 层 3：工作副本 -->
+  <rect x="30" y="268" width="920" height="180" rx="12" fill="url(#g-blue)" stroke="#58a6ff" stroke-width="1.5"/>
+  <text class="hd" x="52" y="294" fill="#58a6ff">③ 客户端 · 工作副本 Working Copy</text>
+  <text class="ts" x="52" y="314">服务器某次快照解压出来的普通目录，外加一个 .svn 隐藏目录保存元数据</text>
+
+  <!-- .svn 内部 -->
+  <rect class="c-blue" x="52" y="330" width="300" height="100" rx="9"/>
+  <text class="tm" x="70" y="354">.svn/　← 每层目录都有，不是只有根目录</text>
+  <line x1="66" y1="366" x2="338" y2="366" stroke="#30363d" stroke-width="1"/>
+  <text class="tm2" x="70" y="386">wc.db　　　SQLite，记录 BASE 版本与状态</text>
+  <text class="tm2" x="70" y="404">pristine/　原始副本，用于 diff 与 revert</text>
+  <text class="tm2" x="70" y="422">entries　　旧格式遗留（1.7 前）</text>
+
+  <!-- 工作副本文件 -->
+  <rect class="c-gray" x="372" y="330" width="240" height="100" rx="9"/>
+  <text class="tm" x="390" y="354">你的源文件</text>
+  <line x1="386" y1="366" x2="598" y2="366" stroke="#30363d" stroke-width="1"/>
+  <text class="tm2" x="390" y="386">README.md　（被跟踪）</text>
+  <text class="tm2" x="390" y="404">src/main.cs　（被跟踪）</text>
+  <text class="tm2" x="390" y="422">build/output.dll　（? 未跟踪）</text>
+
+  <!-- 三种状态 -->
+  <rect class="c-orange" x="632" y="330" width="298" height="100" rx="9"/>
+  <text class="tm" x="650" y="354">文件的三种状态</text>
+  <line x1="646" y1="366" x2="916" y2="366" stroke="#30363d" stroke-width="1"/>
+  <circle cx="658" cy="386" r="5" fill="#8b949e"/>
+  <text class="tm2" x="672" y="390">未版本控制 ? ── 服务器不认识它</text>
+  <circle cx="658" cy="406" r="5" fill="#e3b341"/>
+  <text class="tm2" x="672" y="410">已修改 M ── 与 pristine 副本不同</text>
+  <circle cx="658" cy="426" r="5" fill="#7ee787"/>
+  <text class="tm2" x="672" y="430">已提交 ── 与服务器 BASE 一致</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>关键理解：</b><code class="ic">.svn</code> 目录<strong>不是只在根目录有一份</strong>（那是 SVN 1.6 及以前的老设计），
+    1.7 之后每一级目录都有自己的 <code class="ic">.svn</code>，元数据统一存在 <code class="ic">wc.db</code> 这个 SQLite 数据库里。
+    所以你看到 <code class="ic">.svn</code> 占空间小得反常——因为<em>历史根本没下载下来</em>，
+    真正的大头是 <code class="ic">pristine/</code> 里那些「最近一次更新时拿到的原始副本」，它只用于本地 diff 和 revert。
+  </div>
+</div>
+
+<h4 class="sub" id="s2-2">三种部署形态：URL 前缀决定一切</h4>
+
+<p>
+  SVN 客户端支持 4 种 URL 协议。你写什么前缀，就用什么方式连服务器——
+  这是新手最容易懵的地方，一张图说清：
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 2-2　四种 URL 协议与对应部署方式</span><span class="fs">Protocols</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 400" width="980" height="400" role="img" aria-label="SVN 四种访问协议对比图">
+  <!-- 表头 -->
+  <text class="hd" x="30" y="30">协议前缀</text>
+  <text class="hd" x="230" y="30">服务端要跑什么</text>
+  <text class="hd" x="480" y="30">认证方式</text>
+  <text class="hd" x="700" y="30">适用场景</text>
+  <line x1="24" y1="44" x2="960" y2="44" stroke="#3d444d" stroke-width="1.5"/>
+
+  <!-- file -->
+  <rect x="24" y="56" width="936" height="80" rx="9" fill="rgba(139,148,158,.07)" stroke="#8b949e" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text class="tm" x="42" y="82" fill="#8b949e">file:///</text>
+  <text class="tm2" x="42" y="102">本地磁盘路径</text>
+  <text class="tx" x="230" y="88">什么都不用跑</text>
+  <text class="ts" x="230" y="107">直接读本地目录</text>
+  <text class="tx" x="480" y="88">无（靠文件系统权限）</text>
+  <text class="tx" x="700" y="88">自己练习、本地脚本</text>
+  <text class="tm2" x="700" y="110">file:///E:/repo</text>
+  <text class="ts" x="42" y="126" fill="#ff7b72">注意：Windows 上必须写成 file:///E:/path，三个斜杠 + 盘符加冒号</text>
+
+  <!-- svn -->
+  <rect x="24" y="146" width="936" height="80" rx="9" fill="rgba(210,168,255,.08)" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text class="tm" x="42" y="172" fill="#d2a8ff">svn://</text>
+  <text class="tm2" x="42" y="192">SVN 原生协议</text>
+  <text class="tx" x="230" y="178">svnserve 守护进程</text>
+  <text class="ts" x="230" y="197">端口默认 3690</text>
+  <text class="tx" x="480" y="178">conf/passwd 明文账号</text>
+  <text class="tx" x="700" y="178">内网、速度快、配置最简单</text>
+  <text class="tm2" x="700" y="200">svn://192.168.1.10/repo</text>
+
+  <!-- http -->
+  <rect x="24" y="236" width="936" height="80" rx="9" fill="rgba(88,166,255,.08)" stroke="#58a6ff" stroke-width="1.5"/>
+  <text class="tm" x="42" y="262" fill="#58a6ff">http://  https://</text>
+  <text class="tm2" x="42" y="282">WebDAV 协议</text>
+  <text class="tx" x="230" y="268">Apache + mod_dav_svn</text>
+  <text class="ts" x="230" y="287">或 VisualSVN Server</text>
+  <text class="tx" x="480" y="268">Apache/AD/LDAP，可 SSL</text>
+  <text class="tx" x="700" y="268">企业生产环境、需加密、</text>
+  <text class="ts" x="700" y="287">要过防火墙（走 80/443）</text>
+  <text class="tm2" x="700" y="308">https://svn.corp.com/repo</text>
+
+  <!-- svn+ssh -->
+  <rect x="24" y="326" width="936" height="62" rx="9" fill="rgba(126,231,135,.08)" stroke="#7ee787" stroke-width="1.5"/>
+  <text class="tm" x="42" y="352" fill="#7ee787">svn+ssh://</text>
+  <text class="tm2" x="42" y="372">SSH 隧道</text>
+  <text class="tx" x="230" y="358">系统 SSH 服务 + svnserve</text>
+  <text class="tx" x="480" y="358">SSH 密钥 / 系统账号</text>
+  <text class="tx" x="700" y="358">已有 SSH 环境，免额外开端口、加密最好</text>
+  <text class="tm2" x="700" y="378">svn+ssh://user@host/repo</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>怎么选：</b>个人练手用 <code class="ic">file://</code>；公司内网、追求简单用 <code class="ic">svn://</code>；
+    需要 HTTPS 加密、走防火墙、接 AD 域认证就用 <code class="ic">http(s)://</code>（第 17 节详细对比）。
+  </div>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：查看你的客户端支持哪些协议</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn --version</span>
+svn, version <span class="hl">1.14.5</span> (r1922182)
+   compiled Feb 24 2026, 21:06:40 on x86_64-microsoft-windows6.2.9200
+
+Copyright (C) 2024 The Apache Software Foundation.
+...
+
+The following repository access (RA) modules are available:
+
+<span class="ok">* ra_svn</span> : Module for accessing a repository using the svn network protocol.
+  - handles <span class="cy">'svn'</span> scheme
+<span class="ok">* ra_local</span> : Module for accessing a repository on local disk.
+  - handles <span class="cy">'file'</span> scheme
+<span class="ok">* ra_serf</span> : Module for accessing a repository via WebDAV protocol using serf.
+  - using serf 1.3.10 (compiled with 1.3.10)
+  - handles <span class="cy">'http'</span> scheme
+  - handles <span class="cy">'https'</span> scheme</pre>
+  </div>
+  <p>输出里列出的 <code class="ic">ra_*</code> 模块，就是你<strong>实际可用的协议</strong>。
+  如果这份清单里缺了 <code class="ic">ra_serf</code>，说明客户端没编译 HTTP 支持，<code class="ic">https://</code> 的仓库就连不上。</p>
+</div>
+
+<!-- ==========================================================================
+     第 3 节：安装
+     ========================================================================== -->

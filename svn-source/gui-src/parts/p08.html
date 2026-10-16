@@ -1,0 +1,232 @@
+<h3 class="sec" id="s8"><span class="no">8</span>查看历史：Log 对话框详解</h3>
+
+<p class="lead"> 查历史是 SVN 最有价值的功能之一。它能回答两个每天都在发生的问题：
+  <strong>「这行代码谁写的」</strong>和<strong>「这个功能是什么时候上线的」</strong>。 这一节把 <code class="ic">Show log</code> 对话框从上到下拆开讲清楚。
+</p>
+
+<div class="box key">
+  <span class="bt">为什么值得花时间学这个对话框</span>
+  <p> 出问题时，SVN 的日志能告诉你三件事：<strong>谁改的</strong>（哪个同事）、
+    <strong>什么时候改的</strong>（哪次提交）、<strong>改了什么</strong>（这次提交动了哪些文件、动了哪几行）。 没有它，你只能靠问同事和翻聊天记录。
+  </p>
+  <p> 而且这些信息<strong>不可篡改</strong>——每次提交都会在服务器上留下一条记录， 连提交时写的说明文字都一起存着。所以<em>提交说明写清楚，是给未来的自己留后路</em>。
+  </p>
+</div>
+
+<h4 class="sub">打开日志对话框</h4>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">SHOW LOG</span>三种打开方式，按需要选</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">对着项目文件夹右键（最常用）</span>
+      <span class="sc">选 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Show log</span></span>。
+      <em>对整个文件夹查，能看到这个目录下所有文件的改动历史。</em></span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">对着单个文件右键</span>
+      <span class="sc">菜单里同样有 <code class="ic">Show log</code>。 这样打开的日志<strong>只包含这一个文件</strong>，范围小、看得快， 适合查「这个文件最近被谁动过」。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">从更新或提交的进度窗口里点过去</span>
+      <span class="sc">更新完成或提交完成后，进度窗口里也能直接跳到日志。 好处是<strong>顺手接着看</strong>，不用回到资源管理器重新右键。</span>
+    </div>
+  </div>
+</div>
+
+<h4 class="sub">对话框全貌：四个区域</h4>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">Show log 日志对话框（点击图可放大）</span><span class="fs">Show Log</span></div>
+  <div class="sb"><img src="img/LogMessages.png" alt="TortoiseSVN Show log 日志对话框"></div>
+  <div class="cap"> 这个对话框是本节的主角，<b>从上到下分成四块</b>，每块干一件事：<br><br>
+    <b>① 顶部工具栏</b>——一排小按钮，控制「取多少条历史」「怎么显示」「怎么搜」。 最左边是 <span class="k">Refresh</span>（重新拉一次日志，同事刚提交完想看到最新记录就点它）； 旁边是取更多历史的按钮（一次拉一批，比如 <span class="k">Next 100</span>）， 以及 <span class="k">Show All</span>（一次性把全部历史拉下来，<b>项目久了会很慢</b>）； 再往右是 <span class="k">Statistics</span>（提交量统计，按作者出图）和搜索相关的按钮。<br><br>
+    <b>② 中间上半部分：提交历史列表</b>——这是日志的主体，<b>一行就是一次提交</b>， 每行从左到右固定四列：<span class="k">版本号</span>（Revision，那个不断变大的数字）、
+    <span class="k">作者</span>（谁提交的）、<span class="k">日期时间</span>、<span class="k">日志消息</span>（提交时填的说明）。
+    <b>看这一栏就够了</b>：想知道某功能哪天上线，扫日期列就行。<br><br>
+    <b>③ 中间下半部分：文件列表</b>——在历史列表里<b>选中某一行</b>， 这里就会列出<b>那次提交动了哪些文件</b>。 每个文件名前面带一个字母标记：<span class="k">A</span>=本次新增（Added）、
+    <span class="k">M</span>=本次修改（Modified）、<span class="k">D</span>=本次删除（Deleted）。
+    <b>A/M/D 一眼就看出这次提交的性质</b>——全是 A 说明在加新功能，出现 D 说明删了东西。<br><br>
+    <b>④ 底部：搜索框</b>——在<b>历史消息和作者</b>里做关键字过滤。 想找「修复登录」相关的提交，直接敲「登录」，列表立刻收窄。 删掉关键字就恢复全部。<b>比用眼睛一行行扫快得多</b>，尤其是历史有几千条的时候。
+  </div>
+</div>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:150px">区域</th><th style="width:150px">你要看的信息</th><th>怎么用</th></tr></thead>
+<tbody>
+  <tr>
+    <td><strong>提交历史列表</strong><br><span style="color:#6e7681;font-size:12px">上方</span></td>
+    <td>版本号 / 作者 / 日期 / 说明</td>
+    <td>一行一次提交。<strong>先按时间扫，找到大致范围，再点开看细节</strong>。 越大越新的版本在最上面。</td>
+  </tr>
+  <tr>
+    <td><strong>文件列表</strong><br><span style="color:#6e7681;font-size:12px">下方</span></td>
+    <td>这次改了哪些文件</td>
+    <td>选中一个版本后才有内容。<strong>看 A / M / D 前缀判断这次提交干了什么</strong>。</td>
+  </tr>
+  <tr>
+    <td><strong>搜索框</strong><br><span style="color:#6e7681;font-size:12px">底部</span></td>
+    <td>关键字</td>
+    <td>按关键字过滤提交记录。<strong>找「某个人什么时候改过这块」时特别省事</strong>。</td>
+  </tr>
+  <tr>
+    <td><strong>顶部工具按钮</strong></td>
+    <td>刷新 / 取更多 / 统计</td>
+    <td>刚提交完想看到新记录 → 点刷新；历史拉得不够 → 点取更多。</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<h4 class="sub">右键菜单：真正干活的地方</h4>
+
+<p> 在中间<strong>历史列表的某一行上点右键</strong>，会弹出一整套针对「这一次提交」的操作。 这才是日志对话框最有用的部分——上面的列表只是用来挑目标。
+</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">在某个版本上右键弹出的菜单</span><span class="fs">Log · Context Menu</span></div>
+  <div class="sb"><img src="img/LogContextMenu.png" alt="日志对话框右键菜单" class="mid"></div>
+  <div class="cap"> 菜单里的项目按用途分成几类，<b>先认分类，再记具体项</b>：<br><br> • <b>看内容类</b>：<span class="k">Compare with working copy</span>（拿这个版本和你当前的文件比）、
+    <span class="k">Show changes as unified diff</span>（把这个版本改了什么、一屏列出来，<b>不用点开文件就能扫一眼</b>）、
+    <span class="k">Blame</span>（逐行追责，见下文）<br> • <b>比对两个版本类</b>：先在列表里<b>按住 Ctrl 选中两条</b>，再右键，就能看到比对选项<br> • <b>撤销类</b>：<span class="k">Revert changes from this revision</span>（把这次提交的改动抵消掉，第 9 节详细讲）<br> • <b>把信息拿出去类</b>：<span class="k">Copy to clipboard</span>（把版本号、作者、说明复制走，
+    <b>写周报、贴缺陷单时很有用</b>）、<span class="k">Create branch/tag from revision</span><br> • <b>取回内容类</b>：<span class="k">Save revision to...</span>（把这个历史版本另存到别处，不动你的工作副本）<br><br>
+    <b>注意</b>：在<b>下方文件列表</b>里的文件上右键，菜单会长得不一样—— 那里是针对「这一个文件在这一次提交里」的操作。两层右键别搞混。
+  </div>
+</div>
+
+<h4 class="sub">四个最实用的操作</h4>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">常用</span>查历史的四个高频动作</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">双击文件 → 看它在这个版本里改了什么</span>
+      <span class="sc">在历史列表里选中一个版本，下方文件列表会出现这次提交涉及的文件。
+      <strong>对着其中某个文件双击</strong>，就会打开比对窗口， 把「这个文件在这次提交前后」的差异逐行列出来。<br>
+      <em>这是最常用的动作</em>：先看版本说明，再双击确认「到底改了哪几行」。 比对窗口怎么读，见第 6 节。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">选中两个版本 → 右键 → Compare revisions</span>
+      <span class="sc">按住 <kbd>Ctrl</kbd> 在历史列表里点两个版本（可以隔很远）， 然后在选中项上右键，选 <code class="ic">Compare revisions</code>。<br> 它给你的是<strong>两个版本之间的全部差异</strong>， 而不只是某一次提交——适合回答「这两周里这个模块一共改了什么」这种问题。
+      弹出来的对话框会先列出<b>有哪些文件变了</b>，双击其中任何一个再进比对窗口。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">Blame：逐行追责，查「这行是谁写的」</span>
+      <span class="sc">在日志窗口里选 <span class="k">Blame</span>（也可以直接对文件右键 →
+      <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Blame...</span></span>），
+      它会打开一个新窗口，<strong>每一行代码前面都标着：这行是哪个版本、谁写的、什么时候写的</strong>。<br>
+      把鼠标停在某一行上，还能看到那次提交的说明。<strong>想知道这行诡异的代码为什么会变成这样，就靠它</strong>。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">按作者 / 日期 / 关键字筛选</span>
+      <span class="sc">底部搜索框敲关键字，把提交记录过滤成一个小范围；
+      再配合历史列表自带的日期和作者列，就能快速缩到「某人在某段时间改的那几次提交」。<br>
+      <em>筛选只影响显示，不会改动任何东西</em>，随便试。</span>
+    </div>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">Blame 正确用法：找人不是找茬</span>
+  <p>Blame 这个名字听着像兴师问罪，但在团队里它其实是<strong>沟通工具</strong>：</p>
+  <ul>
+    <li><strong>应该做</strong>：查到某行是同事写的 → 看看那次提交的说明 → 拿着版本号和说明去问他，
+    他一看就知道你指的是哪次改动，沟通成本极低。</li>
+    <li><strong>不该做</strong>：把「这行是谁写的」当成追责武器。代码是团队一起演进出来的，
+    <strong>每一行都有当时的历史原因</strong>。</li>
+    <li><strong>还有一种常见情况</strong>：Blame 显示这行属于一次「格式整理」提交——说明真正的作者更早，
+    你可以顺着那次提交继续往前翻。</li>
+  </ul>
+</div>
+
+<h4 class="sub">合并追踪：这个改动合过来没有？</h4>
+
+<p>
+  项目用了分支之后，日志里会多出一层信息：<strong>哪些版本已经被合并到当前这条线上了</strong>。
+  TortoiseSVN 会把它们<strong>灰显</strong>出来。
+</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">带合并追踪的日志（已合并的版本灰显）</span><span class="fs">Merge Tracking</span></div>
+  <div class="sb"><img src="img/LogMergeTrack.png" alt="日志中的合并追踪显示" class="mid"></div>
+  <div class="cap">
+    看这张图的关键是<b>颜色的差别</b>：<br><br>
+    • <b>正常显示的版本</b>——这些改动<b>还没有合到当前这条线上</b><br>
+    • <span style="color:#6e7681"><b>灰显的版本</b></span>——这些改动<b>已经合过来了</b><br><br>
+    所以「<b>这个 bug 修复合过来没有</b>」这种问题，答案不用问人：
+    在日志里瞄一眼那行是黑的还是灰的就行。<b>灰的 = 已经有了</b>。<br><br>
+    这个功能依赖 SVN 的合并追踪（merge tracking）记录——也就是说，
+    合并必须<strong>通过 <code class="ic">Merge</code> 功能做</strong>，它才会被记下来。
+    如果是手工复制文件「假装合并」，日志里就看不出来，这也是要按规矩做合并的原因之一。
+  </div>
+</div>
+
+<h4 class="sub">离线也能看日志</h4>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">日志缓存（连不上服务器时）</span><span class="fs">Log Cache</span></div>
+  <div class="sb"><img src="img/LogCacheOffline.png" alt="离线日志缓存" class="mid"></div>
+  <div class="cap">
+    TortoiseSVN 会把查过的日志<b>在本地缓存一份</b>。
+    好处有两个：<b>一是快</b>（第二次打开同一段历史几乎是瞬间的），
+    <b>二是服务器连不上或者在家没 VPN 时，仍然能看到之前拉过的历史记录</b>。<br><br>
+    缓存只是加速用的，它不会替你做任何操作。如果怀疑记录不是最新的（同事刚提交），
+    在日志窗口点一下 <span class="k">Refresh</span> 重新拉一次即可。<b>平时不用管它</b>。
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">高频场景：线上出 bug，怎么快速定位是哪次提交引入的</span>
+  <p>这是 Show log 最经典的实战用法，整套流程<b>全在鼠标上</b>：</p>
+  <ol>
+    <li><strong>先确定「出问题的文件名」</strong>——从错误日志或用户描述里拿到那个文件/那个界面。</li>
+    <li><strong>对着这个文件右键 → <code class="ic">Show log</code></strong>，
+    打开的就是这一个文件的完整改动史（<em>范围越小越快</em>）。</li>
+    <li><strong>看最上面一条</strong>：Bug 通常是最近才出现的，先怀疑最近的提交。
+    读它的<span class="k">日志消息</span>，看是不是动了相关的地方。</li>
+    <li><strong>双击那个版本里的文件</strong>，比对窗口会把改动的行列出来。
+    一眼就能看出「这行本来是对的，被改成这样了」——<strong>凶手抓到</strong>。</li>
+    <li><strong>还确定不了就二分</strong>：在列表里选中两个相隔较远的版本 →
+    右键 <code class="ic">Compare revisions</code>，看这段区间一共改了什么，逐步缩小范围。</li>
+    <li><strong>锁定之后</strong>：把版本号、作者、提交说明复制下来（右键 →
+    <span class="k">Copy to clipboard</span>），发给对应的同事。
+    后面怎么退回来，见第 9 节。</li>
+  </ol>
+  <p><strong>这个流程的核心是：不要凭记忆猜，让日志告诉你。</strong></p>
+</div>
+
+<div class="box warn">
+  <span class="bt">看日志时的两个小坑</span>
+  <ul>
+    <li><strong>别一上来就点「Show All」</strong>。大项目的全部历史可能几万条，拉起来慢，
+    还容易卡。先用默认的一批，不够再点「取更多」，最后才考虑全部。</li>
+    <li><strong>日志说明是人的字，可能写得含糊</strong>。「修改」「更新」「fix」这种说明查不出任何东西。
+    所以你自己提交时，<strong>说明要写到「以后搜得到」的程度</strong>——
+    把功能名、模块名、问题编号写进去。</li>
+  </ul>
+</div>

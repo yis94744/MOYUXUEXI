@@ -1,0 +1,196 @@
+<h3 class="sec" id="s1"><span class="no">1</span>认识你的两个图形工具</h3>
+
+<p class="lead">
+  Windows 上做 SVN，标准组合是两个软件：
+  <strong>TortoiseSVN</strong>（你每天用的客户端，集成在资源管理器右键菜单里）
+  +
+  <strong>VisualSVN Server</strong>（装在服务器上，用图形界面管仓库和权限）。
+  这一节先把这两个工具认全，后面所有操作都在这两个界面里完成，<em>不需要敲任何命令</em>。
+</p>
+
+<h4 class="sub">TortoiseSVN：藏在右键菜单里的客户端</h4>
+
+<p>
+  TortoiseSVN 最大的特点是<strong>没有独立的主窗口</strong>。
+  装完之后，它的所有功能都出现在 Windows 资源管理器的<strong>右键菜单</strong>里，
+  以及每个文件图标左下角的小角标上。
+</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">TortoiseSVN 在资源管理器里的样子</span><span class="fs">Explorer Integration</span></div>
+  <div class="sb"><img src="img/Overlays.png" alt="TortoiseSVN 图标覆盖示例" class="bare"></div>
+  <div class="cap">
+    这是<strong>已经检出到本地的项目文件夹</strong>的样子。注意每个文件左下角的小角标——
+    <span class="k">绿色对勾</span>表示这个文件与服务器一致、没有本地修改；
+    <span class="k">红色叹号</span>表示本地改过、还没提交；
+    <span class="k">黄色小锁</span>表示这个文件被锁定了；
+    <span class="k">蓝色加号</span>表示这是个新增的、等待提交的文件。
+    <strong>光看图标颜色，你就知道项目当前的状态</strong>，不用打开任何窗口。
+  </div>
+</div>
+
+<h5 class="mini">图标角标速查</h5>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:110px">角标</th><th style="width:130px">名称</th><th>含义与你会遇到的场景</th></tr></thead>
+<tbody>
+  <tr>
+    <td><span class="tagmini g">绿色对勾</span></td>
+    <td>Normal</td>
+    <td>文件与服务器上的版本完全一致。<strong>不需要做任何操作。</strong></td>
+  </tr>
+  <tr>
+    <td><span class="tagmini r">红色叹号</span></td>
+    <td>Modified</td>
+    <td>你改过这个文件，但还没提交。<strong>这是最常见的状态</strong>，说明你有活儿没提交</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini y">黄色小锁</span></td>
+    <td>Locked</td>
+    <td>文件被加了独占锁（比如美术的 PSD 源文件）。别人改不了，你也得先解锁才能提交</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini b">蓝色加号</span></td>
+    <td>Added</td>
+    <td>新增的文件，已经登记但还没提交。<strong>提交后就会变成绿色对勾</strong></td>
+  </tr>
+  <tr>
+    <td><span class="tagmini p">灰色问号</span></td>
+    <td>Unversioned</td>
+    <td>文件在项目文件夹里，但 SVN <strong>完全不认识它</strong>，提交时会被跳过</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini r">红色叉号</span></td>
+    <td>Deleted</td>
+    <td>已标记删除，提交后服务器上也会删掉</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini r">红色叹号<br>（黄底）</span></td>
+    <td>Conflicted</td>
+    <td><strong>冲突</strong>。你和同事改了同一处，必须人工解决才能提交</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini">无角标</span></td>
+    <td>—</td>
+    <td>通常表示该文件被忽略（如编译产物），或者是空文件夹</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box tip">
+  <span class="bt">看不到图标角标怎么办</span>
+  <ul>
+    <li><strong>重启资源管理器</strong>——装机后第一次最好重启一次，角标才会生效。</li>
+    <li><strong>图标角标数量超限</strong>——Windows 最多只显示前 15 个角标程序。如果你装了网盘、OneDrive 等，它们会抢占名额。解决：在注册表 <code class="ic">HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers</code> 里，给 TortoiseSVN 的项名前加空格让它们排到前面。</li>
+    <li><strong>项目还没检出</strong>——角标只在「已经是 SVN 工作副本」的文件夹里才出现。刚建的空文件夹是不会有的。</li>
+  </ul>
+</div>
+
+<h4 class="sub">右键菜单：两个位置，别找错</h4>
+
+<p>
+  TortoiseSVN 会把菜单项放在<strong>两个地方</strong>，这是新手最容易困惑的点：
+  常用的几个命令会<strong>直接出现在右键菜单顶层</strong>（并且前面带 <code class="ic">SVN</code> 字样），
+  其余全部收在 <span class="mp">TortoiseSVN <span class="ar">→</span></span> 子菜单里。
+</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">在已版本控制的文件夹上右键</span><span class="fs">Context Menu</span></div>
+  <div class="sb"><img src="img/ContextMenuDirControl.png" alt="已版本控制文件夹的右键菜单" class="mid"></div>
+  <div class="cap">
+    <b>顶层三个带 SVN 前缀的选项</b>（<span class="k">SVN Update</span> / <span class="k">SVN Commit...</span> / <span class="k">SVN Check for modifications</span>）
+    是最常用的操作，所以被提到了顶层，方便你少点一次。
+    <br><br>
+    下面蓝色的 <span class="k">TortoiseSVN</span> 是一个子菜单，鼠标移上去展开，里面是<b>全部功能</b>：
+    Show log（看历史）、Repo-browser（浏览服务器）、Revision graph（分支图）、
+    Update to revision（更新到指定版本）、Rename、Delete、Revert、Clean up、
+    Get lock、Branch/tag、Switch、Merge、Export、Relocate、Add、Create patch、Properties 等。
+    <br><br>
+    <b>图标含义</b>：每一项左边都有小图标——比如 Show log 是文档图标、Revert 是回旋箭头、
+    Delete 是红叉。<b>记住图标比记文字更快</b>。
+  </div>
+</div>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">在未版本控制的普通文件夹上右键</span><span class="fs">Unversioned Folder</span></div>
+  <div class="sb"><img src="img/ContextMenuDirNoControl.png" alt="未版本控制文件夹的右键菜单" class="small"></div>
+  <div class="cap">
+    普通文件夹（还没检出、也不是工作副本）的菜单<strong>短得多</strong>，只有：
+    <span class="k">SVN Checkout...</span>（检出到此目录）、
+    <span class="k">TortoiseSVN → Repo-browser</span>（直接浏览服务器，不用检出）、
+    <span class="k">Import...</span>（把当前目录整个传上去）、
+    <span class="k">Settings</span>（全局设置）。
+    <br><br>
+    如果你发现右键菜单里<b>找不到 Commit</b>，多半就是因为这个文件夹还不是工作副本——
+    先做 Checkout。
+  </div>
+</div>
+
+<h4 class="sub">VisualSVN Server：服务器端的管理器</h4>
+
+<p>
+  服务器那边（也就是你们团队共享的那台机器）用 VisualSVN Server 来管。
+  它提供一个图形化的管理器（MMC 管理单元），
+  创建仓库、加用户、配权限、做备份，全都是<strong>点鼠标</strong>。
+</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">VisualSVN Server Manager 主界面</span><span class="fs">Server Manager</span></div>
+  <div class="sb"><img src="img/RepoStatus.png" alt="VisualSVN Server 管理器界面" class="mid"></div>
+  <div class="cap">
+    左边是树形结构：<strong>Repositories</strong>（所有仓库）、<strong>Users</strong>（用户账号）、
+    <strong>Groups</strong>（用户组）、<strong>Jobs</strong>（定时任务，比如自动备份）。
+    右边显示当前选中项的详情，可以查看每个仓库的地址、提交次数、大小。
+    <br><br>
+    看到那个 <span class="k">https://</span> 开头的地址了吗？
+    <strong>这就是你要发给同事的仓库地址</strong>——他们用这个地址在你的 TortoiseSVN 里做 Checkout，
+    就能把代码拉到本地。
+  </div>
+</div>
+
+<div class="box key">
+  <span class="bt">客户端的仓库地址从哪来</span>
+  <p>流程是这样的，两端配合：</p>
+  <ol>
+    <li>你在<strong>服务器的 VisualSVN Server Manager</strong> 上创建一个仓库，比如叫 <code class="ic">MyProject</code>。</li>
+    <li>管理器自动给它生成一个地址，形如 <code class="ic">https://服务器名/svn/MyProject</code>。</li>
+    <li>你把<strong>这个地址</strong>发给团队每个人。</li>
+    <li>每个人在本机用 <strong>TortoiseSVN → Checkout</strong>，把这个地址填进去，代码就拉到自己电脑上了。</li>
+  </ol>
+  <p>之后就各干各的：改文件 → 提交；拉别人的改动 → 更新。<strong>再也不用互相拷文件、发压缩包。</strong></p>
+</div>
+
+<h4 class="sub">两个工具的界面全貌</h4>
+
+<div class="grid2">
+  <div class="card blue">
+    <h6>客户端 · TortoiseSVN（每人装）</h6>
+    <ul>
+      <li><strong>入口</strong>：资源管理器右键菜单</li>
+      <li><strong>角标</strong>：文件图标上的状态提示</li>
+      <li><strong>常用</strong>：Checkout、Update、Commit、Show log</li>
+      <li><strong>特点</strong>：无主窗口，全在右键和对话框里</li>
+      <li><strong>附带</strong>：TortoiseMerge（比对合并工具）</li>
+    </ul>
+  </div>
+  <div class="card pur">
+    <h6>服务端 · VisualSVN Server（装一台）</h6>
+    <ul>
+      <li><strong>入口</strong>：VisualSVN Server Manager（MMC）</li>
+      <li><strong>管仓库</strong>：新建、删除、重命名、迁移</li>
+      <li><strong>管权限</strong>：建用户、建组、按文件夹授权</li>
+      <li><strong>管运维</strong>：备份、定时任务、日志查看</li>
+      <li><strong>附带</strong>：Web 界面，浏览器里也能浏览代码</li>
+    </ul>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">这份教程怎么用</span>
+  <p>后续每一节都是同样的写法：<strong>先给一张真实界面截图，再说清每一步点哪里</strong>。
+  遇到菜单路径，我用这种样式标出来：<span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Commit...</span></span>，
+  意思就是「右键 → 展开 TortoiseSVN 子菜单 → 点击 Commit...」。</p>
+  <p>所有截图<strong>点击可放大</strong>，看不清的按钮放大看就行。</p>
+</div>

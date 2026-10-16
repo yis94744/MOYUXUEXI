@@ -1,0 +1,263 @@
+<h3 class="sec" id="s4"><span class="no">4</span>仓库、版本号与工作副本</h3>
+
+<p class="lead">
+  SVN 有三个概念必须先立住：<strong>仓库（存哪）</strong>、<strong>版本号（怎么标定时间点）</strong>、
+  <strong>工作副本（你手里那份）</strong>。这三个概念一旦串起来，后面所有命令都只是它们的排列组合。
+</p>
+
+<h4 class="sub" id="s4-2">版本号是全局的——这是 SVN 最独特的设计</h4>
+
+<p>
+  在 Git 里，每个提交有自己的哈希，两个文件可能是八竿子打不着的两个哈希。
+  但在 SVN 里，<strong>版本号是一个贯穿整个仓库的递增整数</strong>，从 1 开始，每次提交加一。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 4-1　全局版本号：任何一次提交都会推进整个仓库的版本号</span><span class="fs">Revision Model</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 440" width="980" height="440" role="img" aria-label="SVN 全局版本号示意图">
+  <!-- 仓库根 -->
+  <rect class="n-pur" x="24" y="24" width="140" height="48" rx="9"/>
+  <text class="hd" x="94" y="54" text-anchor="middle">仓库 /</text>
+
+  <!-- 三条路径 -->
+  <rect class="n-blue" x="230" y="24" width="150" height="40" rx="8"/>
+  <text class="tx" x="305" y="50" text-anchor="middle">/trunk</text>
+
+  <rect class="n-green" x="230" y="76" width="150" height="40" rx="8"/>
+  <text class="tx" x="305" y="102" text-anchor="middle">/branches</text>
+
+  <rect class="n-orange" x="230" y="128" width="150" height="40" rx="8"/>
+  <text class="tx" x="305" y="154" text-anchor="middle">/tags</text>
+
+  <path class="arwp" d="M164,48 L230,44"/>
+  <path class="arwp" d="M164,54 L230,96"/>
+  <path class="arwp" d="M164,60 L230,148"/>
+
+  <!-- 时间轴 -->
+  <line x1="430" y1="60" x2="950" y2="60" stroke="#3d444d" stroke-width="2"/>
+  <text class="hd" x="430" y="44">版本号时间轴（全局唯一，单调递增）</text>
+
+  <!-- 版本节点 -->
+  <g>
+    <circle cx="466" cy="60" r="11" fill="#0d1117" stroke="#8b949e" stroke-width="2"/>
+    <text class="tm" x="466" y="65" text-anchor="middle" fill="#8b949e">1</text>
+    <text class="tm2" x="466" y="92" text-anchor="middle">建目录</text>
+  </g>
+  <g>
+    <circle cx="556" cy="60" r="11" fill="#0d1117" stroke="#58a6ff" stroke-width="2"/>
+    <text class="tm" x="556" y="65" text-anchor="middle" fill="#58a6ff">2</text>
+    <text class="tm2" x="556" y="92" text-anchor="middle">trunk 提交</text>
+  </g>
+  <g>
+    <circle cx="646" cy="60" r="11" fill="#0d1117" stroke="#7ee787" stroke-width="2"/>
+    <text class="tm" x="646" y="65" text-anchor="middle" fill="#7ee787">3</text>
+    <text class="tm2" x="646" y="92" text-anchor="middle">branches 提交</text>
+  </g>
+  <g>
+    <circle cx="736" cy="60" r="11" fill="#0d1117" stroke="#d2a8ff" stroke-width="2"/>
+    <text class="tm" x="736" y="65" text-anchor="middle" fill="#d2a8ff">4</text>
+    <text class="tm2" x="736" y="92" text-anchor="middle">改属性</text>
+  </g>
+  <g>
+    <circle cx="826" cy="60" r="11" fill="#0d1117" stroke="#e3b341" stroke-width="2"/>
+    <text class="tm" x="826" y="65" text-anchor="middle" fill="#e3b341">5</text>
+    <text class="tm2" x="826" y="92" text-anchor="middle">打标签</text>
+  </g>
+  <g>
+    <circle cx="916" cy="60" r="11" fill="#0d1117" stroke="#ff7b72" stroke-width="2"/>
+    <text class="tm" x="916" y="65" text-anchor="middle" fill="#ff7b72">6</text>
+    <text class="tm2" x="916" y="92" text-anchor="middle">删文件</text>
+  </g>
+
+  <!-- 关键说明 -->
+  <rect x="430" y="130" width="520" height="130" rx="11" fill="rgba(210,168,255,.07)" stroke="#d2a8ff" stroke-width="1.4"/>
+  <text class="hd" x="452" y="156" fill="#d2a8ff">关键推论：版本号不属于单个文件，属于整个仓库</text>
+  <text class="ts" x="452" y="180">• 你在 /trunk 提交一次，/branches 的版本号也跟着跳到新值</text>
+  <text class="ts" x="452" y="202">• 所以「r5」是整个仓库在那一瞬间的完整快照，不是某个文件的版本</text>
+  <text class="ts" x="452" y="224">• 好处：沟通成本极低——「你 checkout r5 试试」永远只有一个答案</text>
+  <text class="ts" x="452" y="246">• 代价：跨目录的提交无法拆成独立版本，一次 commit 就是一个版本号</text>
+
+  <!-- 对比 -->
+  <rect x="24" y="200" width="380" height="216" rx="11" fill="rgba(88,166,255,.06)" stroke="#58a6ff" stroke-width="1.4"/>
+  <text class="hd" x="46" y="228" fill="#58a6ff">SVN：全局递增整数</text>
+  <text class="tm" x="46" y="256">r1 → r2 → r3 → r4 …</text>
+  <text class="ts" x="46" y="280">「你回退到 r1523 看看」</text>
+  <text class="ts" x="46" y="300">任何人执行都得到完全相同的结果</text>
+  <line x1="46" y1="318" x2="382" y2="318" stroke="#30363d" stroke-width="1"/>
+  <text class="hd" x="46" y="344" fill="#7ee787">Git：每对象独立哈希</text>
+  <text class="tm2" x="46" y="368">a3f9c2e… / 8b1d4f0… / c7e2a91…</text>
+  <text class="ts" x="46" y="392">「你切到 a3f9c2e 看看」</text>
+  <text class="ts" x="46" y="410">口述困难，需靠分支名/标签辅助</text>
+
+  <!-- 工作副本 -->
+  <rect x="430" y="286" width="520" height="130" rx="11" fill="rgba(255,166,87,.07)" stroke="#ffa657" stroke-width="1.4"/>
+  <text class="hd" x="452" y="312" fill="#ffa657">工作副本：混版本快照（Mixed Revision）</text>
+  <text class="ts" x="452" y="336">checkout 出来的工作副本，每个文件可以停留在不同的版本上</text>
+  <text class="ts" x="452" y="358">例如：根目录在 r10，而 src/main.cs 因为刚更新过在 r12</text>
+  <text class="ts" x="452" y="380">这本身是正常状态，但会导致 <tspan fill="#ff7b72">svn merge</tspan> 报 E195020 错误</text>
+  <text class="ts" x="452" y="402">修复：先 svn update 拉平，再执行 merge（第 13 节实测过）</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>记住这张图右上角的紫色框</b>——它解释了几乎所有「为什么我的版本号和同事看到的不一样」的疑问。
+    版本号是<strong>仓库级</strong>的，不是文件级的。
+  </div>
+</div>
+
+<h4 class="sub" id="s4-3">工作副本的三种状态：理解 status 的前提</h4>
+
+<p>
+  工作副本里的每个文件，相对于服务器上的「BASE 版本」，只可能是三种状态之一。
+  <code class="ic">svn status</code> 的字母输出，就是在这三种状态上再细分出来的。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 4-2　文件状态机：从新建到提交的完整流转</span><span class="fs">State Machine</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 400" width="980" height="400" role="img" aria-label="SVN 文件状态机流转图">
+  <!-- 状态节点 -->
+  <rect class="n-gray" x="30" y="60" width="150" height="76" rx="11"/>
+  <text class="hd" x="105" y="88" text-anchor="middle">未版本控制</text>
+  <text class="tm" x="105" y="110" text-anchor="middle" fill="#8b949e">?</text>
+  <text class="ts" x="105" y="128" text-anchor="middle">服务器不认识它</text>
+
+  <rect class="n-green" x="250" y="60" width="150" height="76" rx="11"/>
+  <text class="hd" x="325" y="88" text-anchor="middle">已添加待提交</text>
+  <text class="tm" x="325" y="110" text-anchor="middle" fill="#7ee787">A</text>
+  <text class="ts" x="325" y="128" text-anchor="middle">只存在本地</text>
+
+  <rect class="n-blue" x="470" y="60" width="150" height="76" rx="11"/>
+  <text class="hd" x="545" y="88" text-anchor="middle">已提交（BASE）</text>
+  <text class="tm" x="545" y="110" text-anchor="middle" fill="#58a6ff">无标记</text>
+  <text class="ts" x="545" y="128" text-anchor="middle">与服务端一致</text>
+
+  <rect class="n-yellow" x="690" y="60" width="150" height="76" rx="11"/>
+  <text class="hd" x="765" y="88" text-anchor="middle">已修改</text>
+  <text class="tm" x="765" y="110" text-anchor="middle" fill="#e3b341">M</text>
+  <text class="ts" x="765" y="128" text-anchor="middle">与 pristine 不同</text>
+
+  <!-- 底部状态 -->
+  <rect class="n-orange" x="30" y="250" width="200" height="76" rx="11"/>
+  <text class="hd" x="130" y="278" text-anchor="middle">已删除待提交</text>
+  <text class="tm" x="130" y="300" text-anchor="middle" fill="#ffa657">D</text>
+  <text class="ts" x="130" y="318" text-anchor="middle">文件已从磁盘移除</text>
+
+  <rect class="n-red" x="270" y="250" width="200" height="76" rx="11"/>
+  <text class="hd" x="370" y="278" text-anchor="middle">文件缺失</text>
+  <text class="tm" x="370" y="300" text-anchor="middle" fill="#ff7b72">!</text>
+  <text class="ts" x="370" y="318" text-anchor="middle">手删了但没告诉 SVN</text>
+
+  <rect class="n-red" x="510" y="250" width="200" height="76" rx="11"/>
+  <text class="hd" x="610" y="278" text-anchor="middle">冲突</text>
+  <text class="tm" x="610" y="300" text-anchor="middle" fill="#ff7b72">C</text>
+  <text class="ts" x="610" y="318" text-anchor="middle">需要人工解决</text>
+
+  <rect class="n-gray" x="750" y="250" width="200" height="76" rx="11"/>
+  <text class="hd" x="850" y="278" text-anchor="middle">已忽略</text>
+  <text class="tm" x="850" y="300" text-anchor="middle" fill="#8b949e">I</text>
+  <text class="ts" x="850" y="318" text-anchor="middle">被 svn:ignore 匹配</text>
+
+  <!-- 流转箭头 -->
+  <path class="arwg" d="M180,98 L250,98"/>
+  <text class="tm2" x="215" y="88" text-anchor="middle">svn add</text>
+
+  <path class="arwb" d="M400,98 L470,98"/>
+  <text class="tm2" x="435" y="88" text-anchor="middle">commit</text>
+
+  <path class="arwy" d="M620,98 L690,98"/>
+  <text class="tm2" x="655" y="88" text-anchor="middle">编辑文件</text>
+
+  <path class="arwb" d="M765,136 L600,140"/>
+  <path class="arwb" d="M590,140 L560,136"/>
+  <text class="tm2" x="668" y="158" text-anchor="middle">commit 后回到 BASE</text>
+
+  <path class="arwo" d="M765,170 C730,210 560,215 480,250" stroke="#ffa657" fill="none" stroke-width="1.8"/>
+  <text class="tm2" x="620" y="212" text-anchor="middle">svn delete</text>
+
+  <path class="arwr" d="M690,150 C560,200 420,215 372,250" stroke="#ff7b72" fill="none" stroke-width="1.8"/>
+  <text class="tm2" x="520" y="196" text-anchor="middle">rm 直接删文件</text>
+
+  <path class="arwr" d="M545,136 C560,190 590,210 608,250" stroke="#ff7b72" fill="none" stroke-width="1.8"/>
+  <text class="tm2" x="640" y="236" text-anchor="middle">update 撞车</text>
+
+  <!-- 恢复路径 -->
+  <path class="arwp" d="M130,250 C130,190 105,180 105,136" stroke="#d2a8ff" fill="none" stroke-width="1.8"/>
+  <text class="tm2" x="164" y="212" text-anchor="middle">revert</text>
+
+  <path class="arwp" d="M610,326 C610,370 400,380 130,360" stroke="#d2a8ff" fill="none" stroke-width="1.8" stroke-dasharray="6 4"/>
+  <text class="tm2" x="400" y="388" text-anchor="middle">svn resolve + commit → 回到 BASE 状态</text>
+
+  <!-- 提示 -->
+  <rect x="30" y="150" width="600" height="76" rx="10" fill="rgba(88,166,255,.06)" stroke="#58a6ff" stroke-width="1.2"/>
+  <text class="hd" x="50" y="175" fill="#58a6ff">状态判断的底层逻辑</text>
+  <text class="ts" x="50" y="197">SVN 拿三份内容做比较：① 你磁盘上的文件　② .svn/pristine 里的原始副本　③ 服务端 BASE 版本</text>
+  <text class="ts" x="50" y="217">相互不同就产生对应状态标记。所以 status 永远是基于「本地元数据」的快速操作，<tspan fill="#7ee787">无需联网</tspan>。</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>读图技巧：</b>绿色路径是正常业务流程（add → commit → 修改 → commit）；
+    红色路径是<strong>出错路径</strong>（手删文件、直接 rm、update 撞车）；紫色是<strong>救回路径</strong>（revert / resolve）。
+    第 7 节会给出每个状态码的实测输出。
+  </div>
+</div>
+
+<h4 class="sub">亲手创建一个仓库</h4>
+
+<p>理论说够了，动手。创建仓库的命令是 <code class="ic">svnadmin create</code>：</p>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">创建仓库并观察目录结构</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 建一个仓库目录（服务端动作，和客户端 checkout 无关）</span>
+svnadmin create /var/svn/repo
+
+<span class="c"># 看看它生成了什么</span>
+ls -la /var/svn/repo
+<span class="c"># conf/  db/  format  hooks/  locks/  README.txt</span>
+
+<span class="c"># 关键子目录说明</span>
+ls /var/svn/repo/conf          <span class="c"># svnserve.conf  passwd  authz（认证权限配置）</span>
+ls /var/svn/repo/hooks         <span class="c"># 9 个 .tmpl 钩子模板，改掉后缀 .tmpl 才会生效</span>
+cat /var/svn/repo/format       <span class="c"># 仓库格式版本，1.14 下是 5</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出（Windows / SVN 1.14.5）</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svnadmin create E:\svn-demo\repo</span>
+<span class="dim">&lt;无输出即成功&gt;</span>
+
+<span class="ps">$</span> <span class="cmd">Get-ChildItem E:\svn-demo\repo | Select-Object Mode,Name</span>
+Mode   Name
+----   ----
+d----- <span class="cy">conf</span>
+d----- <span class="cy">db</span>
+d----- <span class="cy">hooks</span>
+d----- <span class="cy">locks</span>
+-ar--- <span class="hl">format</span>
+-a---- README.txt
+
+<span class="ps">$</span> <span class="cmd">Get-ChildItem E:\svn-demo\repo\conf | Select Name,Length</span>
+Name           Length
+----           ------
+authz            <span class="hl">1112</span>   <span class="cmt">← 权限配置文件（整套模板）</span>
+hooks-env.tmpl   904   <span class="cmt">← 钩子环境变量配置</span>
+passwd           317   <span class="cmt">← 账号密码文件</span>
+svnserve.conf   4456   <span class="cmt">← svnserve 服务端主配置</span>
+
+<span class="ps">$</span> <span class="cmd">cat E:\svn-demo\repo\format</span>
+<span class="hl">5</span>   <span class="cmt">← 仓库格式版本 5（对应 SVN 1.8+ 特性）</span></pre>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">别把仓库目录手动改坏</span>
+  <p><code class="ic">db/</code> 是版本数据的全部家当。
+  <strong>永远不要</strong>直接编辑 <code class="ic">db/</code> 下的文件、不要手动删除 <code class="ic">db/revs</code> 里的内容、
+  不要用普通文件复制工具去「备份」正在使用的仓库（要用 <code class="ic">svnadmin hotcopy</code>，见第 21 节）。</p>
+</div>
+
+<!-- ==========================================================================
+     第 5 节：标准目录结构
+     ========================================================================== -->

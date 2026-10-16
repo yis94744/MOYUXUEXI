@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>22. 高级技巧与效率提升 — SVN 完全教程</title>
+<style>
+
+/* ==========================================================================
+   设计令牌
+   ========================================================================== */
+:root{
+  --bg:#0d1117; --bg2:#161b22; --bg3:#1c2128; --bg4:#21262d;
+  --bd:#30363d; --bd2:#3d444d;
+  --tx:#e6edf3; --tx2:#c9d1d9; --tx3:#8b949e; --tx4:#6e7681;
+  --blue:#58a6ff; --blue2:#79c0ff; --green:#7ee787; --green2:#3fb950;
+  --orange:#ffa657; --red:#ff7b72; --purple:#d2a8ff; --cyan:#56d4dd;
+  --yellow:#e3b341;
+  --mono:"JetBrains Mono","Cascadia Code",Consolas,Monaco,"Courier New",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --rad:10px; --rad2:14px; --shadow:0 8px 24px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{background:var(--bg);color:var(--tx2);font-family:var(--sans);
+  font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+#prog{position:fixed;top:0;left:0;height:3px;width:0;z-index:999;
+  background:linear-gradient(90deg,var(--blue),var(--purple),var(--green));transition:width .1s linear}
+.wrap{display:flex;max-width:1600px;margin:0 auto;align-items:flex-start}
+
+/* ==========================================================================
+   侧边导航
+   ========================================================================== */
+aside{position:sticky;top:0;flex:0 0 300px;height:100vh;overflow-y:auto;
+  border-right:1px solid var(--bd);padding:26px 16px 80px;background:var(--bg)}
+aside::-webkit-scrollbar{width:8px}
+aside::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:4px}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.brand .dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;
+  background:linear-gradient(135deg,var(--blue),var(--purple))}
+.brand h1{font-size:15px;font-weight:700;color:var(--tx);letter-spacing:.2px}
+.brand-sub{font-size:12px;color:var(--tx4);margin:0 0 18px 21px;line-height:1.5}
+nav a{display:block;padding:6px 11px;margin:2px 0;font-size:13.5px;color:var(--tx3);
+  text-decoration:none;border-radius:7px;border-left:2px solid transparent;transition:all .14s;line-height:1.5}
+nav a:hover{background:var(--bg3);color:var(--tx)}
+nav a.h3{padding-left:24px;font-size:12.8px;color:var(--tx4)}
+nav a.on{background:var(--bg4);color:var(--blue);border-left-color:var(--blue);font-weight:600}
+nav .grp{margin:16px 0 6px 11px;font-size:11px;font-weight:700;color:var(--tx4);
+  text-transform:uppercase;letter-spacing:.9px}
+
+/* ==========================================================================
+   主体排版
+   ========================================================================== */
+main{flex:1;min-width:0;padding:44px 52px 140px;max-width:1180px}
+.hero{margin-bottom:46px;padding-bottom:30px;border-bottom:1px solid var(--bd)}
+.hero .tag{display:inline-block;font-size:11.5px;font-weight:700;color:var(--blue);
+  background:rgba(88,166,255,.13);border:1px solid rgba(88,166,255,.3);
+  padding:3px 11px;border-radius:20px;margin-bottom:16px;letter-spacing:.4px}
+.hero h2{font-size:34px;font-weight:800;color:var(--tx);line-height:1.25;margin-bottom:12px;
+  background:linear-gradient(135deg,#fff 30%,var(--blue) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-.5px}
+.hero p{font-size:15px;color:var(--tx3);max-width:860px}
+.hero .meta{display:flex;gap:22px;margin-top:20px;flex-wrap:wrap}
+.hero .meta div{font-size:12.5px;color:var(--tx4)}
+.hero .meta b{color:var(--tx2);font-weight:600}
+h3.sec{font-size:25px;font-weight:700;color:var(--tx);margin:66px 0 8px;
+  padding-top:8px;scroll-margin-top:20px;letter-spacing:-.3px}
+h3.sec::before{content:"";display:block;width:38px;height:3px;border-radius:2px;
+  background:linear-gradient(90deg,var(--blue),var(--purple));margin-bottom:16px}
+h3.sec .no{color:var(--blue);font-family:var(--mono);font-size:19px;font-weight:700;margin-right:8px}
+h4.sub{font-size:17.5px;font-weight:700;color:var(--tx);margin:36px 0 12px;scroll-margin-top:20px}
+h4.sub::before{content:"▍";color:var(--blue);margin-right:7px;font-size:14px}
+h5.mini{font-size:14.5px;font-weight:700;color:var(--blue2);margin:26px 0 10px}
+p{margin:12px 0;color:var(--tx2)}
+p.lead{font-size:16px;color:var(--tx3);margin:14px 0 22px}
+ul,ol{margin:12px 0 12px 24px}
+li{margin:6px 0}
+li::marker{color:var(--tx4)}
+strong{color:var(--tx);font-weight:700}
+em{color:var(--orange);font-style:normal;font-weight:600}
+a.ref{color:var(--blue2);text-decoration:none;border-bottom:1px dotted var(--bd2)}
+a.ref:hover{color:var(--cyan)}
+hr.sep{border:none;border-top:1px solid var(--bd);margin:38px 0}
+code.ic{font-family:var(--mono);font-size:13px;color:var(--orange);
+  background:rgba(110,118,129,.16);padding:2px 6px;border-radius:5px;
+  border:1px solid rgba(110,118,129,.22);white-space:nowrap}
+code.ic.b{color:var(--blue2)}
+code.ic.g{color:var(--green)}
+code.ic.p{color:var(--purple)}
+
+/* ==========================================================================
+   代码块
+   ========================================================================== */
+.codewrap{position:relative;margin:18px 0 22px;border-radius:var(--rad2);
+  border:1px solid var(--bd);background:#0b0f14;overflow:hidden;box-shadow:var(--shadow)}
+.codehead{display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px;background:var(--bg2);border-bottom:1px solid var(--bd);gap:10px}
+.codehead .lang{font-family:var(--mono);font-size:11.5px;font-weight:700;
+  color:var(--tx3);letter-spacing:.6px;text-transform:uppercase;white-space:nowrap}
+.codehead .fn{font-family:var(--mono);font-size:11.5px;color:var(--tx4);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;flex:1}
+.codehead .acts{display:flex;gap:7px;flex:0 0 auto}
+.codehead button{background:var(--bg4);border:1px solid var(--bd2);color:var(--tx3);
+  font-family:var(--sans);font-size:11.5px;padding:3px 10px;border-radius:6px;cursor:pointer;transition:all .14s}
+.codehead button:hover{background:var(--blue);color:#000;border-color:var(--blue)}
+.codehead button.ok{background:var(--green2);color:#000;border-color:var(--green2)}
+pre.code{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mono);
+  font-size:13.2px;line-height:1.68;tab-size:4}
+pre.code::-webkit-scrollbar{height:9px}
+pre.code::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+pre.code code{color:var(--tx2);white-space:pre;display:block}
+.k{color:#ff7b72}.t{color:#79c0ff}.s{color:#a5d6ff}.c{color:#8b949e;font-style:italic}
+.n{color:#79c0ff}.m{color:#d2a8ff}.a{color:#ffa657}.p{color:#8b949e}
+
+/* 终端输出块 —— 显示真实命令回显 */
+.term{margin:16px 0 20px;border-radius:var(--rad2);border:1px solid var(--bd);
+  background:#080b0f;overflow:hidden}
+.term .th{display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--bg2);
+  border-bottom:1px solid var(--bd);font-family:var(--mono);font-size:11.5px;color:var(--tx4)}
+.term .th .dotr{width:9px;height:9px;border-radius:50%;background:#ff5f57}
+.term .th .doty{width:9px;height:9px;border-radius:50%;background:#febc2e}
+.term .th .dotg{width:9px;height:9px;border-radius:50%;background:#28c840}
+.term pre{margin:0;padding:14px 16px;overflow-x:auto;font-family:var(--mono);
+  font-size:12.9px;line-height:1.7;color:#c9d1d9;white-space:pre}
+.term pre::-webkit-scrollbar{height:9px}
+.term pre::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+.term .ps{color:var(--green);font-weight:700}       /* 提示符 $ */
+.term .cmd{color:var(--tx)}                          /* 命令本体 */
+.term .cmt{color:var(--tx4);font-style:italic}       /* 注释 */
+.term .ok{color:var(--green)}                        /* 成功 */
+.term .no{color:var(--red)}                          /* 失败 */
+.term .hl{color:var(--yellow);font-weight:600}       /* 重点 */
+.term .dim{color:var(--tx4)}                         /* 弱化 */
+.term .cy{color:var(--cyan)}
+
+/* ==========================================================================
+   提示框
+   ========================================================================== */
+.box{margin:20px 0;padding:15px 18px 15px 46px;border-radius:var(--rad);
+  position:relative;font-size:14.3px;line-height:1.72;border:1px solid;border-left-width:3px}
+.box::before{position:absolute;left:15px;top:14px;font-size:16px;line-height:1}
+.box .bt{display:block;font-weight:700;margin-bottom:5px;font-size:13.5px}
+.box p{margin:6px 0;font-size:14.3px}
+.box ul,.box ol{margin:7px 0 7px 18px}
+.box li{margin:4px 0}
+.box.tip{background:rgba(88,166,255,.07);border-color:rgba(88,166,255,.28)}
+.box.tip::before{content:"★"}.box.tip .bt{color:var(--blue)}
+.box.warn{background:rgba(255,166,87,.07);border-color:rgba(255,166,87,.3)}
+.box.warn::before{content:"!"}.box.warn .bt{color:var(--orange)}
+.box.err{background:rgba(255,123,114,.07);border-color:rgba(255,123,114,.3)}
+.box.err::before{content:"X"}.box.err .bt{color:var(--red)}
+.box.ok{background:rgba(126,231,135,.07);border-color:rgba(126,231,135,.3)}
+.box.ok::before{content:"✓"}.box.ok .bt{color:var(--green)}
+.box.key{background:rgba(210,168,255,.07);border-color:rgba(210,168,255,.3)}
+.box.key::before{content:"◈"}.box.key .bt{color:var(--purple)}
+.box.termbox{background:rgba(86,212,221,.06);border-color:rgba(86,212,221,.28)}
+.box.termbox::before{content:"⌘"}.box.termbox .bt{color:var(--cyan)}
+
+/* ==========================================================================
+   表格
+   ========================================================================== */
+.tw{overflow-x:auto;margin:18px 0;border-radius:var(--rad);border:1px solid var(--bd)}
+table{width:100%;border-collapse:collapse;font-size:13.8px}
+thead th{background:var(--bg3);color:var(--tx);font-weight:700;text-align:left;
+  padding:11px 14px;border-bottom:1px solid var(--bd2);white-space:nowrap;font-size:13px;letter-spacing:.2px}
+tbody td{padding:9px 14px;border-bottom:1px solid rgba(48,54,61,.6);vertical-align:top;line-height:1.65}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:rgba(88,166,255,.045)}
+tbody td:first-child{color:var(--tx)}
+td .ic,th .ic{font-size:12.3px}
+.tagmini{display:inline-block;font-size:11px;padding:2px 7px;border-radius:5px;
+  font-weight:700;font-family:var(--mono);white-space:nowrap}
+.tagmini.g{background:rgba(126,231,135,.15);color:var(--green)}
+.tagmini.r{background:rgba(255,123,114,.15);color:var(--red)}
+.tagmini.y{background:rgba(227,179,65,.15);color:var(--yellow)}
+.tagmini.b{background:rgba(88,166,255,.15);color:var(--blue)}
+.tagmini.p{background:rgba(210,168,255,.15);color:var(--purple)}
+.tagmini.c{background:rgba(86,212,221,.15);color:var(--cyan)}
+
+/* ==========================================================================
+   步骤条
+   ========================================================================== */
+.steps{counter-reset:st;margin:20px 0;border:1px solid var(--bd);
+  border-radius:var(--rad2);overflow:hidden;background:var(--bg2)}
+.steps>.stitle{display:flex;align-items:center;gap:9px;padding:11px 16px;
+  background:linear-gradient(90deg,rgba(210,168,255,.11),transparent);
+  border-bottom:1px solid var(--bd);font-size:13.5px;font-weight:700;color:var(--purple)}
+.steps>.stitle .badge{background:var(--purple);color:#000;font-size:10.5px;
+  padding:2px 8px;border-radius:20px;letter-spacing:.4px;font-weight:800}
+.step{display:flex;gap:14px;padding:13px 16px;border-bottom:1px solid rgba(48,54,61,.55)}
+.step:last-child{border-bottom:none}
+.step:hover{background:rgba(210,168,255,.035)}
+.step .num{counter-increment:st;flex:0 0 26px;height:26px;border-radius:50%;
+  background:rgba(210,168,255,.14);border:1px solid rgba(210,168,255,.35);
+  color:var(--purple);font-family:var(--mono);font-size:12.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;margin-top:2px}
+.step .num::before{content:counter(st)}
+.step .body{flex:1;min-width:0;font-size:14px;line-height:1.7}
+.step .body .st{font-weight:700;color:var(--tx);display:block;margin-bottom:3px}
+.step .body .sc{color:var(--tx3);font-size:13.6px}
+.step .body .menu{font-family:var(--mono);font-size:12.8px;color:var(--yellow);
+  background:rgba(227,179,65,.1);border:1px solid rgba(227,179,65,.25);
+  padding:1px 7px;border-radius:5px;white-space:nowrap;display:inline-block;margin:1px 0}
+
+/* ==========================================================================
+   卡片
+   ========================================================================== */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}
+.card{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rad2);padding:16px 18px}
+.card h6{font-size:13.5px;font-weight:700;margin-bottom:9px;display:flex;
+  align-items:center;gap:7px;color:var(--tx)}
+.card ul{margin:8px 0 0 18px;font-size:13.6px}
+.card ul li{margin:5px 0}
+.card p{font-size:13.7px;margin:8px 0}
+.card.good{border-color:rgba(126,231,135,.32)}.card.good h6{color:var(--green)}
+.card.bad{border-color:rgba(255,123,114,.32)}.card.bad h6{color:var(--red)}
+.card.blue{border-color:rgba(88,166,255,.32)}.card.blue h6{color:var(--blue)}
+.card.warn{border-color:rgba(255,166,87,.32)}.card.warn h6{color:var(--orange)}
+.card.pur{border-color:rgba(210,168,255,.32)}.card.pur h6{color:var(--purple)}
+.card .big{font-family:var(--mono);font-size:22px;font-weight:800;color:var(--tx);
+  display:block;margin-bottom:4px;line-height:1.2}
+.card .cap{font-size:12.2px;color:var(--tx4)}
+
+/* ==========================================================================
+   图文（SVG 插图系统）—— 本教程的核心
+   ========================================================================== */
+.fig{margin:24px 0 26px;border:1px solid var(--bd);border-radius:var(--rad2);
+  background:linear-gradient(180deg,#0f141b,#0b0f14);overflow:hidden;box-shadow:var(--shadow)}
+.fig .fh{padding:10px 18px;background:var(--bg2);border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;gap:9px}
+.fig .fh .ic{color:var(--cyan);font-size:13px}
+.fig .fh .ft{font-size:13.2px;font-weight:700;color:var(--tx)}
+.fig .fh .fs{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--tx4);
+  letter-spacing:.5px;text-transform:uppercase}
+.fig .fb{padding:22px 18px 18px;overflow-x:auto}
+.fig .fb::-webkit-scrollbar{height:9px}
+.fig .fb::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+.fig svg{display:block;margin:0 auto;max-width:100%;height:auto}
+.fig .cap{padding:11px 18px 14px;font-size:13px;color:var(--tx3);border-top:1px solid rgba(48,54,61,.55);
+  line-height:1.7}
+.fig .cap b{color:var(--tx2)}
+/* SVG 通用类：所有插图复用，保证风格统一 */
+svg text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+svg .tt{font-size:14px;font-weight:700;fill:#e6edf3}
+svg .ts{font-size:12px;fill:#8b949e}
+svg .tx{font-size:12.5px;fill:#c9d1d9}
+svg .tm{font-size:12px;font-family:"JetBrains Mono",Consolas,monospace;fill:#e6edf3}
+svg .tm2{font-size:11px;font-family:"JetBrains Mono",Consolas,monospace;fill:#8b949e}
+svg .hd{font-size:11.5px;font-weight:700;fill:#e6edf3}
+svg .bd{fill:none;stroke:#30363d;stroke-width:1.5}
+svg .bd2{fill:none;stroke:#3d444d;stroke-width:1.5}
+svg .dash{fill:none;stroke:#3d444d;stroke-width:1.5;stroke-dasharray:5 4}
+svg .arw{fill:none;stroke:#8b949e;stroke-width:1.6;marker-end:url(#arw)}
+svg .arwb{fill:none;stroke:#58a6ff;stroke-width:1.8;marker-end:url(#arwb)}
+svg .arwg{fill:none;stroke:#7ee787;stroke-width:1.8;marker-end:url(#arwg)}
+svg .arwr{fill:none;stroke:#ff7b72;stroke-width:1.8;marker-end:url(#arwr)}
+svg .arwp{fill:none;stroke:#d2a8ff;stroke-width:1.8;marker-end:url(#arwp)}
+svg .arwy{fill:none;stroke:#e3b341;stroke-width:1.8;marker-end:url(#arwy)}
+svg .arw2{fill:none;stroke:#58a6ff;stroke-width:1.6;marker-end:url(#arwb);stroke-dasharray:6 4}
+svg .n-blue{fill:rgba(88,166,255,.10);stroke:#58a6ff;stroke-width:1.5}
+svg .n-green{fill:rgba(126,231,135,.10);stroke:#7ee787;stroke-width:1.5}
+svg .n-pur{fill:rgba(210,168,255,.10);stroke:#d2a8ff;stroke-width:1.5}
+svg .n-orange{fill:rgba(255,166,87,.10);stroke:#ffa657;stroke-width:1.5}
+svg .n-red{fill:rgba(255,123,114,.10);stroke:#ff7b72;stroke-width:1.5}
+svg .n-yellow{fill:rgba(227,179,65,.10);stroke:#e3b341;stroke-width:1.5}
+svg .n-cyan{fill:rgba(86,212,221,.10);stroke:#56d4dd;stroke-width:1.5}
+svg .n-gray{fill:rgba(139,148,158,.10);stroke:#8b949e;stroke-width:1.5}
+svg .c-blue{fill:#0f141b;stroke:#58a6ff;stroke-width:1.5}
+svg .c-green{fill:#0f141b;stroke:#7ee787;stroke-width:1.5}
+svg .c-pur{fill:#0f141b;stroke:#d2a8ff;stroke-width:1.5}
+svg .c-orange{fill:#0f141b;stroke:#ffa657;stroke-width:1.5}
+svg .c-red{fill:#0f141b;stroke:#ff7b72;stroke-width:1.5}
+svg .c-gray{fill:#161b22;stroke:#3d444d;stroke-width:1.5}
+svg .fill-blue{fill:#58a6ff}svg .fill-green{fill:#7ee787}svg .fill-pur{fill:#d2a8ff}
+svg .fill-orange{fill:#ffa657}svg .fill-red{fill:#ff7b72}svg .fill-cyan{fill:#56d4dd}
+svg .fill-yellow{fill:#e3b341}svg .fill-gray{fill:#8b949e}svg .fill-tx{fill:#e6edf3}
+svg .fill-dim{fill:#6e7681}
+svg .mono{font-family:"JetBrains Mono",Consolas,monospace}
+
+/* 图例 */
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0 4px;font-size:12.5px;color:var(--tx3)}
+.legend span{display:flex;align-items:center;gap:7px}
+.legend i{width:13px;height:13px;border-radius:4px;display:inline-block;flex:0 0 auto}
+
+/* ==========================================================================
+   键值对 / 输出面板
+   ========================================================================== */
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-family:var(--mono);
+  font-size:12.8px;margin:10px 0}
+.kv b{color:var(--tx2);font-weight:600}
+.kv span{color:var(--orange)}
+
+/* 对比双栏（好/坏） */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:20px 0;
+  border:1px solid var(--bd);border-radius:var(--rad2);overflow:hidden}
+.duo>div{padding:14px 16px}
+.duo>div:first-child{border-right:1px solid var(--bd);background:rgba(255,123,114,.045)}
+.duo>div:last-child{background:rgba(126,231,135,.045)}
+.duo .dh{font-size:12.5px;font-weight:800;margin-bottom:9px;letter-spacing:.3px}
+.duo>div:first-child .dh{color:var(--red)}
+.duo>div:last-child .dh{color:var(--green)}
+.duo pre{font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--tx2);
+  white-space:pre-wrap;margin:0;overflow-x:auto}
+
+footer{margin-top:90px;padding-top:28px;border-top:1px solid var(--bd);font-size:13px;color:var(--tx4)}
+footer b{color:var(--tx3)}
+#top{position:fixed;right:26px;bottom:26px;width:44px;height:44px;border-radius:50%;
+  background:var(--bg3);border:1px solid var(--bd2);color:var(--tx2);font-size:17px;
+  cursor:pointer;display:none;align-items:center;justify-content:center;
+  box-shadow:var(--shadow);transition:all .16s;z-index:50}
+#top:hover{background:var(--blue);color:#000;border-color:var(--blue)}
+#top.show{display:flex}
+
+@media(max-width:1220px){aside{display:none}main{padding:30px 26px 100px;max-width:100%}}
+@media(max-width:760px){
+  .grid2,.grid3,.grid4,.duo{grid-template-columns:1fr}
+  .duo>div:first-child{border-right:none;border-bottom:1px solid var(--bd)}
+  .hero h2{font-size:25px}h3.sec{font-size:20px}main{padding:22px 16px 80px}
+  body{font-size:15px}
+}
+
+
+/* ===== 单节文件附加样式：面包屑与翻页 ===== */
+.crumb{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:22px;
+  padding-bottom:14px;border-bottom:1px solid var(--bd);font-size:13px;color:var(--tx4)}
+.crumb .stage{font-size:11.5px;font-weight:700;color:var(--blue);
+  background:rgba(88,166,255,.13);border:1px solid rgba(88,166,255,.3);
+  padding:2px 10px;border-radius:20px;letter-spacing:.3px}
+.crumb .sep{color:var(--tx4);opacity:.5}
+.crumb .cur{color:var(--tx2)}
+.crumb a{color:var(--tx3);text-decoration:none;border-bottom:1px dotted var(--bd2)}
+.crumb a:hover{color:var(--blue)}
+.pager{display:flex;gap:14px;margin:64px 0 0;padding-top:26px;border-top:1px solid var(--bd)}
+.pager a{flex:1;display:block;padding:14px 18px;border:1px solid var(--bd);
+  border-radius:var(--rad2);text-decoration:none;transition:all .16s;background:var(--bg2);min-width:0}
+.pager a:hover{border-color:var(--blue);background:var(--bg3);transform:translateY(-2px)}
+.pager a .lbl{display:block;font-size:11.5px;color:var(--tx4);margin-bottom:5px;
+  letter-spacing:.4px;text-transform:uppercase}
+.pager a .ttl{display:block;font-size:14.5px;color:var(--tx);font-weight:700;
+  line-height:1.5;overflow:hidden;text-overflow:ellipsis}
+.pager a.next{text-align:right}
+.pager a.disabled{opacity:.35;pointer-events:none}
+.pager a.home{flex:0 0 130px;text-align:center;display:flex;align-items:center;justify-content:center}
+.pager a.home .ttl{font-size:13.5px;color:var(--blue2)}
+
+</style>
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 完全教程</h1></div>
+  <div class="brand-sub">图文详解版 · 基于 SVN 1.14 实测</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 认识 SVN</div>
+    <a href="01-intro.html">1. SVN 是什么</a>
+    <a href="02-architecture.html">2. 三层架构与通信协议</a>
+    <a href="03-install.html">3. 安装与环境准备</a>
+    <div class="grp">第二阶段 · 核心模型</div>
+    <a href="04-model.html">4. 仓库、版本号与工作副本</a>
+    <a href="05-layout.html">5. 标准目录结构</a>
+    <div class="grp">第三阶段 · 日常操作</div>
+    <a href="06-first-steps.html">6. 第一次完整上手：从零到提交</a>
+    <a href="07-status.html">7. status 状态码全解</a>
+    <a href="08-daily-loop.html">8. 日常开发循环与 diff / log 进阶</a>
+    <a href="09-rollback.html">9. 撤销与回退：五种后悔场景</a>
+    <div class="grp">第四阶段 · 冲突处理</div>
+    <a href="10-conflict.html">10. 冲突：产生、解剖与解决</a>
+    <div class="grp">第五阶段 · 分支与标签</div>
+    <a href="11-branch-essence.html">11. 分支的本质：一次廉价的复制</a>
+    <a href="12-branch-ops.html">12. 创建、切换与管理分支</a>
+    <a href="13-merge.html">13. 合并全流程与 mergeinfo 机制</a>
+    <a href="14-tags.html">14. 标签与发布管理</a>
+    <div class="grp">第六阶段 · 属性系统</div>
+    <a href="15-properties.html">15. 属性系统：SVN 的隐藏超能力</a>
+    <a href="16-locking.html">16. 锁机制：二进制文件的独占保护</a>
+    <div class="grp">第七阶段 · 服务端</div>
+    <a href="17-deploy-choice.html">17. 服务端部署：方案选型</a>
+    <a href="18-svnserve.html">18. svnserve 部署实战</a>
+    <a href="19-authz.html">19. 认证与权限：authz 精细控制</a>
+    <a href="20-hooks.html">20. 钩子脚本：让 SVN 按你的规矩办事</a>
+    <div class="grp">第八阶段 · 运维与进阶</div>
+    <a href="21-backup.html">21. 备份、恢复与仓库维护</a>
+    <a href="22-advanced.html" class="on">22. 高级技巧与效率提升</a>
+    <a href="23-troubleshooting.html">23. 故障排查速查</a>
+    <a href="24-cheatsheet.html">24. 命令速查表</a>
+    <a href="25-gui.html">25. 图形客户端与 IDE 集成</a>
+    <div class="grp">快速跳转</div>
+    <a href="index.html">总目录</a>
+
+  </nav>
+</aside>
+<main>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/>
+    </marker>
+    <marker id="arwb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/>
+    </marker>
+    <marker id="arwg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7ee787"/>
+    </marker>
+    <marker id="arwr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff7b72"/>
+    </marker>
+    <marker id="arwp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#d2a8ff"/>
+    </marker>
+    <marker id="arwy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#e3b341"/>
+    </marker>
+    <marker id="arwc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#56d4dd"/>
+    </marker>
+    <linearGradient id="g-blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#58a6ff" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#58a6ff" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-pur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d2a8ff" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#d2a8ff" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7ee787" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#7ee787" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-orange" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffa657" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#ffa657" stop-opacity=".04"/>
+    </linearGradient>
+  </defs>
+</svg>
+<div class="crumb">
+  <span class="stage">第八阶段 · 运维与进阶</span>
+  <span class="sep">/</span>
+  <a href="index.html">总目录</a>
+  <span class="sep">/</span>
+  <span class="cur">第 22 节</span>
+</div>
+
+<h3 class="sec" id="s22"><span class="no">22</span>高级技巧与效率提升</h3>
+
+<h4 class="sub">稀疏检出：只拉你要的那部分</h4>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 22-1　--depth 的四种取值</span><span class="fs">Depth</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 400" width="980" height="400" role="img" aria-label="SVN 稀疏检出 depth 取值图">
+  <!-- 目录树示意 -->
+  <text class="hd" x="30" y="28" fill="#e6edf3">仓库结构</text>
+  <text class="tm2" x="44" y="56">trunk/</text>
+  <text class="tm2" x="74" y="78">├── src/</text>
+  <text class="tm2" x="104" y="100">│   ├── main.cs</text>
+  <text class="tm2" x="104" y="122">│   └── utils.cs</text>
+  <text class="tm2" x="74" y="144">├── docs/</text>
+  <text class="tm2" x="104" y="166">│   └── guide.md</text>
+  <text class="tm2" x="74" y="188">├── art/</text>
+  <text class="tm2" x="104" y="210">│   └── huge-textures/  (5GB+)</text>
+  <text class="tm2" x="74" y="232">└── README.md</text>
+
+  <!-- 四种 depth -->
+  <rect class="n-blue" x="340" y="40" width="200" height="86" rx="10"/>
+  <text class="hd" x="360" y="64" fill="#58a6ff">--depth empty</text>
+  <text class="ts" x="360" y="86">只有目录本身</text>
+  <text class="ts" x="360" y="108">连文件名都不拉</text>
+
+  <rect class="n-green" x="560" y="40" width="200" height="86" rx="10"/>
+  <text class="hd" x="580" y="64" fill="#7ee787">--depth files</text>
+  <text class="ts" x="580" y="86">目录 + 文件</text>
+  <text class="ts" x="580" y="108">不要子目录内容</text>
+
+  <rect class="n-yellow" x="340" y="146" width="200" height="86" rx="10"/>
+  <text class="hd" x="360" y="170" fill="#e3b341">--depth immediates</text>
+  <text class="ts" x="360" y="192">目录 + 文件 + 子目录</text>
+  <text class="ts" x="360" y="214">但子目录内容为空</text>
+
+  <rect class="n-pur" x="560" y="146" width="200" height="86" rx="10"/>
+  <text class="hd" x="580" y="170" fill="#d2a8ff">--depth infinity</text>
+  <text class="ts" x="580" y="192">完全递归</text>
+  <text class="ts" x="580" y="214">默认值，全部拉下来</text>
+
+  <!-- 第五种取值 exclude，仅 set-depth 支持 -->
+  <rect class="n-red" x="30" y="146" width="290" height="86" rx="10"/>
+  <text class="hd" x="50" y="170" fill="#ff7b72">--set-depth exclude</text>
+  <text class="ts" x="50" y="192">第 5 种取值，<tspan fill="#e6edf3">只属于 --set-depth</tspan></text>
+  <text class="ts" x="50" y="214">把已检出的目录整个移除（不只是清空）</text>
+
+  <!-- 效果对比 -->
+  <rect x="340" y="256" width="620" height="126" rx="10" fill="#0b0f14" stroke="#30363d" stroke-width="1.3"/>
+  <text class="hd" x="360" y="280" fill="#7ee787">稀疏检出的实际效果</text>
+  <line x1="360" y1="292" x2="940" y2="292" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm2" x="360" y="314" fill="#7ee787">$ svn checkout ^/trunk wc --depth immediates</text>
+  <text class="ts" x="360" y="334">拉下来：trunk/ + README.md + src/ (空) + docs/ (空) + art/ (空)</text>
+  <text class="ts" x="360" y="354">省掉了：huge-textures 那 5GB 内容（但目录壳还在）</text>
+
+  <text class="tm2" x="360" y="376" fill="#7ee787">$ svn update --set-depth infinity src/   ← 按需拉取</text>
+
+  <!-- 左下 -->
+  <rect x="30" y="256" width="290" height="126" rx="10" fill="rgba(210,168,255,.07)" stroke="#d2a8ff" stroke-width="1.3"/>
+  <text class="hd" x="50" y="280" fill="#d2a8ff">典型场景</text>
+  <text class="ts" x="50" y="302">• 美术仓库超大，程序只</text>
+  <text class="ts" x="70" y="322">需要 src 目录</text>
+  <text class="ts" x="50" y="344">• CI 构建只需代码，</text>
+  <text class="ts" x="70" y="364">不需要美术资源</text>
+  <text class="ts" x="50" y="386">• 只想看某个分支的配置</text>
+</svg>
+  </div>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">稀疏检出实战</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ---- 检出时只拉一层 ----</span>
+svn checkout ^/trunk wc --depth immediates
+
+<span class="c"># ---- 事后按需加深某个子目录 ----</span>
+cd wc
+svn update --set-depth infinity src/      <span class="c"># src 完整拉下来</span>
+svn update --set-depth files docs/        <span class="c"># docs 只拉文件</span>
+
+<span class="c"># ---- 把整个工作副本变回完整 ----</span>
+svn update --set-depth infinity .
+
+<span class="c"># ---- 反过来：缩减已检出的目录（会删除本地文件！）----</span>
+svn update --set-depth empty art/         <span class="c"># 清空 art 目录内容，保留目录</span>
+svn update --set-depth exclude art/       <span class="c"># 整个目录从工作副本移除（更强）</span>
+
+<span class="c"># ---- 查看当前目录的深度设置 ----</span>
+svn info wc
+<span class="c"># 输出里有 Depth: immediates</span>
+
+<span class="c"># ---- 切换分支时保持稀疏 ----</span>
+svn switch ^/branches/feature-login --depth immediates
+
+<span class="c"># ---- 在稀疏工作副本里提交（只提交拉下来的部分）----</span>
+cd wc/src
+svn commit -m <span class="s">"只修改了 src 下的文件"</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：稀疏检出的效果</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 只拉一层</span>
+<span class="ps">$</span> <span class="cmd">svn checkout file:///E:/repo/trunk wc-sparse --depth immediates</span>
+Checked out revision <span class="hl">16</span>.
+<span class="cmt">↑ 只输出一行，没有逐个文件（因为子目录都没展开）</span>
+
+<span class="ps">$</span> <span class="cmd">Get-ChildItem wc-sparse | Select Name</span>
+.svn
+bob-test                  <span class="cmt">← 顶层条目都在</span>
+src
+webapp
+art.psd
+docs.md
+<span class="cmt">↑ 但子目录里面是空的 / 文件没拉下来</span>
+
+<span class="cmt"># 按需拉取 src 子目录</span>
+<span class="ps">$</span> <span class="cmd">svn update --set-depth infinity src</span>
+Updating 'src':
+<span class="ok">A</span>    src\main.cs
+Updated to revision 16.
+<span class="cmt">↑ 这时候才真正拉 src 里面的内容</span></pre>
+  </div>
+</div>
+
+<h4 class="sub">changelist：给改动分组</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">changelist 用法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ---- 创建变更列表并归类文件 ----</span>
+svn changelist doc-fix docs.md README.md
+svn changelist code-fix src/main.cs src/utils.cs
+svn changelist test-fix tests/*.cs
+
+<span class="c"># ---- 查看分组后的状态 ----</span>
+svn status
+<span class="c"># 输出会按 changelist 分组显示：</span>
+<span class="c"># --- Changelist 'doc-fix':</span>
+<span class="c"># M       docs.md</span>
+<span class="c"># --- Changelist 'code-fix':</span>
+<span class="c"># M       src/main.cs</span>
+
+<span class="c"># ---- 只提交某个列表 ----</span>
+svn commit --changelist doc-fix -m <span class="s">"文档修正：补充安装说明"</span>
+
+<span class="c"># ---- 只 diff 某个列表 ----</span>
+svn diff --changelist code-fix
+
+<span class="c"># ---- 从列表中移除 ----</span>
+svn changelist --remove src/main.cs
+svn changelist --remove --recursive .          <span class="c"># 全部移除</span>
+
+<span class="c"># ---- 典型用途：把「顺手改的东西」和「本次任务」分开提交 ----</span></pre>
+</div>
+
+<div class="box tip">
+  <span class="bt">changelist 是「小步提交」的助推器</span>
+  <p>很多人攒着一大堆改动一起提交，导致日志写不清、review 困难、回退时牵连太广。
+  changelist 让你能把「这次任务真正相关的改动」单独挑出来提交，
+  剩下的（比如顺手改的错别字、格式化的空行）放到下一个提交里。</p>
+</div>
+
+<h4 class="sub">其他实用技巧合集</h4>
+
+<div class="grid2">
+  <div class="card blue">
+    <h6>svn move：保留历史的重命名</h6>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">move vs 手工 mv</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ✓ 用 svn move（保留历史关联）</span>
+svn move old.cs new.cs
+<span class="c"># 执行后 status 会这样显示（实测）：</span>
+<span class="c">#   A  +    new.cs          ← 第4列的 + 表示「带复制的历史」</span>
+<span class="c">#        > moved from old.cs   ← 附加说明行（不在固定列位）</span>
+<span class="c">#   D       old.cs</span>
+<span class="c">#        > moved to new.cs</span>
+
+svn commit -m "重命名 old.cs 为 new.cs"
+<span class="c"># log -v 里会显示带来源的复制记录：</span>
+<span class="c">#    D /trunk/old.cs</span>
+<span class="c">#    A /trunk/new.cs (from /trunk/old.cs:21)</span>
+
+<span class="c"># ✗ 手工 mv（历史断开）</span>
+mv old.cs new.cs
+svn delete old.cs
+svn add new.cs
+<span class="c"># 历史里看成「删了一个 + 加了一个」，没有 from/to 的来源标注</span>
+
+<span class="c"># 查历史时：SVN 默认【就会】跟随复制历史，无需额外选项</span>
+svn log new.cs
+<span class="c"># 想「只看这个文件自己的历史、不追溯来源」才需要反转默认行为：</span>
+svn log --stop-on-copy new.cs
+
+<span class="c"># 目录也能移动</span>
+svn move src/ legacy-src/
+svn move ^/trunk/lib ^/branches/lib-experimental</pre>
+    </div>
+  </div>
+
+  <div class="card green">
+    <h6>svn blame：逐行追责</h6>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">blame 用法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 每一行前面标出：版本号 作者</span>
+svn blame README.md
+<span class="c">#      8     kelang  版本最终：包含登录功能</span>
+
+<span class="c"># 带日期</span>
+svn blame -v README.md
+
+<span class="c"># 换成 XML 便于脚本处理</span>
+svn blame --xml src/main.cs
+
+<span class="c"># 只看某个版本区间的责任</span>
+svn blame -r 10:20 src/main.cs
+
+<span class="c"># 忽略空白差异（格式化改动造成的假变更）</span>
+svn blame -x -w src/main.cs
+
+<span class="c"># 追查某一行是谁引入的</span>
+svn blame src/main.cs | grep "问题代码"</pre>
+    </div>
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="card pur">
+    <h6>svn cat / export：不落盘查看与导出</h6>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">用法</span><span class="acts"><button data-copy">复制</button></span></div>
+<pre class="code"><span class="c"># 直接看某个版本的某个文件（不检出）</span>
+svn cat -r 8 README.md
+svn cat -r 8 file:///repo/trunk/README.md
+
+<span class="c"># 导出干净副本（不含 .svn，可直接打包）</span>
+svn export ^/trunk release-build/
+svn export -r 520 ^/trunk release-r520/
+svn export ^/tags/v1.0.0 v1.0.0/
+svn export --force ^/trunk ./     <span class="c"># 覆盖已有目录</span>
+
+<span class="c"># export vs checkout 的选择</span>
+<span class="c"># export  → 构建产物、给别人一份、不打算提交</span>
+<span class="c"># checkout → 要提交、要更新、要 diff</span>
+
+<span class="c"># 用 export 避免 .svn 污染构建产物</span>
+svn export ^/tags/v2.0 ./dist &amp;&amp; cd dist &amp;&amp; make</pre>
+    </div>
+  </div>
+
+  <div class="card warn">
+    <h6>svn info --show-item：脚本友好输出</h6>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">等价于只取一个字段</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 只输出一个值，无需 grep/awk 解析</span>
+svn info --show-item revision
+<span class="c"># 20</span>
+
+svn info --show-item last-changed-revision
+svn info --show-item url
+svn info --show-item relative-url
+<span class="c"># ^/trunk</span>
+
+svn info --show-item repos-root-url
+svn info --show-item wc-root
+svn info --show-item kind
+svn info --show-item revision --no-newline    <span class="c"># 不带换行，方便拼字符串</span>
+
+<span class="c"># 脚本示例：拿到当前版本号做版本标记</span>
+REV=$(svn info --show-item last-changed-revision --no-newline)
+echo "BUILD_VERSION=1.0.0-r${REV}" &gt; version.env</pre>
+    </div>
+  </div>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">批量操作与自动化脚本</span><span class="acts"><button data-copy">复制</button></span></div>
+<pre class="code"><span class="c"># ---- 批量给新加入的文件设置 svn:eol-style ----</span>
+svn status | grep <span class="s">'^A'</span> | awk <span class="s">'{print $2}'</span> | \
+  xargs -I{} svn propset svn:eol-style native {}
+svn commit -m <span class="s">"统一新增文件的换行符属性"</span>
+
+<span class="c"># ---- 找出所有未加入版本控制的文件并批量添加 ----</span>
+svn status | grep <span class="s">'^?'</span> | awk <span class="s">'{print $2}'</span> | xargs svn add
+
+<span class="c"># ---- 批量解决冲突 ----</span>
+svn status | grep <span class="s">'^C'</span> | awk <span class="s">'{print $2}'</span> | \
+  xargs -I{} svn resolve --accept working {}
+
+<span class="c"># ---- 提交前自动检查：有没有残留冲突标记 ----</span>
+if grep -rn <span class="s">'^&lt;&lt;&lt;&lt;&lt;&lt;&lt;'</span> --include=<span class="s">"*.cs"</span> --include=<span class="s">"*.js"</span> . ; then
+  echo <span class="s">"发现未解决的冲突标记，请先处理！"</span>
+  exit 1
+fi
+
+<span class="c"># ---- 把工作副本恢复到干净状态（危险操作，谨慎）----</span>
+svn revert -R .
+svn cleanup
+svn status --no-ignore | grep <span class="s">'^?'</span> | awk <span class="s">'{print $2}'</span> | xargs rm -rf
+
+<span class="c"># ---- 找出最近一周的提交，生成变更报告 ----</span>
+svn log -r <span class="s">"{$(date -d '7 days ago' +%Y-%m-%d)}:HEAD"</span> -v &gt; weekly-changes.txt
+
+<span class="c"># ---- 统计每个人的提交次数 ----</span>
+svn log -q -r 1:HEAD | grep <span class="s">'^r'</span> | awk -F<span class="s">'|'</span> <span class="s">'{print $2}'</span> | \
+  tr -d <span class="s">' '</span> | sort | uniq -c | sort -rn
+
+<span class="c"># ---- 对比两个分支的差异清单 ----</span>
+svn diff ^/trunk ^/branches/feature --summarize
+
+<span class="c"># ---- 找出某个文件的所有修改者 ----</span>
+svn log -q src/main.cs | grep <span class="s">'^r'</span> | awk -F<span class="s">'|'</span> <span class="s">'{print $2}'</span> | sort -u</pre>
+</div>
+
+<div class="box tip">
+  <span class="bt">在 ~/.subversion/config 里值得改的几个默认值</span>
+  <div class="codewrap">
+    <div class="codehead"><span class="lang">ini</span><span class="fn">性能与体验优化</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">[helpers]
+<span class="c"># 图形化 diff 工具（配置后 svn diff --diff-cmd 可用）</span>
+diff-cmd = meld
+diff3-cmd = meld
+<span class="c"># 交互式冲突解决工具</span>
+merge-tool-cmd = meld
+
+[miscellany]
+enable-auto-props = yes
+global-ignores = *.o *.lo *.la *.al .libs *.so *.so.[0-9]* *.a *.pyc *.pyo
+  __pycache__ *.rej *~ #*# .#* .*.swp .DS_Store [Tt]humbs.db
+  *.vs bin obj *.user *.suo .idea *.iml node_modules
+
+[auto-props]
+<span class="c">（见第 15.3 节完整配置）</span>
+
+[tunnels]
+<span class="c"># 自定义隧道（比如通过跳板机访问）</span>
+<span class="c"># 用法：svn checkout svn+mycompany://path</span>
+mycompany = ssh -p 2222 -l svnuser relay.example.com
+
+[auth]
+<span class="c"># 凭据缓存方式：simple（明文，默认）/ windows-crypt / gnome-keyring</span>
+password-stores = windows-crypt
+store-passwords = yes
+store-auth-creds = yes</pre>
+    </div>
+  </div>
+
+<!-- ==========================================================================
+     第 23 节：故障排查
+     ========================================================================== -->
+
+<div class="pager">
+  <a href="21-backup.html"><span class="lbl">← 上一节</span><span class="ttl">21. 备份、恢复与仓库维护</span></a>
+  <a class="home" href="index.html"><span class="ttl">总目录</span></a>
+  <a class="next" href="23-troubleshooting.html"><span class="lbl">下一节 →</span><span class="ttl">23. 故障排查速查</span></a>
+</div>
+
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+
+<script>
+
+(function () {
+  'use strict';
+
+  /* ============================================================
+     1. 代码块增强：语法高亮 + 复制按钮 + 换行切换
+     ============================================================ */
+
+  // 极简高亮器：只处理注释、字符串、SVN 命令、选项
+  function escapeHtml(t) {
+    return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function highlight(code) {
+    var lines = code.split('\n');
+    var out = [];
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var indented = escapeHtml(line);
+
+      // 整行注释（# 或 rem 或 :: 开头）
+      if (/^\s*(#|rem\s|::)/i.test(line) && !/^\s*#!/.test(line)) {
+        out.push('<span class="c">' + indented + '</span>');
+        continue;
+      }
+
+      // 行内注释：找到未被引号包裹的 #
+      var result = '';
+      var inStr = false;
+      var strChar = '';
+      var commentStart = -1;
+
+      for (var j = 0; j < line.length; j++) {
+        var ch = line[j];
+        if (!inStr && (ch === '"' || ch === "'")) {
+          inStr = true;
+          strChar = ch;
+        } else if (inStr && ch === strChar) {
+          if (line[j - 1] !== '\\') inStr = false;
+        } else if (!inStr && ch === '#' && j > 0 && line[j - 1] === ' ' && /^\s*#/.test(line.slice(j)) === false) {
+          commentStart = j;
+          break;
+        }
+      }
+
+      var codePart = commentStart >= 0 ? line.slice(0, commentStart) : line;
+      var commentPart = commentStart >= 0 ? line.slice(commentStart) : '';
+      var esc = escapeHtml(codePart);
+
+      // 字符串
+      esc = esc.replace(/(&quot;[^&]*?&quot;|&#39;[^&]*?&#39;)/g, '<span class="s">$1</span>');
+      // 注释里的 svn 命令名（行首后的第一个词）
+      esc = esc.replace(/^(\s*)(svn|svnadmin|svnserve|svnlook|svndumpfilter|svnrdump|svnauthz|svnmucc|sc|find|curl|mail|tar|export|cd|set|echo|if|for|chmod|xargs|grep|awk|sudo)\b/,
+        '$1<span class="k">$2</span>');
+      // 长选项
+      esc = esc.replace(/(\s)(--?[a-zA-Z][a-zA-Z0-9-]*)/g, '$1<span class="a">$2</span>');
+      // 数字（版本号之类）
+      esc = esc.replace(/\b(r\d+)\b/g, '<span class="m">$1</span>');
+
+      result = esc;
+      if (commentPart) result += '<span class="c">' + escapeHtml(commentPart) + '</span>';
+      out.push(result);
+    }
+    return out.join('\n');
+  }
+
+  // 处理所有 codewrap 里的 pre.code
+  var wraps = document.querySelectorAll('.codewrap');
+
+  Array.prototype.forEach.call(wraps, function (wrap) {
+    var pre = wrap.querySelector('pre.code');
+    if (!pre) return;
+
+    // 如果代码块里已经有手工写好的语法着色 span，就原样保留，不再重复处理
+    var alreadyStyled = pre.querySelector('span');
+    if (!alreadyStyled) {
+      var raw = pre.textContent;
+      var codeEl = pre.querySelector('code') || pre;
+      codeEl.innerHTML = highlight(raw);
+    }
+
+    // 加复制按钮（若无）
+    var acts = wrap.querySelector('.acts');
+    if (acts && !acts.querySelector('[data-copy]')) {
+      var b = document.createElement('button');
+      b.setAttribute('data-copy', '');
+      b.textContent = '复制';
+      acts.appendChild(b);
+    }
+  });
+
+  // 复制功能
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('[data-copy]');
+    if (!btn) return;
+
+    var wrap = btn.closest('.codewrap') || btn.closest('.term');
+    if (!wrap) return;
+    var pre = wrap.querySelector('pre');
+    if (!pre) return;
+
+    var text = pre.textContent;
+
+    function done() {
+      btn.textContent = '已复制';
+      btn.classList.add('ok');
+      setTimeout(function () {
+        btn.textContent = '复制';
+        btn.classList.remove('ok');
+      }, 1400);
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text, done); });
+    } else {
+      fallback(text, done);
+    }
+  });
+
+  function fallback(text, done) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done();
+    } catch (err) { /* 静默失败 */ }
+  }
+
+  /* ============================================================
+     2. 进度条 + 回到顶部
+     ============================================================ */
+  var prog = document.getElementById('prog');
+  var topBtn = document.getElementById('top');
+
+  function onScroll() {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var pct = max > 0 ? (h.scrollTop || document.body.scrollTop) / max * 100 : 0;
+    if (prog) prog.style.width = pct + '%';
+    if (topBtn) {
+      if ((h.scrollTop || document.body.scrollTop) > 600) topBtn.classList.add('show');
+      else topBtn.classList.remove('show');
+    }
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  if (topBtn) {
+    topBtn.onclick = function () { window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  }
+
+  /* ============================================================
+     3. 导航高亮：滚动时自动标记当前小节
+     ============================================================ */
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll('#nav a'));
+  var sections = navLinks.map(function (a) {
+    var id = a.getAttribute('href');
+    return { el: id && id.length > 1 ? document.querySelector(id) : null, a: a };
+  }).filter(function (s) { return s.el; });
+
+  function highlightNav() {
+    var pos = window.scrollY + 140;
+    var current = null;
+    for (var i = 0; i < sections.length; i++) {
+      if (sections[i].el.offsetTop <= pos) current = sections[i];
+    }
+    navLinks.forEach(function (a) { a.classList.remove('on'); });
+    if (current) {
+      current.a.classList.add('on');
+      // 让当前项在侧栏可见
+      var box = current.a.parentElement;
+      if (box && box.scrollHeight > box.clientHeight) {
+        var aTop = current.a.offsetTop;
+        if (aTop < box.scrollTop || aTop > box.scrollTop + box.clientHeight - 60) {
+          box.scrollTop = aTop - box.clientHeight / 2;
+        }
+      }
+    }
+  }
+
+  window.addEventListener('scroll', highlightNav, { passive: true });
+  highlightNav();
+
+  /* ============================================================
+     4. 表格首列若为空白则隐藏（防止空单元格）
+     ============================================================ */
+  Array.prototype.forEach.call(document.querySelectorAll('table'), function (t) {
+    var firstTh = t.querySelector('thead th');
+    var firstTd = t.querySelector('tbody td');
+    if (firstTh && firstTd && !firstTh.textContent.trim() && !firstTd.textContent.trim()) {
+      Array.prototype.forEach.call(t.querySelectorAll('tr'), function (tr) {
+        var c = tr.querySelector('th, td');
+        if (c) c.style.display = 'none';
+      });
+    }
+  });
+
+})();
+
+</script>
+</body>
+</html>

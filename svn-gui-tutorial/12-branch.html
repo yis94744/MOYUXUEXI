@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>12. 建分支：开一条独立开发线 | SVN 图形化实战</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 图形化实战</h1></div>
+  <div class="brand-sub">TortoiseSVN + VisualSVN · 全鼠标操作</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 准备</div>
+    <a href="01-tools.html">1. 认识你的两个图形工具</a>
+    <a href="02-first-checkout.html">2. 第一次检出：把代码拉到本地</a>
+    <a href="03-icons.html">3. 看懂图标角标与右键菜单</a>
+    <div class="grp">第二阶段 · 日常使用</div>
+    <a href="04-daily.html">4. 日常三件事：改、更、提</a>
+    <a href="05-status.html">5. 查看改动：哪些文件变了</a>
+    <a href="06-diff.html">6. 比对差异：到底改了哪几行</a>
+    <a href="07-add-delete.html">7. 新增、删除、重命名文件</a>
+    <a href="08-history.html">8. 查看历史：Log 对话框详解</a>
+    <a href="09-revert.html">9. 撤销：改错了怎么退回</a>
+    <div class="grp">第三阶段 · 进阶操作</div>
+    <a href="10-conflict.html">10. 冲突处理：两人改了同一处</a>
+    <a href="11-merge-tool.html">11. 合并编辑器：逐行选择保留谁</a>
+    <a href="12-branch.html" class="on">12. 建分支：开一条独立开发线</a>
+    <a href="13-switch.html">13. 切换分支：在主干和分支间跳</a>
+    <a href="14-merge.html">14. 合并分支：把改动并回主干</a>
+    <a href="15-revision-graph.html">15. 版本拓扑图：看清分支走向</a>
+    <div class="grp">第四阶段 · 属性与锁</div>
+    <a href="16-ignore.html">16. 忽略文件：让编译产物别再烦我</a>
+    <a href="17-properties.html">17. 属性对话框：设置文件行为</a>
+    <a href="18-lock.html">18. 文件锁：二进制文件独占编辑</a>
+    <div class="grp">第五阶段 · 服务端管理</div>
+    <a href="19-server.html">19. 服务端：VisualSVN 建仓库</a>
+    <a href="20-users.html">20. 用户与权限：谁能看谁能改</a>
+    <a href="21-backup.html">21. 备份与恢复：图形界面操作</a>
+    <div class="grp">第六阶段 · 效率技巧</div>
+    <a href="22-patch-export.html">22. 补丁与导出：不走仓库传代码</a>
+    <a href="23-settings.html">23. 设置面板：常用选项怎么调</a>
+    <a href="24-troubleshoot.html">24. 常见问题：报错怎么处理</a>
+    <a href="25-cheatsheet.html">25. 图形操作速查表</a>
+
+  </nav>
+</aside>
+<main>
+<div class="crumb">
+  <span class="stage">第三阶段 · 进阶操作</span>
+  <span class="sep">/</span>
+  <a href="index.html">总目录</a>
+  <span class="sep">/</span>
+  <span class="cur">第 12 节</span>
+</div>
+
+<h3 class="sec" id="s12"><span class="no">12</span>建分支：开一条独立开发线</h3>
+
+<p class="lead"> 分支（branch）说穿了就一句话：<strong>把主干复制一份出来，在副本上随便折腾，不影响主干</strong>。 折腾成功了就合回去，折腾失败了就把副本一删，主干干干净净。
+</p>
+
+<div class="box key">
+  <span class="bt">为什么需要分支：给自己一块可以随便踩的地</span>
+  <p> 没有分支的时候，所有改动都直接落在主干上。<strong>主干是大家共用的那条线</strong>， 你在上面改一半的东西，别人一更新就全看见了——包括那些还没写完、根本跑不起来的半成品。
+  </p>
+  <p>分支解决的就是这个问题。典型有三种场景：</p>
+  <ul>
+    <li><strong>做新功能</strong>——一个功能可能要写两周。 这两周里主干还会不断有新提交，你不想天天去处理冲突， 也不想把自己写了一半的代码塞给别人。开条分支，安安静静写完再合回去。</li>
+    <li><strong>修紧急 bug</strong>——线上出问题了，必须马上出一个修复版本。 但主干上正在做的新功能还没完成，不能跟着一起发。 这时候从<strong>已发布的那个版本</strong>拉一条修复分支出来，只改 bug，改完发版。</li>
+    <li><strong>试不确定的方案</strong>——这个思路不一定成，先试试。 在分支上试，成了就合回来，不成就丢掉。<b>主干完全没被污染</b>。</li>
+  </ul>
+  <p>一句话：<strong>分支让你在「不动别人」的前提下，想怎么改就怎么改。</strong></p>
+</div>
+
+<h4 class="sub">好消息：SVN 的分支不是「复制一份文件」</h4>
+
+<p> 很多人一听「复制一份出来」就担心：仓库是不是要占两份空间？复制是不是要等很久？
+</p>
+<p> 都不会。<strong>SVN 的分支非常轻量</strong>：它本质上是<em>服务器端的一次路径复制</em>—— 服务器把某个目录的内容<b>用链接的方式</b>指向原来那份数据，而不是真的把每个文件再存一遍。
+</p>
+
+<div class="grid2">
+  <div class="card good">
+    <h6>创建分支时发生的事</h6>
+    <ul>
+      <li><strong>瞬间完成</strong>——不管项目有多大，创建分支都是几秒钟的事，不会再传一遍几百兆的代码。</li>
+      <li><strong>几乎不占空间</strong>——新分支只是多了一行「指向旧数据」的记录。只有你之后在新分支上真正改了文件，那些改动才会额外占用空间。</li>
+      <li><strong>服务器端操作</strong>——整个过程在服务器上完成，你的本地工作副本不会有任何变化。</li>
+    </ul>
+  </div>
+  <div class="card warn">
+    <h6>但有两件事要想清楚</h6>
+    <ul>
+      <li><strong>它是一条新路径</strong>，意味着以后你要对着这条路径做检出、切换、合并，需要记住自己在哪条线上。</li>
+      <li><strong>分支不是「保险箱」</strong>——开了分支不等于自动安全， 长期不合回主干的分支最后会越来越难合，<b>这一点在后面的合并章节会专门讲</b>。</li>
+    </ul>
+  </div>
+</div>
+
+<h4 class="sub">面对面看这个对话框</h4>
+
+<p> 创建分支只有一个对话框，但它上面的选项比前面几节的都多，值得逐项认一遍。
+</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">Branch/Tag 对话框：从源到目标，一步复制</span><span class="fs">BRANCH / TAG</span></div>
+  <div class="sb"><img src="img/Copy.png" alt="Branch/Tag 对话框"></div>
+  <div class="cap">
+    这个窗口从上到下分成<b>四块</b>，认清了就不会填错：<br><br>
+
+    <b>① <span class="k">From WC/URL</span> · 源头</b>——<b>你要从哪儿复制</b>。 这里显示的是你当前右键的那个路径（可以是本地工作副本路径，也可以是仓库地址）。 大多数时候它就是你的主干目录，<strong>这一栏一般不用改</strong>。<br>
+    <em>「WC」是 working copy（工作副本）的缩写，意思是「从我本地这份复制」， 这是最常见也最省事的来源。</em><br><br>
+
+    <b>② <span class="k">To path</span> · 目标路径</b>——<b>新分支叫什么名字、放在哪儿</b>。 注意这里填的是<strong>仓库内的相对路径</strong>，不是磁盘上的文件夹。 通常写成 <code class="ic">/branches/功能名</code> 这种形式。 <b>这是整个对话框里唯一必须你动脑子的地方</b>，下一节表格专门讲怎么填。<br><br>
+
+    <b>③ <span class="k">Destination URL</span> · 目标完整地址</b>——<strong>你不用填，它会自己算出来</strong>。 系统把你上面写的 <code class="ic">To path</code> 拼接到仓库根地址后面， 在这里显示成一个完整的 URL，让你<b>确认一眼「最终会建到哪儿」</b>。<br>
+    <em>养成习惯：动手点 OK 之前，瞟一眼这一栏，看路径是不是你预期的那条。</em><br><br>
+
+    <b>④ <span class="k">Log message</span> · 说明区</b>——给这次建分支留一句说明。 别嫌麻烦，<strong>这一句会被记进历史里</strong>，以后在日志里翻到这一版时， 全靠它告诉别人「这条分支是干嘛用的」。 写法比如 <code class="ic">从主干拉出分支，开始做订单导出功能</code>。<br><br>
+
+    <b>⑤ <span class="k">Create copy in the repository from:</span> · 从哪个版本复制</b>——这一组是<strong>单选项</strong>，决定「复制哪一时刻的内容」：<br>
+    &nbsp;&nbsp;• <span class="k">HEAD revision in the repository</span>——<b>用服务器上最新那一版</b>。 最常用，默认就是它，<b>绝大多数情况选这个就够了</b>。<br>
+    &nbsp;&nbsp;• <span class="k">Specific revision in the repository</span>——<b>用指定的某一版</b>。 比如「我要从上次发版的那个版本拉一条修复分支」，就在这儿填版本号。 旁边通常有 <code class="ic">Show log</code> 之类的入口帮你挑版本，不用自己记编号。<br>
+    &nbsp;&nbsp;• <span class="k">Working copy</span>——<b>用你本地工作副本当前的样子</b>。 这个要<strong>特别小心</strong>：它会把<b>你还没提交的本地改动</b>一起复制进新分支。 好处是「我本地试得差不多了，直接开成分支」，坏处是那段内容在主干历史里<b>找不到对应的版本记录</b>。<br>
+    <em>拿不准的时候，永远选第一个。</em><br><br>
+
+    <b>⑥ <span class="k">Create intermediate folders</span> · 自动建中间目录</b>——勾上之后， 如果你写的路径中间有还不存在的目录（比如 <code class="ic">branches</code> 这个目录压根还没建过）， SVN 会<strong>顺手帮你一层层建好</strong>，而不会报错说「路径不存在」。<br>
+    <em>通常保持勾选，省事。</em><br><br>
+
+    <b>⑦ <span class="k">Switch working copy to new branch/tag</span> · 建完就切过去</b>——勾上这个， 创建完成后<b>你当前的工作副本会直接转到新分支上</b>，不用再单独执行一次切换。 详细说明见下面蓝色提示框。<br><br>
+
+    <b>⑧ 底部的 <span class="k">OK</span> / <span class="k">Cancel</span></b>——确认或放弃。 <b>点 OK 只是创建分支，不会修改你的文件，也不会自动提交任何代码改动。</b>
+  </div>
+</div>
+
+<h4 class="sub">实际操作步骤</h4>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">BRANCH</span>从右键到分支建好</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">在一个已受版本控制的文件夹上右键</span>
+      <span class="sc">在你要作为「源头」的那个文件夹上点右键——一般是<b>主干目录</b>。 <em>选错目录会导致分支的内容不对，动手前先在地址栏确认一眼路径。</em></span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">打开分支菜单</span>
+      <span class="sc"><span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Branch/tag...</span></span><br>
+      菜单名里那个 <code class="ic">...</code> 表示「点了会打开一个对话框」，不是直接执行。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">确认来源，填写目标路径</span>
+      <span class="sc">看一眼 <code class="ic">From WC/URL</code> 是不是你要的源头； 然后在 <code class="ic">To path</code> 里写新分支的路径， 比如 <code class="ic">/branches/order-export</code>。<br>
+      <strong>路径写完后看一眼 <code class="ic">Destination URL</code>，确认最终地址是对的。</strong></span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">填一句提交说明</span>
+      <span class="sc">在 <code class="ic">Log message</code> 里写清这条分支的用途。 例如 <code class="ic">从主干创建分支，开始开发订单导出功能，预计两周后合并</code>。<br>
+      <em>把「大概什么时候合回来」也写上，对以后接手的人非常友好。</em></span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">选择从哪个版本复制</span>
+      <span class="sc">保持默认的 <code class="ic">HEAD revision in the repository</code> 通常就对。 如果是<b>从某个已发布版本拉修复分支</b>，才选 <code class="ic">Specific revision</code> 并指定版本号。<br>
+      <em>慎用 <code class="ic">Working copy</code> 那一项，理由前面已经说过。</em></span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">决定要不要顺手切过去</span>
+      <span class="sc">如果你想「建完立刻就在新分支上干活」， 勾上 <code class="ic">Switch working copy to new branch/tag</code>。<br>
+      如果你的打算是「主干这边继续改，抽空再去检出分支」，就<b>别勾</b>。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">点 OK，等待完成提示</span>
+      <span class="sc">服务器端复制非常快，通常一闪而过。 完成后的提示框里会显示<b>这次操作产生的版本号</b>—— 记一下它，以后查这条分支从哪儿来的就靠这个号。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">回到文件夹，确认结果</span>
+      <span class="sc">如果你没勾「切换」，那么<b>本地工作副本看起来毫无变化</b>，这是正常的—— 分支建在服务器上。 想看看新分支确实存在，可以右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Repo-browser</span></span> 在仓库浏览器里展开 <code class="ic">branches</code> 目录确认。</span>
+    </div>
+  </div>
+</div>
+
+<h4 class="sub">To path 到底该怎么填</h4>
+
+<p> 这是唯一容易填错的地方。记住一个原则：<strong>分支是仓库里的一条路径，不是磁盘上的文件夹</strong>。 大家约定俗成会在仓库根下放三个目录：
+</p>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:150px">目录</th><th style="width:170px">放什么</th><th>写路径的例子</th></tr></thead>
+<tbody>
+  <tr>
+    <td><code class="ic">trunk</code></td>
+    <td><strong>主干</strong>：日常开发的那条主线</td>
+    <td>主干自己不用再建。<code class="ic">To path</code> 里通常不会出现它，它只是别人复制时的<b>来源</b>。</td>
+  </tr>
+  <tr>
+    <td><code class="ic">branches</code></td>
+    <td><strong>分支</strong>：临时开发线，用完可以删</td>
+    <td><code class="ic">/branches/order-export</code><br>功能相关的分支都放这儿，一看目录就知道有哪些在并行开发。</td>
+  </tr>
+  <tr>
+    <td><code class="ic">tags</code></td>
+    <td><strong>标签</strong>：留作纪念的快照，比如每个发布版本</td>
+    <td><code class="ic">/tags/v1.2.0</code><br><b>标签本质上就是分支</b>，操作方式完全一样，区别只在「约定上不许改」。</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box tip">
+  <span class="bt">标签是怎么来的？其实就是分支对话框，换个路径而已</span>
+  <p> 你可能注意到菜单叫 <code class="ic">Branch/tag...</code>。这不是偷懒，是<strong>事实如此</strong>： 在 SVN 里标签和分支是<em>同一个操作</em>——都是「复制一份到新路径」。 唯一的区别是人为约定：
+  </p>
+  <ul>
+    <li>放在 <code class="ic">branches/</code> 下面的，大家默认<b>会继续改它</b>。</li>
+    <li>放在 <code class="ic">tags/</code> 下面的，大家默认<b>只读不改</b>，当作一个历史快照。</li>
+  </ul>
+  <p>所以要打一个「v1.2.0 发布快照」，操作和建分支一模一样， 只是 <code class="ic">To path</code> 写成 <code class="ic">/tags/v1.2.0</code>。<strong>发版打标签是个好习惯</strong>： 以后线上出问题，能立刻定位到「当时发的到底是哪一版代码」。</p>
+</div>
+
+<div class="box tip">
+  <span class="bt">勾上「Switch working copy to new branch/tag」能省一步</span>
+  <p> 正常情况下，建完分支你的工作副本还停在主干上。 想去新分支干活，还得再单独做一次切换操作。
+  </p>
+  <p> 勾上这个勾选框，SVN 会在<b>创建完成后自动把你当前这份工作副本切到新分支上</b>—— 你的文件夹、文件一个都没动，但从此以后所有提交都落到新分支去了，<strong>少点一次右键，少一次选择</strong>。
+  </p>
+  <p><strong>什么时候该勾：</strong></p>
+  <ul>
+    <li>你就是为了做这个新功能才拉的分支，拉完马上就要开工——<b>勾上</b>。</li>
+    <li>主干那边还有事要收尾，想两边都保留——<b>别勾</b>，或者干脆再检出第二份工作副本。</li>
+  </ul>
+  <p> <strong>提醒</strong>：切换之后<b>左下角或文件夹属性里显示的路径会变</b>， 这时候你的提交都会进新分支。 <em>如果刚刚切换完就随手提交了一个改动，很容易「以为提交到主干，其实进了分支」—— 养成提交前看一眼当前分支的习惯。</em>
+  </p>
+</div>
+
+<div class="box warn">
+  <span class="bt">分支路径别乱起名，团队要先统一约定</span>
+  <p> <code class="ic">To path</code> 一旦点下去，<strong>这个名字就会长期留在服务器上</strong>， 而且以后合并、查日志都靠它。随手起名过几个月自己都认不出来。
+  </p>
+  <ul>
+    <li><strong>别用中文和空格。</strong>有些工具和环境对中文路径支持不好， 空格有时也会带来麻烦。<b>用英文小写加连字符</b>最稳，比如 <code class="ic">fix-login-timeout</code>。</li>
+    <li><strong>名字里带上「是干什么的」。</strong> <code class="ic">test1</code>、<code class="ic">new</code>、<code class="ic">temp</code> 这种名字一个月后就是垃圾。<b>写 <code class="ic">order-export</code> 这种能看懂的</b>。</li>
+    <li><strong>修复分支带上版本号。</strong>比如 <code class="ic">/branches/hotfix-1.2.1</code>， 一眼就知道它是给哪个版本打的补丁。</li>
+    <li><strong>功能完成、合并回主干后就把分支删掉。</strong> 分支列表里堆几十条僵尸分支，谁也说不清哪条还有人用。<em>删分支不影响历史记录，真要找回也很容易。</em></li>
+    <li><strong>开工前问一句团队。</strong>很多团队会规定「分支必须放在 <code class="ic">branches</code> 下、 命名必须是 <code class="ic">xxx-yyy</code> 格式」——<b>照着团队的约定来，比自己发明一套强</b>。</li>
+  </ul>
+</div>
+
+<div class="box ok">
+  <span class="bt">建分支这一节的要点回顾</span>
+  <ul>
+    <li><strong>分支 = 服务器端的一次复制</strong>，瞬间完成、几乎不占空间，不是真的存两份代码。</li>
+    <li><strong>操作路径只有一条</strong>：右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Branch/tag...</span></span> → 填 <code class="ic">To path</code> → 写说明 → OK。</li>
+    <li><strong>版本来源保持默认</strong>，只有拉修复分支才需要指定具体版本。</li>
+    <li><strong>想建完就在分支上干活</strong>，就勾上「切换工作副本」那一项。</li>
+    <li><strong>命名和存放位置要跟着团队约定走</strong>，别自己发明格式。</li>
+  </ul>
+  <p>下一节讲：分支建好了，怎么在工作副本上<strong>在主干和分支之间来回切</strong>。</p>
+</div>
+
+
+<div class="pager">
+  <a href="11-merge-tool.html"><span class="lbl">← 上一节</span><span class="ttl">11. 合并编辑器：逐行选择保留谁</span></a>
+  <a class="home" href="index.html"><span class="ttl">总目录</span></a>
+  <a class="next" href="13-switch.html"><span class="lbl">下一节 →</span><span class="ttl">13. 切换分支：在主干和分支间跳</span></a>
+</div>
+
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+<script src="assets/app.js"></script>
+</body>
+</html>

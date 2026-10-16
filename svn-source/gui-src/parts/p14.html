@@ -1,0 +1,226 @@
+<h3 class="sec" id="s14"><span class="no">14</span>合并分支：把改动并回主干</h3>
+<p class="lead"> 功能在分支上做完了，接下来要把它<strong>并回主干</strong>，让别人也能用上。 这一步叫合并（merge）。开始之前先记住一条最重要的规矩： <strong>合并要在「接收改动的那一方」的工作副本上做</strong>——想把分支合进主干，就要先站到主干的工作副本上去操作。
+</p>
+<div class="box key"> <span class="bt">方向别搞反：你在哪一边，改动就流到哪一边</span>
+  <p> 这是合并最容易搞错的地方，也是新手最常翻车的一步。
+  </p>
+  <p> 合并时你站在某个工作副本上右键执行合并，<strong>SVN 会把你指定的「来源」上的改动，搬到「你当前所在的」这份工作副本里来</strong>。 换句话说：
+  </p>
+  <ul>
+    <li>你站在<b>主干</b>上，选择从「分支」合并 → 分支的改动<b>流进主干</b>。<em>这是「功能做完了合回主干」。</em></li>
+    <li>你站在<b>分支</b>上，选择从「主干」合并 → 主干的改动<b>流进分支</b>。<em>这是「主干有新东西了，同步到分支上」。这个方向也要经常做。</em></li>
+  </ul>
+  <p> <strong>所以动手前先问自己一句：我要让改动流到哪里去？然后切到那一边再操作。</strong> <em>如果不小心搞反了，看到的效果就是「一堆莫名其妙的改动出现在错误的分支上」——虽然可以撤销，但会很麻烦。</em>
+  </p>
+</div>
+<div class="box key"> <span class="bt">SVN 会记住「哪些版本已经合过了」</span>
+  <p> 这一点是 SVN 合并机制里最值得知道的：<strong>每次合并，SVN 都会在版本库里留下记录</strong>， 标明「这次合并把来源的哪些版本吃进来了」。
+  </p>
+  <p> 带来的好处非常实在：<strong>下次你再从同一个来源合并时，已经合过的版本会自动被跳过</strong>， 不会重复合并一遍、也不会产生一堆重复的改动。
+  </p>
+  <p> 这跟很多人对「合并」的直觉不太一样。别的工具里，合并常常需要你自己记住「上次合到哪了」（记下那个版本号，下次从下一个开始）； <strong>SVN 把这件事交给了服务器记住</strong>，你只要在向导里选好范围就行。
+  </p>
+  <p> <em>也正因为如此，日志窗口里会看到一些版本被灰显（表示它们的改动已经被合并过了）—— 这是 SVN 在告诉你「这些你不用担心了」。这个现象在下一节的版本拓扑图里会看得更清楚。</em>
+  </p>
+</div>
+<h4 class="sub">面对面看合并向导：第一步</h4>
+<p> 合并向导有好几页，第一页最关键——它决定这次合并要按哪种方式做。
+</p>
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">Merge 向导第一页：选合并方式与版本范围</span><span class="fs">MERGE WIZARD</span></div>
+  <div class="sb"><img src="img/MergeWizardRange.png" alt="合并向导 - 选择版本范围"></div>
+  <div class="cap">
+    这一页从上到下有<b>三块内容</b>，一块一块看：<br><br>
+    <b>① 顶部的合并方式（三个单选项）</b>——这是整页的核心，<strong>选错了后面的步骤会完全不一样</strong>：<br><br>
+    &nbsp;&nbsp;<span class="tagmini b">最常用</span> <b><span class="k">Merge a range of revisions</span> · 合并一段版本范围</b><br>
+    &nbsp;&nbsp;意思是「把来源路径上<b>某几个版本</b>的改动搬到我这边来」。 <strong>日常 95% 的情况都用这一项</strong>——比如「把分支上第 100 到 130 版的改动合进主干」。 它把「改动」当作要搬运的对象，<b>可以只搬一部分，也可以分几次搬</b>。<br><br>
+    &nbsp;&nbsp;<b><span class="k">Merge two different trees</span> · 合并两棵不同的树</b><br>
+    &nbsp;&nbsp;意思是「把 A 路径的某个状态，变成 B 路径的某个状态」。 它比上面那种更灵活也更难掌握，典型用途是<b>同步两条长期并行的分支</b>、 或者处理那种「不是线性历史」的合并（比如分支和分支之间互相合）。<br>
+    &nbsp;&nbsp;<em>如果你只是想「把分支上的活儿合回主干」，不需要碰这一项。</em><br><br>
+    &nbsp;&nbsp;<b><span class="k">Merge reintegrate a branch</span> · 把分支完整地合回来</b><br>
+    &nbsp;&nbsp;这是一个「把整条分支整个搬回来」的专用方式。 它要求你<b>把分支上所有的改动一次全合过来，不能只合一部分</b>。 <em>哪些版本有这一项、哪些没有，取决于你服务器上装的 SVN 版本—— 新的版本里它已经被整合进第一种方式，界面上可能看不到它。 拿不准就用第一种。</em><br><br>
+    <b>② <span class="k">URL to merge from</span> · 从哪儿合过来</b>——<b>填「来源」的完整仓库地址</b>。 旁边同样有 <code class="ic">...</code> 浏览按钮可以点开仓库浏览器挑路径。<br>
+    <strong>这里填的就是你要合并过来的那条分支</strong>（比如 <code class="ic">.../branches/order-export</code>）。 有些情况下这一栏会自动带出一个建议值，<b>但一定要自己核对一遍</b>。<br><br>
+    <b>③ <span class="k">Revision range to merge</span> · 要合哪些版本</b>——<strong>填版本号的范围</strong>， 格式是「起始版本-结束版本」。<br>
+    &nbsp;&nbsp;• <strong>留空</strong>是常见做法：表示「把来源上<b>所有还没合过的版本</b>都合过来」。 因为 SVN 记得哪些合过了，留空通常就等于「补齐剩下没合的那些」——<b>这是最省心的用法</b>。<br>
+    &nbsp;&nbsp;• <strong>填具体范围</strong>：比如只想合 <code class="ic">100-130</code>， 就明确写上。适合「这次只合前半部分，剩下的下周期再说」的情况。<br>
+    &nbsp;&nbsp;• 注意它是「<b>从哪个版本到哪个版本</b>」，不是「第几版到第几版」。<em>填反了会得到一个空合并（什么也没发生），或者提示你范围内没有可合并的内容。</em><br><br>
+    <b>④ <span class="k">Show log</span> · 帮我挑版本</b>——<strong>这一页最实用的辅助按钮</strong>。 点开会显示出源路径的完整提交历史，<b>每条记录前面有勾选框</b>。<br>
+    &nbsp;&nbsp;你可以<b>用鼠标勾选要合并的那几条提交</b>，点确定后，向导会自动把对应的版本范围填进上面的输入框。<br>
+    &nbsp;&nbsp;<strong>它最贴心的点是会显示「哪些版本已经合过了」</strong>（那些条目会灰显或带标记）。 所以你不用自己去查上次合到哪了，<b>只看没灰的、勾上它们就行</b>。<br>
+    &nbsp;&nbsp;<em>不确定范围的时候，永远先点这个按钮看看。</em><br><br>
+    <b>⑤ <span class="k">Reverse merge</span> · 反向合并</b>——勾上它，这次的合并方向会<b>反过来</b>： 不是「把来源的改动加进来」，而是「把来源的改动从我这儿拿掉」。<br>
+    &nbsp;&nbsp;听起来奇怪，但用途很明确：<strong>撤销一次已经合并进来的改动</strong>。 比如某个功能合并进主干之后发现有大问题，要紧急撤掉，就用它。<br>
+    &nbsp;&nbsp;<em>日常正常合并时，<b>不要勾这一项</b>。勾错的后果是「你以为合进来一个功能，实际上把对应内容删掉了」。</em><br><br>
+    <b>⑥ 底部按钮</b>——<code class="ic">Next &gt;</code> 进入下一页（选具体选项、确认合并参数）， 最后一步会让你点 <b><code class="ic">Test Merge</code></b> 或 <b><code class="ic">Merge</code></b>。 <b>这两个按钮的区别，是本页下面蓝色提示框专门要讲的。</b>
+  </div>
+</div>
+<h4 class="sub">完整的合并操作步骤</h4>
+<div class="ops">
+  <div class="otitle"><span class="badge">MERGE</span>把分支的改动合回主干</div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">切到「接收方」的工作副本</span>
+      <span class="sc">要把分支合进主干，就<b>切到主干那份工作副本上</b>（或者在主干文件夹上操作）。<br>
+      <em>如果你用的是两份独立的工作副本，直接在主干那个文件夹上右键即可。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">先 Update 一次，把主干更到最新</span>
+      <span class="sc"><span class="mp">SVN Update</span>——<strong>这一步不能省</strong>。<br>
+      理由：你合进去的改动，要落在主干最新的内容上。 如果本地是几天前的旧版本，合并过程会产生大量<b>本来不该有的冲突</b>，白费力气。</span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">确认工作副本是干净的</span>
+      <span class="sc">看一眼有没有红色的「已修改」角标。<strong>先把本地未提交的改动处理掉</strong>， 该提交的提交、该撤销的撤销。<br>
+      原因见下面橙色警告框。</span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">右键打开合并向导</span>
+      <span class="sc"><span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Merge...</span></span><br>
+      <em>注意是在<b>主干文件夹</b>上右键——右键的位置决定了改动流向哪里。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">选择合并方式</span>
+      <span class="sc">绝大多数情况选第一个：<code class="ic">Merge a range of revisions</code>。<br>
+      <em>只合一部分改动、或者要分几次慢慢合，它都能应付。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">填来源地址，再用 Show log 挑版本</span>
+      <span class="sc">在 <code class="ic">URL to merge from</code> 里填<b>分支的地址</b>（用 <code class="ic">...</code> 浏览挑选最稳）。<br>
+      然后点 <code class="ic">Show log</code>，<strong>在历史列表里勾选要合并的那些提交</strong>， 让版本范围自动填好。<br>
+      <em>看到灰色的、已经合过的条目就跳过它们。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">检查 Reverse merge 有没有被误勾</span>
+      <span class="sc">这个勾选框在正常合并时<b>必须是没勾上的状态</b>。 顺手确认一眼，比出事后再补救划算得多。</span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">点 Test Merge 预演一遍（强烈推荐）</span>
+      <span class="sc">向导里会提供 <code class="ic">Test Merge</code> 按钮。 <strong>点它！</strong>它会把「这次合并将要产生的改动」列出来给你看， 但<b>不会真的动你的文件</b>。<br>
+      <em>详细说明见下面蓝色提示框。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">预演没问题，点 Merge 正式执行</span>
+      <span class="sc">这时候文件才会真的被修改。进度对话框里会列出每个被处理的文件—— <b>新增、修改、删除、冲突，各是各的颜色</b>。</span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">检查合并结果，处理冲突</span>
+      <span class="sc">合并完<b>先别急着提交</b>。 如果有文件变成冲突状态（黄底红叹号），逐个解决它们， 解决完右键 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Resolved</span></span>。<br>
+      <em>就算没有冲突，也建议随便打开几个被合并的文件看一眼—— 尤其是那些「两边都改过」的地方。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">提交，说明里写清这次合并了什么</span>
+      <span class="sc">在 <code class="ic">Message</code> 里明确写「从哪条分支合并过来、做了什么」。 比如 <code class="ic">从 branches/order-export 合并订单导出功能，含 118-142 版改动</code>。<br>
+      <strong>这次提交会把合并记录一起存进版本库</strong>，下次合并才能自动跳过这些版本。</span>
+    </div>
+  </div>
+</div>
+<div class="box tip"> <span class="bt">★ 执行前一定要点 Test Merge</span>
+  <p> 这是本节最想推荐的一个习惯。
+  </p>
+  <p> <strong><code class="ic">Test Merge</code> 是「试合并」</strong>：它完整地走一遍合并的计算过程， 把<b>将要发生什么</b>清清楚楚列出来——哪些文件会被改、哪些会被新增、哪些会被删除、 是否会产生冲突——<strong>但绝对不修改你的任何文件</strong>。
+  </p>
+  <p> 为什么值得多花这一步：</p>
+  <ul>
+    <li><strong>版本范围填错时，一眼就能看出来。</strong> 比如你以为要合 30 个版本，结果预演显示「无改动」—— 那多半是范围填反了、或者这些版本早就合过了。<em>在没有付出任何代价的时候发现错误，是最划算的。</em></li>
+    <li><strong>提前知道会不会冲突。</strong> 如果预演结果里显示大量冲突，说明分支和主干已经分岔太久了。 这时候<b>先别硬合</b>，可以考虑先把主干的改动同步到分支上、在分支上把冲突解决掉，再来合主干—— 这样风险小得多，而且不会把主干搞成冲突状态。</li>
+    <li><strong>能发现「不该动的东西要被动了」。</strong> 比如预演里冒出来一个你没预期会被删除的文件， 那就是提醒你「这条分支上有别人的改动混在里面」，需要先弄清楚再合。</li>
+    <li><strong>它给了你一个反悔的机会。</strong> 合并一旦执行，文件就被改了；虽然能撤销，但那又是一番操作。 <em>预演是零成本的保险。</em></li>
+  </ul>
+  <p> <strong>养成习惯：看到 Test Merge 就点一下，看清结果再决定要不要点 Merge。</strong> 这个动作只花几秒，但能挡掉绝大多数合并事故。
+  </p>
+</div>
+<div class="box warn"> <span class="bt">合并前工作副本必须是干净的</span>
+  <p> <strong>干净</strong>的意思是：<b>没有未提交的本地改动</b>，也没有还没解决的冲突。
+  </p>
+  <p> 为什么要求这么严？因为合并会往你的文件里写东西。 如果本地本来就有一批没提交的改动，合并的结果会和它们<b>混在一起</b>，然后：</p>
+  <ul>
+    <li><strong>你分不清哪些是合并带来的、哪些是你自己改的。</strong> 提交的时候更麻烦——要么把自己的半成品一起提上去，要么费半天劲挑拣。</li>
+    <li><strong>冲突会变得难以理解。</strong> 冲突对话框会告诉你「我的版本」和「别人的版本」冲突了， 但这里的「我的版本」其实是一个混合体，<b>根本没法判断该留谁</b>。</li>
+    <li><strong>出问题时无法干净地撤销。</strong> 想放弃这次合并？你只能连自己的改动一起撤掉，那要多难受有多难受。</li>
+  </ul>
+  <p><strong>正确顺序永远是：</strong> <em>提交（或撤销）所有本地改动 → Update 到最新 → 确认干净 → 再开始合并。</em> 这三步只花一两分钟，但能省掉一整个下午的排查。
+  </p>
+</div>
+<h4 class="sub">更省事的办法：一键合并</h4>
+<p> 向导虽然清楚，但每次都要点好几页也很烦。 TortoiseSVN 提供了一个专门的快捷方式，专门对付「把我刚做完的这条分支合回去」这种最常见的情况。
+</p>
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">Merge all：一条命令把该合的合并回来</span><span class="fs">MERGE ALL</span></div>
+  <div class="sb"><img src="img/MergeAll.png" alt="Merge all 一键合并对话框" class="mid"></div>
+  <div class="cap">
+    <b>怎么叫出它</b>：在文件夹上右键时<strong>按住 <kbd>Shift</kbd> 键</strong>， 菜单里会多出一个 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Merge all...</span></span> 选项。<br>
+    <em>Shift 是这个菜单的关键——不按 Shift 是看不到它的。</em><br><br>
+    <b>它替你做了什么</b>：一键合并<b>不需要你选合并方式、不需要你填版本范围</b>。 SVN 自己去分析「这个工作副本当前的状态」， 找出<b>所有还没合并进来的改动</b>，然后一次性把它们全都合过来。<br>
+    换句话说，它相当于自动帮你完成了「填来源、挑版本范围」这两步最容易出错的工作。<br><br>
+    <b>什么时候用它最合适</b>：<br>
+    • 分支上的功能<b>全部做完了</b>，要整体合回主干——这正是它的主场。<br>
+    • 你<b>自己不太确定该合哪些版本</b>，只想「把该合的合回来」。<br>
+    • 你是那种「分支不多、合并关系很单纯」的团队。<br><br>
+    <b>什么时候别用它</b>：<br>
+    • 你只想<b>合并一部分</b>改动（比如一个功能分两批合），它会把所有没合的都合过来，太粗了。<br>
+    • 两条长期并行的分支互相纠缠、合并关系复杂时——<b>自动判断可能和你的预期不一样</b>， 这种场景还是老老实实走向导，每一步都自己确认。<br><br>
+    <b>对话框里通常有的内容</b>：它会显示<b>分析出来的合并计划</b>（从哪儿合、合哪些版本）， 你确认无误后点执行。执行完之后，<b>检查文件、处理冲突、提交的步骤和向导方式完全一样</b>。
+  </div>
+</div>
+<div class="duo">
+  <div>
+    <div class="dh">◈ Merge... 合并向导</div>
+    <p><strong>优点</strong>：每一步都看得见、都能自己定——<b>合并方式、来源、版本范围全在你手上</b>； 可以精确地只合一部分改动；任何特殊场景它都能应付。</p>
+    <p><strong>缺点</strong>：要点好几页；<b>版本范围这一项需要你判断</b>，填错了就得重来。</p>
+    <p><strong>适合</strong>：所有复杂情况；只合部分改动；两条分支互相合并； 以及<b>你还不熟悉合并机制、想看清楚每一步的时候</b>。</p>
+  </div>
+  <div>
+    <div class="dh">◈ Merge all... 一键合并</div>
+    <p><strong>优点</strong>：<b>快</b>，一步到位；不用自己判断版本范围，<b>省掉了最容易出错的一步</b>； 对「功能做完整体合回主干」这种日常动作来说刚刚好。</p>
+    <p><strong>缺点</strong>：<b>不能只合一部分</b>；合并关系复杂时，自动判断的结果未必符合你的预期； 过程不透明，出了问题不太好定位是哪一步。</p>
+    <p><strong>适合</strong>：你自己拉的分支、自己做完、要整体合回主干；分支结构简单的团队日常使用。</p>
+    <p><em>建议：<b>先用向导走通一两次，理解了合并是怎么回事，再开始用一键合并</b>。</em></p>
+  </div>
+</div>
+<div class="box ok"> <span class="bt">合并完成之后：这次提交会把合并记录一起存下来</span>
+  <p> 合并执行完，别忘了最后也是最关键的一步：<strong>提交</strong>。 你现在看到的那些改动，还只存在于你的本地工作副本里。
+  </p>
+  <p> 而这次提交和普通的提交不太一样——<strong>它会把这次的合并记录一起写进版本库</strong>： 「版本 145 是从版本 118-142 合并产生的」这类信息会被永久保存下来。
+  </p>
+  <p> 这就是前面说的「SVN 记得哪些合过了」能成立的<b>根本原因</b>：
+  </p>
+  <ul>
+    <li><strong>提交之后</strong>，下次再合，那些版本就会自动跳过，不用你操心。</li>
+    <li><strong>提交之前</strong>，记录还没进版本库；如果你反悔了、把合并的改动全撤销掉，那就当无事发生。</li>
+    <li><strong>如果一直不提交</strong>，这些改动会在你本地停着，别人看不到，合并记录也不会生成—— <b>等于这次合并白做了</b>。</li>
+  </ul>
+  <p> 所以提交说明要写清楚。别写「合并」两个字就完事，<b>写清从哪条分支合的、合了什么内容</b>。 半年后有人查这一版为什么突然多了几百行改动，全靠你这句说明。 <em>而且日志窗口里那些「已合并」的标记，也是靠着这次提交才能显示的。</em>
+  </p>
+</div>

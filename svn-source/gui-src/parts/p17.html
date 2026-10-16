@@ -1,0 +1,243 @@
+<h3 class="sec" id="s17"><span class="no">17</span>属性对话框：设置文件行为</h3>
+
+<p class="lead"> 上一节的忽略规则，其实只是众多<b>属性（property）</b>里的一个。 属性就是<strong>附着在文件或目录上的一小段设置</strong>， 它的作用是告诉 SVN：<strong>这个文件你该用什么样的方式对待它</strong>。
+</p>
+<div class="box key"> <span class="bt">属性和文件内容，是两回事</span>
+  <p> 理解属性最重要的一点：<strong>它不是文件里的一部分，而是「关于这个文件的一份附注」</strong>。
+  </p>
+  <p> 打个比方：你给一本书贴了一张便签，写着「这本书是易碎品，请轻拿轻放」。 便签上的字<b>不会变成书里的内容</b>，但别人拿起这本书时，会看到便签并按照它的指示行事。
+  </p>
+  <p> 属性就是这样。它带来的几个直接结论：</p>
+  <ul>
+    <li><strong>属性和文件内容分开存</strong>——改属性不会改文件的一个字符。</li>
+    <li><strong>属性也有版本历史</strong>——可以提交、可以更新，还能查到是谁什么时候改的。</li>
+    <li><strong>改属性同样算「改动」</strong>——所以属性改完之后文件会显示成已修改，<b>必须提交才生效</b>。</li>
+    <li><strong>属性是可分享的</strong>——一次设置提交上去，团队所有人更新后都会遵守。</li>
+  </ul>
+  <p> <em>这就解释了上一节那个「忽略了规则一定要提交」的道理——规则本身就是属性。</em>
+  </p>
+</div>
+<h4 class="sub">打开属性标签页</h4>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">PROPS</span>进入属性管理界面</div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">在文件或目录上右键</span>
+      <span class="sc">属性既可以设在文件上，也可以设在目录上。 <strong>设在目录上的属性会作用到它下面的内容</strong>，所以大部分时候大家是在<b>目录</b>上设属性。<br>
+      <em>这一节讲的忽略、换行符这类设置，通常都设在目录上。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">打开属性入口</span>
+      <span class="sc"><span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Properties</span></span><br>
+      <em>有的版本里叫 <code class="ic">Show properties</code>，位置都在 TortoiseSVN 子菜单里，效果一样。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">切到属性标签页</span>
+      <span class="sc">弹出的窗口里有几排标签页，<b>点「属性」那一页</b>。 这里列出的是这个路径上已有的全部属性。<br>
+      <em>看不到属性时不要慌——说明还没设过，列表是空的，这很正常。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">新增一条属性</span>
+      <span class="sc">点 <code class="ic">New...</code> 按钮，会打开添加属性的对话框（见下一张图）。 在属性名下拉里选一个常用属性，然后在下方填它的值。</span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">修改或删除已有属性</span>
+      <span class="sc">选中列表里的一行，点 <code class="ic">Edit...</code> 改它的值， 或者点 <code class="ic">Remove</code> 把它整个删掉。<br>
+      <em>取消某个设置，不是「关掉开关」，而是<b>把这条属性删掉</b>。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">提交，让改动生效</span>
+      <span class="sc">属性改动会立刻反映在你的工作副本上， 但要<b>分享给团队、进入版本历史，就必须提交</b>。<br>
+      提交说明里写清改了什么属性、为什么改。</span>
+    </div>
+  </div>
+</div>
+<h4 class="sub">面对面看两张图</h4>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">属性标签页：已有属性的清单</span><span class="fs">PROPERTIES</span></div>
+  <div class="sb"><img src="img/Properties.png" alt="属性标签页" class="mid"></div>
+  <div class="cap">
+    这个窗口是属性的「总控台」，<b>所有属性操作都从这儿发起</b>：<br><br>
+
+    <b>① 上方的属性列表</b>——列出当前路径上<b>已经存在的每一条属性</b>， 通常左边是属性名（比如 <code class="ic">svn:ignore</code>、 <code class="ic">svn:eol-style</code>），右边是这个属性的值。<br>
+    <strong>点中一行，就能在别处看到它的详细内容。</strong><br>
+    <em>这个列表就是「这个文件/目录被设了哪些特殊规则」的答案。搞不清某个文件行为为什么和别人不一样时，先来这儿看一眼。</em><br><br>
+
+    <b>② <code class="ic">New...</code> 按钮</b>——<b>新增一条属性</b>。 点开后可以选择一个常用的属性名（下拉列表里列好了），也可以自己手工敲一个名字。<br>
+    <em>这是最常用的按钮——绝大多数时候你都是来加新属性的。</em><br><br>
+
+    <b>③ <code class="ic">Edit...</code> 按钮</b>——<b>修改选中属性的值</b>。 比如忽略列表里要加一个名字、换行符的设置要从一种改成另一种，都用它。<br>
+    <em>改值的时候会有专门的编辑窗口，不同属性弹出来的窗口长得不一样—— 见下面那张对照表里的几张图。</em><br><br>
+
+    <b>④ <code class="ic">Remove</code> 按钮</b>——<b>删掉选中的属性</b>。 删掉之后，这个文件就恢复成「没有任何特殊规则」的默认状态。<br>
+    <strong>注意：删属性也是一次改动，一样要提交才生效。</strong><br><br>
+
+    <b>⑤ 下方的内容显示区</b>——选中某条属性后，这里显示它的<b>完整取值</b>。 属性值可能是很长的一串（比如忽略列表里几十个名字）， 所以需要一块专门的地方来看全。<br>
+    <em>查看长属性值时，别只看列表里被截断的那一小段。</em>
+  </div>
+</div>
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">添加属性对话框：选名字、填值</span><span class="fs">ADD PROPERTY</span></div>
+  <div class="sb"><img src="img/PropertyAdd.png" alt="添加属性对话框" class="mid"></div>
+  <div class="cap">
+    点 <code class="ic">New...</code> 之后弹出的就是这个，它只有<b>两部分</b>要填：<br><br>
+
+    <b>① <span class="k">Property name</span> · 属性名</b>——这是一个<b>下拉框</b>， 点开后会列出<b>一批常用的属性名</b>，直接选一个就行，不用自己记拼写。<br>
+    <strong>强烈建议从下拉里选</strong>：属性名是区分大小写的固定写法， 手打很容易打错（比如少个冒号、大小写不对），也是<b>最容易出现「设了但不生效」的原因</b>。<br>
+    <em>下拉里一般会包含：忽略规则、换行符、二进制标记、关键字、加锁有关的、外部引用这几类常用项。 如果确实需要下拉里没有的属性，可以手工输入——但请务必确认拼写完全正确。</em><br><br>
+
+    <b>② <span class="k">Property value</span> · 属性值</b>——<b>这条属性的内容</b>。 不同的属性这里填的东西完全不一样：<br>
+    &nbsp;&nbsp;• 忽略规则填的是一串名字（可以一行一个）；<br>
+    &nbsp;&nbsp;• 换行符的类型填的是一个固定的词；<br>
+    &nbsp;&nbsp;• 二进制标记填的是类型描述；<br>
+    &nbsp;&nbsp;• 加锁相关的属性值往往是一个固定的词，代表「这个属性生效」。<br>
+    <em>拿不准填什么，就回到这张图下面的对照表，每种属性都写清楚了。</em><br><br>
+
+    <b>③ <span class="k">Apply property recursively</span> · 递归应用</b>——<b>勾上它，这条属性会应用到当前目录下面的所有子目录和文件</b>。<br>
+    <strong>这是最容易被忽略、也最重要的一项</strong>：<br>
+    &nbsp;&nbsp;• <b>不勾</b>：属性只设在当前这一层，子目录不管。<br>
+    &nbsp;&nbsp;• <b>勾上</b>：整个目录树一起生效，省得一层层去设。<br>
+    <em>比如「整个项目的源码都要统一换行符」，那就得勾上递归——否则你只设了根目录， 深层子目录里的文件还是老样子。 但也要注意：<b>递归设置会覆盖子目录上原有的同名属性</b>，动手前想清楚。</em><br><br>
+
+    <b>④ 底部按钮</b>——<code class="ic">OK</code> 确认添加，<code class="ic">Cancel</code> 放弃。 点完 OK 回到属性标签页，你会看到新属性出现在列表里。<br>
+    <strong>别忘了最后提交。</strong>
+  </div>
+</div>
+<h4 class="sub">常用属性对照表</h4>
+
+<p> 属性有很多，但日常真正会用到的就下面这几条。每一条都配了它自己的编辑窗口截图。
+</p>
+<div class="tw">
+<table>
+<thead><tr><th style="width:140px">属性名</th><th style="width:180px">它管什么</th><th>什么时候该设</th></tr></thead>
+<tbody>
+  <tr>
+    <td><code class="ic">svn:ignore</code></td>
+    <td><strong>忽略规则</strong></td>
+    <td>让编译产物、日志、IDE 个人配置不再出现在待提交列表里。 <b>上一节整节讲的就是它。</b><em>设完之后记得提交，否则只在你本机生效。</em></td>
+  </tr>
+  <tr>
+    <td><code class="ic">svn:needs-lock</code></td>
+    <td><strong>默认只读，加锁才能改</strong></td>
+    <td>给<b>图片、模型、Office 文档这类没法合并的文件</b>设上。 设了之后，这些文件检出时是<b>只读的</b>，必须先加锁才能编辑—— <strong>等于强制大家「先锁再改」，从机制上避免两个人同时改坏文件。</strong><em>下一节讲加锁时会详细展开。</em></td>
+  </tr>
+  <tr>
+    <td><code class="ic">svn:mime-type</code></td>
+    <td><strong>标记这是什么类型的文件</strong></td>
+    <td>告诉 SVN 这个文件是<b>文本还是二进制</b>。 用在那些「扩展名不太常见、SVN 认不出来」的文件上，<b>避免它拿二进制文件当文本去比对</b>（那样容易出乱子）。 <em>图片、压缩包、可执行文件这一类最典型。</em></td>
+  </tr>
+  <tr>
+    <td><code class="ic">svn:eol-style</code></td>
+    <td><strong>统一换行符</strong></td>
+    <td>解决「Windows 上打出的换行符和 Mac/Linux 不一样」带来的伪冲突。 <b>设成固定的那种处理后，无论谁检出、在哪个系统上编辑，SVN 都会帮你转成那个平台合适的换行符，而存进版本库的是统一格式。</b><em>版本库里就不会因为「换行符不一样」而报一堆无意义的冲突。</em></td>
+  </tr>
+  <tr>
+    <td><code class="ic">svn:keywords</code></td>
+    <td><strong>让文件里自动带上版本信息</strong></td>
+    <td>设好之后，文件里写的那些<b>特殊标记</b>会在提交时被自动替换成真实的值—— 比如把标记替换成「最后一次改这个文件的版本号」「改它的人」「改动时间」。<strong>适合放在文件头部的注释里</strong>，一眼就知道这是哪一版。<em>不设这个属性，那些标记就只是一串普通文字，永远不会变。</em></td>
+  </tr>
+  <tr>
+    <td><code class="ic">svn:externals</code></td>
+    <td><strong>引用别处的目录</strong></td>
+    <td>让一个目录里「挂上」另一个仓库路径的内容—— 更新的时候，被引用的那份也会一起拉下来。<strong>适合多个项目共用一份公共代码的情况</strong>（比如好几个项目都要用的基础库）。<em>用起来方便但要小心：公共代码一改，所有引用它的地方都会跟着变，改动的影响面会一下子放大。</em></td>
+  </tr>
+</tbody>
+</table>
+</div>
+<h5 class="mini">每条属性长什么样：编辑窗口速览</h5>
+
+<p> 下面四个窗口是选中属性后点 <code class="ic">Edit...</code> 时弹出的样子。 <strong>它们的共同点是：属性名已经固定好了，你只需要决定「值」怎么填</strong>—— 有的让你在下拉框里挑一项，有的让你勾选几个关键字。
+</p>
+
+<div class="grid2">
+  <div class="card pur">
+    <h6>svn:needs-lock · 默认只读</h6>
+    <img src="img/PropEditNeedsLock.png" alt="编辑 svn:needs-lock 属性" class="mid">
+    <p> 设置「文件默认只读」的窗口。<strong>值通常就是一个固定的词，代表这个属性生效</strong>—— 填上它，文件以后检出就是只读的，必须先加锁才能编辑。<em>给图片、设计稿这类文件设，用来解决「总忘记加锁」的问题。</em>
+    </p>
+  </div>
+  <div class="card blue">
+    <h6>svn:mime-type · 标记文件类型</h6>
+    <img src="img/PropEditMimeType.png" alt="编辑 svn:mime-type 属性" class="mid">
+    <p> 标记文件类型的窗口。<strong>填的内容是描述文件格式的固定写法</strong>， 用来告诉 SVN「这是二进制文件，别拿它当文本去对比」。<em>用在那些扩展名不常见、SVN 认不出来的文件上。</em>
+    </p>
+  </div>
+  <div class="card good">
+    <h6>svn:eol-style · 统一换行符</h6>
+    <img src="img/PropEditEol.png" alt="编辑 svn:eol-style 属性" class="mid">
+    <p> 换行符设置的窗口。<strong>里面是一个选择项，在几种换行风格里挑一种</strong>。 选了之后团队内换行符就统一了，不会再出现「整个文件全是改动、其实一行代码都没改」的假冲突。<em>团队里操作系统不一致时几乎必设。</em>
+    </p>
+  </div>
+  <div class="card warn">
+    <h6>svn:keywords · 自动带上版本信息</h6>
+    <img src="img/PropEditKeywords.png" alt="编辑 svn:keywords 属性" class="mid">
+    <p> 关键字替换的窗口。<strong>在这里勾选或填入要启用的关键字</strong>， 之后文件里对应的标记会在提交时被自动替换成真实的版本号、作者、修改时间。<em>设了才有用，不设的话那些标记就只是普通文字，永远不变。</em>
+    </p>
+  </div>
+</div>
+<div class="box tip"> <span class="bt">两条最值得现在就设上的属性</span>
+  <p> 属性很多，但对大多数团队来说，<strong>先把这两条设好，收益最大</strong>：
+  </p>
+  <ul>
+    <li> <strong><code class="ic">svn:eol-style</code> · 统一换行符</strong>—— 如果你的团队里有人用 Windows、有人用 Mac，这条几乎是<b>必修项</b>。 不设它的话，你会遇到那种「打开一看整个文件全是改动、其实一行代码都没变」的诡异冲突。 <em>设一次，永久清净。</em>
+    </li>
+    <li> <strong><code class="ic">svn:needs-lock</code> · 给二进制文件默认加锁</strong>—— 如果你做的是有美术资源、设计稿、Office 文档的项目，这条能<b>从机制上防止两个人同时改同一个文件而互相覆盖</b>。 <em>人总会忘记手动加锁，把它变成文件本身的属性才靠得住。</em>
+    </li>
+  </ul>
+  <p> <strong>这两条都建议设在目录上，并且勾上「递归应用」</strong>，一次把整棵树覆盖掉。
+  </p>
+</div>
+<div class="box warn"> <span class="bt">属性改动也要提交才生效</span>
+  <p> 这一点值得再强调一遍，因为它是属性功能最容易被误解的地方。
+  </p>
+  <p> <strong>你设完属性，只在你这台机器上立刻生效了。</strong> 服务器和同事那边还不知道。只有提交之后，其他人更新时才会把这条属性一起拿下来。
+  </p>
+  <p> 不提交会导致几种尴尬情况：</p>
+  <ul>
+    <li>你这边已经把某个目录忽略掉了，同事那边还在一堆垃圾文件里挑拣。</li>
+    <li>你给文档设了「必须加锁才能改」，同事更新下来发现文件还是可写的，照样改，照样冲突。</li>
+    <li>排查问题时大家看到的文件行为不一致——<b>因为每个人的属性设置不一样</b>。</li>
+  </ul>
+  <p> <strong>所以完整流程是四步：打开属性 → 设置 → 确认 → 提交。</strong> <em>少了最后一步，前面三步都只在你自己电脑上有效。</em>
+  </p>
+</div>
+<div class="box tip"> <span class="bt">改完属性后文件显示「已修改」，这是正常的</span>
+  <p> 第一次遇到这个现象会有点慌：<strong>我明明一个字都没改，为什么文件变成红色叹号（已修改）了？</strong>
+  </p>
+  <p> <strong>答案是：属性的变化本身也是一次改动。</strong> SVN 不只是跟踪文件内容，也跟踪附着在上面的属性。 你改了属性，这个文件的「状态」就变了，所以角标显示成已修改——<b>它没有出错，也没有把你的文件改坏。</b>
+  </p>
+  <p> 遇到这种情况该怎么办：</p>
+  <ul>
+    <li><strong>别急着撤销。</strong> 如果你确实想保留这条属性设置，这个「已修改」正是你想要的——提交它就行。</li>
+    <li><strong>想确认改的到底是内容还是属性</strong>，打开属性标签页看一眼，或者比对一下文件内容。 <em>如果内容没变而状态是已修改，那十有八九就是属性变了。</em></li>
+    <li><strong>确实不想要这个属性改动</strong>，就在属性标签页里把它改回去或删掉，状态自然会恢复正常。</li>
+  </ul>
+  <p> <em>同样地，别人改了某个文件的属性并提交，你更新之后也会看到那个文件变成「已修改」—— 这时候不用管它，正常往下干活即可，或者顺手提交一下让状态干净。</em>
+  </p>
+</div>
+<div class="box err"> <span class="bt">设置属性时最容易出问题的几处</span>
+  <ul>
+    <li><strong>属性名手打拼错。</strong>自己敲的属性名拼错了，SVN 不会报错，只是这条属性和它不认识的名字一起被存下来，<b>然后什么效果也没有</b>。 <em>一律从下拉列表里选，别手打。</em></li>
+    <li><strong>该递归的没勾递归。</strong>在根目录设了换行符属性却没勾递归应用， 结果只有根目录那几个文件生效，深层子目录里几百个文件还是老样子。<b>设完记得抽查一个子目录里的文件确认。</b></li>
+    <li><strong>递归设置覆盖了子目录的旧设置。</strong>某个子目录上本来有特别配置， 你在上层勾了递归一设，它就<b>被悄悄盖掉了</b>。动手前先扫一眼子目录有没有已经存在的同名属性。</li>
+    <li><strong>设完不提交。</strong>前面已经反复说了，但它依然是使用属性时最高频的问题。</li>
+  </ul>
+</div>

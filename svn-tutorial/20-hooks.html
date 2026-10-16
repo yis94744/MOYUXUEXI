@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>20. 钩子脚本：让 SVN 按你的规矩办事 — SVN 完全教程</title>
+<style>
+
+/* ==========================================================================
+   设计令牌
+   ========================================================================== */
+:root{
+  --bg:#0d1117; --bg2:#161b22; --bg3:#1c2128; --bg4:#21262d;
+  --bd:#30363d; --bd2:#3d444d;
+  --tx:#e6edf3; --tx2:#c9d1d9; --tx3:#8b949e; --tx4:#6e7681;
+  --blue:#58a6ff; --blue2:#79c0ff; --green:#7ee787; --green2:#3fb950;
+  --orange:#ffa657; --red:#ff7b72; --purple:#d2a8ff; --cyan:#56d4dd;
+  --yellow:#e3b341;
+  --mono:"JetBrains Mono","Cascadia Code",Consolas,Monaco,"Courier New",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --rad:10px; --rad2:14px; --shadow:0 8px 24px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{background:var(--bg);color:var(--tx2);font-family:var(--sans);
+  font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+#prog{position:fixed;top:0;left:0;height:3px;width:0;z-index:999;
+  background:linear-gradient(90deg,var(--blue),var(--purple),var(--green));transition:width .1s linear}
+.wrap{display:flex;max-width:1600px;margin:0 auto;align-items:flex-start}
+
+/* ==========================================================================
+   侧边导航
+   ========================================================================== */
+aside{position:sticky;top:0;flex:0 0 300px;height:100vh;overflow-y:auto;
+  border-right:1px solid var(--bd);padding:26px 16px 80px;background:var(--bg)}
+aside::-webkit-scrollbar{width:8px}
+aside::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:4px}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.brand .dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;
+  background:linear-gradient(135deg,var(--blue),var(--purple))}
+.brand h1{font-size:15px;font-weight:700;color:var(--tx);letter-spacing:.2px}
+.brand-sub{font-size:12px;color:var(--tx4);margin:0 0 18px 21px;line-height:1.5}
+nav a{display:block;padding:6px 11px;margin:2px 0;font-size:13.5px;color:var(--tx3);
+  text-decoration:none;border-radius:7px;border-left:2px solid transparent;transition:all .14s;line-height:1.5}
+nav a:hover{background:var(--bg3);color:var(--tx)}
+nav a.h3{padding-left:24px;font-size:12.8px;color:var(--tx4)}
+nav a.on{background:var(--bg4);color:var(--blue);border-left-color:var(--blue);font-weight:600}
+nav .grp{margin:16px 0 6px 11px;font-size:11px;font-weight:700;color:var(--tx4);
+  text-transform:uppercase;letter-spacing:.9px}
+
+/* ==========================================================================
+   主体排版
+   ========================================================================== */
+main{flex:1;min-width:0;padding:44px 52px 140px;max-width:1180px}
+.hero{margin-bottom:46px;padding-bottom:30px;border-bottom:1px solid var(--bd)}
+.hero .tag{display:inline-block;font-size:11.5px;font-weight:700;color:var(--blue);
+  background:rgba(88,166,255,.13);border:1px solid rgba(88,166,255,.3);
+  padding:3px 11px;border-radius:20px;margin-bottom:16px;letter-spacing:.4px}
+.hero h2{font-size:34px;font-weight:800;color:var(--tx);line-height:1.25;margin-bottom:12px;
+  background:linear-gradient(135deg,#fff 30%,var(--blue) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-.5px}
+.hero p{font-size:15px;color:var(--tx3);max-width:860px}
+.hero .meta{display:flex;gap:22px;margin-top:20px;flex-wrap:wrap}
+.hero .meta div{font-size:12.5px;color:var(--tx4)}
+.hero .meta b{color:var(--tx2);font-weight:600}
+h3.sec{font-size:25px;font-weight:700;color:var(--tx);margin:66px 0 8px;
+  padding-top:8px;scroll-margin-top:20px;letter-spacing:-.3px}
+h3.sec::before{content:"";display:block;width:38px;height:3px;border-radius:2px;
+  background:linear-gradient(90deg,var(--blue),var(--purple));margin-bottom:16px}
+h3.sec .no{color:var(--blue);font-family:var(--mono);font-size:19px;font-weight:700;margin-right:8px}
+h4.sub{font-size:17.5px;font-weight:700;color:var(--tx);margin:36px 0 12px;scroll-margin-top:20px}
+h4.sub::before{content:"▍";color:var(--blue);margin-right:7px;font-size:14px}
+h5.mini{font-size:14.5px;font-weight:700;color:var(--blue2);margin:26px 0 10px}
+p{margin:12px 0;color:var(--tx2)}
+p.lead{font-size:16px;color:var(--tx3);margin:14px 0 22px}
+ul,ol{margin:12px 0 12px 24px}
+li{margin:6px 0}
+li::marker{color:var(--tx4)}
+strong{color:var(--tx);font-weight:700}
+em{color:var(--orange);font-style:normal;font-weight:600}
+a.ref{color:var(--blue2);text-decoration:none;border-bottom:1px dotted var(--bd2)}
+a.ref:hover{color:var(--cyan)}
+hr.sep{border:none;border-top:1px solid var(--bd);margin:38px 0}
+code.ic{font-family:var(--mono);font-size:13px;color:var(--orange);
+  background:rgba(110,118,129,.16);padding:2px 6px;border-radius:5px;
+  border:1px solid rgba(110,118,129,.22);white-space:nowrap}
+code.ic.b{color:var(--blue2)}
+code.ic.g{color:var(--green)}
+code.ic.p{color:var(--purple)}
+
+/* ==========================================================================
+   代码块
+   ========================================================================== */
+.codewrap{position:relative;margin:18px 0 22px;border-radius:var(--rad2);
+  border:1px solid var(--bd);background:#0b0f14;overflow:hidden;box-shadow:var(--shadow)}
+.codehead{display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px;background:var(--bg2);border-bottom:1px solid var(--bd);gap:10px}
+.codehead .lang{font-family:var(--mono);font-size:11.5px;font-weight:700;
+  color:var(--tx3);letter-spacing:.6px;text-transform:uppercase;white-space:nowrap}
+.codehead .fn{font-family:var(--mono);font-size:11.5px;color:var(--tx4);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;flex:1}
+.codehead .acts{display:flex;gap:7px;flex:0 0 auto}
+.codehead button{background:var(--bg4);border:1px solid var(--bd2);color:var(--tx3);
+  font-family:var(--sans);font-size:11.5px;padding:3px 10px;border-radius:6px;cursor:pointer;transition:all .14s}
+.codehead button:hover{background:var(--blue);color:#000;border-color:var(--blue)}
+.codehead button.ok{background:var(--green2);color:#000;border-color:var(--green2)}
+pre.code{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mono);
+  font-size:13.2px;line-height:1.68;tab-size:4}
+pre.code::-webkit-scrollbar{height:9px}
+pre.code::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+pre.code code{color:var(--tx2);white-space:pre;display:block}
+.k{color:#ff7b72}.t{color:#79c0ff}.s{color:#a5d6ff}.c{color:#8b949e;font-style:italic}
+.n{color:#79c0ff}.m{color:#d2a8ff}.a{color:#ffa657}.p{color:#8b949e}
+
+/* 终端输出块 —— 显示真实命令回显 */
+.term{margin:16px 0 20px;border-radius:var(--rad2);border:1px solid var(--bd);
+  background:#080b0f;overflow:hidden}
+.term .th{display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--bg2);
+  border-bottom:1px solid var(--bd);font-family:var(--mono);font-size:11.5px;color:var(--tx4)}
+.term .th .dotr{width:9px;height:9px;border-radius:50%;background:#ff5f57}
+.term .th .doty{width:9px;height:9px;border-radius:50%;background:#febc2e}
+.term .th .dotg{width:9px;height:9px;border-radius:50%;background:#28c840}
+.term pre{margin:0;padding:14px 16px;overflow-x:auto;font-family:var(--mono);
+  font-size:12.9px;line-height:1.7;color:#c9d1d9;white-space:pre}
+.term pre::-webkit-scrollbar{height:9px}
+.term pre::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+.term .ps{color:var(--green);font-weight:700}       /* 提示符 $ */
+.term .cmd{color:var(--tx)}                          /* 命令本体 */
+.term .cmt{color:var(--tx4);font-style:italic}       /* 注释 */
+.term .ok{color:var(--green)}                        /* 成功 */
+.term .no{color:var(--red)}                          /* 失败 */
+.term .hl{color:var(--yellow);font-weight:600}       /* 重点 */
+.term .dim{color:var(--tx4)}                         /* 弱化 */
+.term .cy{color:var(--cyan)}
+
+/* ==========================================================================
+   提示框
+   ========================================================================== */
+.box{margin:20px 0;padding:15px 18px 15px 46px;border-radius:var(--rad);
+  position:relative;font-size:14.3px;line-height:1.72;border:1px solid;border-left-width:3px}
+.box::before{position:absolute;left:15px;top:14px;font-size:16px;line-height:1}
+.box .bt{display:block;font-weight:700;margin-bottom:5px;font-size:13.5px}
+.box p{margin:6px 0;font-size:14.3px}
+.box ul,.box ol{margin:7px 0 7px 18px}
+.box li{margin:4px 0}
+.box.tip{background:rgba(88,166,255,.07);border-color:rgba(88,166,255,.28)}
+.box.tip::before{content:"★"}.box.tip .bt{color:var(--blue)}
+.box.warn{background:rgba(255,166,87,.07);border-color:rgba(255,166,87,.3)}
+.box.warn::before{content:"!"}.box.warn .bt{color:var(--orange)}
+.box.err{background:rgba(255,123,114,.07);border-color:rgba(255,123,114,.3)}
+.box.err::before{content:"X"}.box.err .bt{color:var(--red)}
+.box.ok{background:rgba(126,231,135,.07);border-color:rgba(126,231,135,.3)}
+.box.ok::before{content:"✓"}.box.ok .bt{color:var(--green)}
+.box.key{background:rgba(210,168,255,.07);border-color:rgba(210,168,255,.3)}
+.box.key::before{content:"◈"}.box.key .bt{color:var(--purple)}
+.box.termbox{background:rgba(86,212,221,.06);border-color:rgba(86,212,221,.28)}
+.box.termbox::before{content:"⌘"}.box.termbox .bt{color:var(--cyan)}
+
+/* ==========================================================================
+   表格
+   ========================================================================== */
+.tw{overflow-x:auto;margin:18px 0;border-radius:var(--rad);border:1px solid var(--bd)}
+table{width:100%;border-collapse:collapse;font-size:13.8px}
+thead th{background:var(--bg3);color:var(--tx);font-weight:700;text-align:left;
+  padding:11px 14px;border-bottom:1px solid var(--bd2);white-space:nowrap;font-size:13px;letter-spacing:.2px}
+tbody td{padding:9px 14px;border-bottom:1px solid rgba(48,54,61,.6);vertical-align:top;line-height:1.65}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:rgba(88,166,255,.045)}
+tbody td:first-child{color:var(--tx)}
+td .ic,th .ic{font-size:12.3px}
+.tagmini{display:inline-block;font-size:11px;padding:2px 7px;border-radius:5px;
+  font-weight:700;font-family:var(--mono);white-space:nowrap}
+.tagmini.g{background:rgba(126,231,135,.15);color:var(--green)}
+.tagmini.r{background:rgba(255,123,114,.15);color:var(--red)}
+.tagmini.y{background:rgba(227,179,65,.15);color:var(--yellow)}
+.tagmini.b{background:rgba(88,166,255,.15);color:var(--blue)}
+.tagmini.p{background:rgba(210,168,255,.15);color:var(--purple)}
+.tagmini.c{background:rgba(86,212,221,.15);color:var(--cyan)}
+
+/* ==========================================================================
+   步骤条
+   ========================================================================== */
+.steps{counter-reset:st;margin:20px 0;border:1px solid var(--bd);
+  border-radius:var(--rad2);overflow:hidden;background:var(--bg2)}
+.steps>.stitle{display:flex;align-items:center;gap:9px;padding:11px 16px;
+  background:linear-gradient(90deg,rgba(210,168,255,.11),transparent);
+  border-bottom:1px solid var(--bd);font-size:13.5px;font-weight:700;color:var(--purple)}
+.steps>.stitle .badge{background:var(--purple);color:#000;font-size:10.5px;
+  padding:2px 8px;border-radius:20px;letter-spacing:.4px;font-weight:800}
+.step{display:flex;gap:14px;padding:13px 16px;border-bottom:1px solid rgba(48,54,61,.55)}
+.step:last-child{border-bottom:none}
+.step:hover{background:rgba(210,168,255,.035)}
+.step .num{counter-increment:st;flex:0 0 26px;height:26px;border-radius:50%;
+  background:rgba(210,168,255,.14);border:1px solid rgba(210,168,255,.35);
+  color:var(--purple);font-family:var(--mono);font-size:12.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;margin-top:2px}
+.step .num::before{content:counter(st)}
+.step .body{flex:1;min-width:0;font-size:14px;line-height:1.7}
+.step .body .st{font-weight:700;color:var(--tx);display:block;margin-bottom:3px}
+.step .body .sc{color:var(--tx3);font-size:13.6px}
+.step .body .menu{font-family:var(--mono);font-size:12.8px;color:var(--yellow);
+  background:rgba(227,179,65,.1);border:1px solid rgba(227,179,65,.25);
+  padding:1px 7px;border-radius:5px;white-space:nowrap;display:inline-block;margin:1px 0}
+
+/* ==========================================================================
+   卡片
+   ========================================================================== */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}
+.card{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rad2);padding:16px 18px}
+.card h6{font-size:13.5px;font-weight:700;margin-bottom:9px;display:flex;
+  align-items:center;gap:7px;color:var(--tx)}
+.card ul{margin:8px 0 0 18px;font-size:13.6px}
+.card ul li{margin:5px 0}
+.card p{font-size:13.7px;margin:8px 0}
+.card.good{border-color:rgba(126,231,135,.32)}.card.good h6{color:var(--green)}
+.card.bad{border-color:rgba(255,123,114,.32)}.card.bad h6{color:var(--red)}
+.card.blue{border-color:rgba(88,166,255,.32)}.card.blue h6{color:var(--blue)}
+.card.warn{border-color:rgba(255,166,87,.32)}.card.warn h6{color:var(--orange)}
+.card.pur{border-color:rgba(210,168,255,.32)}.card.pur h6{color:var(--purple)}
+.card .big{font-family:var(--mono);font-size:22px;font-weight:800;color:var(--tx);
+  display:block;margin-bottom:4px;line-height:1.2}
+.card .cap{font-size:12.2px;color:var(--tx4)}
+
+/* ==========================================================================
+   图文（SVG 插图系统）—— 本教程的核心
+   ========================================================================== */
+.fig{margin:24px 0 26px;border:1px solid var(--bd);border-radius:var(--rad2);
+  background:linear-gradient(180deg,#0f141b,#0b0f14);overflow:hidden;box-shadow:var(--shadow)}
+.fig .fh{padding:10px 18px;background:var(--bg2);border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;gap:9px}
+.fig .fh .ic{color:var(--cyan);font-size:13px}
+.fig .fh .ft{font-size:13.2px;font-weight:700;color:var(--tx)}
+.fig .fh .fs{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--tx4);
+  letter-spacing:.5px;text-transform:uppercase}
+.fig .fb{padding:22px 18px 18px;overflow-x:auto}
+.fig .fb::-webkit-scrollbar{height:9px}
+.fig .fb::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+.fig svg{display:block;margin:0 auto;max-width:100%;height:auto}
+.fig .cap{padding:11px 18px 14px;font-size:13px;color:var(--tx3);border-top:1px solid rgba(48,54,61,.55);
+  line-height:1.7}
+.fig .cap b{color:var(--tx2)}
+/* SVG 通用类：所有插图复用，保证风格统一 */
+svg text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+svg .tt{font-size:14px;font-weight:700;fill:#e6edf3}
+svg .ts{font-size:12px;fill:#8b949e}
+svg .tx{font-size:12.5px;fill:#c9d1d9}
+svg .tm{font-size:12px;font-family:"JetBrains Mono",Consolas,monospace;fill:#e6edf3}
+svg .tm2{font-size:11px;font-family:"JetBrains Mono",Consolas,monospace;fill:#8b949e}
+svg .hd{font-size:11.5px;font-weight:700;fill:#e6edf3}
+svg .bd{fill:none;stroke:#30363d;stroke-width:1.5}
+svg .bd2{fill:none;stroke:#3d444d;stroke-width:1.5}
+svg .dash{fill:none;stroke:#3d444d;stroke-width:1.5;stroke-dasharray:5 4}
+svg .arw{fill:none;stroke:#8b949e;stroke-width:1.6;marker-end:url(#arw)}
+svg .arwb{fill:none;stroke:#58a6ff;stroke-width:1.8;marker-end:url(#arwb)}
+svg .arwg{fill:none;stroke:#7ee787;stroke-width:1.8;marker-end:url(#arwg)}
+svg .arwr{fill:none;stroke:#ff7b72;stroke-width:1.8;marker-end:url(#arwr)}
+svg .arwp{fill:none;stroke:#d2a8ff;stroke-width:1.8;marker-end:url(#arwp)}
+svg .arwy{fill:none;stroke:#e3b341;stroke-width:1.8;marker-end:url(#arwy)}
+svg .arw2{fill:none;stroke:#58a6ff;stroke-width:1.6;marker-end:url(#arwb);stroke-dasharray:6 4}
+svg .n-blue{fill:rgba(88,166,255,.10);stroke:#58a6ff;stroke-width:1.5}
+svg .n-green{fill:rgba(126,231,135,.10);stroke:#7ee787;stroke-width:1.5}
+svg .n-pur{fill:rgba(210,168,255,.10);stroke:#d2a8ff;stroke-width:1.5}
+svg .n-orange{fill:rgba(255,166,87,.10);stroke:#ffa657;stroke-width:1.5}
+svg .n-red{fill:rgba(255,123,114,.10);stroke:#ff7b72;stroke-width:1.5}
+svg .n-yellow{fill:rgba(227,179,65,.10);stroke:#e3b341;stroke-width:1.5}
+svg .n-cyan{fill:rgba(86,212,221,.10);stroke:#56d4dd;stroke-width:1.5}
+svg .n-gray{fill:rgba(139,148,158,.10);stroke:#8b949e;stroke-width:1.5}
+svg .c-blue{fill:#0f141b;stroke:#58a6ff;stroke-width:1.5}
+svg .c-green{fill:#0f141b;stroke:#7ee787;stroke-width:1.5}
+svg .c-pur{fill:#0f141b;stroke:#d2a8ff;stroke-width:1.5}
+svg .c-orange{fill:#0f141b;stroke:#ffa657;stroke-width:1.5}
+svg .c-red{fill:#0f141b;stroke:#ff7b72;stroke-width:1.5}
+svg .c-gray{fill:#161b22;stroke:#3d444d;stroke-width:1.5}
+svg .fill-blue{fill:#58a6ff}svg .fill-green{fill:#7ee787}svg .fill-pur{fill:#d2a8ff}
+svg .fill-orange{fill:#ffa657}svg .fill-red{fill:#ff7b72}svg .fill-cyan{fill:#56d4dd}
+svg .fill-yellow{fill:#e3b341}svg .fill-gray{fill:#8b949e}svg .fill-tx{fill:#e6edf3}
+svg .fill-dim{fill:#6e7681}
+svg .mono{font-family:"JetBrains Mono",Consolas,monospace}
+
+/* 图例 */
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0 4px;font-size:12.5px;color:var(--tx3)}
+.legend span{display:flex;align-items:center;gap:7px}
+.legend i{width:13px;height:13px;border-radius:4px;display:inline-block;flex:0 0 auto}
+
+/* ==========================================================================
+   键值对 / 输出面板
+   ========================================================================== */
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-family:var(--mono);
+  font-size:12.8px;margin:10px 0}
+.kv b{color:var(--tx2);font-weight:600}
+.kv span{color:var(--orange)}
+
+/* 对比双栏（好/坏） */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:20px 0;
+  border:1px solid var(--bd);border-radius:var(--rad2);overflow:hidden}
+.duo>div{padding:14px 16px}
+.duo>div:first-child{border-right:1px solid var(--bd);background:rgba(255,123,114,.045)}
+.duo>div:last-child{background:rgba(126,231,135,.045)}
+.duo .dh{font-size:12.5px;font-weight:800;margin-bottom:9px;letter-spacing:.3px}
+.duo>div:first-child .dh{color:var(--red)}
+.duo>div:last-child .dh{color:var(--green)}
+.duo pre{font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--tx2);
+  white-space:pre-wrap;margin:0;overflow-x:auto}
+
+footer{margin-top:90px;padding-top:28px;border-top:1px solid var(--bd);font-size:13px;color:var(--tx4)}
+footer b{color:var(--tx3)}
+#top{position:fixed;right:26px;bottom:26px;width:44px;height:44px;border-radius:50%;
+  background:var(--bg3);border:1px solid var(--bd2);color:var(--tx2);font-size:17px;
+  cursor:pointer;display:none;align-items:center;justify-content:center;
+  box-shadow:var(--shadow);transition:all .16s;z-index:50}
+#top:hover{background:var(--blue);color:#000;border-color:var(--blue)}
+#top.show{display:flex}
+
+@media(max-width:1220px){aside{display:none}main{padding:30px 26px 100px;max-width:100%}}
+@media(max-width:760px){
+  .grid2,.grid3,.grid4,.duo{grid-template-columns:1fr}
+  .duo>div:first-child{border-right:none;border-bottom:1px solid var(--bd)}
+  .hero h2{font-size:25px}h3.sec{font-size:20px}main{padding:22px 16px 80px}
+  body{font-size:15px}
+}
+
+
+/* ===== 单节文件附加样式：面包屑与翻页 ===== */
+.crumb{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:22px;
+  padding-bottom:14px;border-bottom:1px solid var(--bd);font-size:13px;color:var(--tx4)}
+.crumb .stage{font-size:11.5px;font-weight:700;color:var(--blue);
+  background:rgba(88,166,255,.13);border:1px solid rgba(88,166,255,.3);
+  padding:2px 10px;border-radius:20px;letter-spacing:.3px}
+.crumb .sep{color:var(--tx4);opacity:.5}
+.crumb .cur{color:var(--tx2)}
+.crumb a{color:var(--tx3);text-decoration:none;border-bottom:1px dotted var(--bd2)}
+.crumb a:hover{color:var(--blue)}
+.pager{display:flex;gap:14px;margin:64px 0 0;padding-top:26px;border-top:1px solid var(--bd)}
+.pager a{flex:1;display:block;padding:14px 18px;border:1px solid var(--bd);
+  border-radius:var(--rad2);text-decoration:none;transition:all .16s;background:var(--bg2);min-width:0}
+.pager a:hover{border-color:var(--blue);background:var(--bg3);transform:translateY(-2px)}
+.pager a .lbl{display:block;font-size:11.5px;color:var(--tx4);margin-bottom:5px;
+  letter-spacing:.4px;text-transform:uppercase}
+.pager a .ttl{display:block;font-size:14.5px;color:var(--tx);font-weight:700;
+  line-height:1.5;overflow:hidden;text-overflow:ellipsis}
+.pager a.next{text-align:right}
+.pager a.disabled{opacity:.35;pointer-events:none}
+.pager a.home{flex:0 0 130px;text-align:center;display:flex;align-items:center;justify-content:center}
+.pager a.home .ttl{font-size:13.5px;color:var(--blue2)}
+
+</style>
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 完全教程</h1></div>
+  <div class="brand-sub">图文详解版 · 基于 SVN 1.14 实测</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 认识 SVN</div>
+    <a href="01-intro.html">1. SVN 是什么</a>
+    <a href="02-architecture.html">2. 三层架构与通信协议</a>
+    <a href="03-install.html">3. 安装与环境准备</a>
+    <div class="grp">第二阶段 · 核心模型</div>
+    <a href="04-model.html">4. 仓库、版本号与工作副本</a>
+    <a href="05-layout.html">5. 标准目录结构</a>
+    <div class="grp">第三阶段 · 日常操作</div>
+    <a href="06-first-steps.html">6. 第一次完整上手：从零到提交</a>
+    <a href="07-status.html">7. status 状态码全解</a>
+    <a href="08-daily-loop.html">8. 日常开发循环与 diff / log 进阶</a>
+    <a href="09-rollback.html">9. 撤销与回退：五种后悔场景</a>
+    <div class="grp">第四阶段 · 冲突处理</div>
+    <a href="10-conflict.html">10. 冲突：产生、解剖与解决</a>
+    <div class="grp">第五阶段 · 分支与标签</div>
+    <a href="11-branch-essence.html">11. 分支的本质：一次廉价的复制</a>
+    <a href="12-branch-ops.html">12. 创建、切换与管理分支</a>
+    <a href="13-merge.html">13. 合并全流程与 mergeinfo 机制</a>
+    <a href="14-tags.html">14. 标签与发布管理</a>
+    <div class="grp">第六阶段 · 属性系统</div>
+    <a href="15-properties.html">15. 属性系统：SVN 的隐藏超能力</a>
+    <a href="16-locking.html">16. 锁机制：二进制文件的独占保护</a>
+    <div class="grp">第七阶段 · 服务端</div>
+    <a href="17-deploy-choice.html">17. 服务端部署：方案选型</a>
+    <a href="18-svnserve.html">18. svnserve 部署实战</a>
+    <a href="19-authz.html">19. 认证与权限：authz 精细控制</a>
+    <a href="20-hooks.html" class="on">20. 钩子脚本：让 SVN 按你的规矩办事</a>
+    <div class="grp">第八阶段 · 运维与进阶</div>
+    <a href="21-backup.html">21. 备份、恢复与仓库维护</a>
+    <a href="22-advanced.html">22. 高级技巧与效率提升</a>
+    <a href="23-troubleshooting.html">23. 故障排查速查</a>
+    <a href="24-cheatsheet.html">24. 命令速查表</a>
+    <a href="25-gui.html">25. 图形客户端与 IDE 集成</a>
+    <div class="grp">快速跳转</div>
+    <a href="index.html">总目录</a>
+
+  </nav>
+</aside>
+<main>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/>
+    </marker>
+    <marker id="arwb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/>
+    </marker>
+    <marker id="arwg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7ee787"/>
+    </marker>
+    <marker id="arwr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff7b72"/>
+    </marker>
+    <marker id="arwp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#d2a8ff"/>
+    </marker>
+    <marker id="arwy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#e3b341"/>
+    </marker>
+    <marker id="arwc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#56d4dd"/>
+    </marker>
+    <linearGradient id="g-blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#58a6ff" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#58a6ff" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-pur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d2a8ff" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#d2a8ff" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7ee787" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#7ee787" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-orange" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffa657" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#ffa657" stop-opacity=".04"/>
+    </linearGradient>
+  </defs>
+</svg>
+<div class="crumb">
+  <span class="stage">第七阶段 · 服务端</span>
+  <span class="sep">/</span>
+  <a href="index.html">总目录</a>
+  <span class="sep">/</span>
+  <span class="cur">第 20 节</span>
+</div>
+
+<h3 class="sec" id="s20"><span class="no">20</span>钩子脚本：让 SVN 按你的规矩办事</h3>
+
+<p class="lead">
+  钩子（Hook）是服务端在特定操作前后<strong>自动执行的脚本</strong>。
+  提交日志格式检查、自动发通知、触发 CI、防止误删——都靠它。
+  这是把 SVN 从「能用」变成「好用」的关键一步。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 20-1　九个钩子的触发时机</span><span class="fs">Hooks Timeline</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 460" width="980" height="460" role="img" aria-label="SVN 九个钩子触发时机图">
+  <!-- 时间段 -->
+  <text class="hd" x="30" y="26" fill="#8b949e">提交（commit）流程</text>
+
+  <!-- 时间轴 -->
+  <line x1="60" y1="70" x2="920" y2="70" stroke="#3d444d" stroke-width="2"/>
+
+  <!-- 阶段 -->
+  <rect class="n-blue" x="80" y="100" width="180" height="60" rx="9"/>
+  <text class="tx" x="170" y="126" text-anchor="middle">客户端发起提交</text>
+  <text class="ts" x="170" y="146" text-anchor="middle">传输文件数据</text>
+
+  <rect class="n-yellow" x="300" y="100" width="180" height="60" rx="9"/>
+  <text class="tx" x="390" y="126" text-anchor="middle">服务器创建事务</text>
+  <text class="ts" x="390" y="146" text-anchor="middle">（临时 tx）</text>
+
+  <rect class="n-red" x="520" y="100" width="180" height="60" rx="9"/>
+  <text class="tx" x="610" y="126" text-anchor="middle">校验事务</text>
+  <text class="ts" x="610" y="146" text-anchor="middle">日志/权限/格式</text>
+
+  <rect class="n-green" x="740" y="100" width="180" height="60" rx="9"/>
+  <text class="tx" x="830" y="126" text-anchor="middle">写入版本库</text>
+  <text class="ts" x="830" y="146" text-anchor="middle">生成新版本号</text>
+
+  <!-- 箭头 -->
+  <path class="arwb" d="M260,130 L300,130"/>
+  <path class="arwy" d="M480,130 L520,130"/>
+  <path class="arwr" d="M700,130 L740,130"/>
+
+  <!-- 钩子标注 -->
+  <path class="dash" d="M170,100 L170,76"/>
+  <circle cx="170" cy="70" r="6" fill="#58a6ff"/>
+  <text class="tm2" x="134" y="56" fill="#58a6ff">start-commit</text>
+
+  <path class="dash" d="M610,100 L610,76"/>
+  <circle cx="610" cy="70" r="6" fill="#ff7b72"/>
+  <text class="tm2" x="576" y="56" fill="#ff7b72">pre-commit</text>
+
+  <path class="dash" d="M830,100 L830,76"/>
+  <circle cx="830" cy="70" r="6" fill="#7ee787"/>
+  <text class="tm2" x="790" y="56" fill="#7ee787">post-commit</text>
+
+  <!-- 说明 -->
+  <rect x="80" y="176" width="400" height="100" rx="10" fill="rgba(88,166,255,.07)" stroke="#58a6ff" stroke-width="1.3"/>
+  <text class="hd" x="100" y="200" fill="#58a6ff">start-commit</text>
+  <text class="ts" x="100" y="222">在提交开始前触发，此时还不知道改了哪些文件。</text>
+  <text class="ts" x="100" y="242">参数：仓库路径，用户名</text>
+  <text class="ts" x="100" y="262">用途：拉黑某个用户、限制提交时段（如禁止周五上线）</text>
+
+  <rect x="500" y="176" width="420" height="100" rx="10" fill="rgba(255,123,114,.07)" stroke="#ff7b72" stroke-width="1.3"/>
+  <text class="hd" x="520" y="200" fill="#ff7b72">pre-commit　★ 最重要</text>
+  <text class="ts" x="520" y="222">提交被写入版本库之前的最后一道关卡。</text>
+  <text class="ts" x="520" y="242">参数：仓库路径，事务名（tx）</text>
+  <text class="ts" x="520" y="262" fill="#7ee787">返回非 0 → 提交被拒绝，错误信息回显给客户端</text>
+
+  <!-- 锁流程 -->
+  <text class="hd" x="30" y="308" fill="#8b949e">锁（lock）流程</text>
+  <line x1="60" y1="340" x2="920" y2="340" stroke="#3d444d" stroke-width="2"/>
+
+  <circle cx="200" cy="340" r="6" fill="#ffa657"/>
+  <text class="tm2" x="150" y="326" fill="#ffa657">pre-lock</text>
+  <circle cx="400" cy="340" r="6" fill="#7ee787"/>
+  <text class="tm2" x="355" y="326" fill="#7ee787">post-lock</text>
+  <circle cx="620" cy="340" r="6" fill="#ffa657"/>
+  <text class="tm2" x="570" y="326" fill="#ffa657">pre-unlock</text>
+  <circle cx="820" cy="340" r="6" fill="#7ee787"/>
+  <text class="tm2" x="775" y="326" fill="#7ee787">post-unlock</text>
+
+  <text class="ts" x="100" y="368">pre-lock / pre-unlock：决定「能不能加锁/解锁」——可用于防止抢锁</text>
+  <text class="ts" x="100" y="390">post-lock / post-unlock：加锁/解锁发生后 —— 可用于自动发邮件通知相关人</text>
+
+  <!-- revprop -->
+  <text class="hd" x="30" y="424" fill="#8b949e">日志修改流程</text>
+  <circle cx="200" cy="448" r="6" fill="#ffa657"/>
+  <text class="tm2" x="86" y="452" fill="#ffa657">pre-revprop-change</text>
+  <circle cx="520" cy="448" r="6" fill="#7ee787"/>
+  <text class="tm2" x="400" y="452" fill="#7ee787">post-revprop-change</text>
+  <text class="ts" x="640" y="452">默认不存在 = 所有 revprop 修改被禁止（安全默认值）</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>钩子部署的关键规则：</b>
+    ① 钩子文件必须放在 <code class="ic">{仓库}/hooks/</code> 目录下；
+    ② 必须<strong>去掉 <code class="ic">.tmpl</code> 后缀</strong>才会生效（<code class="ic">pre-commit.tmpl</code> → <code class="ic">pre-commit</code>）；
+    ③ Linux 上必须有<strong>可执行权限</strong>（<code class="ic">chmod +x</code>）；
+    ④ Windows 上要写成 <code class="ic">.bat</code> / <code class="ic">.cmd</code> / <code class="ic">.exe</code>。
+  </div>
+</div>
+
+<h4 class="sub" id="s20-2">pre-commit 实战：强制日志规范</h4>
+
+<div class="cards grid2">
+  <div class="card red">
+    <h6>需求</h6>
+    <p>团队里总有人写「fix」「update」「111」这种毫无信息量的提交日志，
+    或者干脆留空。事后查历史时完全看不懂。</p>
+    <p><strong>目标：强制提交日志至少 10 个字符，并且必须包含关联的任务号。</strong></p>
+  </div>
+  <div class="card green">
+    <h6>方案</h6>
+    <p>用 <code class="ic">pre-commit</code> 钩子，在提交写入前检查日志：
+    不符合规则就 <code class="ic">exit 1</code>，把错误信息回显给提交者。</p>
+    <p>关键工具：<code class="ic">svnlook log -t TXN 仓库</code> 读取本次提交的日志。</p>
+  </div>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">hooks/pre-commit　Linux / macOS 版本</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c">#!/bin/sh
+#############################################################################
+# pre-commit 钩子：强制提交日志规范
+#
+# 参数：
+#   $1 = 仓库路径
+#   $2 = 事务名（transaction，本次提交的临时 ID）
+#
+# 退出码：
+#   0 = 允许提交
+#   非 0 = 拒绝提交，stderr 的内容会回显给客户端
+#############################################################################</span>
+
+REPOS=<span class="s">"$1"</span>
+TXN=<span class="s">"$2"</span>
+
+<span class="c"># ---- 读取本次提交的日志 ----</span>
+LOGMSG=$(svnlook log -t <span class="s">"$TXN"</span> <span class="s">"$REPOS"</span>)
+
+<span class="c"># ---- 去掉首尾空白字符 ----</span>
+TRIMMED=$(echo <span class="s">"$LOGMSG"</span> | sed <span class="s">'s/^[[:space:]]*//;s/[[:space:]]*$//'</span>)
+
+<span class="c"># ---- 规则 1：日志不能为空 ----</span>
+<span class="k">if</span> [ -z <span class="s">"$TRIMMED"</span> ]; <span class="k">then</span>
+  echo <span class="s">""</span> &gt;&amp;2
+  echo <span class="s">"══════════════════════════════════════════════"</span> &gt;&amp;2
+  echo <span class="s">" 提交被拒绝：必须填写提交日志"</span> &gt;&amp;2
+  echo <span class="s">"══════════════════════════════════════════════"</span> &gt;&amp;2
+  echo <span class="s">" 原因：空的提交日志会让历史完全无法追溯。"</span> &gt;&amp;2
+  echo <span class="s">" 正确示例："</span> &gt;&amp;2
+  echo <span class="s">"   svn commit -m \"[PROJ-123] 修复登录接口空指针异常\""</span> &gt;&amp;2
+  echo <span class="s">""</span> &gt;&amp;2
+  exit 1
+<span class="k">fi</span>
+
+<span class="c"># ---- 规则 2：日志长度至少 10 个字符 ----</span>
+LEN=${#TRIMMED}
+<span class="k">if</span> [ <span class="s">"$LEN"</span> -lt 10 ]; <span class="k">then</span>
+  echo <span class="s">""</span> &gt;&amp;2
+  echo <span class="s">"══════════════════════════════════════════════"</span> &gt;&amp;2
+  echo <span class="s">" 提交被拒绝：提交日志太短（当前 $LEN 字符，最少 10 字符）"</span> &gt;&amp;2
+  echo <span class="s">"══════════════════════════════════════════════"</span> &gt;&amp;2
+  echo <span class="s">" 你的日志：$TRIMMED"</span> &gt;&amp;2
+  echo <span class="s">" 请说明「做了什么 + 为什么改」。"</span> &gt;&amp;2
+  echo <span class="s">""</span> &gt;&amp;2
+  exit 1
+<span class="k">fi</span>
+
+<span class="c"># ---- 规则 3：必须包含任务编号（[PROJ-数字] 格式，可按需调整）----</span>
+<span class="c"># 如需强制，取消下面的注释</span>
+<span class="c"># if ! echo "$TRIMMED" | grep -qE '\[[A-Z]+-[0-9]+\]'; then</span>
+<span class="c">#   echo "" >&amp;2</span>
+<span class="c">#   echo "提交被拒绝：日志必须包含任务编号，格式 [PROJ-123]" >&amp;2</span>
+<span class="c">#   echo "你的日志：$TRIMMED" >&amp;2</span>
+<span class="c">#   exit 1</span>
+<span class="c"># fi</span>
+
+<span class="c"># ---- 规则 4：禁止无意义日志（黑名单）----</span>
+<span class="k">case</span> <span class="s">"$(echo "$TRIMMED" | tr '[:upper:]' '[:lower:]')"</span> <span class="k">in</span>
+  fix|update|commit|test|111|aaa|test1|临时提交|修改|更新)
+    echo <span class="s">""</span> &gt;&amp;2
+    echo <span class="s">"提交被拒绝：'$TRIMMED' 是无意义日志，请描述具体改动内容"</span> &gt;&amp;2
+    exit 1
+    ;;
+<span class="k">esac</span>
+
+<span class="c"># ---- 规则 5：检查文件后缀黑名单（防止误传编译产物）----</span>
+CHANGED=$(svnlook changed -t <span class="s">"$TXN"</span> <span class="s">"$REPOS"</span>)
+<span class="k">if</span> echo <span class="s">"$CHANGED"</span> | grep -qE <span class="s">'\.(exe|dll|so|a|class|pyc|o|obj|log|tmp)$'</span>; <span class="k">then</span>
+  echo <span class="s">""</span> &gt;&amp;2
+  echo <span class="s">"提交被拒绝：检测到编译产物/临时文件，请勿提交这些内容"</span> &gt;&amp;2
+  echo <span class="s">"$(echo "$CHANGED" | grep -E '\.(exe|dll|so|a|class|pyc|o|obj|log|tmp)$')"</span> &gt;&amp;2
+  echo <span class="s">"建议：在 svn:ignore 中加入这些模式"</span> &gt;&amp;2
+  exit 1
+<span class="k">fi</span>
+
+<span class="c"># ---- 规则 6：禁止提交超大文件（比如大于 50MB）----</span>
+<span class="k">for</span> f in $(svnlook changed -t <span class="s">"$TXN"</span> <span class="s">"$REPOS"</span> | awk <span class="s">'{print $2}'</span>); <span class="k">do</span>
+  SIZE=$(svnlook filesize -t <span class="s">"$TXN"</span> <span class="s">"$REPOS"</span> <span class="s">"$f"</span> 2&gt;/dev/null || echo 0)
+  <span class="k">if</span> [ <span class="s">"$SIZE"</span> -gt 52428800 ]; <span class="k">then</span>
+    echo <span class="s">"提交被拒绝：文件 $f 大小 $(($SIZE/1024/1024))MB，超过 50MB 限制"</span> &gt;&amp;2
+    echo <span class="s">"大文件请使用独立的二进制仓库或制品库"</span> &gt;&amp;2
+    exit 1
+  <span class="k">fi</span>
+<span class="k">done</span>
+
+<span class="c"># ---- 全部通过 ----</span>
+exit 0</pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：钩子拦截提交</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 提交时用很短的日志</span>
+<span class="ps">$</span> <span class="cmd">svn commit -m "fix"</span>
+Sending        version.txt
+Transmitting file data .done
+Committing transaction...
+<span class="no">svn: E165001: Commit failed (details follow):</span>
+<span class="no">svn: E165001: Commit blocked by pre-commit hook (exit code 1) with output:</span>
+<span class="no">[pre-commit] REJECTED: log must be at least 10 chars. Got: fix</span>
+<span class="cmt">↑ 关键：钩子的 stderr 内容完整回显给了提交者</span>
+<span class="cmt">  客户端退出码 = 1</span>
+
+<span class="cmt"># 用合规的日志再提交</span>
+<span class="ps">$</span> <span class="cmd">svn commit -m "abcd efgh ij"</span>
+Transmitting file data .done
+Committing transaction...
+<span class="ok">Committed revision 19.</span>
+<span class="cmt">↑ 通过钩子检查，正常提交</span></pre>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">Windows 上写钩子的三个坑（全部实测踩过）</span>
+  <ol>
+    <li><strong>必须用 ASCII 无 BOM 编码写文件</strong> ——
+      如果用 UTF-8 with BOM 保存，CMD 会把 BOM 字节当成命令的一部分，
+      出现 <code class="ic">'∩╗┐@echo' is not recognized as an internal or external command</code> 这种莫名其妙的错误。
+      用 PowerShell 的话：<code class="ic">[System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::ASCII)</code></li>
+    <li><strong>批处理里的变量替换语法</strong> ——
+      <code class="ic">%LOG:~9%</code> 这种子串语法在普通批处理里可用，
+      但在 <code class="ic">if</code> 块内部会出问题，需要 <code class="ic">setlocal enabledelayedexpansion</code> + <code class="ic">!LOG:~9!</code>。
+      更稳妥的写法是<strong>避免在 if 块里做字符串操作</strong>。</li>
+    <li><strong>必须写到 stderr</strong> —— <code class="ic">echo 消息 1&gt;&amp;2</code>。
+      如果只写 stdout，有的 SVN 版本不会把内容回显给客户端，提交者只会看到「Commit blocked」而不知道原因。</li>
+  </ol>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bat</span><span class="fn">hooks/pre-commit.bat　Windows 版本</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">@echo off
+<span class="c">rem =====================================================================
+rem pre-commit 钩子（Windows）：强制提交日志规范
+rem 参数：%1 = 仓库路径    %2 = 事务名
+rem 注意：本文件必须保存为 ASCII 无 BOM 编码！
+rem =====================================================================</span>
+
+set REPOS=%1
+set TXN=%2
+set LOGFILE=%TEMP%\svn_precommit_%RANDOM%.txt
+
+<span class="c">rem ---- 读取本次提交的日志 ----</span>
+svnlook log "%REPOS%" -t "%TXN%" &gt; "%LOGFILE%"
+
+<span class="c">rem ---- 读入变量（只取第一行做长度判断）----</span>
+set LOG=
+for /f "usebackq delims=" %%a in ("%LOGFILE%") do set LOG=%%a
+
+del "%LOGFILE%" &gt;nul 2&gt;&amp;1
+
+<span class="c">rem ---- 规则 1：日志不能为空 ----</span>
+if "%LOG%"=="" (
+  echo. 1&gt;&amp;2
+  echo ============================================== 1&gt;&amp;2
+  echo  REJECTED: commit message is required. 1&gt;&amp;2
+  echo ============================================== 1&gt;&amp;2
+  echo  Example: svn commit -m "[PROJ-123] fix login NPE" 1&gt;&amp;2
+  echo. 1&gt;&amp;2
+  exit /b 1
+)
+
+<span class="c">rem ---- 规则 2：日志至少 10 个字符 ----</span>
+<span class="c">rem 通过「取第 10 个字符之后的子串是否为空」来判断长度</span>
+set TAIL=%LOG:~9%
+if "%TAIL%"=="" (
+  echo. 1&gt;&amp;2
+  echo ============================================== 1&gt;&amp;2
+  echo  REJECTED: log must be at least 10 chars. 1&gt;&amp;2
+  echo  Got: [%LOG%] 1&gt;&amp;2
+  echo ============================================== 1&gt;&amp;2
+  echo  Please describe WHAT you changed and WHY. 1&gt;&amp;2
+  echo. 1&gt;&amp;2
+  exit /b 1
+)
+
+<span class="c">rem ---- 规则 3：禁止无意义日志 ----</span>
+echo %LOG% | findstr /i /x "fix update commit test 111 aaa" &gt;nul
+if not errorlevel 1 (
+  echo REJECTED: '%LOG%' is a meaningless message. 1&gt;&amp;2
+  exit /b 1
+)
+
+<span class="c">rem ---- 规则 4：拒绝编译产物 ----</span>
+svnlook changed "%REPOS%" -t "%TXN%" | findstr /i /r "\.exe$ \.dll$ \.pyc$ \.class$ \.obj$ \.log$ \.tmp$" &gt;nul
+if not errorlevel 1 (
+  echo. 1&gt;&amp;2
+  echo REJECTED: build artifacts / temp files detected. 1&gt;&amp;2
+  echo Add them to svn:ignore instead of committing. 1&gt;&amp;2
+  exit /b 1
+)
+
+<span class="c">rem ---- 全部通过 ----</span>
+exit /b 0</pre>
+</div>
+
+<h4 class="sub" id="s20-3">其余八个钩子的实用脚本</h4>
+
+<div class="grid2">
+  <div class="card blue">
+    <h6>post-commit　提交后自动通知</h6>
+    <p>最常用的用途：提交后自动发邮件、触发 CI 构建、写审计日志。</p>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">hooks/post-commit</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">#!/bin/sh
+REPOS="$1"
+REV="$2"
+
+<span class="c"># 收集本次提交的信息</span>
+AUTHOR=$(svnlook author -r "$REV" "$REPOS")
+DATE=$(svnlook date -r "$REV" "$REPOS")
+LOG=$(svnlook log -r "$REV" "$REPOS")
+CHANGED=$(svnlook changed -r "$REV" "$REPOS")
+
+<span class="c"># ---- 1. 写审计日志 ----</span>
+{
+  echo "==================================================="
+  echo "Revision : $REV"
+  echo "Author   : $AUTHOR"
+  echo "Date     : $DATE"
+  echo "Message  : $LOG"
+  echo "Changed  :"
+  echo "$CHANGED"
+} &gt;&gt; /var/log/svn-commits.log
+
+<span class="c"># ---- 2. 发邮件通知（需装 mailutils）----</span>
+{
+  echo "提交版本：r$REV"
+  echo "提交者：$AUTHOR"
+  echo "时间：$DATE"
+  echo ""
+  echo "日志：$LOG"
+  echo ""
+  echo "变更文件："
+  echo "$CHANGED"
+} | mail -s "[SVN] r$REV by $AUTHOR" dev-team@example.com
+
+<span class="c"># ---- 3. 触发 CI 构建（调用 Jenkins/GitLab CI 的 webhook）----</span>
+curl -s -X POST "https://jenkins.example.com/job/myproject/build?token=BUILD_TOKEN" &gt;/dev/null 2&gt;&amp;1
+
+<span class="c"># post-commit 的返回值不影响提交（已经提交成功了）</span>
+exit 0</pre>
+    </div>
+  </div>
+
+  <div class="card pur">
+    <h6>pre-revprop-change　防止日志被改</h6>
+    <p>SVN 默认<strong>禁止</strong>修改版本库属性（包括提交日志），因为该钩子不存在。
+    想允许修改必须显式创建它并 <code class="ic">exit 0</code>；想禁止篡改就 <code class="ic">exit 1</code>。</p>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">方案 A：完全禁止修改（推荐）</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">#!/bin/sh
+<span class="c"># 拒绝一切 revprop 修改，保证历史不可篡改</span>
+echo "revision properties are immutable" &gt;&amp;2
+exit 1</pre>
+    </div>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">方案 B：只允许管理员改日志，且记录审计</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">#!/bin/sh
+REPOS="$1"; REV="$2"; USER="$3"
+PROPNAME="$4"; ACTION="$5"
+
+<span class="c"># 只允许修改 svn:log，不允许改 svn:author / svn:date</span>
+if [ "$PROPNAME" != "svn:log" ]; then
+  echo "only svn:log can be changed (attempted: $PROPNAME)" &gt;&amp;2
+  exit 1
+fi
+
+<span class="c"># 只允许 admin 用户</span>
+if [ "$USER" != "admin" ]; then
+  echo "only 'admin' can modify revision properties" &gt;&amp;2
+  exit 1
+fi
+
+<span class="c"># 记审计日志</span>
+OLD=$(svnlook propget -r "$REV" --revprop svn:log "$REPOS" 2&gt;/dev/null)
+echo "[$(date -Iseconds)] $USER modified svn:log of r$REV" &gt;&gt; /var/log/svn-revprop-audit.log
+echo "  old: $OLD" &gt;&gt; /var/log/svn-revprop-audit.log
+
+exit 0</pre>
+    </div>
+  </div>
+</div>
+
+<div class="tw">
+<table>
+<thead><tr><th>钩子</th><th>触发时机</th><th>参数</th><th>典型用途</th></tr></thead>
+<tbody>
+  <tr>
+    <td><code class="ic b">start-commit</code></td>
+    <td>提交开始前（还不知道改了哪些文件）</td>
+    <td><code class="ic">仓库 用户</code></td>
+    <td>拉黑用户、限制提交时段、检查用户是否有提交权限</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">pre-commit</code></td>
+    <td>提交写入前（<strong>最后一道关卡</strong>）</td>
+    <td><code class="ic">仓库 事务名</code></td>
+    <td><strong>日志规范检查</strong>、禁止提交编译产物、大文件拦截、代码风格检查</td>
+  </tr>
+  <tr>
+    <td><code class="ic g">post-commit</code></td>
+    <td>提交成功后</td>
+    <td><code class="ic">仓库 版本号</code></td>
+    <td>邮件通知、触发 CI、写审计日志、更新文档站</td>
+  </tr>
+  <tr>
+    <td><code class="ic y">pre-lock</code></td>
+    <td>加锁前</td>
+    <td><code class="ic">仓库 路径 用户 [注释] [force]</code></td>
+    <td>限制谁可以加锁、禁止抢占他人锁</td>
+  </tr>
+  <tr>
+    <td><code class="ic g">post-lock</code></td>
+    <td>加锁成功后</td>
+    <td><code class="ic">仓库 用户</code> (stdin 传路径列表)</td>
+    <td>通知相关人「某文件已被锁定」</td>
+  </tr>
+  <tr>
+    <td><code class="ic y">pre-unlock</code></td>
+    <td>解锁前</td>
+    <td><code class="ic">仓库 路径 用户 [token] [break-lock]</code></td>
+    <td>禁止强制解除他人锁</td>
+  </tr>
+  <tr>
+    <td><code class="ic g">post-unlock</code></td>
+    <td>解锁成功后</td>
+    <td><code class="ic">仓库 用户</code></td>
+    <td>通知「文件已释放，可以编辑了」</td>
+  </tr>
+  <tr>
+    <td><code class="ic y">pre-revprop-change</code></td>
+    <td>修改版本库属性前</td>
+    <td><code class="ic">仓库 版本号 用户 属性名 动作</code></td>
+    <td>防止日志被篡改；或仅允许管理员修改并审计</td>
+  </tr>
+  <tr>
+    <td><code class="ic g">post-revprop-change</code></td>
+    <td>修改版本库属性后</td>
+    <td><code class="ic">仓库 版本号 用户 属性名 动作</code></td>
+    <td>记录属性修改的审计日志、发通知</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：revprop 保护的两个方向</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># ===== 方向一：钩子返回 1 → 拒绝修改历史日志 =====</span>
+<span class="ps">$</span> <span class="cmd">svn propset --revprop -r 19 svn:log "篡改历史日志"</span>
+<span class="no">svn: E165001: Revprop change blocked by pre-revprop-change hook (exit code 1) with output:</span>
+<span class="no">[pre-revprop-change] REJECTED: revision properties are immutable.</span>
+<span class="cmt">↑ 历史不可篡改，符合审计要求</span>
+
+<span class="cmt"># ===== 方向二：钩子返回 0 → 允许修改 =====</span>
+<span class="cmt"># 把钩子内容改成：@echo off / exit /b 0</span>
+<span class="ps">$</span> <span class="cmd">svn propset --revprop -r 19 svn:log "Corrected commit message for r19"</span>
+<span class="ok">property 'svn:log' set on repository revision 19</span>
+
+<span class="cmt"># 验证修改生效</span>
+<span class="ps">$</span> <span class="cmd">svn log -r 19</span>
+------------------------------------------------------------------------
+r19 | kelang | 2026-10-08 11:14:04 | 1 line
+
+<span class="ok">Corrected commit message for r19</span>
+------------------------------------------------------------------------
+
+<span class="cmt"># ===== 未创建钩子时（默认状态）=====</span>
+<span class="ps">$</span> <span class="cmd">svn propset --revprop -r 20 svn:log "test"</span>
+<span class="no">svn: E165006: Repository has not been enabled to accept revision propchanges;</span>
+<span class="no">              ask the administrator to create a pre-revprop-change hook</span>
+<span class="cmt">↑ 这是 SVN 的安全默认值：没有钩子 = 不允许改</span></pre>
+  </div>
+</div>
+
+<div class="box key">
+  <span class="bt">钩子调试的三个建议</span>
+  <ol>
+    <li><strong>钩子里的输出一定要写到 stderr</strong>（<code class="ic">&gt;&amp;2</code>）。
+      写到 stdout 的内容在多数情况下不会回显给提交者。</li>
+    <li><strong>先在命令行手工测一遍</strong>再部署。比如测 pre-commit：
+      <div class="codewrap" style="margin:8px 0 0">
+        <div class="codehead"><span class="lang">bash</span><span class="fn">手工测试钩子</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 先制造一个事务（不提交）</span>
+svnmucc -U svn://localhost/repo mkdir /trunk/tmp <span class="c"># 或在客户端执行提交但取消</span>
+
+<span class="c"># 更实用的方式：直接手工调用钩子脚本</span>
+/var/svn/repo/hooks/pre-commit /var/svn/repo <span class="s">"1-abc"</span>
+echo $?   <span class="c"># 看退出码</span>
+
+<span class="c"># 查看某个事务的信息</span>
+svnlook changed -t <span class="s">"1-abc"</span> /var/svn/repo
+svnlook log -t <span class="s">"1-abc"</span> /var/svn/repo
+
+<span class="c"># 清理卡住的事务（钩子崩溃可能留下垃圾事务）</span>
+svnadmin lstxns /var/svn/repo
+svnadmin rmtxns /var/svn/repo <span class="s">"1-abc"</span></pre>
+      </div>
+    </li>
+    <li><strong>注意执行环境</strong>——钩子运行时的工作目录、<code class="ic">PATH</code>、环境变量与你登录时<strong>完全不同</strong>。
+      命令一定要写<strong>绝对路径</strong>（比如 <code class="ic">/usr/bin/svnlook</code> 而不是 <code class="ic">svnlook</code>），
+      否则会出现「我在终端能跑，钩子一跑就失败」。
+      更稳妥的做法是用 <code class="ic">hooks/hooks-env.tmpl</code> 配置环境变量。</li>
+  </ol>
+</div>
+
+<!-- ==========================================================================
+     第八阶段 · 第 21 节：备份与恢复
+     ========================================================================== -->
+
+<div class="pager">
+  <a href="19-authz.html"><span class="lbl">← 上一节</span><span class="ttl">19. 认证与权限：authz 精细控制</span></a>
+  <a class="home" href="index.html"><span class="ttl">总目录</span></a>
+  <a class="next" href="21-backup.html"><span class="lbl">下一节 →</span><span class="ttl">21. 备份、恢复与仓库维护</span></a>
+</div>
+
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+
+<script>
+
+(function () {
+  'use strict';
+
+  /* ============================================================
+     1. 代码块增强：语法高亮 + 复制按钮 + 换行切换
+     ============================================================ */
+
+  // 极简高亮器：只处理注释、字符串、SVN 命令、选项
+  function escapeHtml(t) {
+    return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function highlight(code) {
+    var lines = code.split('\n');
+    var out = [];
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var indented = escapeHtml(line);
+
+      // 整行注释（# 或 rem 或 :: 开头）
+      if (/^\s*(#|rem\s|::)/i.test(line) && !/^\s*#!/.test(line)) {
+        out.push('<span class="c">' + indented + '</span>');
+        continue;
+      }
+
+      // 行内注释：找到未被引号包裹的 #
+      var result = '';
+      var inStr = false;
+      var strChar = '';
+      var commentStart = -1;
+
+      for (var j = 0; j < line.length; j++) {
+        var ch = line[j];
+        if (!inStr && (ch === '"' || ch === "'")) {
+          inStr = true;
+          strChar = ch;
+        } else if (inStr && ch === strChar) {
+          if (line[j - 1] !== '\\') inStr = false;
+        } else if (!inStr && ch === '#' && j > 0 && line[j - 1] === ' ' && /^\s*#/.test(line.slice(j)) === false) {
+          commentStart = j;
+          break;
+        }
+      }
+
+      var codePart = commentStart >= 0 ? line.slice(0, commentStart) : line;
+      var commentPart = commentStart >= 0 ? line.slice(commentStart) : '';
+      var esc = escapeHtml(codePart);
+
+      // 字符串
+      esc = esc.replace(/(&quot;[^&]*?&quot;|&#39;[^&]*?&#39;)/g, '<span class="s">$1</span>');
+      // 注释里的 svn 命令名（行首后的第一个词）
+      esc = esc.replace(/^(\s*)(svn|svnadmin|svnserve|svnlook|svndumpfilter|svnrdump|svnauthz|svnmucc|sc|find|curl|mail|tar|export|cd|set|echo|if|for|chmod|xargs|grep|awk|sudo)\b/,
+        '$1<span class="k">$2</span>');
+      // 长选项
+      esc = esc.replace(/(\s)(--?[a-zA-Z][a-zA-Z0-9-]*)/g, '$1<span class="a">$2</span>');
+      // 数字（版本号之类）
+      esc = esc.replace(/\b(r\d+)\b/g, '<span class="m">$1</span>');
+
+      result = esc;
+      if (commentPart) result += '<span class="c">' + escapeHtml(commentPart) + '</span>';
+      out.push(result);
+    }
+    return out.join('\n');
+  }
+
+  // 处理所有 codewrap 里的 pre.code
+  var wraps = document.querySelectorAll('.codewrap');
+
+  Array.prototype.forEach.call(wraps, function (wrap) {
+    var pre = wrap.querySelector('pre.code');
+    if (!pre) return;
+
+    // 如果代码块里已经有手工写好的语法着色 span，就原样保留，不再重复处理
+    var alreadyStyled = pre.querySelector('span');
+    if (!alreadyStyled) {
+      var raw = pre.textContent;
+      var codeEl = pre.querySelector('code') || pre;
+      codeEl.innerHTML = highlight(raw);
+    }
+
+    // 加复制按钮（若无）
+    var acts = wrap.querySelector('.acts');
+    if (acts && !acts.querySelector('[data-copy]')) {
+      var b = document.createElement('button');
+      b.setAttribute('data-copy', '');
+      b.textContent = '复制';
+      acts.appendChild(b);
+    }
+  });
+
+  // 复制功能
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('[data-copy]');
+    if (!btn) return;
+
+    var wrap = btn.closest('.codewrap') || btn.closest('.term');
+    if (!wrap) return;
+    var pre = wrap.querySelector('pre');
+    if (!pre) return;
+
+    var text = pre.textContent;
+
+    function done() {
+      btn.textContent = '已复制';
+      btn.classList.add('ok');
+      setTimeout(function () {
+        btn.textContent = '复制';
+        btn.classList.remove('ok');
+      }, 1400);
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text, done); });
+    } else {
+      fallback(text, done);
+    }
+  });
+
+  function fallback(text, done) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done();
+    } catch (err) { /* 静默失败 */ }
+  }
+
+  /* ============================================================
+     2. 进度条 + 回到顶部
+     ============================================================ */
+  var prog = document.getElementById('prog');
+  var topBtn = document.getElementById('top');
+
+  function onScroll() {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var pct = max > 0 ? (h.scrollTop || document.body.scrollTop) / max * 100 : 0;
+    if (prog) prog.style.width = pct + '%';
+    if (topBtn) {
+      if ((h.scrollTop || document.body.scrollTop) > 600) topBtn.classList.add('show');
+      else topBtn.classList.remove('show');
+    }
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  if (topBtn) {
+    topBtn.onclick = function () { window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  }
+
+  /* ============================================================
+     3. 导航高亮：滚动时自动标记当前小节
+     ============================================================ */
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll('#nav a'));
+  var sections = navLinks.map(function (a) {
+    var id = a.getAttribute('href');
+    return { el: id && id.length > 1 ? document.querySelector(id) : null, a: a };
+  }).filter(function (s) { return s.el; });
+
+  function highlightNav() {
+    var pos = window.scrollY + 140;
+    var current = null;
+    for (var i = 0; i < sections.length; i++) {
+      if (sections[i].el.offsetTop <= pos) current = sections[i];
+    }
+    navLinks.forEach(function (a) { a.classList.remove('on'); });
+    if (current) {
+      current.a.classList.add('on');
+      // 让当前项在侧栏可见
+      var box = current.a.parentElement;
+      if (box && box.scrollHeight > box.clientHeight) {
+        var aTop = current.a.offsetTop;
+        if (aTop < box.scrollTop || aTop > box.scrollTop + box.clientHeight - 60) {
+          box.scrollTop = aTop - box.clientHeight / 2;
+        }
+      }
+    }
+  }
+
+  window.addEventListener('scroll', highlightNav, { passive: true });
+  highlightNav();
+
+  /* ============================================================
+     4. 表格首列若为空白则隐藏（防止空单元格）
+     ============================================================ */
+  Array.prototype.forEach.call(document.querySelectorAll('table'), function (t) {
+    var firstTh = t.querySelector('thead th');
+    var firstTd = t.querySelector('tbody td');
+    if (firstTh && firstTd && !firstTh.textContent.trim() && !firstTd.textContent.trim()) {
+      Array.prototype.forEach.call(t.querySelectorAll('tr'), function (tr) {
+        var c = tr.querySelector('th, td');
+        if (c) c.style.display = 'none';
+      });
+    }
+  });
+
+})();
+
+</script>
+</body>
+</html>

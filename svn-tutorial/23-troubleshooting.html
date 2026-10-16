@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>23. 故障排查速查 — SVN 完全教程</title>
+<style>
+
+/* ==========================================================================
+   设计令牌
+   ========================================================================== */
+:root{
+  --bg:#0d1117; --bg2:#161b22; --bg3:#1c2128; --bg4:#21262d;
+  --bd:#30363d; --bd2:#3d444d;
+  --tx:#e6edf3; --tx2:#c9d1d9; --tx3:#8b949e; --tx4:#6e7681;
+  --blue:#58a6ff; --blue2:#79c0ff; --green:#7ee787; --green2:#3fb950;
+  --orange:#ffa657; --red:#ff7b72; --purple:#d2a8ff; --cyan:#56d4dd;
+  --yellow:#e3b341;
+  --mono:"JetBrains Mono","Cascadia Code",Consolas,Monaco,"Courier New",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --rad:10px; --rad2:14px; --shadow:0 8px 24px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{background:var(--bg);color:var(--tx2);font-family:var(--sans);
+  font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+#prog{position:fixed;top:0;left:0;height:3px;width:0;z-index:999;
+  background:linear-gradient(90deg,var(--blue),var(--purple),var(--green));transition:width .1s linear}
+.wrap{display:flex;max-width:1600px;margin:0 auto;align-items:flex-start}
+
+/* ==========================================================================
+   侧边导航
+   ========================================================================== */
+aside{position:sticky;top:0;flex:0 0 300px;height:100vh;overflow-y:auto;
+  border-right:1px solid var(--bd);padding:26px 16px 80px;background:var(--bg)}
+aside::-webkit-scrollbar{width:8px}
+aside::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:4px}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.brand .dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;
+  background:linear-gradient(135deg,var(--blue),var(--purple))}
+.brand h1{font-size:15px;font-weight:700;color:var(--tx);letter-spacing:.2px}
+.brand-sub{font-size:12px;color:var(--tx4);margin:0 0 18px 21px;line-height:1.5}
+nav a{display:block;padding:6px 11px;margin:2px 0;font-size:13.5px;color:var(--tx3);
+  text-decoration:none;border-radius:7px;border-left:2px solid transparent;transition:all .14s;line-height:1.5}
+nav a:hover{background:var(--bg3);color:var(--tx)}
+nav a.h3{padding-left:24px;font-size:12.8px;color:var(--tx4)}
+nav a.on{background:var(--bg4);color:var(--blue);border-left-color:var(--blue);font-weight:600}
+nav .grp{margin:16px 0 6px 11px;font-size:11px;font-weight:700;color:var(--tx4);
+  text-transform:uppercase;letter-spacing:.9px}
+
+/* ==========================================================================
+   主体排版
+   ========================================================================== */
+main{flex:1;min-width:0;padding:44px 52px 140px;max-width:1180px}
+.hero{margin-bottom:46px;padding-bottom:30px;border-bottom:1px solid var(--bd)}
+.hero .tag{display:inline-block;font-size:11.5px;font-weight:700;color:var(--blue);
+  background:rgba(88,166,255,.13);border:1px solid rgba(88,166,255,.3);
+  padding:3px 11px;border-radius:20px;margin-bottom:16px;letter-spacing:.4px}
+.hero h2{font-size:34px;font-weight:800;color:var(--tx);line-height:1.25;margin-bottom:12px;
+  background:linear-gradient(135deg,#fff 30%,var(--blue) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-.5px}
+.hero p{font-size:15px;color:var(--tx3);max-width:860px}
+.hero .meta{display:flex;gap:22px;margin-top:20px;flex-wrap:wrap}
+.hero .meta div{font-size:12.5px;color:var(--tx4)}
+.hero .meta b{color:var(--tx2);font-weight:600}
+h3.sec{font-size:25px;font-weight:700;color:var(--tx);margin:66px 0 8px;
+  padding-top:8px;scroll-margin-top:20px;letter-spacing:-.3px}
+h3.sec::before{content:"";display:block;width:38px;height:3px;border-radius:2px;
+  background:linear-gradient(90deg,var(--blue),var(--purple));margin-bottom:16px}
+h3.sec .no{color:var(--blue);font-family:var(--mono);font-size:19px;font-weight:700;margin-right:8px}
+h4.sub{font-size:17.5px;font-weight:700;color:var(--tx);margin:36px 0 12px;scroll-margin-top:20px}
+h4.sub::before{content:"▍";color:var(--blue);margin-right:7px;font-size:14px}
+h5.mini{font-size:14.5px;font-weight:700;color:var(--blue2);margin:26px 0 10px}
+p{margin:12px 0;color:var(--tx2)}
+p.lead{font-size:16px;color:var(--tx3);margin:14px 0 22px}
+ul,ol{margin:12px 0 12px 24px}
+li{margin:6px 0}
+li::marker{color:var(--tx4)}
+strong{color:var(--tx);font-weight:700}
+em{color:var(--orange);font-style:normal;font-weight:600}
+a.ref{color:var(--blue2);text-decoration:none;border-bottom:1px dotted var(--bd2)}
+a.ref:hover{color:var(--cyan)}
+hr.sep{border:none;border-top:1px solid var(--bd);margin:38px 0}
+code.ic{font-family:var(--mono);font-size:13px;color:var(--orange);
+  background:rgba(110,118,129,.16);padding:2px 6px;border-radius:5px;
+  border:1px solid rgba(110,118,129,.22);white-space:nowrap}
+code.ic.b{color:var(--blue2)}
+code.ic.g{color:var(--green)}
+code.ic.p{color:var(--purple)}
+
+/* ==========================================================================
+   代码块
+   ========================================================================== */
+.codewrap{position:relative;margin:18px 0 22px;border-radius:var(--rad2);
+  border:1px solid var(--bd);background:#0b0f14;overflow:hidden;box-shadow:var(--shadow)}
+.codehead{display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px;background:var(--bg2);border-bottom:1px solid var(--bd);gap:10px}
+.codehead .lang{font-family:var(--mono);font-size:11.5px;font-weight:700;
+  color:var(--tx3);letter-spacing:.6px;text-transform:uppercase;white-space:nowrap}
+.codehead .fn{font-family:var(--mono);font-size:11.5px;color:var(--tx4);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;flex:1}
+.codehead .acts{display:flex;gap:7px;flex:0 0 auto}
+.codehead button{background:var(--bg4);border:1px solid var(--bd2);color:var(--tx3);
+  font-family:var(--sans);font-size:11.5px;padding:3px 10px;border-radius:6px;cursor:pointer;transition:all .14s}
+.codehead button:hover{background:var(--blue);color:#000;border-color:var(--blue)}
+.codehead button.ok{background:var(--green2);color:#000;border-color:var(--green2)}
+pre.code{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mono);
+  font-size:13.2px;line-height:1.68;tab-size:4}
+pre.code::-webkit-scrollbar{height:9px}
+pre.code::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+pre.code code{color:var(--tx2);white-space:pre;display:block}
+.k{color:#ff7b72}.t{color:#79c0ff}.s{color:#a5d6ff}.c{color:#8b949e;font-style:italic}
+.n{color:#79c0ff}.m{color:#d2a8ff}.a{color:#ffa657}.p{color:#8b949e}
+
+/* 终端输出块 —— 显示真实命令回显 */
+.term{margin:16px 0 20px;border-radius:var(--rad2);border:1px solid var(--bd);
+  background:#080b0f;overflow:hidden}
+.term .th{display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--bg2);
+  border-bottom:1px solid var(--bd);font-family:var(--mono);font-size:11.5px;color:var(--tx4)}
+.term .th .dotr{width:9px;height:9px;border-radius:50%;background:#ff5f57}
+.term .th .doty{width:9px;height:9px;border-radius:50%;background:#febc2e}
+.term .th .dotg{width:9px;height:9px;border-radius:50%;background:#28c840}
+.term pre{margin:0;padding:14px 16px;overflow-x:auto;font-family:var(--mono);
+  font-size:12.9px;line-height:1.7;color:#c9d1d9;white-space:pre}
+.term pre::-webkit-scrollbar{height:9px}
+.term pre::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+.term .ps{color:var(--green);font-weight:700}       /* 提示符 $ */
+.term .cmd{color:var(--tx)}                          /* 命令本体 */
+.term .cmt{color:var(--tx4);font-style:italic}       /* 注释 */
+.term .ok{color:var(--green)}                        /* 成功 */
+.term .no{color:var(--red)}                          /* 失败 */
+.term .hl{color:var(--yellow);font-weight:600}       /* 重点 */
+.term .dim{color:var(--tx4)}                         /* 弱化 */
+.term .cy{color:var(--cyan)}
+
+/* ==========================================================================
+   提示框
+   ========================================================================== */
+.box{margin:20px 0;padding:15px 18px 15px 46px;border-radius:var(--rad);
+  position:relative;font-size:14.3px;line-height:1.72;border:1px solid;border-left-width:3px}
+.box::before{position:absolute;left:15px;top:14px;font-size:16px;line-height:1}
+.box .bt{display:block;font-weight:700;margin-bottom:5px;font-size:13.5px}
+.box p{margin:6px 0;font-size:14.3px}
+.box ul,.box ol{margin:7px 0 7px 18px}
+.box li{margin:4px 0}
+.box.tip{background:rgba(88,166,255,.07);border-color:rgba(88,166,255,.28)}
+.box.tip::before{content:"★"}.box.tip .bt{color:var(--blue)}
+.box.warn{background:rgba(255,166,87,.07);border-color:rgba(255,166,87,.3)}
+.box.warn::before{content:"!"}.box.warn .bt{color:var(--orange)}
+.box.err{background:rgba(255,123,114,.07);border-color:rgba(255,123,114,.3)}
+.box.err::before{content:"X"}.box.err .bt{color:var(--red)}
+.box.ok{background:rgba(126,231,135,.07);border-color:rgba(126,231,135,.3)}
+.box.ok::before{content:"✓"}.box.ok .bt{color:var(--green)}
+.box.key{background:rgba(210,168,255,.07);border-color:rgba(210,168,255,.3)}
+.box.key::before{content:"◈"}.box.key .bt{color:var(--purple)}
+.box.termbox{background:rgba(86,212,221,.06);border-color:rgba(86,212,221,.28)}
+.box.termbox::before{content:"⌘"}.box.termbox .bt{color:var(--cyan)}
+
+/* ==========================================================================
+   表格
+   ========================================================================== */
+.tw{overflow-x:auto;margin:18px 0;border-radius:var(--rad);border:1px solid var(--bd)}
+table{width:100%;border-collapse:collapse;font-size:13.8px}
+thead th{background:var(--bg3);color:var(--tx);font-weight:700;text-align:left;
+  padding:11px 14px;border-bottom:1px solid var(--bd2);white-space:nowrap;font-size:13px;letter-spacing:.2px}
+tbody td{padding:9px 14px;border-bottom:1px solid rgba(48,54,61,.6);vertical-align:top;line-height:1.65}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:rgba(88,166,255,.045)}
+tbody td:first-child{color:var(--tx)}
+td .ic,th .ic{font-size:12.3px}
+.tagmini{display:inline-block;font-size:11px;padding:2px 7px;border-radius:5px;
+  font-weight:700;font-family:var(--mono);white-space:nowrap}
+.tagmini.g{background:rgba(126,231,135,.15);color:var(--green)}
+.tagmini.r{background:rgba(255,123,114,.15);color:var(--red)}
+.tagmini.y{background:rgba(227,179,65,.15);color:var(--yellow)}
+.tagmini.b{background:rgba(88,166,255,.15);color:var(--blue)}
+.tagmini.p{background:rgba(210,168,255,.15);color:var(--purple)}
+.tagmini.c{background:rgba(86,212,221,.15);color:var(--cyan)}
+
+/* ==========================================================================
+   步骤条
+   ========================================================================== */
+.steps{counter-reset:st;margin:20px 0;border:1px solid var(--bd);
+  border-radius:var(--rad2);overflow:hidden;background:var(--bg2)}
+.steps>.stitle{display:flex;align-items:center;gap:9px;padding:11px 16px;
+  background:linear-gradient(90deg,rgba(210,168,255,.11),transparent);
+  border-bottom:1px solid var(--bd);font-size:13.5px;font-weight:700;color:var(--purple)}
+.steps>.stitle .badge{background:var(--purple);color:#000;font-size:10.5px;
+  padding:2px 8px;border-radius:20px;letter-spacing:.4px;font-weight:800}
+.step{display:flex;gap:14px;padding:13px 16px;border-bottom:1px solid rgba(48,54,61,.55)}
+.step:last-child{border-bottom:none}
+.step:hover{background:rgba(210,168,255,.035)}
+.step .num{counter-increment:st;flex:0 0 26px;height:26px;border-radius:50%;
+  background:rgba(210,168,255,.14);border:1px solid rgba(210,168,255,.35);
+  color:var(--purple);font-family:var(--mono);font-size:12.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;margin-top:2px}
+.step .num::before{content:counter(st)}
+.step .body{flex:1;min-width:0;font-size:14px;line-height:1.7}
+.step .body .st{font-weight:700;color:var(--tx);display:block;margin-bottom:3px}
+.step .body .sc{color:var(--tx3);font-size:13.6px}
+.step .body .menu{font-family:var(--mono);font-size:12.8px;color:var(--yellow);
+  background:rgba(227,179,65,.1);border:1px solid rgba(227,179,65,.25);
+  padding:1px 7px;border-radius:5px;white-space:nowrap;display:inline-block;margin:1px 0}
+
+/* ==========================================================================
+   卡片
+   ========================================================================== */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}
+.card{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rad2);padding:16px 18px}
+.card h6{font-size:13.5px;font-weight:700;margin-bottom:9px;display:flex;
+  align-items:center;gap:7px;color:var(--tx)}
+.card ul{margin:8px 0 0 18px;font-size:13.6px}
+.card ul li{margin:5px 0}
+.card p{font-size:13.7px;margin:8px 0}
+.card.good{border-color:rgba(126,231,135,.32)}.card.good h6{color:var(--green)}
+.card.bad{border-color:rgba(255,123,114,.32)}.card.bad h6{color:var(--red)}
+.card.blue{border-color:rgba(88,166,255,.32)}.card.blue h6{color:var(--blue)}
+.card.warn{border-color:rgba(255,166,87,.32)}.card.warn h6{color:var(--orange)}
+.card.pur{border-color:rgba(210,168,255,.32)}.card.pur h6{color:var(--purple)}
+.card .big{font-family:var(--mono);font-size:22px;font-weight:800;color:var(--tx);
+  display:block;margin-bottom:4px;line-height:1.2}
+.card .cap{font-size:12.2px;color:var(--tx4)}
+
+/* ==========================================================================
+   图文（SVG 插图系统）—— 本教程的核心
+   ========================================================================== */
+.fig{margin:24px 0 26px;border:1px solid var(--bd);border-radius:var(--rad2);
+  background:linear-gradient(180deg,#0f141b,#0b0f14);overflow:hidden;box-shadow:var(--shadow)}
+.fig .fh{padding:10px 18px;background:var(--bg2);border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;gap:9px}
+.fig .fh .ic{color:var(--cyan);font-size:13px}
+.fig .fh .ft{font-size:13.2px;font-weight:700;color:var(--tx)}
+.fig .fh .fs{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--tx4);
+  letter-spacing:.5px;text-transform:uppercase}
+.fig .fb{padding:22px 18px 18px;overflow-x:auto}
+.fig .fb::-webkit-scrollbar{height:9px}
+.fig .fb::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+.fig svg{display:block;margin:0 auto;max-width:100%;height:auto}
+.fig .cap{padding:11px 18px 14px;font-size:13px;color:var(--tx3);border-top:1px solid rgba(48,54,61,.55);
+  line-height:1.7}
+.fig .cap b{color:var(--tx2)}
+/* SVG 通用类：所有插图复用，保证风格统一 */
+svg text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+svg .tt{font-size:14px;font-weight:700;fill:#e6edf3}
+svg .ts{font-size:12px;fill:#8b949e}
+svg .tx{font-size:12.5px;fill:#c9d1d9}
+svg .tm{font-size:12px;font-family:"JetBrains Mono",Consolas,monospace;fill:#e6edf3}
+svg .tm2{font-size:11px;font-family:"JetBrains Mono",Consolas,monospace;fill:#8b949e}
+svg .hd{font-size:11.5px;font-weight:700;fill:#e6edf3}
+svg .bd{fill:none;stroke:#30363d;stroke-width:1.5}
+svg .bd2{fill:none;stroke:#3d444d;stroke-width:1.5}
+svg .dash{fill:none;stroke:#3d444d;stroke-width:1.5;stroke-dasharray:5 4}
+svg .arw{fill:none;stroke:#8b949e;stroke-width:1.6;marker-end:url(#arw)}
+svg .arwb{fill:none;stroke:#58a6ff;stroke-width:1.8;marker-end:url(#arwb)}
+svg .arwg{fill:none;stroke:#7ee787;stroke-width:1.8;marker-end:url(#arwg)}
+svg .arwr{fill:none;stroke:#ff7b72;stroke-width:1.8;marker-end:url(#arwr)}
+svg .arwp{fill:none;stroke:#d2a8ff;stroke-width:1.8;marker-end:url(#arwp)}
+svg .arwy{fill:none;stroke:#e3b341;stroke-width:1.8;marker-end:url(#arwy)}
+svg .arw2{fill:none;stroke:#58a6ff;stroke-width:1.6;marker-end:url(#arwb);stroke-dasharray:6 4}
+svg .n-blue{fill:rgba(88,166,255,.10);stroke:#58a6ff;stroke-width:1.5}
+svg .n-green{fill:rgba(126,231,135,.10);stroke:#7ee787;stroke-width:1.5}
+svg .n-pur{fill:rgba(210,168,255,.10);stroke:#d2a8ff;stroke-width:1.5}
+svg .n-orange{fill:rgba(255,166,87,.10);stroke:#ffa657;stroke-width:1.5}
+svg .n-red{fill:rgba(255,123,114,.10);stroke:#ff7b72;stroke-width:1.5}
+svg .n-yellow{fill:rgba(227,179,65,.10);stroke:#e3b341;stroke-width:1.5}
+svg .n-cyan{fill:rgba(86,212,221,.10);stroke:#56d4dd;stroke-width:1.5}
+svg .n-gray{fill:rgba(139,148,158,.10);stroke:#8b949e;stroke-width:1.5}
+svg .c-blue{fill:#0f141b;stroke:#58a6ff;stroke-width:1.5}
+svg .c-green{fill:#0f141b;stroke:#7ee787;stroke-width:1.5}
+svg .c-pur{fill:#0f141b;stroke:#d2a8ff;stroke-width:1.5}
+svg .c-orange{fill:#0f141b;stroke:#ffa657;stroke-width:1.5}
+svg .c-red{fill:#0f141b;stroke:#ff7b72;stroke-width:1.5}
+svg .c-gray{fill:#161b22;stroke:#3d444d;stroke-width:1.5}
+svg .fill-blue{fill:#58a6ff}svg .fill-green{fill:#7ee787}svg .fill-pur{fill:#d2a8ff}
+svg .fill-orange{fill:#ffa657}svg .fill-red{fill:#ff7b72}svg .fill-cyan{fill:#56d4dd}
+svg .fill-yellow{fill:#e3b341}svg .fill-gray{fill:#8b949e}svg .fill-tx{fill:#e6edf3}
+svg .fill-dim{fill:#6e7681}
+svg .mono{font-family:"JetBrains Mono",Consolas,monospace}
+
+/* 图例 */
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0 4px;font-size:12.5px;color:var(--tx3)}
+.legend span{display:flex;align-items:center;gap:7px}
+.legend i{width:13px;height:13px;border-radius:4px;display:inline-block;flex:0 0 auto}
+
+/* ==========================================================================
+   键值对 / 输出面板
+   ========================================================================== */
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-family:var(--mono);
+  font-size:12.8px;margin:10px 0}
+.kv b{color:var(--tx2);font-weight:600}
+.kv span{color:var(--orange)}
+
+/* 对比双栏（好/坏） */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:20px 0;
+  border:1px solid var(--bd);border-radius:var(--rad2);overflow:hidden}
+.duo>div{padding:14px 16px}
+.duo>div:first-child{border-right:1px solid var(--bd);background:rgba(255,123,114,.045)}
+.duo>div:last-child{background:rgba(126,231,135,.045)}
+.duo .dh{font-size:12.5px;font-weight:800;margin-bottom:9px;letter-spacing:.3px}
+.duo>div:first-child .dh{color:var(--red)}
+.duo>div:last-child .dh{color:var(--green)}
+.duo pre{font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--tx2);
+  white-space:pre-wrap;margin:0;overflow-x:auto}
+
+footer{margin-top:90px;padding-top:28px;border-top:1px solid var(--bd);font-size:13px;color:var(--tx4)}
+footer b{color:var(--tx3)}
+#top{position:fixed;right:26px;bottom:26px;width:44px;height:44px;border-radius:50%;
+  background:var(--bg3);border:1px solid var(--bd2);color:var(--tx2);font-size:17px;
+  cursor:pointer;display:none;align-items:center;justify-content:center;
+  box-shadow:var(--shadow);transition:all .16s;z-index:50}
+#top:hover{background:var(--blue);color:#000;border-color:var(--blue)}
+#top.show{display:flex}
+
+@media(max-width:1220px){aside{display:none}main{padding:30px 26px 100px;max-width:100%}}
+@media(max-width:760px){
+  .grid2,.grid3,.grid4,.duo{grid-template-columns:1fr}
+  .duo>div:first-child{border-right:none;border-bottom:1px solid var(--bd)}
+  .hero h2{font-size:25px}h3.sec{font-size:20px}main{padding:22px 16px 80px}
+  body{font-size:15px}
+}
+
+
+/* ===== 单节文件附加样式：面包屑与翻页 ===== */
+.crumb{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:22px;
+  padding-bottom:14px;border-bottom:1px solid var(--bd);font-size:13px;color:var(--tx4)}
+.crumb .stage{font-size:11.5px;font-weight:700;color:var(--blue);
+  background:rgba(88,166,255,.13);border:1px solid rgba(88,166,255,.3);
+  padding:2px 10px;border-radius:20px;letter-spacing:.3px}
+.crumb .sep{color:var(--tx4);opacity:.5}
+.crumb .cur{color:var(--tx2)}
+.crumb a{color:var(--tx3);text-decoration:none;border-bottom:1px dotted var(--bd2)}
+.crumb a:hover{color:var(--blue)}
+.pager{display:flex;gap:14px;margin:64px 0 0;padding-top:26px;border-top:1px solid var(--bd)}
+.pager a{flex:1;display:block;padding:14px 18px;border:1px solid var(--bd);
+  border-radius:var(--rad2);text-decoration:none;transition:all .16s;background:var(--bg2);min-width:0}
+.pager a:hover{border-color:var(--blue);background:var(--bg3);transform:translateY(-2px)}
+.pager a .lbl{display:block;font-size:11.5px;color:var(--tx4);margin-bottom:5px;
+  letter-spacing:.4px;text-transform:uppercase}
+.pager a .ttl{display:block;font-size:14.5px;color:var(--tx);font-weight:700;
+  line-height:1.5;overflow:hidden;text-overflow:ellipsis}
+.pager a.next{text-align:right}
+.pager a.disabled{opacity:.35;pointer-events:none}
+.pager a.home{flex:0 0 130px;text-align:center;display:flex;align-items:center;justify-content:center}
+.pager a.home .ttl{font-size:13.5px;color:var(--blue2)}
+
+</style>
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 完全教程</h1></div>
+  <div class="brand-sub">图文详解版 · 基于 SVN 1.14 实测</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 认识 SVN</div>
+    <a href="01-intro.html">1. SVN 是什么</a>
+    <a href="02-architecture.html">2. 三层架构与通信协议</a>
+    <a href="03-install.html">3. 安装与环境准备</a>
+    <div class="grp">第二阶段 · 核心模型</div>
+    <a href="04-model.html">4. 仓库、版本号与工作副本</a>
+    <a href="05-layout.html">5. 标准目录结构</a>
+    <div class="grp">第三阶段 · 日常操作</div>
+    <a href="06-first-steps.html">6. 第一次完整上手：从零到提交</a>
+    <a href="07-status.html">7. status 状态码全解</a>
+    <a href="08-daily-loop.html">8. 日常开发循环与 diff / log 进阶</a>
+    <a href="09-rollback.html">9. 撤销与回退：五种后悔场景</a>
+    <div class="grp">第四阶段 · 冲突处理</div>
+    <a href="10-conflict.html">10. 冲突：产生、解剖与解决</a>
+    <div class="grp">第五阶段 · 分支与标签</div>
+    <a href="11-branch-essence.html">11. 分支的本质：一次廉价的复制</a>
+    <a href="12-branch-ops.html">12. 创建、切换与管理分支</a>
+    <a href="13-merge.html">13. 合并全流程与 mergeinfo 机制</a>
+    <a href="14-tags.html">14. 标签与发布管理</a>
+    <div class="grp">第六阶段 · 属性系统</div>
+    <a href="15-properties.html">15. 属性系统：SVN 的隐藏超能力</a>
+    <a href="16-locking.html">16. 锁机制：二进制文件的独占保护</a>
+    <div class="grp">第七阶段 · 服务端</div>
+    <a href="17-deploy-choice.html">17. 服务端部署：方案选型</a>
+    <a href="18-svnserve.html">18. svnserve 部署实战</a>
+    <a href="19-authz.html">19. 认证与权限：authz 精细控制</a>
+    <a href="20-hooks.html">20. 钩子脚本：让 SVN 按你的规矩办事</a>
+    <div class="grp">第八阶段 · 运维与进阶</div>
+    <a href="21-backup.html">21. 备份、恢复与仓库维护</a>
+    <a href="22-advanced.html">22. 高级技巧与效率提升</a>
+    <a href="23-troubleshooting.html" class="on">23. 故障排查速查</a>
+    <a href="24-cheatsheet.html">24. 命令速查表</a>
+    <a href="25-gui.html">25. 图形客户端与 IDE 集成</a>
+    <div class="grp">快速跳转</div>
+    <a href="index.html">总目录</a>
+
+  </nav>
+</aside>
+<main>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/>
+    </marker>
+    <marker id="arwb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/>
+    </marker>
+    <marker id="arwg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7ee787"/>
+    </marker>
+    <marker id="arwr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff7b72"/>
+    </marker>
+    <marker id="arwp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#d2a8ff"/>
+    </marker>
+    <marker id="arwy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#e3b341"/>
+    </marker>
+    <marker id="arwc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#56d4dd"/>
+    </marker>
+    <linearGradient id="g-blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#58a6ff" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#58a6ff" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-pur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d2a8ff" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#d2a8ff" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7ee787" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#7ee787" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-orange" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffa657" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#ffa657" stop-opacity=".04"/>
+    </linearGradient>
+  </defs>
+</svg>
+<div class="crumb">
+  <span class="stage">第八阶段 · 运维与进阶</span>
+  <span class="sep">/</span>
+  <a href="index.html">总目录</a>
+  <span class="sep">/</span>
+  <span class="cur">第 23 节</span>
+</div>
+
+<h3 class="sec" id="s23"><span class="no">23</span>故障排查速查</h3>
+
+<p class="lead">
+  这一节收录的都是<strong>实测踩过的真实错误</strong>，包含错误原文、根本原因和修复步骤。
+  遇到问题先在这里搜错误码。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 23-1　错误码速查：错误码前缀决定排查方向</span><span class="fs">Error Codes</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 420" width="980" height="420" role="img" aria-label="SVN 错误码分类速查图">
+  <!-- 分类 -->
+  <rect x="24" y="30" width="220" height="150" rx="10" fill="rgba(88,166,255,.07)" stroke="#58a6ff" stroke-width="1.4"/>
+  <text class="hd" x="44" y="54" fill="#58a6ff">E1xx</text>
+  <text class="ts" x="44" y="76">客户端 / 工作副本问题</text>
+  <line x1="44" y1="88" x2="224" y2="88" stroke="#30363d" stroke-width="1"/>
+  <text class="tm2" x="44" y="110" fill="#7ee787">E155004</text>
+  <text class="tm2" x="140" y="110">工作副本被锁</text>
+  <text class="tm2" x="44" y="132" fill="#7ee787">E155015</text>
+  <text class="tm2" x="140" y="132">冲突未解决</text>
+  <text class="tm2" x="44" y="154" fill="#7ee787">E155010</text>
+  <text class="tm2" x="140" y="154">节点不存在</text>
+  <text class="tm2" x="44" y="176" fill="#7ee787">E195020</text>
+  <text class="tm2" x="140" y="176">混合版本不能 merge</text>
+
+  <rect x="254" y="30" width="220" height="150" rx="10" fill="rgba(210,168,255,.07)" stroke="#d2a8ff" stroke-width="1.4"/>
+  <text class="hd" x="274" y="54" fill="#d2a8ff">E16xx</text>
+  <text class="ts" x="274" y="76">服务器端 / 钩子问题</text>
+  <line x1="274" y1="88" x2="454" y2="88" stroke="#30363d" stroke-width="1"/>
+  <text class="tm2" x="274" y="110" fill="#7ee787">E165001</text>
+  <text class="tm2" x="370" y="110">钩子拒绝提交</text>
+  <text class="tm2" x="274" y="132" fill="#7ee787">E165002</text>
+  <text class="tm2" x="370" y="132">钩子启动失败</text>
+  <text class="tm2" x="274" y="154" fill="#7ee787">E165006</text>
+  <text class="tm2" x="370" y="154">revprop 修改未启用</text>
+
+  <rect x="484" y="30" width="220" height="150" rx="10" fill="rgba(255,166,87,.07)" stroke="#ffa657" stroke-width="1.4"/>
+  <text class="hd" x="504" y="54" fill="#ffa657">E17xx</text>
+  <text class="ts" x="504" y="76">网络 / 认证问题</text>
+  <line x1="504" y1="88" x2="684" y2="88" stroke="#30363d" stroke-width="1"/>
+  <text class="tm2" x="504" y="110" fill="#7ee787">E170001</text>
+  <text class="tm2" x="600" y="110">认证失败</text>
+  <text class="tm2" x="504" y="132" fill="#7ee787">E170013</text>
+  <text class="tm2" x="600" y="132">连不上仓库</text>
+  <text class="tm2" x="504" y="154" fill="#7ee787">E175002</text>
+  <text class="tm2" x="600" y="154">HTTP 连接错误</text>
+
+  <rect x="714" y="30" width="240" height="150" rx="10" fill="rgba(255,123,114,.07)" stroke="#ff7b72" stroke-width="1.4"/>
+  <text class="hd" x="734" y="54" fill="#ff7b72">E2xxxx</text>
+  <text class="ts" x="734" y="76">权限 / 协议层问题</text>
+  <line x1="734" y1="88" x2="934" y2="88" stroke="#30363d" stroke-width="1"/>
+  <text class="tm2" x="734" y="110" fill="#7ee787">E220004</text>
+  <text class="tm2" x="834" y="110">权限被拒</text>
+  <text class="tm2" x="734" y="132" fill="#7ee787">E220001</text>
+  <text class="tm2" x="834" y="132">认证被拒</text>
+  <text class="tm2" x="734" y="154" fill="#7ee787">E200009</text>
+  <text class="tm2" x="834" y="154">提交失败（部分文件）</text>
+
+  <!-- 排查流程 -->
+  <text class="hd" x="30" y="212" fill="#e6edf3">通用排查流程</text>
+  <rect x="24" y="228" width="930" height="170" rx="11" fill="#0b0f14" stroke="#30363d" stroke-width="1.3"/>
+
+  <circle cx="60" cy="262" r="14" fill="#58a6ff"/>
+  <text class="tm" x="60" y="267" text-anchor="middle" fill="#0d1117" font-weight="700">1</text>
+  <text class="tx" x="86" y="258">看错误码前缀，确定问题层次</text>
+  <text class="ts" x="86" y="278">E1xxx → 本地问题；E16xx → 服务端/钩子；E17xx/E2xxxx → 网络或权限</text>
+
+  <circle cx="60" cy="308" r="14" fill="#7ee787"/>
+  <text class="tm" x="60" y="313" text-anchor="middle" fill="#0d1117" font-weight="700">2</text>
+  <text class="tx" x="86" y="304">先跑 svn cleanup + svn update</text>
+  <text class="ts" x="86" y="324">80% 的 E155xxx「工作副本卡住」类问题，这两步就解决了</text>
+
+  <circle cx="60" cy="354" r="14" fill="#d2a8ff"/>
+  <text class="tm" x="60" y="359" text-anchor="middle" fill="#0d1117" font-weight="700">3</text>
+  <text class="tx" x="86" y="350">用 svn info / svn status -u 确认状态</text>
+  <text class="ts" x="86" y="370">确认 URL 对不对、版本号是不是落后、有没有冲突残留</text>
+
+  <circle cx="60" cy="390" r="14" fill="#ffa657"/>
+  <text class="tm" x="60" y="395" text-anchor="middle" fill="#0d1117" font-weight="700">4</text>
+  <text class="tx" x="86" y="386">服务端问题看 svnserve 日志 + 手工跑钩子</text>
+  <text class="ts" x="86" y="406" fill="#7ee787">钩子相关的错误，90% 是「路径不对」或「没有执行权限」</text>
+</svg>
+  </div>
+</div>
+
+<h4 class="sub">工作副本类错误</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:23%">错误原文</th><th style="width:29%">原因</th><th>修复</th></tr></thead>
+<tbody>
+  <tr>
+    <td><code class="ic r">E155004<br>...is already locked<br>Run 'svn cleanup'</code></td>
+    <td>工作副本被锁。常见于：上次操作被强制中断、进程崩溃、磁盘满</td>
+    <td><code class="ic">svn cleanup</code>　—— 实测有效，一条命令解决。<br>如果 cleanup 也报错，检查是否还有 svn 进程在跑（<code class="ic">Get-Process svn</code> / <code class="ic">ps aux | grep svn</code>），杀掉后重试</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E155015<br>Aborting commit:<br>'xxx' remains in conflict</code></td>
+    <td>文件处于冲突状态（C），未调用 <code class="ic">svn resolve</code></td>
+    <td>解决冲突内容后：<br><code class="ic">svn resolve --accept working 文件名</code><br>然后提交</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E155010<br>The node 'xxx' was not found</code></td>
+    <td>操作了不存在的路径。常见于 <code class="ic">propset</code> 一个已被忽略/不存在的目录</td>
+    <td>先用 <code class="ic">svn status</code> 确认路径真实存在；<br>被忽略的目录需先 <code class="ic">svn add --no-ignore</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E195020<br>Cannot merge into<br>mixed-revision working copy</code></td>
+    <td>工作副本里不同节点处于不同版本（混合版本状态），merge 拒绝执行</td>
+    <td><code class="ic">svn update</code>　—— 实测这一步就能解决，然后再 merge</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E195006<br>'xxx' has local modifications --<br>commit or revert them first</code></td>
+    <td>对已修改的文件执行 <code class="ic">svn delete</code> / <code class="ic">switch</code> 等操作</td>
+    <td>先 <code class="ic">svn commit</code> 或 <code class="ic">svn revert</code>；<br>确需强制操作加 <code class="ic">--force</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E155007<br>'xxx' is not a<br>working copy</code></td>
+    <td>在非工作副本目录里执行了需要工作副本的命令</td>
+    <td>确认你在正确的目录（有 <code class="ic">.svn</code> 的地方）；<br>或用 URL 形式执行命令</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E200009<br>Some targets are<br>inaccessible</code></td>
+    <td>提交时某些文件不可访问（权限、被占用、路径过长）</td>
+    <td>检查文件是否被其他程序独占（比如 IDE、Excel 打开着）；<br>Windows 路径超 260 字符也可能触发</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E155036<br>The working copy is too old<br>(format N; need at least M)</code></td>
+    <td>工作副本格式比当前 SVN 客户端版本旧（比如从很老的 SVN 升级上来）</td>
+    <td>重新 <code class="ic">svn checkout</code>（最简单）；<br>或 <code class="ic">svn upgrade</code>（1.7+ 的旧工作副本可原地升级）</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：E155004 与 E195020 的完整现场</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># ===== E155004：工作副本被锁 =====</span>
+<span class="ps">$</span> <span class="cmd">svn patch E:\my.patch</span>
+<span class="no">svn: E155004: 'E:\svn-demo\wc' is already locked.</span>
+<span class="no">svn: E155004: Run 'svn cleanup' to remove locks (type 'svn help cleanup' for details)</span>
+
+<span class="ps">$</span> <span class="cmd">svn cleanup</span>
+<span class="dim">&lt;无输出 = 成功&gt;</span>
+<span class="ps">$</span> <span class="cmd">svn patch E:\my.patch</span>
+<span class="ok">U         src\main.cs</span>          <span class="cmt">← 恢复正常</span>
+
+<span class="cmt"># ===== E195020：混合版本不能 merge =====</span>
+<span class="ps">$</span> <span class="cmd">svn merge file:///E:/repo/branches/feature-login</span>
+<span class="no">svn: E195020: Cannot merge into mixed-revision working copy [6:7];</span>
+<span class="no">              try updating first</span>
+<span class="cmt">↑ 报错本身已经给出了解决方法："try updating first"</span>
+
+<span class="ps">$</span> <span class="cmd">svn update</span>
+Updating '.':
+At revision 7.                    <span class="cmt">← 拉平成单一版本</span>
+
+<span class="ps">$</span> <span class="cmd">svn merge file:///E:/repo/branches/feature-login</span>
+--- Merging r5 through r7 into '.':   <span class="cmt">← 成功执行</span></pre>
+  </div>
+</div>
+
+<h4 class="sub">服务端与钩子类错误</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:23%">错误原文</th><th style="width:29%">原因</th><th>修复</th></tr></thead>
+<tbody>
+  <tr>
+    <td><code class="ic r">E165001<br>Commit blocked by<br>pre-commit hook (exit code 1)</code></td>
+    <td>钩子主动拒绝了本次提交。这是<strong>预期行为</strong>，不是故障</td>
+    <td>看错误信息里钩子输出的原因（<code class="ic">with output:</code> 后面的内容），按提示修改提交内容或日志</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E165002<br>Failed to start<br>'xxx/pre-commit' hook</code></td>
+    <td>钩子文件存在但无法执行</td>
+    <td>检查三点：① Linux 上是否有 <code class="ic">chmod +x</code> 执行权限；
+      ② 首行 shebang 是否正确（<code class="ic">#!/bin/sh</code>）；
+      ③ Windows 上是否是 <code class="ic">.bat</code>/<code class="ic">.cmd</code> 且为 ASCII 无 BOM 编码</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E720005<br>Can't set process<br>'...' stdio pipes</code></td>
+    <td>钩子进程无法建立标准输入输出管道。<strong>常见于受限环境</strong>（安全软件拦截、容器权限不足、Windows 上的权限策略）</td>
+    <td>本教程实测时就遇到了这个：Windows 沙箱阻止了子进程管道创建。
+      解决：给 svnserve / 钩子进程足够权限，或把 svnserve 换成 Windows 服务方式运行</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E165006<br>Repository has not been<br>enabled to accept<br>revision propchanges</code></td>
+    <td>尝试修改提交日志，但没有 <code class="ic">pre-revprop-change</code> 钩子</td>
+    <td>这是 SVN 的<strong>安全默认值</strong>。要允许修改就创建该钩子并 <code class="ic">exit 0</code>；
+      要禁止篡改就创建并 <code class="ic">exit 1</code>（见第 20 节）</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E140001<br>Malformed dumpfile header</code></td>
+    <td>dump 文件格式错误。<strong>PowerShell 重定向写成 UTF-16</strong> 是实测高发原因</td>
+    <td>改用 <code class="ic">svnadmin dump --file xxx.dump</code>；<br>核对文件头前几字节应为 <code class="ic">53 56 4E 2D</code>（"SVN-"）</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E160013<br>File not found:<br>revision N, path '/x'</code></td>
+    <td>在指定版本里该路径不存在。常见于 peg revision 用错</td>
+    <td>用 <code class="ic">svn log -v</code> 确认路径在不同版本下的实际名字（重命名前后）；<br>peg 语法：<code class="ic">URL@PEG</code> 配合 <code class="ic">-r OP_REV</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E160020<br>File already exists</code></td>
+    <td>提交的路径已存在（比如建目录时名字重复）</td>
+    <td><code class="ic">svn list</code> 确认当前结构；换个名字或先删除已有路径</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E200030<br>Transaction is out of date</code></td>
+    <td>提交时事务已过期（你提交期间别人先提交了同一文件）</td>
+    <td><code class="ic">svn update</code> 后重新提交。<strong>这就是「先 update 再 commit」习惯的由来</strong></td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<h4 class="sub">网络与权限类错误</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:23%">错误原文</th><th style="width:29%">原因</th><th>修复</th></tr></thead>
+<tbody>
+  <tr>
+    <td><code class="ic r">E170001<br>Authentication error from<br>server: Password incorrect<br>或 Can't get password</code></td>
+    <td>认证失败。后半句不同含义不同：<br><code class="ic">Password incorrect</code> = 密码错；<br><code class="ic">Can't get password</code> = 客户端没提供凭据（且不能交互）</td>
+    <td>加 <code class="ic">--username xxx --password xxx</code>；<br>脚本里必须加 <code class="ic">--non-interactive</code>，否则会卡住等输入</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E170001<br>Authorization failed</code></td>
+    <td>认证通过了，但<strong>权限不足</strong>（authz 里没给你这个路径的权限）</td>
+    <td>用 <code class="ic">svnauthz access --username X --path /y authz</code> 查实际权限；<br>检查 authz 里 <code class="ic">[path]</code> 的路径基准是否写对（相对仓库根）</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E220004<br>Access denied</code></td>
+    <td>写操作被 authz 拒绝（比如往只读的 <code class="ic">/tags</code> 提交）</td>
+    <td>这是权限设计生效了。需要写权限就找管理员在 authz 里加对应组</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E170013<br>Unable to connect to a<br>repository at URL</code></td>
+    <td>连不上服务器。通常是网络/服务未启动/端口不通</td>
+    <td>逐步排查：<br>① 服务在跑吗 <code class="ic">ps aux | grep svnserve</code>；<br>② 端口通吗 <code class="ic">telnet host 3690</code>；<br>③ 防火墙放行了吗；<br>④ URL 拼写对吗（<code class="ic">svn://host/repo</code>，注意仓库名）</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E730061<br>Can't connect to host</code></td>
+    <td>TCP 层连接被拒绝（服务没监听、端口错、防火墙拦截）</td>
+    <td>同上一行。常见坑：svnserve 只监听了 <code class="ic">127.0.0.1</code>，外部连不上——用 <code class="ic">--listen-host 0.0.0.0</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic r">E175002<br>HTTP 相关错误</code></td>
+    <td>Apache 配置问题、SSL 证书问题、代理拦截</td>
+    <td>检查 Apache 的 <code class="ic">error.log</code>；确认 <code class="ic">mod_dav_svn</code> 已加载；<br>自签名证书需配置信任或加 <code class="ic">--trust-server-cert</code></td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：认证与权限错误的精确区分</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># ---- 1. 密码错误 ----</span>
+<span class="ps">$</span> <span class="cmd">svn list --username alice --password WRONG --non-interactive svn://127.0.0.1/repo</span>
+<span class="no">svn: E170001: Authentication error from server: Password incorrect</span>
+<span class="cmt">↑ 关键字 "Password incorrect" —— 是密码问题，不是权限问题</span>
+
+<span class="cmt"># ---- 2. 没提供凭据（非交互模式）----</span>
+<span class="ps">$</span> <span class="cmd">svn list --non-interactive --no-auth-cache svn://127.0.0.1/repo</span>
+<span class="no">svn: E170001: Can't get password</span>
+<span class="cmt">↑ 关键字 "Can't get password" —— 客户端没有凭据可用</span>
+
+<span class="cmt"># ---- 3. 权限不足（认证过了但没权限）----</span>
+<span class="ps">$</span> <span class="cmd">svn list --username bob --password bob123 --non-interactive svn://127.0.0.1/repo</span>
+<span class="no">svn: E170001: Authorization failed</span>
+<span class="cmt">↑ 关键字 "Authorization failed" —— 是 authz 权限问题</span>
+
+<span class="cmt"># ---- 4. 写操作被拒 ----</span>
+<span class="ps">$</span> <span class="cmd">svn mkdir --username bob --password bob123 svn://127.0.0.1/repo/tags/v2.0 -m "test"</span>
+<span class="no">svn: E220004: Access denied</span>
+<span class="cmt">↑ bob 对 /tags 只有读权限，写被拒</span>
+
+<span class="cmt"># ---- 5. 连不上服务 ----</span>
+<span class="ps">$</span> <span class="cmd">svn list svn://127.0.0.1/repo</span>
+<span class="no">svn: E170013: Unable to connect to a repository at URL 'svn://127.0.0.1/repo'</span>
+<span class="no">svn: E730061: Can't connect to host '127.0.0.1': 由于目标计算机积极拒绝，无法连接。</span>
+<span class="cmt">↑ "积极拒绝" = 服务没在监听这个端口</span></pre>
+  </div>
+</div>
+
+<div class="box ok">
+  <span class="bt">「先 cleanup，再 update」—— 两条命令解决大部分问题</span>
+  <p>这不是玄学。绝大多数工作副本异常都是因为<strong>上一次操作被中断，留下了未清理的锁和中间状态</strong>。</p>
+  <div class="codewrap">
+    <div class="codehead"><span class="lang">bash</span><span class="fn">万能恢复三步</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 第 1 步：清理锁和中间状态</span>
+svn cleanup
+
+<span class="c"># 如果 cleanup 报错「还有进程在用」，先杀掉残留进程</span>
+<span class="c"># Linux:</span>
+pkill svn
+<span class="c"># Windows:</span>
+Get-Process svn -ErrorAction SilentlyContinue | Stop-Process -Force
+taskkill /F /IM TortoiseProc.exe     <span class="c"># 关掉卡住的 TortoiseSVN 对话框</span>
+
+<span class="c"># 第 2 步：重新同步</span>
+svn update
+
+<span class="c"># 第 3 步：看状态是否正常</span>
+svn status
+svn info
+
+<span class="c"># ---- 如果还是不行，最后手段（会丢失本地未提交改动！）----</span>
+svn revert -R .                      <span class="c"># 撤销所有本地修改</span>
+svn cleanup
+svn update
+<span class="c"># 或者：删掉工作副本重新检出（最彻底）</span>
+svn checkout <span class="s">"$(svn info --show-item url)"</span> wc-fresh</pre>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">重新检出前，先抢救未提交的改动</span>
+  <p>删掉工作副本是<strong>不可逆</strong>的。执行前务必：
+  ① <code class="ic">svn status</code> 看有没有未提交内容；
+  ② <code class="ic">svn diff --file rescue.patch</code> 把改动存成补丁；
+  ③ 把新文件（<code class="ic">?</code> 状态）复制到工作副本外面。</p>
+  <p>重新检出后再用 <code class="ic">svn patch rescue.patch</code> 把改动应用回来。</p>
+</div>
+
+<!-- ==========================================================================
+     第 24 节：命令速查表
+     ========================================================================== -->
+
+<div class="pager">
+  <a href="22-advanced.html"><span class="lbl">← 上一节</span><span class="ttl">22. 高级技巧与效率提升</span></a>
+  <a class="home" href="index.html"><span class="ttl">总目录</span></a>
+  <a class="next" href="24-cheatsheet.html"><span class="lbl">下一节 →</span><span class="ttl">24. 命令速查表</span></a>
+</div>
+
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+
+<script>
+
+(function () {
+  'use strict';
+
+  /* ============================================================
+     1. 代码块增强：语法高亮 + 复制按钮 + 换行切换
+     ============================================================ */
+
+  // 极简高亮器：只处理注释、字符串、SVN 命令、选项
+  function escapeHtml(t) {
+    return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function highlight(code) {
+    var lines = code.split('\n');
+    var out = [];
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var indented = escapeHtml(line);
+
+      // 整行注释（# 或 rem 或 :: 开头）
+      if (/^\s*(#|rem\s|::)/i.test(line) && !/^\s*#!/.test(line)) {
+        out.push('<span class="c">' + indented + '</span>');
+        continue;
+      }
+
+      // 行内注释：找到未被引号包裹的 #
+      var result = '';
+      var inStr = false;
+      var strChar = '';
+      var commentStart = -1;
+
+      for (var j = 0; j < line.length; j++) {
+        var ch = line[j];
+        if (!inStr && (ch === '"' || ch === "'")) {
+          inStr = true;
+          strChar = ch;
+        } else if (inStr && ch === strChar) {
+          if (line[j - 1] !== '\\') inStr = false;
+        } else if (!inStr && ch === '#' && j > 0 && line[j - 1] === ' ' && /^\s*#/.test(line.slice(j)) === false) {
+          commentStart = j;
+          break;
+        }
+      }
+
+      var codePart = commentStart >= 0 ? line.slice(0, commentStart) : line;
+      var commentPart = commentStart >= 0 ? line.slice(commentStart) : '';
+      var esc = escapeHtml(codePart);
+
+      // 字符串
+      esc = esc.replace(/(&quot;[^&]*?&quot;|&#39;[^&]*?&#39;)/g, '<span class="s">$1</span>');
+      // 注释里的 svn 命令名（行首后的第一个词）
+      esc = esc.replace(/^(\s*)(svn|svnadmin|svnserve|svnlook|svndumpfilter|svnrdump|svnauthz|svnmucc|sc|find|curl|mail|tar|export|cd|set|echo|if|for|chmod|xargs|grep|awk|sudo)\b/,
+        '$1<span class="k">$2</span>');
+      // 长选项
+      esc = esc.replace(/(\s)(--?[a-zA-Z][a-zA-Z0-9-]*)/g, '$1<span class="a">$2</span>');
+      // 数字（版本号之类）
+      esc = esc.replace(/\b(r\d+)\b/g, '<span class="m">$1</span>');
+
+      result = esc;
+      if (commentPart) result += '<span class="c">' + escapeHtml(commentPart) + '</span>';
+      out.push(result);
+    }
+    return out.join('\n');
+  }
+
+  // 处理所有 codewrap 里的 pre.code
+  var wraps = document.querySelectorAll('.codewrap');
+
+  Array.prototype.forEach.call(wraps, function (wrap) {
+    var pre = wrap.querySelector('pre.code');
+    if (!pre) return;
+
+    // 如果代码块里已经有手工写好的语法着色 span，就原样保留，不再重复处理
+    var alreadyStyled = pre.querySelector('span');
+    if (!alreadyStyled) {
+      var raw = pre.textContent;
+      var codeEl = pre.querySelector('code') || pre;
+      codeEl.innerHTML = highlight(raw);
+    }
+
+    // 加复制按钮（若无）
+    var acts = wrap.querySelector('.acts');
+    if (acts && !acts.querySelector('[data-copy]')) {
+      var b = document.createElement('button');
+      b.setAttribute('data-copy', '');
+      b.textContent = '复制';
+      acts.appendChild(b);
+    }
+  });
+
+  // 复制功能
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('[data-copy]');
+    if (!btn) return;
+
+    var wrap = btn.closest('.codewrap') || btn.closest('.term');
+    if (!wrap) return;
+    var pre = wrap.querySelector('pre');
+    if (!pre) return;
+
+    var text = pre.textContent;
+
+    function done() {
+      btn.textContent = '已复制';
+      btn.classList.add('ok');
+      setTimeout(function () {
+        btn.textContent = '复制';
+        btn.classList.remove('ok');
+      }, 1400);
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text, done); });
+    } else {
+      fallback(text, done);
+    }
+  });
+
+  function fallback(text, done) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done();
+    } catch (err) { /* 静默失败 */ }
+  }
+
+  /* ============================================================
+     2. 进度条 + 回到顶部
+     ============================================================ */
+  var prog = document.getElementById('prog');
+  var topBtn = document.getElementById('top');
+
+  function onScroll() {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var pct = max > 0 ? (h.scrollTop || document.body.scrollTop) / max * 100 : 0;
+    if (prog) prog.style.width = pct + '%';
+    if (topBtn) {
+      if ((h.scrollTop || document.body.scrollTop) > 600) topBtn.classList.add('show');
+      else topBtn.classList.remove('show');
+    }
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  if (topBtn) {
+    topBtn.onclick = function () { window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  }
+
+  /* ============================================================
+     3. 导航高亮：滚动时自动标记当前小节
+     ============================================================ */
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll('#nav a'));
+  var sections = navLinks.map(function (a) {
+    var id = a.getAttribute('href');
+    return { el: id && id.length > 1 ? document.querySelector(id) : null, a: a };
+  }).filter(function (s) { return s.el; });
+
+  function highlightNav() {
+    var pos = window.scrollY + 140;
+    var current = null;
+    for (var i = 0; i < sections.length; i++) {
+      if (sections[i].el.offsetTop <= pos) current = sections[i];
+    }
+    navLinks.forEach(function (a) { a.classList.remove('on'); });
+    if (current) {
+      current.a.classList.add('on');
+      // 让当前项在侧栏可见
+      var box = current.a.parentElement;
+      if (box && box.scrollHeight > box.clientHeight) {
+        var aTop = current.a.offsetTop;
+        if (aTop < box.scrollTop || aTop > box.scrollTop + box.clientHeight - 60) {
+          box.scrollTop = aTop - box.clientHeight / 2;
+        }
+      }
+    }
+  }
+
+  window.addEventListener('scroll', highlightNav, { passive: true });
+  highlightNav();
+
+  /* ============================================================
+     4. 表格首列若为空白则隐藏（防止空单元格）
+     ============================================================ */
+  Array.prototype.forEach.call(document.querySelectorAll('table'), function (t) {
+    var firstTh = t.querySelector('thead th');
+    var firstTd = t.querySelector('tbody td');
+    if (firstTh && firstTd && !firstTh.textContent.trim() && !firstTd.textContent.trim()) {
+      Array.prototype.forEach.call(t.querySelectorAll('tr'), function (tr) {
+        var c = tr.querySelector('th, td');
+        if (c) c.style.display = 'none';
+      });
+    }
+  });
+
+})();
+
+</script>
+</body>
+</html>

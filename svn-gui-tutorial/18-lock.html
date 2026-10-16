@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>18. 文件锁：二进制文件独占编辑 | SVN 图形化实战</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 图形化实战</h1></div>
+  <div class="brand-sub">TortoiseSVN + VisualSVN · 全鼠标操作</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 准备</div>
+    <a href="01-tools.html">1. 认识你的两个图形工具</a>
+    <a href="02-first-checkout.html">2. 第一次检出：把代码拉到本地</a>
+    <a href="03-icons.html">3. 看懂图标角标与右键菜单</a>
+    <div class="grp">第二阶段 · 日常使用</div>
+    <a href="04-daily.html">4. 日常三件事：改、更、提</a>
+    <a href="05-status.html">5. 查看改动：哪些文件变了</a>
+    <a href="06-diff.html">6. 比对差异：到底改了哪几行</a>
+    <a href="07-add-delete.html">7. 新增、删除、重命名文件</a>
+    <a href="08-history.html">8. 查看历史：Log 对话框详解</a>
+    <a href="09-revert.html">9. 撤销：改错了怎么退回</a>
+    <div class="grp">第三阶段 · 进阶操作</div>
+    <a href="10-conflict.html">10. 冲突处理：两人改了同一处</a>
+    <a href="11-merge-tool.html">11. 合并编辑器：逐行选择保留谁</a>
+    <a href="12-branch.html">12. 建分支：开一条独立开发线</a>
+    <a href="13-switch.html">13. 切换分支：在主干和分支间跳</a>
+    <a href="14-merge.html">14. 合并分支：把改动并回主干</a>
+    <a href="15-revision-graph.html">15. 版本拓扑图：看清分支走向</a>
+    <div class="grp">第四阶段 · 属性与锁</div>
+    <a href="16-ignore.html">16. 忽略文件：让编译产物别再烦我</a>
+    <a href="17-properties.html">17. 属性对话框：设置文件行为</a>
+    <a href="18-lock.html" class="on">18. 文件锁：二进制文件独占编辑</a>
+    <div class="grp">第五阶段 · 服务端管理</div>
+    <a href="19-server.html">19. 服务端：VisualSVN 建仓库</a>
+    <a href="20-users.html">20. 用户与权限：谁能看谁能改</a>
+    <a href="21-backup.html">21. 备份与恢复：图形界面操作</a>
+    <div class="grp">第六阶段 · 效率技巧</div>
+    <a href="22-patch-export.html">22. 补丁与导出：不走仓库传代码</a>
+    <a href="23-settings.html">23. 设置面板：常用选项怎么调</a>
+    <a href="24-troubleshoot.html">24. 常见问题：报错怎么处理</a>
+    <a href="25-cheatsheet.html">25. 图形操作速查表</a>
+
+  </nav>
+</aside>
+<main>
+<div class="crumb">
+  <span class="stage">第四阶段 · 属性与锁</span>
+  <span class="sep">/</span>
+  <a href="index.html">总目录</a>
+  <span class="sep">/</span>
+  <span class="cur">第 18 节</span>
+</div>
+
+<h3 class="sec" id="s18"><span class="no">18</span>文件锁：二进制文件独占编辑</h3>
+<p class="lead"> 图片、PSD、3D 模型、Excel 表格这些<strong>二进制文件</strong>，两个人同时改就废了—— 它们没法像代码那样「一行一行合并」， 后提交的那个人会把前一个人的工作<b>整个盖掉</b>。 解决办法是<strong>加锁</strong>：我先把它锁上，别人就改不了，等我改完再放开。</p>
+<div class="box key"> <span class="bt">为什么二进制文件必须靠锁，而不是靠合并</span>
+  <p> 源码文件是纯文本，两个人的改动即使落在同一行，SVN 也能给你标出来、让你选留谁的。 <strong>这类文件天生可以「合并」。</strong></p>
+  <p> 但一张 PSD 文件是一堆二进制数据，没有「第几行」这个概念。 两个人同时改，SVN <b>完全没办法把两份改动拼起来</b>—— 它唯一能做的就是判定冲突，让你二选一。</p>
+  <p> 而现实往往更糟：很多人不会谨慎处理，直接一路点「用我的」， 另一个人改了一下午的东西<b>就这么没了，而且没有任何提示</b>。</p>
+  <p> <strong>所以对二进制文件，正确的思路不是「出了冲突怎么合」，而是「从一开始就别让两个人同时改」。</strong> 这就是锁的作用：<em>加锁之后，文件被一个人独占，别人在机制上就改不了，从根本上避免了覆盖。</em></p>
+</div>
+<h4 class="sub">加锁：把这文件占为己有</h4>
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">Get Lock 对话框：声明「这个文件接下来归我改」</span><span class="fs">GET LOCK</span></div>
+  <div class="sb"><img src="img/GetLock.png" alt="Get Lock 加锁对话框"></div>
+  <div class="cap">
+    这个对话框很简洁，但每一项都有实际作用：<br><br>
+    <b>① 上方的文件列表</b>——<b>这一次要给哪些文件加锁</b>。 如果你是在某个文件上右键的，这里就显示那一个文件； 如果在文件夹上右键、并且勾了要包含的内容，这里就可能列出<b>多个文件</b>，可以逐条勾选。<br>
+    <em>列表里的勾选框让你精确控制「只锁其中哪几个」，批量加锁时很有用。</em><br><br>
+    <b>② <span class="k">Message</span> · 备注框</b>——<b>给这次加锁写一句说明</b>。 别人在文件上尝试加锁、或者查看锁定状态时，<strong>能看到你这句备注</strong>。<br>
+    <b>强烈建议填，而且要写具体</b>：比如 <code class="ic">我要调整首页banner的配色，大约两小时后释放</code>。<br>
+    一句好备注能省掉无数次「这个文件谁锁的、要锁多久、我要不要等他」的追问。<br>
+    <em>不填也能锁上，但别人就只能看到一个「有人锁了」，看不见原因—— 这时候大多数人会直接来找你问，反而更费时间。</em><br><br>
+    <b>③ <span class="k">Steal the locks</span> · 抢锁</b>——<b>把锁从别人手里抢过来</b>，归自己。<br>
+    这个选项平时是灰的，<strong>只有当文件已经被别人锁住时才有意义</strong>。 勾上它并确认，那个人的锁会被强制解除，文件归你。<br>
+    <b>这是一个破坏性操作</b>：对方可能正开着这个文件在改，毫无预兆的锁被抢走， 他保存的时候就会失败，甚至丢失未保存的修改。 <em>详细说明见下面橙色警告框——这一项要慎之又慎。</em><br><br>
+    <b>④ <span class="k">Get</span> 按钮 / <span class="k">Cancel</span></b>——点 <code class="ic">Get</code> 执行加锁，点 <code class="ic">Cancel</code> 放弃。<br>
+    加锁成功后，<b>这个文件的角标会变成黄色的小锁</b>，同时文件从只读变成可以编辑（如果它之前因为属性设置而只读的话）。<br>
+    <strong>注意：加锁会立刻在服务器上留下记录，不需要提交。</strong>
+  </div>
+</div>
+<div class="ops">
+  <div class="otitle"><span class="badge">LOCK</span>加锁的完整步骤</div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">准备动手改之前，先加锁（不是改完再加）</span>
+      <span class="sc">顺序很重要：<strong>先加锁，再打开编辑</strong>。 如果先打开改了半天才发现锁不上（别人已经锁了），那半天就白干了。<br>
+      <em>养成「动手前先锁」的条件反射，是使用二进制文件的基本功。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">在文件上右键，打开加锁对话框</span>
+      <span class="sc"><span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Get lock...</span></span><br>
+      <em>菜单名带省略号，表示会弹出对话框。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">确认要锁的文件，写清备注</span>
+      <span class="sc">看一眼文件列表是不是你要锁的那些。 然后在 <code class="ic">Message</code> 里写清楚<b>你要做什么、大概多久</b>。<br>
+      <em>「改一下」这种备注等于没写，能写多具体就写多具体。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">如果提示「已被他人锁定」，先去找人</span>
+      <span class="sc">对话框会告诉你<b>是谁锁的、什么时候锁的、备注写的是什么</b>。<br>
+      <strong>正确做法是去沟通，而不是抢。</strong> 对方可能马上就改完了。</span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">点 Get，确认角标变化</span>
+      <span class="sc">加锁成功后<b>黄色小锁的角标</b>会出现。 这时候再打开文件编辑——一切正常。</span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">改完之后... 别急着走，两步不能漏</span>
+      <span class="sc"><strong>先提交</strong>——把你的改动存入版本库。<br>
+      <strong>再释放锁</strong>——右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Release lock</span></span>，把锁交还给团队。<br>
+      <em>很多人在提交的对话框里会看到一个「保留锁」的选项——除非你还要接着改，否则别勾它。</em></span>
+    </div>
+  </div>
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">确认锁真的释放了</span>
+      <span class="sc">释放后黄色小锁消失。 <strong>如果你临时有事要先走，一定要记得释放</strong>， 否则这个文件会一直锁在你名下，别人干等。<br>
+      <em>实在来不及处理，至少在备注或群里说一声「我锁着 XX 文件，明天继续」。</em></span>
+    </div>
+  </div>
+</div>
+<div class="box warn"> <span class="bt">Steal the locks 会破坏别人的工作，非必要不要碰</span>
+  <p> 这个选项的存在是为了应对<b>真实发生的意外</b>（比如同事离职了、他的电脑坏了、锁挂在某个再也联系不上的人名下）， 而不是用来「我要改，你别挡路」。</p>
+  <p> 抢锁之后会发生什么：</p>
+  <ul>
+    <li>对方的锁<b>在毫无预警的情况下消失</b>。他可能正开着这个文件在改，完全不知道已经失去控制权了。</li>
+    <li>他保存时会被拒绝，或者更糟——如果软件不做检查，他会<b>保存成功但提交失败</b>， 白改一场。</li>
+    <li>最坏的情况：<b>他保存的内容把仓库里的覆盖了，或者他意识到后只能从头再来</b>。 这已经不是浪费时间的问题了，是实实在在的工作损失。</li>
+  </ul>
+  <p> <strong>正确的顺序永远是：先看备注 → 先问人 → 实在联系不上、而且确实紧急，才考虑抢锁。</strong></p>
+  <p> <em>抢完之后也建议跟对方说一声——毕竟从对方视角看，他的锁是「凭空消失」的，被蒙在鼓里的体验很差。</em></p>
+</div>
+<h4 class="sub">不忘记加锁的秘诀：让文件默认就是只读的</h4>
+<p> 「先加锁再改」说起来简单，做起来经常忘—— 尤其是临时要改一张图的时候，往往是双击打开、改完保存、提交，全程没想起来有锁这回事。</p>
+<p> 针对这个「人会遗忘」的问题，SVN 提供了机制层面的解决办法：<strong>让文件一检出就是只读的</strong>。</p>
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">svn:needs-lock 属性：用只读强制你想起加锁这件事</span><span class="fs">PROPERTIES</span></div>
+  <div class="sb"><img src="img/PropEditNeedsLock.png" alt="编辑 svn:needs-lock 属性" class="mid"></div>
+  <div class="cap">
+    <b>这是个属性，不是每次手动操作</b>。它是上一节讲的属性之一， 通过属性对话框设置（右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Properties</span></span> → <code class="ic">New...</code>）， 设好之后对<b>这个文件、以及所有更新到它的人</b>长期生效。<br><br>
+    <b>它做了什么</b>：给文件设上这个属性之后，<strong>任何人检出或更新这个文件，拿到的都是「只读」的</strong>—— 双击能打开、能看，但<b>一旦尝试保存，就会提示失败或者让你另存为</b>。<br><br>
+    <b>为什么这样反而更好用</b>：你正改得顺手、点了保存，结果被拒绝—— 这一下<b>强力提醒了你「这个文件必须先加锁」</b>。 于是你去加锁，然后文件自动变成可写的，继续改就行。<br>
+    <em>它把「记住要加锁」这件需要靠自觉的事，变成了一个「不做就干不下去」的硬性流程。 对容易忘事的人来说，这比任何提醒都管用。</em><br><br>
+    <b>加锁之后会自动变可写</b>——这是这个机制设计得最舒服的地方： <b>你不需要手动去改文件属性</b>，加锁成功的瞬间，SVN 会把这个文件变成可编辑状态；<b>释放锁之后，它又变回只读</b>。<br><br>
+    <b>怎么给一批文件设上</b>：一般是在<b>目录</b>上设，并且<b>勾上「递归应用」</b>， 让整个目录树里的文件都继承这条规则。 <em>但要注意：它会对目录下所有文件生效，包括那些其实可以合并的文本文件—— 所以更常见的做法是<b>只在存放图片、设计稿、文档的这些专门目录上设</b>，而不是整个项目根目录。</em>
+  </div>
+</div>
+<div class="box tip"> <span class="bt">怎么快速判断「这个文件该不该设 needs-lock」</span>
+  <p> 一个很好用的判断标准：<strong>这个文件能不能「打开来看见里面的文字」，并且改动能不能被一行一行地合并？</strong></p>
+  <ul>
+    <li><strong>能</strong>（源码、配置、说明文档）——<b>不要设</b>，让它保持可写，大家随便改，冲突了用合并工具解决。</li>
+    <li><strong>不能</strong>（图片、PSD、模型、Excel、压缩包）——<b>设上</b>，用只读强制大家先加锁。</li>
+  </ul>
+  <p> <em>还有一个更实际的判断法：<b>如果两个人同时改了这个文件，会不会导致其中一方的成果彻底丢失？</b> 会，那就该设锁。</em></p>
+</div>
+<h4 class="sub">看图说话：锁和只读长什么样</h4>
+<div class="iconrow">
+  <div class="ic-card">
+    <img src="img/LockedIcon.png" alt="已加锁图标">
+    <span class="nm">LockedIcon · 黄色小锁</span>
+    <span class="ds">这个角标表示<b>文件已经被加了锁</b>。如果锁是你自己加的，说明你可以放心改；如果是别人加的，你就<b>不应该去动它</b>，动了也提交不上去。看到这个图标，先弄清楚「是谁锁的、为什么锁」。</span>
+  </div>
+  <div class="ic-card">
+    <img src="img/ReadOnlyIcon.png" alt="只读图标">
+    <span class="nm">ReadOnlyIcon · 只读标记</span>
+    <span class="ds">表示<b>这个文件当前是只读的、不能编辑</b>。在 SVN 里最常见的原因是：它设了 needs-lock 属性、而<b>你还没有加锁</b>。<b>看到它别去手工改文件属性「解锁」</b>——正确做法是走加锁流程，加锁后它会自己变成可写。</span>
+  </div>
+</div>
+<div class="box err"> <span class="bt">绕过只读去编辑，是最典型的错误操作</span>
+  <p> 有人发现文件是只读的，保存不了，于是做了这件事： <strong>在文件上右键 → 属性 → 把「只读」的勾去掉 → 然后照常编辑、提交。</strong></p>
+  <p> <strong>这样做看起来「解决了问题」，实际上把所有保护都绕过去了：</strong></p>
+  <ul>
+    <li>你<b>没有加锁</b>，所以别人也可能同时在改这个文件——锁机制完全失效了。</li>
+    <li>真要出现两人同时改，结果依然是<b>一方的工作被覆盖</b>，而且是那种悄无声息的覆盖。</li>
+    <li>你手工改的这个只读标记只是本地文件系统的事，<b>和 SVN 的锁没任何关系</b>； 下次更新，你的本地设置可能又被改回去，白折腾。</li>
+  </ul>
+  <p> <strong>看到只读的正确反应只有两个：</strong></p>
+  <ul>
+    <li><b>我要改它</b> → 老老实实走加锁流程（右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Get lock...</span></span>），加锁后它就变可写了。</li>
+    <li><b>我不该改它</b>（别人锁着 / 这不是我的活） → 别动它。</li>
+  </ul>
+  <p> <em>「和锁机制对抗」永远比「按流程加个锁」麻烦得多，而且后果更严重。</em></p>
+</div>
+<h4 class="sub">哪些文件该加锁，哪些不该</h4>
+<div class="tw">
+<table>
+<thead><tr><th style="width:150px">文件类型</th><th style="width:110px">该不该锁</th><th>理由</th></tr></thead>
+<tbody>
+  <tr>
+    <td><strong>PSD / 设计稿</strong></td>
+    <td><span class="tagmini r">必须锁</span></td>
+    <td>Photoshop 文件完全是二进制，图层改一下整个文件就变了，<b>没有任何合并的可能</b>。 两人同时改必然丢工作。<em>建议连同 needs-lock 属性一起设，从机制上强制。</em></td>
+  </tr>
+  <tr>
+    <td><strong>Unity 场景 / 预制体</strong></td>
+    <td><span class="tagmini r">必须锁</span></td>
+    <td>游戏引擎的场景文件内部结构极其复杂，指一下鼠标都可能产生几百行变化。 <b>两个人同时改一个场景</b>，合并是根本不可能的事，只能二选一。</td>
+  </tr>
+  <tr>
+    <td><strong>Excel / Word 文档</strong></td>
+    <td><span class="tagmini r">建议锁</span></td>
+    <td>虽然新版的 Office 文件格式在理论上能看出一些结构差异，但<b>实际合并的结果通常没法看</b>。 表格里两个人各填几行，合出来的东西经常是乱的。<em>需要多人协作的数据，用共享的方式来管，不要靠版本库合并。</em></td>
+  </tr>
+  <tr>
+    <td><strong>图片资源（png/jpg 等）</strong></td>
+    <td><span class="tagmini y">看情况</span></td>
+    <td>如果是<b>美术实际会去改的源文件</b>（比如需要重新裁切、调色的），该锁。 如果只是「导出的成品图、基本不会动」，那不用锁，<b>锁了反而增加流程负担</b>。</td>
+  </tr>
+  <tr>
+    <td><strong>音视频素材</strong></td>
+    <td><span class="tagmini y">看情况</span></td>
+    <td>体积大、改动少的一般不用锁；<b>需要反复剪辑加工</b>的工程文件则该锁。</td>
+  </tr>
+  <tr>
+    <td><strong>普通源码（.cs / .java / .js 等）</strong></td>
+    <td><span class="tagmini g">不要锁</span></td>
+    <td><b>这是最重要的「不该锁」的一类。</b> 文本文件天生可以合并，冲突了用工具解决就行。 如果给每个源码文件都加上锁，<b>就等于退回「同一时刻只能一个人改这个文件」的工作方式</b>—— 团队效率会被严重拖慢，而且大家会因为「懒得等锁」而互相干扰。<em>版本控制的优势正在于「大家同时改，最后合并」，别把它关掉。</em></td>
+  </tr>
+  <tr>
+    <td><strong>配置文件 / 项目文件</strong></td>
+    <td><span class="tagmini g">不要锁</span></td>
+    <td>虽然偶尔会因为格式问题产生冲突，但冲突了慢慢合就行。<b>锁了会让大家没法同时推进工作。</b></td>
+  </tr>
+</tbody>
+</table>
+</div>
+<div class="box warn"> <span class="bt">锁是有生命周期的，用完记得释放</span>
+  <p> 锁不是「设置一次就一直有效」的开关，它是<b>一条有开始、也该有结束的记录</b>。 加锁 → 改文件 → 提交 → <b>释放锁</b>，这才是一个完整的循环。</p>
+  <p> <strong>忘记释放的后果很直接</strong>：</p>
+  <ul>
+    <li>这个文件<b>一直锁在你名下</b>，别人想改也改不了，而且<b>没人知道你要锁到什么时候</b>。</li>
+    <li>同事们会来问你、等你，或者干脆绕开这个文件去改别的——<b>进度就这么被拖住了</b>。</li>
+    <li>更糟的是你自己也忘了。过了两周别人受不了去抢锁，你可能才发现自己还锁着好几个文件。</li>
+    <li><b>锁会跟着工作副本走。</b>如果你换了一台电脑、或者重新检出， 之前锁的文件仍然挂在服务器上——它不会因为你本地的工作副本删了而自动消失。</li>
+  </ul>
+  <p><strong>几个实用习惯：</strong></p>
+  <ul>
+    <li><strong>提交后就顺手释放。</strong>别想着「等会儿再放」——等会儿你就忘了。</li>
+    <li><strong>提交对话框里的「保留锁」选项，默认别勾。</strong> 那个选项的意思是「提交完继续锁着」——只有你确实还要接着改才需要它。</li>
+    <li><strong>备注里写上大概的时间。</strong>万一你真忘了，别人看到「大约两小时后释放」至少心里有底，知道该等还是该找人。</li>
+    <li><strong>定期自查。</strong>可以浏览一下仓库，看看有没有数量异常多的锁项还挂在自己名下，顺手清理掉。<em>尤其是休假前、换任务前。</em></li>
+  </ul>
+</div>
+<div class="box ok"> <span class="bt">加锁这一节的要点</span>
+  <ul>
+    <li><strong>二进制文件只能靠锁，不能靠合并</strong>——同时改必然有一方的工作被覆盖。</li>
+    <li><strong>加锁</strong>：右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Get lock...</span></span> → 写清备注 → <code class="ic">Get</code>。 <b>动手改之前就锁，别改完才想起来。</b></li>
+    <li><strong>解锁</strong>：右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Release lock</span></span>。<b>提交完就释放，别拖着。</b></li>
+    <li><strong>自动锁</strong>：给文件设上「默认只读」的属性，检出即只读，<b>逼你先加锁再改</b>，加锁后自动变可写。用它解决「总忘记加锁」的问题。</li>
+    <li><strong>源码不要加锁</strong>——那是自废武功，会让整个团队没法并行干活。</li>
+    <li><strong>抢锁是破坏性操作</strong>，先沟通、再考虑，别当成常规手段。</li>
+  </ul>
+  <p> 到这里，SVN 的日常操作就基本走完一轮了： 从检出、更新、提交，到冲突处理、分支、合并、忽略、属性、加锁。 <em>把这几节练熟，团队协作里九成以上的场景都能应付。</em></p>
+</div>
+
+
+<div class="pager">
+  <a href="17-properties.html"><span class="lbl">← 上一节</span><span class="ttl">17. 属性对话框：设置文件行为</span></a>
+  <a class="home" href="index.html"><span class="ttl">总目录</span></a>
+  <a class="next" href="19-server.html"><span class="lbl">下一节 →</span><span class="ttl">19. 服务端：VisualSVN 建仓库</span></a>
+</div>
+
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+<script src="assets/app.js"></script>
+</body>
+</html>

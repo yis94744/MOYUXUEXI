@@ -1,0 +1,219 @@
+<h3 class="sec" id="s9"><span class="no">9</span>撤销与回退：五种「后悔」场景</h3>
+
+<p class="lead">
+  「我改错了」「我想回到上个版本」「这个提交整个不要了」——
+  这是 SVN 里最容易混淆的一组操作，因为<strong>撤销本地改动</strong>和<strong>撤销已提交的改动</strong>完全是两回事。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 9-1　回退的五种场景与对应命令</span><span class="fs">Rollback Matrix</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 470" width="980" height="470" role="img" aria-label="SVN 回退场景与命令对应图">
+  <!-- 时间轴 -->
+  <line x1="80" y1="60" x2="920" y2="60" stroke="#3d444d" stroke-width="2"/>
+  <text class="hd" x="80" y="40">时间轴（左旧右新）</text>
+
+  <circle cx="180" cy="60" r="12" fill="#0d1117" stroke="#8b949e" stroke-width="2"/>
+  <text class="tm" x="180" y="65" text-anchor="middle">8</text>
+  <circle cx="360" cy="60" r="12" fill="#0d1117" stroke="#e3b341" stroke-width="2"/>
+  <text class="tm" x="360" y="65" text-anchor="middle">9</text>
+  <circle cx="540" cy="60" r="12" fill="#0d1117" stroke="#ff7b72" stroke-width="2"/>
+  <text class="tm" x="540" y="65" text-anchor="middle">10</text>
+  <circle cx="720" cy="60" r="12" fill="#0d1117" stroke="#58a6ff" stroke-width="2"/>
+  <text class="tm" x="720" y="65" text-anchor="middle">11</text>
+  <circle cx="880" cy="60" r="12" fill="#0d1117" stroke="#d2a8ff" stroke-width="2"/>
+  <text class="tm" x="880" y="65" text-anchor="middle">12</text>
+
+  <text class="tm2" x="540" y="88" text-anchor="middle" fill="#ff7b72">犯错的提交</text>
+  <text class="tm2" x="720" y="88" text-anchor="middle" fill="#58a6ff">工作副本当前</text>
+
+  <!-- 场景 1 -->
+  <rect x="24" y="112" width="460" height="98" rx="10" fill="rgba(210,168,255,.07)" stroke="#d2a8ff" stroke-width="1.4"/>
+  <text class="hd" x="44" y="136" fill="#d2a8ff">场景 1：还没提交，想丢弃本地修改</text>
+  <text class="tm" x="44" y="160" fill="#7ee787">svn revert README.md</text>
+  <text class="tm" x="44" y="180" fill="#7ee787">svn revert -R .            ← 递归撤销整个目录</text>
+  <text class="ts" x="44" y="200">注意：这是不可逆操作，revert 掉的改动找不回来（除非 diff 存过）</text>
+
+  <!-- 场景 2 -->
+  <rect x="496" y="112" width="460" height="98" rx="10" fill="rgba(88,166,255,.07)" stroke="#58a6ff" stroke-width="1.4"/>
+  <text class="hd" x="516" y="136" fill="#58a6ff">场景 2：还没提交，想丢弃「add」动作</text>
+  <text class="tm" x="516" y="160" fill="#7ee787">svn revert newfile.txt</text>
+  <text class="tm" x="516" y="180" fill="#7ee787">svn revert -R newdir/</text>
+  <text class="ts" x="516" y="200">revert 会让 A 状态的文件变回 ?，文件本身仍在磁盘上</text>
+
+  <!-- 场景 3 -->
+  <rect x="24" y="224" width="460" height="112" rx="10" fill="rgba(255,166,87,.07)" stroke="#ffa657" stroke-width="1.4"/>
+  <text class="hd" x="44" y="248" fill="#ffa657">场景 3：已提交，想「反向提交」一次以抵消</text>
+  <text class="ts" x="44" y="270">假设 r10 是个错误提交，要撤销它的全部影响：</text>
+  <text class="tm" x="44" y="292" fill="#7ee787">svn merge -c -10 .          ← 反向合并 r10</text>
+  <text class="tm" x="44" y="312" fill="#7ee787">svn commit -m "回退 r10"</text>
+  <text class="ts" x="44" y="332">安全：历史保留完整，r10 和回退记录都在</text>
+
+  <!-- 场景 4 -->
+  <rect x="496" y="224" width="460" height="112" rx="10" fill="rgba(255,123,114,.07)" stroke="#ff7b72" stroke-width="1.4"/>
+  <text class="hd" x="516" y="248" fill="#ff7b72">场景 4：已提交，想把它整个从历史里抹掉</text>
+  <text class="ts" x="516" y="270">必须用管理员工具，且会改变后续所有版本号：</text>
+  <text class="tm" x="516" y="292" fill="#ff7b72">svnadmin dump → 过滤 → load 到新库</text>
+  <text class="ts" x="516" y="312">极端手段，会破坏所有同事的工作副本，</text>
+  <text class="ts" x="516" y="332">只有误提交了密码/大文件时才考虑（第 21 节）</text>
+
+  <!-- 场景 5 -->
+  <rect x="24" y="350" width="932" height="106" rx="10" fill="rgba(126,231,135,.07)" stroke="#7ee787" stroke-width="1.4"/>
+  <text class="hd" x="44" y="374" fill="#7ee787">场景 5：只想「回到过去看一眼」，不想真的改东西</text>
+  <text class="tm" x="44" y="398" fill="#7ee787">svn update -r 8 .              ← 工作副本整体回到 r8（这是「历史检出」，可随时回来）</text>
+  <text class="tm" x="44" y="418" fill="#7ee787">svn update                      ← 玩完了，update 回最新</text>
+  <text class="tm" x="532" y="398" fill="#7ee787">svn cat -r 8 README.md          ← 只看内容，不落盘</text>
+  <text class="tm" x="532" y="418" fill="#7ee787">svn export -r 8 URL out/        ← 导出 r8 的干净副本</text>
+  <text class="ts" x="44" y="444">核心区别：<tspan fill="#e6edf3">update -r</tspan> 是「把工作副本的时间指针往回拨」，不是丢弃数据；随时可以 update 回来。</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>决策口诀：</b>没提交 → <code class="ic">revert</code>；
+    已提交想抵消 → <code class="ic">merge -c -N</code> + <code class="ic">commit</code>；
+    只想看看过去 → <code class="ic">update -r</code> / <code class="ic">cat -r</code>；
+    要从历史抹掉 → <code class="ic">svnadmin dump/load</code>（极危险）。
+    <strong>SVN 里「撤销已提交」永远是「再提交一次反向改动」，而不是删除历史</strong>——这是集中式系统的安全基石。
+  </div>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：revert 撤销本地修改</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 改了文件，status 显示 M</span>
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="hl">M</span>       README.md
+
+<span class="cmt"># 后悔了，撤销</span>
+<span class="ps">$</span> <span class="cmd">svn revert README.md</span>
+<span class="ok">Reverted 'README.md'</span>
+
+<span class="span cmt"># 验证：干净了</span>
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="dim">&lt;空输出 = 已恢复&gt;</span>
+
+<span class="cmt"># 递归撤销整个工作副本的所有本地改动（慎用！）</span>
+<span class="ps">$</span> <span class="cmd">svn revert -R .</span>
+Reverted '.'                    <span class="cmt">← 会逐层列出被撤销的路径</span>
+
+<span class="cmt"># 撤销「添加」动作：A 变回 ?</span>
+<span class="ps">$</span> <span class="cmd">svn revert newfile.txt</span>
+Reverted 'newfile.txt'
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="no">?</span>       newfile.txt            <span class="cmt">← 回到未跟踪状态，文件还在</span></pre>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">revert 是不可逆的</span>
+  <p><code class="ic">svn revert</code> 会把文件内容<strong>恢复成 pristine 副本</strong>（最近一次 update 拿到的那份），
+  你所有未提交的修改会<em>永久丢失</em>，无法通过 SVN 找回。</p>
+  <p>养成习惯：<strong>revert 之前先 <code class="ic">svn diff --file backup.patch</code> 存一份</strong>，
+  至少给自己留条后路。IDE 的本地历史（如 VS Code 的 Timeline、JetBrains 的 Local History）也能救急。</p>
+</div>
+
+<h4 class="sub">撤销已提交的改动：反向合并</h4>
+
+<p>
+  对于已经提交上去的错误改动，标准做法是<strong>「再提交一次反向补丁」</strong>。
+  <code class="ic">svn merge -c -10</code> 里那个<strong>负号</strong>就是关键——它表示「反向应用」。
+</p>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">撤销已提交改动的标准流程</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 前提：你的工作副本是干净的，且在正确的分支/目录上</span>
+cd wc
+svn update --non-interactive
+
+<span class="c"># 第 1 步：先看看 r10 到底改了什么（确认没找错对象）</span>
+svn log -v -c 10
+svn diff -c 10
+
+<span class="c"># 第 2 步：反向合并 r10（注意那个负号！）</span>
+svn merge -c -10 .
+<span class="c"># 执行后工作副本里，r10 的改动被「倒回去」了，但还没提交</span>
+
+<span class="c"># 第 3 步：确认结果符合预期</span>
+svn status
+svn diff
+
+<span class="c"># 第 4 步：提交这次回退</span>
+svn commit -m <span class="s">"回退 r10：该版本引入了错误的登录逻辑"</span>
+<span class="c"># 得到一个新版本号（比如 r13），历史完整保留</span>
+
+<span class="c"># ---- 撤销多个版本 ----</span>
+svn merge -c -10,-11,-12 .              <span class="c"># 撤销三个不连续的版本</span>
+svn merge -r 12:9 .                     <span class="c"># 撤销 r10~r12（反向区间）</span>
+
+<span class="c"># ---- 只想撤销某次提交里的一部分文件 ----</span>
+svn merge -c -10 src/login.cs           <span class="c"># 只回退这个文件的改动</span>
+
+<span class="c"># ---- 撤销还没提交的 merge 结果（反悔了）----</span>
+svn revert -R .
+svn cleanup                              <span class="c"># 清掉 mergeinfo 的中间状态</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：反向合并的输出</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn merge -c -10 .</span>
+<span class="hl">--- Reverse-merging r10 into '.':</span>
+<span class="hl">U</span>    docs.md
+<span class="cmt">          ↑ U = 文件被更新（改动已倒回）</span>
+<span class="cmt">          注意提示里明确写了 "Reverse-merging"（反向合并）</span>
+
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="hl">M</span>       docs.md                 <span class="cmt">← 现在它是一个普通的待提交修改</span>
+
+<span class="ps">$</span> <span class="cmd">svn commit -m "回退 r10"</span>
+Sending        docs.md
+Transmitting file data .done
+Committing transaction...
+<span class="ok">Committed revision 13.</span>          <span class="cmt">← 新的版本号，历史没被破坏</span></pre>
+  </div>
+</div>
+
+<h4 class="sub">只想看历史版本，不想改动</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">查看历史版本的四种方式</span><span class="acts"><button data-copy">复制</button></span></div>
+<pre class="code"><span class="c"># 方式一：看单个文件的历史内容（不落盘，最轻量）</span>
+svn cat -r 8 README.md
+svn cat -r 8 file:///repo/trunk/README.md
+
+<span class="c"># 方式二：导出某个版本的干净副本（无 .svn 目录）</span>
+svn export -r 8 file:///repo/trunk ./release-8/
+svn export file:///repo/tags/v1.0 ./v1.0/
+
+<span class="c"># 方式三：把整个工作副本拨回某个版本（可随时回来）</span>
+svn update -r 8
+<span class="c"># 此时 svn info 会显示 Revision: 8，但这是「混合版本」状态</span>
+svn update                    <span class="c"># 回到最新</span>
+
+<span class="c"># 方式四：取回一个已删除的文件</span>
+svn cat -r 5 file:///repo/trunk/deleted-file.txt &gt; recovered.txt
+<span class="c"># 或先记下路径再复制回来</span>
+svn copy -r 5 file:///repo/trunk/deleted-file.txt ./recovered.txt
+svn commit -m <span class="s">"恢复被删除的 deleted-file.txt"</span>
+
+<span class="c"># 方式五：把某个文件回退到历史版本（但其他文件不动）</span>
+svn merge -c -8 README.md     <span class="c"># 只回退这个文件在 r8 的改动</span>
+<span class="c"># 或直接取出旧内容覆盖</span>
+svn cat -r 8 README.md &gt; README.md
+svn commit -m <span class="s">"README 回退到 r8 内容"</span></pre>
+</div>
+
+<div class="box tip">
+  <span class="bt">快捷键：-c 与 -r 的区别</span>
+  <ul>
+    <li><code class="ic">-c N</code>　= <code class="ic">-r N-1:N</code>　——<strong>只</strong>看第 N 次提交引入的变化</li>
+    <li><code class="ic">-c -N</code>　= 反向应用第 N 次提交（撤销）</li>
+    <li><code class="ic">-r A:B</code>　—— 从 A 到 B 之间的<strong>全部</strong>变化（多个提交的累积）</li>
+  </ul>
+  <p>所以「撤销单次提交」要用 <code class="ic">-c -N</code>，用 <code class="ic">-r</code> 容易一下子撤多了。</p>
+</div>
+
+<!-- ==========================================================================
+     第四阶段 · 第 10 节：冲突处理
+     ========================================================================== -->

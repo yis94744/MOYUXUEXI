@@ -1,0 +1,37 @@
+# ===== 编译产物 =====
+*.obj
+*.o
+*.exe
+*.dll
+*.pdb
+*.ilk
+*.exp
+*.lib
+
+# ===== 临时文件 =====
+*.tmp
+*.temp
+*.bak
+*~
+*.log
+Thumbs.db
+desktop.ini
+ehthumbs.db
+.DS_Store
+
+# ===== 编辑器配置 =====
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+
+# ===== 依赖目录 =====
+node_modules/
+__pycache__/
+*.pyc
+
+# ===== 构建输出 =====
+dist/
+build/
+out/

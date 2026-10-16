@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>20. 用户与权限：谁能看谁能改 | SVN 图形化实战</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 图形化实战</h1></div>
+  <div class="brand-sub">TortoiseSVN + VisualSVN · 全鼠标操作</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 准备</div>
+    <a href="01-tools.html">1. 认识你的两个图形工具</a>
+    <a href="02-first-checkout.html">2. 第一次检出：把代码拉到本地</a>
+    <a href="03-icons.html">3. 看懂图标角标与右键菜单</a>
+    <div class="grp">第二阶段 · 日常使用</div>
+    <a href="04-daily.html">4. 日常三件事：改、更、提</a>
+    <a href="05-status.html">5. 查看改动：哪些文件变了</a>
+    <a href="06-diff.html">6. 比对差异：到底改了哪几行</a>
+    <a href="07-add-delete.html">7. 新增、删除、重命名文件</a>
+    <a href="08-history.html">8. 查看历史：Log 对话框详解</a>
+    <a href="09-revert.html">9. 撤销：改错了怎么退回</a>
+    <div class="grp">第三阶段 · 进阶操作</div>
+    <a href="10-conflict.html">10. 冲突处理：两人改了同一处</a>
+    <a href="11-merge-tool.html">11. 合并编辑器：逐行选择保留谁</a>
+    <a href="12-branch.html">12. 建分支：开一条独立开发线</a>
+    <a href="13-switch.html">13. 切换分支：在主干和分支间跳</a>
+    <a href="14-merge.html">14. 合并分支：把改动并回主干</a>
+    <a href="15-revision-graph.html">15. 版本拓扑图：看清分支走向</a>
+    <div class="grp">第四阶段 · 属性与锁</div>
+    <a href="16-ignore.html">16. 忽略文件：让编译产物别再烦我</a>
+    <a href="17-properties.html">17. 属性对话框：设置文件行为</a>
+    <a href="18-lock.html">18. 文件锁：二进制文件独占编辑</a>
+    <div class="grp">第五阶段 · 服务端管理</div>
+    <a href="19-server.html">19. 服务端：VisualSVN 建仓库</a>
+    <a href="20-users.html" class="on">20. 用户与权限：谁能看谁能改</a>
+    <a href="21-backup.html">21. 备份与恢复：图形界面操作</a>
+    <div class="grp">第六阶段 · 效率技巧</div>
+    <a href="22-patch-export.html">22. 补丁与导出：不走仓库传代码</a>
+    <a href="23-settings.html">23. 设置面板：常用选项怎么调</a>
+    <a href="24-troubleshoot.html">24. 常见问题：报错怎么处理</a>
+    <a href="25-cheatsheet.html">25. 图形操作速查表</a>
+
+  </nav>
+</aside>
+<main>
+<div class="crumb">
+  <span class="stage">第五阶段 · 服务端管理</span>
+  <span class="sep">/</span>
+  <a href="index.html">总目录</a>
+  <span class="sep">/</span>
+  <span class="cur">第 20 节</span>
+</div>
+
+<h3 class="sec" id="s20"><span class="no">20</span>用户与权限：谁能看谁能改</h3>
+
+<p class="lead">
+  SVN 相比「大家共用一个共享盘」的最大优势，就是能<strong>精确控制权限</strong>：
+  谁能读哪个目录、谁能往哪个目录里写、谁连看都看不到，都可以一个一个仓库、一层一层目录地设定。
+  这一节在 VisualSVN Server Manager 里完成——建人、建组、发权限，全是勾选框和对话框。
+</p>
+
+<div class="box key">
+  <span class="bt">为什么值得花时间把权限配好</span>
+  <ul>
+    <li><strong>保护主干</strong>：让新人或外包只能在自己的分支里改，主干不会被误伤。</li>
+    <li><strong>保护发布</strong>：<code class="ic">tags</code> 目录设成只读，已经发出去的版本号<strong>永远不会被谁手滑改掉</strong>。</li>
+    <li><strong>保护源码</strong>：核心模块只对内部成员开放，外包同学打开仓库根本看不到那些目录。</li>
+    <li><strong>减少扯皮</strong>：权限写清楚，谁该做什么一目了然，<em>比事后追责省事得多</em>。</li>
+  </ul>
+  <p>而且这些配置<strong>一次配好长期有效</strong>，不用每来一个人就重新折腾一遍。</p>
+</div>
+
+<h4 class="sub">第一步：给每个人建账号</h4>
+
+<p>服务器上的账号和 Windows 账号是两回事，是 VisualSVN 自己维护的名单。同事想连上你们的服务器，名字必须在这个名单里。</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">USER</span>新建一个用户账号</div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">在 Users 节点上右键</span>
+    <span class="sc">左边树里找到 <code class="ic">Users</code>，在它上面右键。<em>也可以直接用顶部工具栏的<strong>新建用户</strong>按钮。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">选择新建用户</span>
+    <span class="sc">走 <span class="mp">Users <span class="ar">→</span> <span class="item">New</span> <span class="ar">→</span> <span class="item">User...</span></span>，弹出新建用户对话框。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">填用户名的规则</span>
+    <span class="sc">在 <code class="ic">Username</code> 里填，建议用<strong>姓名的拼音、或者工号</strong>，别用网名或花名。<em>用户名是能被别人看到的，以后排查「谁提交的」时全靠它对得上人。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">设置初始密码并告诉本人</span>
+    <span class="sc">填 <code class="ic">Password</code> 和 <code class="ic">Confirm password</code>，点 <code class="ic">OK</code> 完成。建好后把用户名和密码用<strong>私聊方式</strong>发给本人，让大家第一次连上后自己改掉。<em>别在群里贴密码。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">以后要改密码、停用账号，都回到这里</span>
+    <span class="sc">在这个用户上右键 → <code class="ic">Properties</code>，可以改密码、改描述。人员离职时不要删账号，而是<strong>把它的权限收回</strong>——删掉会让历史记录里的作者名对不上。</span>
+  </div></div>
+</div>
+
+<div class="box tip">
+  <span class="bt">新人来了，最少要做两件事</span>
+  <p>一是在 <code class="ic">Users</code> 里<strong>建账号</strong>（这一小节）；二是把账号<strong>加进对应的用户组</strong>或直接给权限（下面两个小节）。</p>
+  <p>两件都做完，他才能连上仓库。<em>只建账号不给权限，客户端会一直提示认证失败或没有访问权限，其实不是密码错了。</em></p>
+</div>
+
+<h4 class="sub">第二步：建用户组，按角色管理</h4>
+
+<p>人一多，一个个给权限就会出现「漏掉一个人」「删掉一个人忘了收回」这类问题。正确做法是<strong>按角色建组，权限发给组，人员变动只改组</strong>。</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">GROUP</span>建一个用户组并把人放进去</div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">在 Groups 节点上右键</span>
+    <span class="sc">左边树里找到 <code class="ic">Groups</code>，右键，走 <span class="mp">Groups <span class="ar">→</span> <span class="item">New</span> <span class="ar">→</span> <span class="item">Group...</span></span>。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">填组名</span>
+    <span class="sc">按<strong>角色</strong>起名，而不是按人名堆。常见的几个：<code class="ic">Developers</code>（开发）、<code class="ic">Testers</code>（测试）、<code class="ic">Outsourcing</code>（外包）、<code class="ic">Admins</code>（管理员）。<em>名字起清楚了，几个月后回来看权限表还能一眼看懂。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">把成员加进去</span>
+    <span class="sc">在 <code class="ic">Members</code> 那一栏点 <code class="ic">Add...</code>，从已有的用户里勾选。<strong>一个用户可以同时属于多个组</strong>，比如一个技术负责人既在 <code class="ic">Developers</code> 也在 <code class="ic">Admins</code>。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">以后人员变动只改这里</span>
+    <span class="sc">新人入职 → 加进组；离职 → 从组里移出。<strong>仓库那边的权限配置一个字都不用动</strong>，这就是分组管理最大的好处。<em>组也可以嵌套组，做更细的层级。</em></span>
+  </div></div>
+</div>
+
+<h4 class="sub">第三步：给仓库分配权限</h4>
+
+<p>账号和组都准备好了，接下来才是真正决定「谁能看谁能改」的地方。入口在仓库的<strong>属性对话框</strong>里。</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">PERM</span>给用户或组发权限</div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">在仓库节点上右键，打开属性</span>
+    <span class="sc">左边树里在<strong>具体的仓库</strong>（不是 <code class="ic">Repositories</code> 这一层）上右键 → <span class="mp"><span class="item">Properties</span></span>。<em>对你只想管某一个仓库时，就在这里配。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">切到 Security 标签页</span>
+    <span class="sc">对话框上方有几个标签页，点 <code class="ic">Security</code>。这里列着<strong>当前已经授权的对象</strong>和他们的权限级别。<em>刚建的新仓库，这里可能是空的。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">点 Add 选择要授权的人或组</span>
+    <span class="sc">点 <code class="ic">Add...</code> 按钮，弹出选择窗口，里面有 <code class="ic">Users</code> 和 <code class="ic">Groups</code> 两份名单。<strong>优先选组</strong>——实在临时才直接选个人。选好点确定，它就出现在列表里了。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">勾选权限级别</span>
+    <span class="sc">在列表里选中刚加进来的那一行，在下方勾权限——<code class="ic">Read Only</code> 还是 <code class="ic">Read/Write</code>。<em>权限是一次一行生效的，所以加一批人要逐行设一遍。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">下一步：如果要细化到子目录，点 Custom</span>
+    <span class="sc">只想给<strong>整个仓库</strong>统一定一个级别，到上一步就够了，点 <code class="ic">OK</code> 保存。想让某个人<strong>只对某几个子目录</strong>有权限，就继续看下面的「精细权限」。</span>
+  </div></div>
+</div>
+
+<h4 class="sub">三种权限级别</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:150px">权限</th><th style="width:230px">能做什么</th><th>什么时候给</th></tr></thead>
+<tbody>
+  <tr>
+    <td><strong>Read Only</strong><br><span class="tagmini b">只读</span></td>
+    <td>可以检出、可以更新、可以看历史和差异。<strong>不能提交</strong>，改了也传不上去。</td>
+    <td>给<strong>只浏览不参与开发</strong>的人：产品、美术、领导、外部评审。也用在 <code class="ic">tags</code> 这类「只许看、不许动」的目录上。</td>
+  </tr>
+  <tr>
+    <td><strong>Read/Write</strong><br><span class="tagmini g">读写</span></td>
+    <td>只读的全部都能做，另外<strong>可以提交、可以建分支和标签</strong>。</td>
+    <td>给真正要写代码的人：开发、以及需要维护脚本的测试。<strong>这是团队成员最常见的级别</strong>。</td>
+  </tr>
+  <tr>
+    <td><strong>No Access</strong><br><span class="tagmini r">无权限</span></td>
+    <td>连仓库都连不上，<strong>看不到任何内容</strong>，就像这个仓库不存在一样。</td>
+    <td>给<strong>不该看到这套代码的人</strong>。也用来「收回权限」——不删账号，直接改成无权限。<em>它比 Read Only 更彻底：只读至少还能看见内容和历史。</em></td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box warn">
+  <span class="bt">只读 ≠ 看不见</span>
+  <p>很多人以为设成 <code class="ic">Read Only</code> 就安全了。其实<strong>只读的人能看到全部代码、全部历史和全部差异</strong>，只是不能改而已。</p>
+  <p>如果这套代码<strong>根本不该让某个角色看到</strong>（比如外包不该看到核心算法），必须用 <code class="ic">No Access</code>，或者用下面的精细权限把那个目录藏起来。</p>
+</div>
+
+<h4 class="sub">精细权限：细化到具体子目录</h4>
+
+<p>权限不是只能在仓库这一层设。你可以<strong>针对仓库里的某条路径单独配</strong>，路径越具体，优先级越高。这是 SVN 权限体系最有价值的部分。典型场景有三个。</p>
+
+<h5 class="mini">场景一：tags 目录只许看，不许写</h5>
+
+<p><code class="ic">tags</code> 是记录「已发布版本」的地方。它的意义就在于<strong>打上之后永远不动</strong>——一旦有人把里面的东西改了，你手上那个发布版本号就对不上代码了，线上出问题时完全没法追溯。</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">LOCKDOWN</span>把 tags 设成大多数人只读</div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">先给仓库级配好基础权限</span>
+    <span class="sc">在 <code class="ic">Security</code> 标签页里，先给 <code class="ic">Developers</code> 组仓库级的 <code class="ic">Read/Write</code>。<strong>这是「默认值」</strong>，子目录会继承它。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">再为 tags 这一条路径加一条更具体的规则</span>
+    <span class="sc">在这次授权里，把作用范围<strong>指定到 <code class="ic">/tags</code> 这条子路径</strong>上，给 <code class="ic">Developers</code> 组设成 <code class="ic">Read Only</code>。<em>界面上的做法是：编辑这条权限的适用路径，把它从「整个仓库」收窄到 <code class="ic">tags</code>。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">单独给管理员留写权限</span>
+    <span class="sc">再为同一条 <code class="ic">/tags</code> 路径加一条规则，对象是 <code class="ic">Admins</code> 组，级别 <code class="ic">Read/Write</code>。<strong>这样只有管理员能在 tags 下建标签，其他人看得见、动不了。</strong></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">保存，然后自己验一遍</span>
+    <span class="sc">点 <code class="ic">OK</code> 关闭属性对话框。用普通成员账号在客户端里试着提交一次到 <code class="ic">tags</code>，<strong>应该被服务器拒绝</strong>；提交到 <code class="ic">trunk</code> 则正常。<em>配完权限一定要实测一次，别只看配置界面。</em></span>
+  </div></div>
+</div>
+
+<div class="box tip">
+  <span class="bt">规则优先级：谁更具体听谁的</span>
+  <p>同一个用户命中多条规则时，服务器按这个顺序判断：<strong>① 路径更具体的赢</strong>——<code class="ic">/tags</code> 上的规则会盖过仓库级的规则；<strong>② 针对人的赢过针对组的</strong>——直接给某人配的规则，优先于他所在组的规则；<strong>③ 都没命中就拒绝</strong>——默认是「不给」，所以必须显式授权。</p>
+  <p>理解这一点，「继承 + 局部覆盖」的玩法就通了：<strong>根上配一套通用的，个别目录写几条例外，整套权限清清楚楚。</strong></p>
+</div>
+
+<h5 class="mini">场景二：外包只能看一部分代码</h5>
+
+<p>同一个仓库里，如果 <code class="ic">/trunk/core</code> 是核心算法，外包同学不应该看到，那就先给外包组整体 <code class="ic">No Access</code>，再为他能访问的那几条路径单独开 <code class="ic">Read/Write</code>。<strong>顺序是「先全部关掉，再逐个打开」</strong>，这样不会漏。</p>
+
+<h4 class="sub">一张典型的权限矩阵</h4>
+
+<p>下面这个矩阵可以直接当作团队的起点抄下来，再按自己的情况微调。<strong>✔ 读写</strong> 表示能提交，<strong>只读</strong> 表示只能看，<strong>—</strong> 表示完全看不到。</p>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:170px">目录</th><th style="width:120px">管理员</th><th style="width:120px">开发</th><th style="width:120px">测试</th><th>外包</th></tr></thead>
+<tbody>
+  <tr><td><code class="ic">/trunk</code><br><span class="tagmini c">主干</span></td><td><strong>✔ 读写</strong></td><td><strong>✔ 读写</strong></td><td>只读</td><td>—</td></tr>
+  <tr><td><code class="ic">/trunk/core</code><br><span class="tagmini r">核心模块</span></td><td><strong>✔ 读写</strong></td><td><strong>✔ 读写</strong></td><td>只读</td><td><strong>—</strong></td></tr>
+  <tr><td><code class="ic">/branches/dev-*</code><br><span class="tagmini b">开发分支</span></td><td><strong>✔ 读写</strong></td><td><strong>✔ 读写</strong></td><td>只读</td><td><strong>✔ 读写</strong></td></tr>
+  <tr><td><code class="ic">/branches/test-*</code><br><span class="tagmini y">测试分支</span></td><td><strong>✔ 读写</strong></td><td><strong>✔ 读写</strong></td><td><strong>✔ 读写</strong></td><td>只读</td></tr>
+  <tr><td><code class="ic">/tags</code><br><span class="tagmini p">发布标签</span></td><td><strong>✔ 读写</strong></td><td>只读</td><td>只读</td><td>只读</td></tr>
+  <tr><td><code class="ic">/docs</code><br><span class="tagmini c">文档</span></td><td><strong>✔ 读写</strong></td><td><strong>✔ 读写</strong></td><td><strong>✔ 读写</strong></td><td>只读</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:150px">角色</th><th style="width:170px">对应的组</th><th>设计思路</th></tr></thead>
+<tbody>
+  <tr><td><strong>管理员</strong></td><td><code class="ic">Admins</code></td><td>所有路径读写，<strong>唯一能改 tags 的人</strong>。人数控制在 1~2 人。</td></tr>
+  <tr><td><strong>开发</strong></td><td><code class="ic">Developers</code></td><td>主干和自己的分支读写，<strong>tags 只读</strong>，保证发布记录不被误改。</td></tr>
+  <tr><td><strong>测试</strong></td><td><code class="ic">Testers</code></td><td>主干只读（随时对着最新代码验），<strong>测试分支可写</strong>（记录用例和报告）。</td></tr>
+  <tr><td><strong>外包</strong></td><td><code class="ic">Outsourcing</code></td><td>核心模块<strong>完全看不到</strong>，只在指定的开发分支里干活，交付通过合并或补丁回主仓库（第 22 节）。</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="box tip">
+  <span class="bt">权限是继承的，别每个目录都重配一遍</span>
+  <p>你在仓库根上配的那一套，<strong>下面所有子目录默认全部继承</strong>——也就是说，<code class="ic">Developers</code> 在根上有读写，进到 <code class="ic">trunk/src/login</code> 一样有读写，不需要一层层去点。</p>
+  <ul>
+    <li><strong>先在仓库根上配一套通用的</strong>，覆盖 90% 的目录。工作量最小，也最不容易漏。</li>
+    <li><strong>只对个别目录写例外</strong>：比如 <code class="ic">/tags</code> 收紧成只读、<code class="ic">/trunk/core</code> 对外包关闭。</li>
+    <li><strong>例外越少越好</strong>。例外一多，几个月后连你自己都说不清谁到底能访问什么。<em>权限表能一屏看完，才算配得好。</em></li>
+  </ul>
+</div>
+
+<div class="box warn">
+  <span class="bt">改完权限后，客户端可能需要清一次凭据</span>
+  <p>权限是在服务器端改的，但<strong>改动不会自动推到客户端</strong>。最常见的情况是：你刚给某个同事撤了权限，他那边却还能照常更新——因为他本机缓存着上次登录的凭据，服务器看的是旧会话。</p>
+  <p>让他这样做：在资源管理器空白处右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Settings</span></span> → 左侧选 <code class="ic">Saved Data</code> → 在 <code class="ic">Authentication data</code> 那一行点 <code class="ic">Clear</code> 按钮 → 确定关闭。</p>
+  <p><strong>清完之后下一次操作会重新弹登录框</strong>，输入新的用户名密码即可。同样的做法也适用于「换了密码一直认证失败」这类问题（第 23、24 节还会再遇到）。</p>
+  <p><em>顺带提醒：改权限属于影响面比较大的操作，最好避开大家正在提交的时间段，改完在群里说一声。</em></p>
+</div>
+
+<h4 class="sub">去哪儿清凭据：Settings 面板认路</h4>
+
+<p>上面说的「清一次凭据」是在客户端做的，所以得先认识 TortoiseSVN 的设置面板长什么样。这一步经常用，值得单独记住位置。</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">TortoiseSVN Settings：左侧分类树是要认的重点</span><span class="fs">SETTINGS</span></div>
+  <div class="sb"><img src="img/SettingsMain.png" alt="TortoiseSVN 设置面板"></div>
+  <div class="cap">
+    打开方式：<strong>在资源管理器任意空白处右键</strong> → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Settings</span></span>。窗口分左右两栏，<strong>左边那一列分类树才是关键</strong>——所有设置都按这个树分组，找功能先来这里点。<br><br>
+
+    <b>与会话/权限相关的几项：</b><br>
+    <span class="k">Saved Data</span>（保存的数据）——<strong>本节要用的就是它</strong>。展开后里面是各种「历史记录」和「认证数据」的清理入口，换了账号密码、或者撤了权限后对方还能操作，都在这里清。<br>
+    <span class="k">Log Caching</span>（日志缓存）——日志的本地缓存。有时候日志显示的内容过时、或者换过服务器地址，可以在这里清理。<br>
+    <span class="k">Cached Repositories</span>（缓存的仓库）——记录你访问过的仓库地址。<br><br>
+
+    <b>其他高频分类，顺便认一下：</b><br>
+    <span class="k">General</span>（常规）——界面语言、检查更新、全局忽略规则。图里右边显示的就是这个页面，能看到 <code class="ic">Language</code> 下拉框（想换中文界面就在这里选）和 <code class="ic">Global ignore pattern</code>（全局忽略规则，对所有工作副本生效）。<br>
+    <span class="k">Context Menu</span>（右键菜单）——<strong>嫌右键菜单太长就调这里</strong>，可以把顶层那几项收进子菜单。<br>
+    <span class="k">Icon Overlays</span>（图标覆盖）——控制文件夹里的角标显示，角标太多性能下降时可以关掉一些。<br>
+    <span class="k">Revision Graph</span>（版本图）——让版本拓扑图能正确识别 trunk / branches / tags，<em>如果编号模式不按预期显示，改这里</em>。<br><br>
+
+    <b>底部三个按钮</b>：<code class="ic">OK</code>（保存并关闭）、<code class="ic">Apply</code>（保存但不关闭）、<code class="ic">Cancel</code>（放弃）。<strong>改动不确定就先点 Apply 试效果</strong>，不用反复开关窗口。
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">为什么权限改了不生效：九成是这个原因</span>
+  <p>把因果串起来看，这个坑就很好理解了：</p>
+  <ol>
+    <li>你在服务器上<strong>撤掉了某人对某个目录的写权限</strong>。</li>
+    <li>他本机 <strong>TortoiseSVN 缓存着旧的用户名密码</strong>（或者 Windows 凭据管理器里存着）。</li>
+    <li>他再点提交，客户端<strong>直接用缓存凭据连上去</strong>，服务器一看是这个账号、这个路径——按理该拒。</li>
+    <li>但因为会话是复用旧凭据建立的，<strong>他会看到「还能提交」的假象</strong>，或者收到一个含糊的认证错误。</li>
+  </ol>
+  <p><strong>标准解决办法</strong>：让对方按上面的路径清一次 <code class="ic">Saved Data</code> 里的认证数据，然后重新操作，会强制弹登录框，输新凭据即可。</p>
+  <p><em>另一种情况是权限确实没配错，但对方用的是「另一个账号」——他电脑上同时存过好几个账号的凭据。清掉全部认证数据最省事。</em></p>
+</div>
+
+<div class="box ok">
+  <span class="bt">权限配好之后的检查清单</span>
+  <ul>
+    <li>用<strong>管理员账号</strong>登录，确认所有目录都能正常读写。</li>
+    <li>找一个<strong>普通开发</strong>，确认他能提交到主干、<strong>但改不动 tags</strong>。</li>
+    <li>用<strong>外包账号</strong>试一下，核心目录应该连看都看不到。</li>
+    <li>把一个 <code class="ic">Read Only</code> 的账号检出一次，确认能读不能提。</li>
+  </ul>
+  <p>四个角色各测一遍，通常十来分钟，<strong>能省掉以后反复被人问「我为什么提交不了」的大量时间</strong>。</p>
+</div>
+
+
+<div class="pager">
+  <a href="19-server.html"><span class="lbl">← 上一节</span><span class="ttl">19. 服务端：VisualSVN 建仓库</span></a>
+  <a class="home" href="index.html"><span class="ttl">总目录</span></a>
+  <a class="next" href="21-backup.html"><span class="lbl">下一节 →</span><span class="ttl">21. 备份与恢复：图形界面操作</span></a>
+</div>
+
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+{
+  "pageTitle": "SVN 图形化实战 · 总目录",
+  "heroTag": "TortoiseSVN + VisualSVN Server · 全鼠标操作",
+  "heroTitle": "SVN 图形化实战<br>不敲一行命令",
+  "heroLead": "这是一份<strong>纯图形界面</strong>的 SVN 教程。所有操作都用右键菜单和对话框完成，每一步都配<strong>真实界面截图</strong>，说清「点哪个按钮、填什么、为什么」。",
+  "heroBody": "全教程按 <strong>6 个阶段、25 个小节</strong>展开。每个小节做成独立页面，可以单独打开阅读。主要面向 Windows 上的 <em>TortoiseSVN</em> 客户端 + <em>VisualSVN Server</em> 服务端这套标准组合。",
+  "statSections": "节",
+  "statShots": "60+",
+  "statShotsLabel": "张界面截图",
+  "statStages": "6",
+  "statStagesLabel": "个阶段",
+  "statTools": "2",
+  "statToolsLabel": "个工具全覆盖",
+  "howtoTitle": "这份教程怎么用",
+  "howtoBody": "左侧导航可以直接跳到任意一节，每节底部有「上一节 / 下一节」按钮。所有截图<strong>点击可以放大</strong>，看不清的按钮放大看即可。菜单路径都用这种样式标出来：<span class=\"mp\">TortoiseSVN <span class=\"ar\">→</span> <span class=\"item\">Commit...</span></span>，意思就是「右键 → 展开 TortoiseSVN 子菜单 → 点击 Commit」。",
+  "stagesTitle": "六个阶段总览",
+  "stagesIntro": "从「装好软件第一次检出」到「服务端管理和常见问题排查」。建议第一次按顺序读前两个阶段，后面的用到再查。",
+  "sectionsUnit": "节",
+  "quickTitle": "四条常见路径",
+  "quickstart": [
+    {
+      "title": "路径 A：今天第一次用 SVN",
+      "body": "从第 1 节顺序读。第 1 节认识两个软件，第 2 节把代码拉到本地，第 3 节认全右键菜单，第 4 节学会「改、更、提」这个日常循环。读完前四节就能正常干活了。",
+      "link": "01-tools.html",
+      "linkText": "从第 1 节开始 →"
+    },
+    {
+      "title": "路径 B：代码撞车了 / 出现冲突",
+      "body": "直接看第 10 节和第 11 节。第 10 节讲冲突是怎么产生的、冲突文件里的标记怎么看、什么时候该找谁；第 11 节讲怎么用合并工具逐行解决，不用手工删标记。",
+      "link": "10-conflict.html",
+      "linkText": "打开冲突处理 →"
+    },
+    {
+      "title": "路径 C：我要搭服务器 / 管权限",
+      "body": "从第 19 节进入服务端部分。建仓库、加用户、配权限、做备份，全部在 VisualSVN Server Manager 里点鼠标完成，不用碰配置文件。",
+      "link": "19-server.html",
+      "linkText": "跳到第 19 节 →"
+    },
+    {
+      "title": "路径 D：报错了 / 不知道点哪里",
+      "body": "第 24 节按「症状」组织，列出常见问题和图形界面的解决办法。第 25 节是全套图形操作的速查表，可以打印贴墙。",
+      "link": "24-troubleshoot.html",
+      "linkText": "打开问题排查 →"
+    }
+  ],
+  "verifiedTitle": "关于截图来源",
+  "verifiedBody": "教程中的界面截图取自 TortoiseSVN 官方文档与 VisualSVN 官方站点，对应的是 TortoiseSVN 1.14 与 VisualSVN Server 5.x 版本的界面。你实际安装的版本如果界面略有差异（比如按钮位置微调），属正常情况，功能位置是一致的。",
+  "footerTitle": "SVN 图形化实战 · 全鼠标操作",
+  "footerBody": "六个阶段：准备（1-3）→ 日常使用（4-9）→ 进阶操作（10-15）→ 属性与锁（16-18）→ 服务端管理（19-21）→ 效率技巧（22-25）。",
+  "footerNote": "需要命令行版本的完整参考，可以查官方文档 Version Control with Subversion（svnbook.red-bean.com，免费电子书）；TortoiseSVN 的完整帮助手册在 tortoisesvn.net/support.html。",
+  "stages": [
+    {
+      "title": "第一阶段 · 准备",
+      "desc": "认识两个图形工具、把代码拉到本地、认全右键菜单",
+      "blurbs": {
+        "1": "TortoiseSVN 客户端与 VisualSVN 服务端，各自管什么",
+        "2": "Checkout 对话框逐项说明，第一次检出到本地",
+        "3": "图标角标含义、文件夹/文件的右键菜单、右键拖动的妙用"
+      }
+    },
+    {
+      "title": "第二阶段 · 日常使用",
+      "desc": "每天都要用的操作：更新、提交、查看改动、比对差异、看历史、撤销",
+      "blurbs": {
+        "4": "改、更、提三步循环，Update 与 Commit 对话框详解",
+        "5": "查看改动清单，提交前自查避免误提交",
+        "6": "比对差异，看清到底改了哪几行",
+        "7": "新增、删除、重命名的正确做法（别用 F2）",
+        "8": "Show log 日志对话框详解，查谁改了什么",
+        "9": "撤销本地改动与撤销已提交的改动，两者完全不同"
+      }
+    },
+    {
+      "title": "第三阶段 · 进阶操作",
+      "desc": "冲突处理、分支合并、版本拓扑图——多人协作的核心",
+      "blurbs": {
+        "10": "冲突是怎么产生的、冲突文件里的标记怎么看",
+        "11": "TortoiseMerge 三栏合并编辑器，逐行选择保留谁",
+        "12": "Branch/tag 对话框建分支，开一条独立开发线",
+        "13": "Switch 在主干和分支之间来回切换",
+        "14": "Merge 向导把分支改动合并回主干，含 Test Merge 预演",
+        "15": "Revision graph 版本拓扑图，看清分支走向"
+      }
+    },
+    {
+      "title": "第四阶段 · 属性与锁",
+      "desc": "让 SVN 按你的规矩对待文件：忽略规则、属性设置、文件锁",
+      "blurbs": {
+        "16": "忽略编译产物和临时文件，让提交列表干净",
+        "17": "属性对话框：换行符、二进制标记、关键字替换",
+        "18": "二进制文件独占锁，防止两人改坏同一个 PSD"
+      }
+    },
+    {
+      "title": "第五阶段 · 服务端管理",
+      "desc": "VisualSVN Server Manager 里的图形化管理",
+      "blurbs": {
+        "19": "新建仓库、建标准目录、拿到仓库地址发给同事",
+        "20": "创建用户和组，按目录分配读写权限",
+        "21": "备份与恢复，含定时任务和恢复演练建议"
+      }
+    },
+    {
+      "title": "第六阶段 · 效率技巧",
+      "desc": "补丁导出、设置调优、问题排查、速查表",
+      "blurbs": {
+        "22": "创建和应用补丁、Export 干净副本、Import 导入",
+        "23": "设置面板：精简右键菜单、清除认证数据等实用调整",
+        "24": "常见报错按症状排查，附 Clean up 万能修复",
+        "25": "全套图形操作速查表 + 团队协作约定模板"
+      }
+    }
+  ]
+}

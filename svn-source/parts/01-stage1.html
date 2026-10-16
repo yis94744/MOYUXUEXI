@@ -1,0 +1,592 @@
+<!-- ============================================================
+     SVG 全局箭头定义（所有插图共用，只需定义一次）
+     ============================================================ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/>
+    </marker>
+    <marker id="arwb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/>
+    </marker>
+    <marker id="arwg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7ee787"/>
+    </marker>
+    <marker id="arwr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff7b72"/>
+    </marker>
+    <marker id="arwp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#d2a8ff"/>
+    </marker>
+    <marker id="arwy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#e3b341"/>
+    </marker>
+    <marker id="arwc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#56d4dd"/>
+    </marker>
+    <linearGradient id="g-blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#58a6ff" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#58a6ff" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-pur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d2a8ff" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#d2a8ff" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7ee787" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#7ee787" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-orange" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffa657" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#ffa657" stop-opacity=".04"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<!-- ==========================================================================
+     第一阶段 · 第 1 节
+     ========================================================================== -->
+<h3 class="sec" id="s1"><span class="no">1</span>SVN 是什么</h3>
+
+<p class="lead">
+  SVN（Subversion）是一个<strong>集中式版本控制系统</strong>。一句话概括它的作用：
+  把文件的每一次修改都记成一条不可篡改的历史，让多人协作时不互相覆盖、随时能回到过去。
+</p>
+
+<p>它要解决的核心问题只有三个，但每个都很要命：</p>
+
+<div class="grid3">
+  <div class="card blue">
+    <h6>① 覆盖问题</h6>
+    <p>两个人同时改同一个文件，后保存的把先保存的<strong>整个覆盖掉</strong>。SVN 通过「先更新再提交」的机制拦住这种情况。</p>
+  </div>
+  <div class="card pur">
+    <h6>② 回退问题</h6>
+    <p>改了三天发现方向全错，想退回上周五的状态。没有版本控制就只能靠手抄备份。</p>
+  </div>
+  <div class="card green">
+    <h6>③ 追责问题</h6>
+    <p>这行代码是谁写的、为什么这么写、当时跟着什么需求一起改的——<code class="ic">svn blame</code> 一行行告诉你。</p>
+  </div>
+</div>
+
+<h4 class="sub" id="s1-2">集中式的本质：一个中央仓库</h4>
+
+<p>
+  「集中式」这三个字是整个 SVN 设计的地基，理解了它就理解了 SVN 一半的行为。
+  它意味着：<strong>所有历史只存在一个地方</strong>——服务器上的那个仓库（Repository）。
+  每个开发者的电脑上只有一份「工作副本」（Working Copy），是某次快照的解压结果，<em>不含完整历史</em>。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 1-1　集中式 vs 分布式：历史存在哪里</span><span class="fs">Architecture</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 430" width="980" height="430" role="img" aria-label="集中式与分布式版本控制架构对比图">
+  <!-- 左面板 -->
+  <text class="tt" x="24" y="28">集中式（SVN）</text>
+  <text class="ts" x="24" y="49">历史唯一存在服务器；客户端只有工作副本</text>
+
+  <!-- 中央仓库 -->
+  <rect class="n-pur" x="140" y="76" width="190" height="76" rx="11"/>
+  <text class="hd" x="235" y="103" text-anchor="middle">中央仓库 Repository</text>
+  <text class="ts" x="235" y="123" text-anchor="middle">唯一权威 · 完整历史 · 全部版本号</text>
+  <text class="tm2" x="235" y="140" text-anchor="middle">svn://192.168.1.10/repo</text>
+
+  <!-- 客户端 -->
+  <rect class="c-gray" x="26" y="262" width="128" height="66" rx="9"/>
+  <text class="tx" x="90" y="287" text-anchor="middle">开发者 A</text>
+  <text class="ts" x="90" y="307" text-anchor="middle">工作副本（局部）</text>
+
+  <rect class="c-gray" x="176" y="262" width="128" height="66" rx="9"/>
+  <text class="tx" x="240" y="287" text-anchor="middle">开发者 B</text>
+  <text class="ts" x="240" y="307" text-anchor="middle">工作副本（局部）</text>
+
+  <rect class="c-gray" x="326" y="262" width="128" height="66" rx="9"/>
+  <text class="tx" x="390" y="287" text-anchor="middle">开发者 C</text>
+  <text class="ts" x="390" y="307" text-anchor="middle">工作副本（局部）</text>
+
+  <!-- 连线 -->
+  <path class="arwp" d="M92,262 L186,154"/>
+  <path class="arwp" d="M240,262 L240,154"/>
+  <path class="arwp" d="M388,262 L288,154"/>
+
+  <text class="tm2" x="252" y="200">svn update / commit</text>
+  <text class="ts" x="252" y="232">每次操作都要联网</text>
+
+  <!-- 断网提示 -->
+  <rect class="n-red" x="26" y="348" width="428" height="58" rx="9" stroke-dasharray="5 4"/>
+  <text class="hd" x="44" y="371" fill="#ff7b72">断网时：能改、能 diff，但无法提交、无法查历史</text>
+  <text class="ts" x="44" y="393">工作副本里只有 .svn 元数据，没有历史版本可回溯</text>
+
+  <!-- 分隔线 -->
+  <line x1="490" y1="16" x2="490" y2="410" stroke="#30363d" stroke-width="1.5" stroke-dasharray="6 5"/>
+
+  <!-- 右面板 -->
+  <text class="tt" x="516" y="28">分布式（Git / Mercurial）</text>
+  <text class="ts" x="516" y="49">每个人都有一份完整仓库，含全部历史</text>
+
+  <rect class="n-green" x="530" y="96" width="150" height="92" rx="11"/>
+  <text class="hd" x="605" y="122" text-anchor="middle">开发者 A</text>
+  <text class="ts" x="605" y="142" text-anchor="middle">完整仓库</text>
+  <text class="tm2" x="605" y="162" text-anchor="middle">含全部历史</text>
+
+  <rect class="n-green" x="716" y="96" width="150" height="92" rx="11"/>
+  <text class="hd" x="791" y="122" text-anchor="middle">开发者 B</text>
+  <text class="ts" x="791" y="142" text-anchor="middle">完整仓库</text>
+  <text class="tm2" x="791" y="162" text-anchor="middle">含全部历史</text>
+
+  <rect class="n-green" x="623" y="248" width="150" height="92" rx="11"/>
+  <text class="hd" x="698" y="274" text-anchor="middle">中央裸库（可选）</text>
+  <text class="ts" x="698" y="294" text-anchor="middle">仅作为交换点</text>
+  <text class="tm2" x="698" y="314" text-anchor="middle">非权威</text>
+
+  <!-- 双向箭头 -->
+  <path class="arwg" d="M680,134 L716,134"/>
+  <path class="arwg" d="M716,146 L680,146"/>
+  <path class="arwg" d="M791,188 L760,248"/>
+  <path class="arwg" d="M742,246 L686,190"/>
+
+  <text class="ts" x="530" y="378">离线也能提交、查历史、切分支</text>
+  <text class="ts" x="530" y="400">代价：概念多、学习曲线陡、大仓克隆慢</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>看图要点：</b>左边 SVN 的所有箭头都指向<strong>同一个中心</strong>——没有网络就没有版本历史可言。
+    右边每个节点自己就是一份完整仓库，节点之间是<strong>对等</strong>关系。
+    这张图解释了 SVN 的绝大部分「行为特性」：为什么提交要联网、为什么 <code class="ic">.svn</code> 目录不大、为什么分支那么轻量（服务端只记一条路径映射）。
+  </div>
+</div>
+
+<div class="box key">
+  <span class="bt">一个必须扭转的直觉</span>
+  <p>很多人以为 SVN 的分支是「复制一份代码」——<strong>恰恰相反</strong>。
+  在 SVN 里创建分支是<em>服务端一瞬间的元数据操作</em>，0 字节数据被复制。
+  第 11 节会用一张图彻底讲清楚这个「廉价复制」机制，这也是 SVN 分支比 Git 更「轻」的地方。</p>
+</div>
+
+<h4 class="sub" id="s1-3">SVN 与 Git 对照：该选谁</h4>
+
+<p>这是绕不开的一问。结论先给：<strong>SVN 没有死，它在特定场景下依然是最优解。</strong></p>
+
+<div class="tw">
+<table>
+<thead>
+  <tr><th>对比项</th><th>SVN（集中式）</th><th>Git（分布式）</th></tr>
+</thead>
+<tbody>
+  <tr>
+    <td>历史存放</td>
+    <td>只在服务器</td>
+    <td>每人一份完整副本</td>
+  </tr>
+  <tr>
+    <td>提交是否需联网</td>
+    <td><span class="tagmini r">需要</span> 每次 commit 都走网络</td>
+    <td><span class="tagmini g">不需要</span> 本地 commit，push 才联网</td>
+  </tr>
+  <tr>
+    <td>版本号</td>
+    <td><strong>全局递增整数</strong>（r1, r2, r3…）——好沟通</td>
+    <td>每对象一个 SHA-1 哈希——精确但难口述</td>
+  </tr>
+  <tr>
+    <td>分支成本</td>
+    <td>服务端几乎零成本；<strong>但切换要联网</strong></td>
+    <td>本地瞬时切换</td>
+  </tr>
+  <tr>
+    <td>权限粒度</td>
+    <td><span class="tagmini g">极细</span> 可精确到<strong>目录级读/写</strong></td>
+    <td>通常只能到仓库级</td>
+  </tr>
+  <tr>
+    <td>大文件 / 二进制</td>
+    <td><span class="tagmini g">友好</span> 支持 <code class="ic">svn lock</code> 独占锁</td>
+    <td>弱，需 LFS 外挂</td>
+  </tr>
+  <tr>
+    <td>部分检出</td>
+    <td><span class="tagmini g">原生支持</span> <code class="ic">--depth</code> 稀疏检出</td>
+    <td>需 sparse-checkout，较繁琐</td>
+  </tr>
+  <tr>
+    <td>学习曲线</td>
+    <td><span class="tagmini g">平缓</span> 约 15 个命令覆盖 95% 场景</td>
+    <td>陡峭，需理解暂存区、引用、rebase</td>
+  </tr>
+  <tr>
+    <td>目录结构</td>
+    <td><strong>约定俗成</strong> trunk/branches/tags，靠人遵守</td>
+    <td>内置分支模型</td>
+  </tr>
+  <tr>
+    <td>典型用户</td>
+    <td>企业内网、游戏美术、嵌入式、<br>需要精细权限的团队</td>
+    <td>开源社区、互联网研发</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="grid2">
+  <div class="card good">
+    <h6>选 SVN 的场景</h6>
+    <ul>
+      <li>项目里<strong>大量二进制资源</strong>（美术图、模型、音效）——Git 仓库会被撑爆</li>
+      <li>需要<strong>目录级权限隔离</strong>，比如外包只能看 <code class="ic">/trunk/art</code></li>
+      <li>团队成员<strong>非技术人员多</strong>，需要简单直白的模型</li>
+      <li>公司<strong>内网隔离</strong>，不希望完整代码库散落在每台电脑上</li>
+      <li>需要「版本号」这种<strong>人类可读</strong>的沟通语言（"你回退到 r1523 试试"）</li>
+    </ul>
+  </div>
+  <div class="card blue">
+    <h6>选 Git 的场景</h6>
+    <ul>
+      <li>以<strong>文本代码</strong>为主，需要高频分支、频繁试验</li>
+      <li>需要<strong>离线开发</strong>，或网络不稳定</li>
+      <li>依赖 <strong>PR / Code Review</strong> 工作流</li>
+      <li>参与<strong>开源协作</strong>，需要 fork + pull request</li>
+      <li>大量历史清理需求（rebase、squash、Cherry-pick）</li>
+    </ul>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">现实中两者常共存</span>
+  <p>很多游戏团队的做法是：<strong>美术资源用 SVN，程序代码用 Git</strong>，两边通过一个脚本同步。
+  这不是妥协，而是让每个工具做它最擅长的事。</p>
+</div>
+
+<!-- ==========================================================================
+     第 2 节：三层架构
+     ========================================================================== -->
+<h3 class="sec" id="s2"><span class="no">2</span>三层架构与通信协议</h3>
+
+<p>
+  SVN 的所有命令都围绕三个东西转：<strong>仓库（Repository）→ 工作副本（Working Copy）→ 暂存区（其实是本地元数据）</strong>。
+  把下面这张图刻在脑子里，后面所有命令你都能猜到它作用在哪一层。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 2-1　SVN 三层架构与数据流向</span><span class="fs">Data Flow</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 470" width="980" height="470" role="img" aria-label="SVN 三层架构与数据流向图">
+  <!-- 层 1：仓库 -->
+  <rect x="30" y="26" width="920" height="118" rx="12" fill="url(#g-pur)" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text class="hd" x="52" y="52" fill="#d2a8ff">① 服务器端 · 仓库 Repository</text>
+  <text class="ts" x="52" y="72">唯一权威数据源，保存全部历史。物理上是一个目录，内含 db / conf / hooks / locks</text>
+
+  <rect class="c-pur" x="52" y="86" width="168" height="46" rx="8"/>
+  <text class="tm" x="136" y="106" text-anchor="middle">db/</text>
+  <text class="tm2" x="136" y="122" text-anchor="middle">版本数据（FSFS）</text>
+
+  <rect class="c-pur" x="238" y="86" width="168" height="46" rx="8"/>
+  <text class="tm" x="322" y="106" text-anchor="middle">conf/</text>
+  <text class="tm2" x="322" y="122" text-anchor="middle">认证 · 权限</text>
+
+  <rect class="c-pur" x="424" y="86" width="168" height="46" rx="8"/>
+  <text class="tm" x="508" y="106" text-anchor="middle">hooks/</text>
+  <text class="tm2" x="508" y="122" text-anchor="middle">提交前后触发脚本</text>
+
+  <rect class="c-pur" x="610" y="86" width="168" height="46" rx="8"/>
+  <text class="tm" x="694" y="106" text-anchor="middle">locks/</text>
+  <text class="tm2" x="694" y="122" text-anchor="middle">锁数据</text>
+
+  <rect class="c-pur" x="796" y="86" width="134" height="46" rx="8"/>
+  <text class="tm" x="863" y="106" text-anchor="middle">format</text>
+  <text class="tm2" x="863" y="122" text-anchor="middle">仓库格式版本</text>
+
+  <!-- 层 2：协议 -->
+  <rect class="n-cyan" x="30" y="176" width="920" height="62" rx="12"/>
+  <text class="hd" x="52" y="202" fill="#56d4dd">② 通信层 · 访问协议（RA 模块）</text>
+  <text class="ts" x="52" y="222">svn 客户端通过 URL 协议前缀自动选择对应模块，三种协议对应三种部署形态</text>
+
+  <text class="tm" x="330" y="204" text-anchor="middle">file:///</text>
+  <text class="tm" x="490" y="204" text-anchor="middle">svn://</text>
+  <text class="tm" x="650" y="204" text-anchor="middle">http://</text>
+  <text class="tm" x="806" y="204" text-anchor="middle">svn+ssh://</text>
+
+  <!-- 层 3：工作副本 -->
+  <rect x="30" y="268" width="920" height="180" rx="12" fill="url(#g-blue)" stroke="#58a6ff" stroke-width="1.5"/>
+  <text class="hd" x="52" y="294" fill="#58a6ff">③ 客户端 · 工作副本 Working Copy</text>
+  <text class="ts" x="52" y="314">服务器某次快照解压出来的普通目录，外加一个 .svn 隐藏目录保存元数据</text>
+
+  <!-- .svn 内部 -->
+  <rect class="c-blue" x="52" y="330" width="300" height="100" rx="9"/>
+  <text class="tm" x="70" y="354">.svn/　← 每层目录都有，不是只有根目录</text>
+  <line x1="66" y1="366" x2="338" y2="366" stroke="#30363d" stroke-width="1"/>
+  <text class="tm2" x="70" y="386">wc.db　　　SQLite，记录 BASE 版本与状态</text>
+  <text class="tm2" x="70" y="404">pristine/　原始副本，用于 diff 与 revert</text>
+  <text class="tm2" x="70" y="422">entries　　旧格式遗留（1.7 前）</text>
+
+  <!-- 工作副本文件 -->
+  <rect class="c-gray" x="372" y="330" width="240" height="100" rx="9"/>
+  <text class="tm" x="390" y="354">你的源文件</text>
+  <line x1="386" y1="366" x2="598" y2="366" stroke="#30363d" stroke-width="1"/>
+  <text class="tm2" x="390" y="386">README.md　（被跟踪）</text>
+  <text class="tm2" x="390" y="404">src/main.cs　（被跟踪）</text>
+  <text class="tm2" x="390" y="422">build/output.dll　（? 未跟踪）</text>
+
+  <!-- 三种状态 -->
+  <rect class="c-orange" x="632" y="330" width="298" height="100" rx="9"/>
+  <text class="tm" x="650" y="354">文件的三种状态</text>
+  <line x1="646" y1="366" x2="916" y2="366" stroke="#30363d" stroke-width="1"/>
+  <circle cx="658" cy="386" r="5" fill="#8b949e"/>
+  <text class="tm2" x="672" y="390">未版本控制 ? ── 服务器不认识它</text>
+  <circle cx="658" cy="406" r="5" fill="#e3b341"/>
+  <text class="tm2" x="672" y="410">已修改 M ── 与 pristine 副本不同</text>
+  <circle cx="658" cy="426" r="5" fill="#7ee787"/>
+  <text class="tm2" x="672" y="430">已提交 ── 与服务器 BASE 一致</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>关键理解：</b><code class="ic">.svn</code> 目录<strong>不是只在根目录有一份</strong>（那是 SVN 1.6 及以前的老设计），
+    1.7 之后每一级目录都有自己的 <code class="ic">.svn</code>，元数据统一存在 <code class="ic">wc.db</code> 这个 SQLite 数据库里。
+    所以你看到 <code class="ic">.svn</code> 占空间小得反常——因为<em>历史根本没下载下来</em>，
+    真正的大头是 <code class="ic">pristine/</code> 里那些「最近一次更新时拿到的原始副本」，它只用于本地 diff 和 revert。
+  </div>
+</div>
+
+<h4 class="sub" id="s2-2">三种部署形态：URL 前缀决定一切</h4>
+
+<p>
+  SVN 客户端支持 4 种 URL 协议。你写什么前缀，就用什么方式连服务器——
+  这是新手最容易懵的地方，一张图说清：
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 2-2　四种 URL 协议与对应部署方式</span><span class="fs">Protocols</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 400" width="980" height="400" role="img" aria-label="SVN 四种访问协议对比图">
+  <!-- 表头 -->
+  <text class="hd" x="30" y="30">协议前缀</text>
+  <text class="hd" x="230" y="30">服务端要跑什么</text>
+  <text class="hd" x="480" y="30">认证方式</text>
+  <text class="hd" x="700" y="30">适用场景</text>
+  <line x1="24" y1="44" x2="960" y2="44" stroke="#3d444d" stroke-width="1.5"/>
+
+  <!-- file -->
+  <rect x="24" y="56" width="936" height="80" rx="9" fill="rgba(139,148,158,.07)" stroke="#8b949e" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text class="tm" x="42" y="82" fill="#8b949e">file:///</text>
+  <text class="tm2" x="42" y="102">本地磁盘路径</text>
+  <text class="tx" x="230" y="88">什么都不用跑</text>
+  <text class="ts" x="230" y="107">直接读本地目录</text>
+  <text class="tx" x="480" y="88">无（靠文件系统权限）</text>
+  <text class="tx" x="700" y="88">自己练习、本地脚本</text>
+  <text class="tm2" x="700" y="110">file:///E:/repo</text>
+  <text class="ts" x="42" y="126" fill="#ff7b72">注意：Windows 上必须写成 file:///E:/path，三个斜杠 + 盘符加冒号</text>
+
+  <!-- svn -->
+  <rect x="24" y="146" width="936" height="80" rx="9" fill="rgba(210,168,255,.08)" stroke="#d2a8ff" stroke-width="1.5"/>
+  <text class="tm" x="42" y="172" fill="#d2a8ff">svn://</text>
+  <text class="tm2" x="42" y="192">SVN 原生协议</text>
+  <text class="tx" x="230" y="178">svnserve 守护进程</text>
+  <text class="ts" x="230" y="197">端口默认 3690</text>
+  <text class="tx" x="480" y="178">conf/passwd 明文账号</text>
+  <text class="tx" x="700" y="178">内网、速度快、配置最简单</text>
+  <text class="tm2" x="700" y="200">svn://192.168.1.10/repo</text>
+
+  <!-- http -->
+  <rect x="24" y="236" width="936" height="80" rx="9" fill="rgba(88,166,255,.08)" stroke="#58a6ff" stroke-width="1.5"/>
+  <text class="tm" x="42" y="262" fill="#58a6ff">http://  https://</text>
+  <text class="tm2" x="42" y="282">WebDAV 协议</text>
+  <text class="tx" x="230" y="268">Apache + mod_dav_svn</text>
+  <text class="ts" x="230" y="287">或 VisualSVN Server</text>
+  <text class="tx" x="480" y="268">Apache/AD/LDAP，可 SSL</text>
+  <text class="tx" x="700" y="268">企业生产环境、需加密、</text>
+  <text class="ts" x="700" y="287">要过防火墙（走 80/443）</text>
+  <text class="tm2" x="700" y="308">https://svn.corp.com/repo</text>
+
+  <!-- svn+ssh -->
+  <rect x="24" y="326" width="936" height="62" rx="9" fill="rgba(126,231,135,.08)" stroke="#7ee787" stroke-width="1.5"/>
+  <text class="tm" x="42" y="352" fill="#7ee787">svn+ssh://</text>
+  <text class="tm2" x="42" y="372">SSH 隧道</text>
+  <text class="tx" x="230" y="358">系统 SSH 服务 + svnserve</text>
+  <text class="tx" x="480" y="358">SSH 密钥 / 系统账号</text>
+  <text class="tx" x="700" y="358">已有 SSH 环境，免额外开端口、加密最好</text>
+  <text class="tm2" x="700" y="378">svn+ssh://user@host/repo</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>怎么选：</b>个人练手用 <code class="ic">file://</code>；公司内网、追求简单用 <code class="ic">svn://</code>；
+    需要 HTTPS 加密、走防火墙、接 AD 域认证就用 <code class="ic">http(s)://</code>（第 17 节详细对比）。
+  </div>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：查看你的客户端支持哪些协议</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn --version</span>
+svn, version <span class="hl">1.14.5</span> (r1922182)
+   compiled Feb 24 2026, 21:06:40 on x86_64-microsoft-windows6.2.9200
+
+Copyright (C) 2024 The Apache Software Foundation.
+...
+
+The following repository access (RA) modules are available:
+
+<span class="ok">* ra_svn</span> : Module for accessing a repository using the svn network protocol.
+  - handles <span class="cy">'svn'</span> scheme
+<span class="ok">* ra_local</span> : Module for accessing a repository on local disk.
+  - handles <span class="cy">'file'</span> scheme
+<span class="ok">* ra_serf</span> : Module for accessing a repository via WebDAV protocol using serf.
+  - using serf 1.3.10 (compiled with 1.3.10)
+  - handles <span class="cy">'http'</span> scheme
+  - handles <span class="cy">'https'</span> scheme</pre>
+  </div>
+  <p>输出里列出的 <code class="ic">ra_*</code> 模块，就是你<strong>实际可用的协议</strong>。
+  如果这份清单里缺了 <code class="ic">ra_serf</code>，说明客户端没编译 HTTP 支持，<code class="ic">https://</code> 的仓库就连不上。</p>
+</div>
+
+<!-- ==========================================================================
+     第 3 节：安装
+     ========================================================================== -->
+<h3 class="sec" id="s3"><span class="no">3</span>安装与环境准备</h3>
+
+<h4 class="sub">Windows：三种安装方式</h4>
+
+<div class="grid3">
+  <div class="card blue">
+    <h6>方式一：SlikSVN（只装命令行）</h6>
+    <p>最纯净，只有 <code class="ic">svn</code> 和 <code class="ic">svnadmin</code> 命令，安装包约 10MB。</p>
+    <p>适合：服务器、CI 机器、只要命令行的人。</p>
+    <p><a class="ref" href="https://sliksvn.com/download/" target="_blank" rel="noreferrer">sliksvn.com/download</a></p>
+  </div>
+  <div class="card pur">
+    <h6>方式二：VisualSVN Server</h6>
+    <p>一站式服务端，自带图形管理器 + Apache，Web 界面可视化管理仓库与用户。</p>
+    <p>适合：要搭服务器的 Windows 团队（<strong>推荐</strong>）。</p>
+    <p><a class="ref" href="https://www.visualsvn.com/server/download/" target="_blank" rel="noreferrer">visualsvn.com/server</a></p>
+  </div>
+  <div class="card green">
+    <h6>方式三：TortoiseSVN（图形外壳）</h6>
+    <p>集成到资源管理器右键菜单，不提供命令行工具（需勾选 <code class="ic">command line client tools</code>）。</p>
+    <p>适合：不习惯命令行的 GUI 用户。</p>
+    <p><a class="ref" href="https://tortoisesvn.net/downloads.html" target="_blank" rel="noreferrer">tortoisesvn.net</a></p>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">TortoiseSVN 安装时的一个坑</span>
+  <p>安装向导默认<strong>不勾选</strong>「command line client tools」。
+  如果你既想要右键菜单、又想在脚本里用 <code class="ic">svn</code> 命令，安装时必须手动选上这一项，
+  否则会在命令行里看到 <code class="ic">'svn' 不是内部或外部命令</code>。</p>
+</div>
+
+<h4 class="sub">Linux：包管理器一行搞定</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">安装客户端 + 服务端</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"># Debian / Ubuntu
+sudo apt update &amp;&amp; sudo apt install -y <span class="a">subversion</span>
+
+# RHEL / CentOS / Rocky
+sudo dnf install -y <span class="a">subversion</span>
+
+# 顺便装上命令行补全工具（强烈推荐，能补全子命令和参数）
+sudo apt install -y subversion-tools
+# 或
+sudo dnf install -y subversion-tools
+
+# 验证
+svn --version --quiet          <span class="c"># 只输出版本号，脚本里好用</span>
+svn --version -q               <span class="c"># 等价简写</span>
+which svn svnadmin svnserve svnlook</pre>
+</div>
+
+<h4 class="sub">macOS：Homebrew</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">macOS 安装</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># macOS 自带的是很老的 1.7/1.8，务必用 brew 装新的</span>
+brew install <span class="a">subversion</span>
+
+<span class="c"># 确认用到的是 brew 版本而不是系统自带</span>
+which svn
+<span class="c"># 期望输出：/opt/homebrew/bin/svn  （而不是 /usr/bin/svn）</span>
+
+<span class="c"># 如果还是系统的，把它加入 PATH 最前面</span>
+export PATH="/opt/homebrew/opt/subversion/bin:$PATH"</pre>
+</div>
+
+<h4 class="sub">验证安装：一个自检脚本</h4>
+
+<p>装完别急着往下走，先跑这个自检——它能一次性告诉你客户端、服务端工具、协议支持是否齐全。</p>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">check-svn.sh　自检脚本</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c">#!/usr/bin/env bash</span>
+<span class="c"># SVN 环境自检：确认客户端、服务端工具链、协议模块是否齐全</span>
+set -u
+
+echo <span class="s">"===== 1. 四个核心可执行文件 ====="</span>
+<span class="k">for</span> bin in svn svnadmin svnserve svnlook; <span class="k">do</span>
+  <span class="k">if</span> command -v <span class="s">"$bin"</span> &gt;/dev/null 2&gt;&amp;1; <span class="k">then</span>
+    printf <span class="s">"  [OK]   %-10s %s\n"</span> <span class="s">"$bin"</span> <span class="s">"$(command -v "$bin")"</span>
+  <span class="k">else</span>
+    printf <span class="s">"  [MISS] %-10s 未安装\n"</span> <span class="s">"$bin"</span>
+  <span class="k">fi</span>
+<span class="k">done</span>
+
+echo
+echo <span class="s">"===== 2. 客户端版本 ====="</span>
+svn --version --quiet
+
+echo
+echo <span class="s">"===== 3. 仓库访问模块（协议支持）====="</span>
+svn --version | grep -E <span class="s">'^\* ra_'</span> || echo <span class="s">"  (未检测到 ra_ 模块，异常)"</span>
+
+echo
+echo <span class="s">"===== 4. 服务端工具版本 ====="</span>
+svnadmin --version --quiet
+svnserve --version --quiet
+svnlook --version --quiet
+
+echo
+echo <span class="s">"===== 5. 可用子命令总数 ====="</span>
+printf <span class="s">"  svn      : %s 个\n"</span> <span class="s">"$(svn help | grep -cE '^   [a-z]')"</span>
+printf <span class="s">"  svnadmin : %s 个\n"</span> <span class="s">"$(svnadmin help | grep -cE '^   [a-z]')"</span>
+
+echo
+echo <span class="s">"自检完成。"</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：自检脚本在 SVN 1.14.5 上的输出</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">bash</span></div>
+<pre><span class="ps">$</span> <span class="cmd">bash check-svn.sh</span>
+===== 1. 四个核心可执行文件 =====
+  <span class="ok">[OK]</span>   svn        /usr/bin/svn
+  <span class="ok">[OK]</span>   svnadmin   /usr/bin/svnadmin
+  <span class="ok">[OK]</span>   svnserve   /usr/bin/svnserve
+  <span class="ok">[OK]</span>   svnlook    /usr/bin/svnlook
+
+===== 2. 客户端版本 =====
+<span class="hl">1.14.5</span>
+
+===== 3. 仓库访问模块（协议支持）=====
+<span class="ok">* ra_svn</span> : Module for accessing a repository using the svn network protocol.
+<span class="ok">* ra_local</span> : Module for accessing a repository on local disk.
+<span class="ok">* ra_serf</span> : Module for accessing a repository via WebDAV protocol using serf.
+
+===== 4. 服务端工具版本 =====
+1.14.5
+1.14.5
+1.14.5
+
+===== 5. 可用子命令总数 =====
+  svn      : <span class="hl">49</span> 个
+  svnadmin : <span class="hl">31</span> 个
+
+自检完成。</pre>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">Windows 用户注意路径写法</span>
+  <p>本教程的命令在 Windows PowerShell / CMD 与 Linux bash 下<strong>完全通用</strong>，
+  唯一要改的是本地路径：Windows 是 <code class="ic">E:\repo</code>，Linux 是 <code class="ic">/var/svn/repo</code>。
+  而 URL 里的本地路径<strong>必须</strong>写成 <code class="ic">file:///E:/repo</code> 这种形式（三斜杠 + 盘符 + 正斜杠）。</p>
+</div>

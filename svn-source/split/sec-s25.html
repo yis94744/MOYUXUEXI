@@ -1,0 +1,235 @@
+<h3 class="sec" id="s25"><span class="no">25</span>图形客户端与 IDE 集成</h3>
+
+<h4 class="sub">TortoiseSVN：Windows 上事实标准</h4>
+
+<p>
+  TortoiseSVN 把 SVN 操作集成到资源管理器的<strong>右键菜单</strong>和<strong>图标覆盖</strong>上。
+  对不习惯命令行的用户，这是最友好的选择。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 25-1　TortoiseSVN 图标覆盖与右键菜单对照</span><span class="fs">GUI Mapping</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 460" width="980" height="460" role="img" aria-label="TortoiseSVN 图标覆盖与菜单对照图">
+  <!-- 左：图标覆盖 -->
+  <text class="hd" x="30" y="28" fill="#58a6ff">图标覆盖（icon overlay）：一眼看出文件状态</text>
+
+  <rect x="30" y="46" width="440" height="34" rx="6" fill="#161b22" stroke="#3d444d" stroke-width="1"/>
+  <circle cx="52" cy="63" r="9" fill="#3fb950"/>
+  <path d="M47,63 L50,67 L58,58" stroke="#fff" stroke-width="2" fill="none"/>
+  <text class="tm" x="74" y="68">绿色对勾</text>
+  <text class="ts" x="200" y="68">文件与仓库一致，无改动</text>
+
+  <rect x="30" y="88" width="440" height="34" rx="6" fill="#161b22" stroke="#3d444d" stroke-width="1"/>
+  <circle cx="52" cy="105" r="9" fill="#ff5f57"/>
+  <path d="M48,101 L56,109 M56,101 L48,109" stroke="#fff" stroke-width="2"/>
+  <text class="tm" x="74" y="110">红色感叹号</text>
+  <text class="ts" x="200" y="110">本地有未提交的修改（对应 M）</text>
+
+  <rect x="30" y="130" width="440" height="34" rx="6" fill="#161b22" stroke="#3d444d" stroke-width="1"/>
+  <circle cx="52" cy="147" r="9" fill="#58a6ff"/>
+  <text class="tm" x="52" y="152" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">+</text>
+  <text class="tm" x="74" y="152">蓝色加号</text>
+  <text class="ts" x="200" y="152">已加入版本控制待提交（对应 A）</text>
+
+  <rect x="30" y="172" width="440" height="34" rx="6" fill="#161b22" stroke="#3d444d" stroke-width="1"/>
+  <circle cx="52" cy="189" r="9" fill="#febc2e"/>
+  <text class="tm" x="52" y="194" text-anchor="middle" fill="#000" font-weight="700" font-size="11">!</text>
+  <text class="tm" x="74" y="194">黄色感叹号</text>
+  <text class="ts" x="200" y="194">冲突，需要人工解决（对应 C）</text>
+
+  <rect x="30" y="214" width="440" height="34" rx="6" fill="#161b22" stroke="#3d444d" stroke-width="1"/>
+  <circle cx="52" cy="231" r="9" fill="#8b949e"/>
+  <text class="tm" x="52" y="236" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">?</text>
+  <text class="tm" x="74" y="236">灰色问号</text>
+  <text class="ts" x="200" y="236">未版本控制（对应 ?）</text>
+
+  <rect x="30" y="256" width="440" height="34" rx="6" fill="#161b22" stroke="#3d444d" stroke-width="1"/>
+  <circle cx="52" cy="273" r="9" fill="#ff7b72"/>
+  <text class="tm" x="52" y="278" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">-</text>
+  <text class="tm" x="74" y="278">红色减号</text>
+  <text class="ts" x="200" y="278">已标记删除待提交（对应 D）</text>
+
+  <rect x="30" y="298" width="440" height="34" rx="6" fill="#161b22" stroke="#3d444d" stroke-width="1"/>
+  <circle cx="52" cy="315" r="9" fill="#d2a8ff"/>
+  <text class="tm" x="52" y="320" text-anchor="middle" fill="#000" font-weight="700" font-size="11">!</text>
+  <text class="tm" x="74" y="315">紫色感叹号</text>
+  <text class="ts" x="200" y="315">被 svn:needs-lock 锁定</text>
+
+  <!-- 右：右键菜单 -->
+  <text class="hd" x="510" y="28" fill="#d2a8ff">右键菜单 → 对应命令</text>
+  <rect x="504" y="46" width="446" height="286" rx="9" fill="#161b22" stroke="#3d444d" stroke-width="1.3"/>
+
+  <text class="tm" x="524" y="72" fill="#e6edf3">SVN Checkout...</text>
+  <text class="tm2" x="820" y="72" fill="#7ee787">→ svn checkout</text>
+  <line x1="524" y1="84" x2="930" y2="84" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="106" fill="#e6edf3">SVN Update</text>
+  <text class="tm2" x="820" y="106" fill="#7ee787">→ svn update</text>
+  <line x1="524" y1="118" x2="930" y2="118" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="140" fill="#e6edf3">SVN Commit...</text>
+  <text class="tm2" x="820" y="140" fill="#7ee787">→ svn commit</text>
+  <line x1="524" y1="152" x2="930" y2="152" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="174" fill="#e6edf3">TortoiseSVN → Add</text>
+  <text class="tm2" x="820" y="174" fill="#7ee787">→ svn add</text>
+  <line x1="524" y1="186" x2="930" y2="186" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="208" fill="#e6edf3">TortoiseSVN → Revert</text>
+  <text class="tm2" x="820" y="208" fill="#7ee787">→ svn revert</text>
+  <line x1="524" y1="220" x2="930" y2="220" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="242" fill="#e6edf3">TortoiseSVN → Diff</text>
+  <text class="tm2" x="820" y="242" fill="#7ee787">→ svn diff + TortoiseMerge</text>
+  <line x1="524" y1="254" x2="930" y2="254" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="276" fill="#e6edf3">TortoiseSVN → Revision Graph</text>
+  <text class="tm2" x="820" y="276" fill="#7ee787">→ 可视化分支合并图</text>
+  <line x1="524" y1="288" x2="930" y2="288" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="310" fill="#e6edf3">TortoiseSVN → Repo-browser</text>
+  <text class="tm2" x="820" y="310" fill="#7ee787">→ 浏览仓库（无需检出）</text>
+
+  <!-- 底部提示 -->
+  <rect x="30" y="352" width="920" height="96" rx="10" fill="rgba(227,179,65,.07)" stroke="#e3b341" stroke-width="1.3"/>
+  <text class="hd" x="50" y="376" fill="#e3b341">GUI 很好用，但仍建议掌握命令行</text>
+  <text class="ts" x="50" y="398">理由一：服务器、CI、Docker 里没有 GUI，脚本必须用命令行。</text>
+  <text class="ts" x="50" y="420">理由二：GUI 会隐藏细节。比如它不告诉你 mergeinfo 被改了、不显示冲突文件的 .mine/.r2/.r3。</text>
+  <text class="ts" x="50" y="442">最佳实践：<tspan fill="#7ee787">日常用 GUI 提高效率，出问题用命令行定位</tspan>。两者查的是同一个 .svn 目录，完全兼容。</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>对照表：</b>左边每个图标颜色都对应第 7 节的 status 状态码。
+    学会看图标，就能在资源管理器里<strong>一眼扫出</strong>哪些文件需要处理，而不必打开命令行。
+  </div>
+</div>
+
+<div class="grid3">
+  <div class="card blue">
+    <h6>Windows</h6>
+    <ul>
+      <li><strong>TortoiseSVN</strong>　右键集成，事实标准</li>
+      <li><strong>VisualSVN</strong>（商业）　VS 插件</li>
+      <li><strong>AnkhSVN</strong>　Visual Studio 开源插件</li>
+      <li><strong>RapidSVN</strong>　跨平台独立客户端</li>
+    </ul>
+  </div>
+  <div class="card green">
+    <h6>macOS</h6>
+    <ul>
+      <li><strong>Cornerstone</strong>（商业）　功能最全</li>
+      <li><strong>Versions</strong>（商业）　界面简洁</li>
+      <li><strong>SnailSVN</strong>　仿 TortoiseSVN 的 Finder 扩展</li>
+      <li><strong>SmartSVN</strong>　跨平台，有免费版</li>
+    </ul>
+  </div>
+  <div class="card pur">
+    <h6>Linux / 跨平台</h6>
+    <ul>
+      <li><strong>RabbitVCS</strong>　Nautilus/Thunar 集成</li>
+      <li><strong>SmartSVN</strong>　商业，跨三平台</li>
+      <li><strong>kdesvn</strong>　KDE 环境</li>
+      <li><strong>TortoiseGit 风格插件</strong>　IDE 内置</li>
+    </ul>
+  </div>
+</div>
+
+<h4 class="sub">IDE 内置集成</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:22%">IDE</th><th style="width:20%">SVN 支持方式</th><th>说明</th></tr></thead>
+<tbody>
+  <tr>
+    <td><strong>Visual Studio</strong></td>
+    <td>AnkhSVN / VisualSVN 插件<br>或 TortoiseSVN 右键</td>
+    <td>AnkhSVN 开源免费，在解决方案资源管理器里直接显示状态图标。VisualSVN 是商业版，集成度更高。也可以完全不用插件，用 TortoiseSVN 的右键菜单操作。</td>
+  </tr>
+  <tr>
+    <td><strong>IntelliJ IDEA<br>PyCharm / WebStorm</strong></td>
+    <td>内置（无需插件）</td>
+    <td>JetBrains 全家桶<strong>原生支持 SVN</strong>。在 <code class="ic">Settings → Version Control</code> 里加 SVN 映射即可。
+      提交界面、diff、冲突解决工具都是内置的，体验很好。快捷键 <code class="ic">Ctrl+K</code> 提交、<code class="ic">Ctrl+T</code> 更新。</td>
+  </tr>
+  <tr>
+    <td><strong>Eclipse</strong></td>
+    <td>Subclipse / Subversive</td>
+    <td>两个都是老牌插件。Subclipse 由 SVN 社区维护，Subversive 是 Eclipse 官方项目。现在 Eclipse 用户少了，但企业里仍有存量。</td>
+  </tr>
+  <tr>
+    <td><strong>VS Code</strong></td>
+    <td>SVN 插件（第三方）</td>
+    <td>比如 <code class="ic">johnstoncode.svn-scm</code>。功能相对基础（状态显示、diff、提交），复杂操作还是得回命令行。
+      注意：VS Code 的插件用的是系统安装的 <code class="ic">svn</code> 命令，所以必须先装好命令行客户端。</td>
+  </tr>
+  <tr>
+    <td><strong>Unity / Unreal</strong></td>
+    <td>编辑器内置版本控制面板</td>
+    <td>Unity 的 <code class="ic">Version Control</code> 设置里选 <code class="ic">Subversion</code> 模式，能显示资源状态。
+      <strong>但真正提交还是建议用 TortoiseSVN 或命令行</strong>——编辑器面板容易漏提交 <code class="ic">.meta</code>、<code class="ic">.asset</code> 这类文件。</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box warn">
+  <span class="bt">GUI 与命令行混用的一个注意事项</span>
+  <p>GUI 客户端和命令行<strong>操作的是同一个 <code class="ic">.svn</code> 工作副本</strong>，可以随意混用，不会冲突。
+  但要注意两点：</p>
+  <ul>
+    <li><strong>不要在 GUI 操作进行中同时跑命令行</strong>——
+      比如 TortoiseSVN 正在提交时，你在命令行执行 <code class="ic">svn commit</code>，会导致工作副本锁冲突（E155004）。
+      遇到就 <code class="ic">svn cleanup</code>。</li>
+    <li><strong>GUI 的「刷新」不会自动</strong>——
+      命令行改完后，TortoiseSVN 的图标覆盖可能还是旧状态，按 <code class="ic">F5</code> 或右键 → <code class="ic">Refresh</code> 才更新。</li>
+  </ul>
+</div>
+
+<div class="box ok">
+  <span class="bt">推荐的工具组合</span>
+  <div class="grid2" style="margin-top:10px">
+    <div class="card">
+      <h6>Windows 开发团队</h6>
+      <ul>
+        <li><strong>命令行</strong>：SlikSVN（纯净，不进 PATH 干扰）</li>
+        <li><strong>GUI</strong>：TortoiseSVN（勾选 command line tools）</li>
+        <li><strong>IDE</strong>：IDEA / VS + AnkhSVN</li>
+        <li><strong>服务端</strong>：VisualSVN Server</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h6>Linux 开发团队</h6>
+      <ul>
+        <li><strong>命令行</strong>：<code class="ic">apt install subversion</code></li>
+        <li><strong>GUI</strong>：RabbitVCS 或 SmartSVN</li>
+        <li><strong>IDE</strong>：IDEA（原生支持）</li>
+        <li><strong>服务端</strong>：svnserve + systemd</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">最后：一套完整团队协作约定（可直接抄）</span>
+  <p>把前面所有内容浓缩成一份可落地的团队规范。</p>
+  <div class="tw" style="margin-top:10px">
+  <table>
+  <thead><tr><th style="width:22%">项目</th><th>约定</th></tr></thead>
+  <tbody>
+    <tr><td><strong>目录结构</strong></td><td><code class="ic">/trunk</code> 主干 · <code class="ic">/branches/&lt;功能名&gt;</code> 功能分支 · <code class="ic">/tags/v1.2.3</code> 发布标签</td></tr>
+    <tr><td><strong>分支命名</strong></td><td><code class="ic">feature-登录</code> / <code class="ic">bugfix-1024</code> / <code class="ic">hotfix-crash</code> / <code class="ic">release-2.0</code>，一眼看出用途</td></tr>
+    <tr><td><strong>提交日志</strong></td><td><code class="ic">[模块] 做了什么 + 为什么</code>，至少 10 字；关联任务号写 <code class="ic">[PROJ-123]</code></td></tr>
+    <tr><td><strong>提交粒度</strong></td><td>一个完整的小功能一提交，别攒一整天；提交前必 <code class="ic">svn update</code></td></tr>
+    <tr><td><strong>分支生命</strong></td><td>功能分支 ≤ 2 周；每周至少一次 <code class="ic">svn merge ^/trunk</code> 反向同步</td></tr>
+    <tr><td><strong>Tags 保护</strong></td><td>authz 里 <code class="ic">[/tags] * = r</code>，只有 admins 能写</td></tr>
+    <tr><td><strong>忽略规则</strong></td><td>编译产物（<code class="ic">bin</code> <code class="ic">obj</code> <code class="ic">node_modules</code>）、IDE 配置（<code class="ic">.vs</code> <code class="ic">.idea</code>）、日志一律进 <code class="ic">svn:ignore</code></td></tr>
+    <tr><td><strong>二进制文件</strong></td><td>美术源文件（psd/max/fbx）设 <code class="ic">svn:needs-lock</code>，改前先 <code class="ic">svn lock</code></td></tr>
+    <tr><td><strong>换行符</strong></td><td>源码统一 <code class="ic">svn:eol-style native</code>，用 auto-props 自动设置</td></tr>
+    <tr><td><strong>提交前检查</strong></td><td>① <code class="ic">svn status</code> 确认范围 ② <code class="ic">svn diff</code> 核对内容 ③ <code class="ic">grep -rn "^&lt;&lt;&lt;&lt;&lt;&lt;&lt;" .</code> 确认无冲突标记</td></tr>
+    <tr><td><strong>钩子强制</strong></td><td>pre-commit 检查日志规范 + 拦截编译产物；pre-revprop-change 保护历史不可篡改</td></tr>
+    <tr><td><strong>备份策略</strong></td><td>每日 <code class="ic">hotcopy</code> + 每周增量 <code class="ic">dump</code>；每季度做一次恢复演练</td></tr>
+  </tbody>
+  </table>
+  </div>
+</div>

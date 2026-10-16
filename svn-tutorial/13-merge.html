@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>13. 合并全流程与 mergeinfo 机制 — SVN 完全教程</title>
+<style>
+
+/* ==========================================================================
+   设计令牌
+   ========================================================================== */
+:root{
+  --bg:#0d1117; --bg2:#161b22; --bg3:#1c2128; --bg4:#21262d;
+  --bd:#30363d; --bd2:#3d444d;
+  --tx:#e6edf3; --tx2:#c9d1d9; --tx3:#8b949e; --tx4:#6e7681;
+  --blue:#58a6ff; --blue2:#79c0ff; --green:#7ee787; --green2:#3fb950;
+  --orange:#ffa657; --red:#ff7b72; --purple:#d2a8ff; --cyan:#56d4dd;
+  --yellow:#e3b341;
+  --mono:"JetBrains Mono","Cascadia Code",Consolas,Monaco,"Courier New",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --rad:10px; --rad2:14px; --shadow:0 8px 24px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{background:var(--bg);color:var(--tx2);font-family:var(--sans);
+  font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+#prog{position:fixed;top:0;left:0;height:3px;width:0;z-index:999;
+  background:linear-gradient(90deg,var(--blue),var(--purple),var(--green));transition:width .1s linear}
+.wrap{display:flex;max-width:1600px;margin:0 auto;align-items:flex-start}
+
+/* ==========================================================================
+   侧边导航
+   ========================================================================== */
+aside{position:sticky;top:0;flex:0 0 300px;height:100vh;overflow-y:auto;
+  border-right:1px solid var(--bd);padding:26px 16px 80px;background:var(--bg)}
+aside::-webkit-scrollbar{width:8px}
+aside::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:4px}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.brand .dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;
+  background:linear-gradient(135deg,var(--blue),var(--purple))}
+.brand h1{font-size:15px;font-weight:700;color:var(--tx);letter-spacing:.2px}
+.brand-sub{font-size:12px;color:var(--tx4);margin:0 0 18px 21px;line-height:1.5}
+nav a{display:block;padding:6px 11px;margin:2px 0;font-size:13.5px;color:var(--tx3);
+  text-decoration:none;border-radius:7px;border-left:2px solid transparent;transition:all .14s;line-height:1.5}
+nav a:hover{background:var(--bg3);color:var(--tx)}
+nav a.h3{padding-left:24px;font-size:12.8px;color:var(--tx4)}
+nav a.on{background:var(--bg4);color:var(--blue);border-left-color:var(--blue);font-weight:600}
+nav .grp{margin:16px 0 6px 11px;font-size:11px;font-weight:700;color:var(--tx4);
+  text-transform:uppercase;letter-spacing:.9px}
+
+/* ==========================================================================
+   主体排版
+   ========================================================================== */
+main{flex:1;min-width:0;padding:44px 52px 140px;max-width:1180px}
+.hero{margin-bottom:46px;padding-bottom:30px;border-bottom:1px solid var(--bd)}
+.hero .tag{display:inline-block;font-size:11.5px;font-weight:700;color:var(--blue);
+  background:rgba(88,166,255,.13);border:1px solid rgba(88,166,255,.3);
+  padding:3px 11px;border-radius:20px;margin-bottom:16px;letter-spacing:.4px}
+.hero h2{font-size:34px;font-weight:800;color:var(--tx);line-height:1.25;margin-bottom:12px;
+  background:linear-gradient(135deg,#fff 30%,var(--blue) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-.5px}
+.hero p{font-size:15px;color:var(--tx3);max-width:860px}
+.hero .meta{display:flex;gap:22px;margin-top:20px;flex-wrap:wrap}
+.hero .meta div{font-size:12.5px;color:var(--tx4)}
+.hero .meta b{color:var(--tx2);font-weight:600}
+h3.sec{font-size:25px;font-weight:700;color:var(--tx);margin:66px 0 8px;
+  padding-top:8px;scroll-margin-top:20px;letter-spacing:-.3px}
+h3.sec::before{content:"";display:block;width:38px;height:3px;border-radius:2px;
+  background:linear-gradient(90deg,var(--blue),var(--purple));margin-bottom:16px}
+h3.sec .no{color:var(--blue);font-family:var(--mono);font-size:19px;font-weight:700;margin-right:8px}
+h4.sub{font-size:17.5px;font-weight:700;color:var(--tx);margin:36px 0 12px;scroll-margin-top:20px}
+h4.sub::before{content:"▍";color:var(--blue);margin-right:7px;font-size:14px}
+h5.mini{font-size:14.5px;font-weight:700;color:var(--blue2);margin:26px 0 10px}
+p{margin:12px 0;color:var(--tx2)}
+p.lead{font-size:16px;color:var(--tx3);margin:14px 0 22px}
+ul,ol{margin:12px 0 12px 24px}
+li{margin:6px 0}
+li::marker{color:var(--tx4)}
+strong{color:var(--tx);font-weight:700}
+em{color:var(--orange);font-style:normal;font-weight:600}
+a.ref{color:var(--blue2);text-decoration:none;border-bottom:1px dotted var(--bd2)}
+a.ref:hover{color:var(--cyan)}
+hr.sep{border:none;border-top:1px solid var(--bd);margin:38px 0}
+code.ic{font-family:var(--mono);font-size:13px;color:var(--orange);
+  background:rgba(110,118,129,.16);padding:2px 6px;border-radius:5px;
+  border:1px solid rgba(110,118,129,.22);white-space:nowrap}
+code.ic.b{color:var(--blue2)}
+code.ic.g{color:var(--green)}
+code.ic.p{color:var(--purple)}
+
+/* ==========================================================================
+   代码块
+   ========================================================================== */
+.codewrap{position:relative;margin:18px 0 22px;border-radius:var(--rad2);
+  border:1px solid var(--bd);background:#0b0f14;overflow:hidden;box-shadow:var(--shadow)}
+.codehead{display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px;background:var(--bg2);border-bottom:1px solid var(--bd);gap:10px}
+.codehead .lang{font-family:var(--mono);font-size:11.5px;font-weight:700;
+  color:var(--tx3);letter-spacing:.6px;text-transform:uppercase;white-space:nowrap}
+.codehead .fn{font-family:var(--mono);font-size:11.5px;color:var(--tx4);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;flex:1}
+.codehead .acts{display:flex;gap:7px;flex:0 0 auto}
+.codehead button{background:var(--bg4);border:1px solid var(--bd2);color:var(--tx3);
+  font-family:var(--sans);font-size:11.5px;padding:3px 10px;border-radius:6px;cursor:pointer;transition:all .14s}
+.codehead button:hover{background:var(--blue);color:#000;border-color:var(--blue)}
+.codehead button.ok{background:var(--green2);color:#000;border-color:var(--green2)}
+pre.code{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mono);
+  font-size:13.2px;line-height:1.68;tab-size:4}
+pre.code::-webkit-scrollbar{height:9px}
+pre.code::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+pre.code code{color:var(--tx2);white-space:pre;display:block}
+.k{color:#ff7b72}.t{color:#79c0ff}.s{color:#a5d6ff}.c{color:#8b949e;font-style:italic}
+.n{color:#79c0ff}.m{color:#d2a8ff}.a{color:#ffa657}.p{color:#8b949e}
+
+/* 终端输出块 —— 显示真实命令回显 */
+.term{margin:16px 0 20px;border-radius:var(--rad2);border:1px solid var(--bd);
+  background:#080b0f;overflow:hidden}
+.term .th{display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--bg2);
+  border-bottom:1px solid var(--bd);font-family:var(--mono);font-size:11.5px;color:var(--tx4)}
+.term .th .dotr{width:9px;height:9px;border-radius:50%;background:#ff5f57}
+.term .th .doty{width:9px;height:9px;border-radius:50%;background:#febc2e}
+.term .th .dotg{width:9px;height:9px;border-radius:50%;background:#28c840}
+.term pre{margin:0;padding:14px 16px;overflow-x:auto;font-family:var(--mono);
+  font-size:12.9px;line-height:1.7;color:#c9d1d9;white-space:pre}
+.term pre::-webkit-scrollbar{height:9px}
+.term pre::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+.term .ps{color:var(--green);font-weight:700}       /* 提示符 $ */
+.term .cmd{color:var(--tx)}                          /* 命令本体 */
+.term .cmt{color:var(--tx4);font-style:italic}       /* 注释 */
+.term .ok{color:var(--green)}                        /* 成功 */
+.term .no{color:var(--red)}                          /* 失败 */
+.term .hl{color:var(--yellow);font-weight:600}       /* 重点 */
+.term .dim{color:var(--tx4)}                         /* 弱化 */
+.term .cy{color:var(--cyan)}
+
+/* ==========================================================================
+   提示框
+   ========================================================================== */
+.box{margin:20px 0;padding:15px 18px 15px 46px;border-radius:var(--rad);
+  position:relative;font-size:14.3px;line-height:1.72;border:1px solid;border-left-width:3px}
+.box::before{position:absolute;left:15px;top:14px;font-size:16px;line-height:1}
+.box .bt{display:block;font-weight:700;margin-bottom:5px;font-size:13.5px}
+.box p{margin:6px 0;font-size:14.3px}
+.box ul,.box ol{margin:7px 0 7px 18px}
+.box li{margin:4px 0}
+.box.tip{background:rgba(88,166,255,.07);border-color:rgba(88,166,255,.28)}
+.box.tip::before{content:"★"}.box.tip .bt{color:var(--blue)}
+.box.warn{background:rgba(255,166,87,.07);border-color:rgba(255,166,87,.3)}
+.box.warn::before{content:"!"}.box.warn .bt{color:var(--orange)}
+.box.err{background:rgba(255,123,114,.07);border-color:rgba(255,123,114,.3)}
+.box.err::before{content:"X"}.box.err .bt{color:var(--red)}
+.box.ok{background:rgba(126,231,135,.07);border-color:rgba(126,231,135,.3)}
+.box.ok::before{content:"✓"}.box.ok .bt{color:var(--green)}
+.box.key{background:rgba(210,168,255,.07);border-color:rgba(210,168,255,.3)}
+.box.key::before{content:"◈"}.box.key .bt{color:var(--purple)}
+.box.termbox{background:rgba(86,212,221,.06);border-color:rgba(86,212,221,.28)}
+.box.termbox::before{content:"⌘"}.box.termbox .bt{color:var(--cyan)}
+
+/* ==========================================================================
+   表格
+   ========================================================================== */
+.tw{overflow-x:auto;margin:18px 0;border-radius:var(--rad);border:1px solid var(--bd)}
+table{width:100%;border-collapse:collapse;font-size:13.8px}
+thead th{background:var(--bg3);color:var(--tx);font-weight:700;text-align:left;
+  padding:11px 14px;border-bottom:1px solid var(--bd2);white-space:nowrap;font-size:13px;letter-spacing:.2px}
+tbody td{padding:9px 14px;border-bottom:1px solid rgba(48,54,61,.6);vertical-align:top;line-height:1.65}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:rgba(88,166,255,.045)}
+tbody td:first-child{color:var(--tx)}
+td .ic,th .ic{font-size:12.3px}
+.tagmini{display:inline-block;font-size:11px;padding:2px 7px;border-radius:5px;
+  font-weight:700;font-family:var(--mono);white-space:nowrap}
+.tagmini.g{background:rgba(126,231,135,.15);color:var(--green)}
+.tagmini.r{background:rgba(255,123,114,.15);color:var(--red)}
+.tagmini.y{background:rgba(227,179,65,.15);color:var(--yellow)}
+.tagmini.b{background:rgba(88,166,255,.15);color:var(--blue)}
+.tagmini.p{background:rgba(210,168,255,.15);color:var(--purple)}
+.tagmini.c{background:rgba(86,212,221,.15);color:var(--cyan)}
+
+/* ==========================================================================
+   步骤条
+   ========================================================================== */
+.steps{counter-reset:st;margin:20px 0;border:1px solid var(--bd);
+  border-radius:var(--rad2);overflow:hidden;background:var(--bg2)}
+.steps>.stitle{display:flex;align-items:center;gap:9px;padding:11px 16px;
+  background:linear-gradient(90deg,rgba(210,168,255,.11),transparent);
+  border-bottom:1px solid var(--bd);font-size:13.5px;font-weight:700;color:var(--purple)}
+.steps>.stitle .badge{background:var(--purple);color:#000;font-size:10.5px;
+  padding:2px 8px;border-radius:20px;letter-spacing:.4px;font-weight:800}
+.step{display:flex;gap:14px;padding:13px 16px;border-bottom:1px solid rgba(48,54,61,.55)}
+.step:last-child{border-bottom:none}
+.step:hover{background:rgba(210,168,255,.035)}
+.step .num{counter-increment:st;flex:0 0 26px;height:26px;border-radius:50%;
+  background:rgba(210,168,255,.14);border:1px solid rgba(210,168,255,.35);
+  color:var(--purple);font-family:var(--mono);font-size:12.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;margin-top:2px}
+.step .num::before{content:counter(st)}
+.step .body{flex:1;min-width:0;font-size:14px;line-height:1.7}
+.step .body .st{font-weight:700;color:var(--tx);display:block;margin-bottom:3px}
+.step .body .sc{color:var(--tx3);font-size:13.6px}
+.step .body .menu{font-family:var(--mono);font-size:12.8px;color:var(--yellow);
+  background:rgba(227,179,65,.1);border:1px solid rgba(227,179,65,.25);
+  padding:1px 7px;border-radius:5px;white-space:nowrap;display:inline-block;margin:1px 0}
+
+/* ==========================================================================
+   卡片
+   ========================================================================== */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}
+.card{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rad2);padding:16px 18px}
+.card h6{font-size:13.5px;font-weight:700;margin-bottom:9px;display:flex;
+  align-items:center;gap:7px;color:var(--tx)}
+.card ul{margin:8px 0 0 18px;font-size:13.6px}
+.card ul li{margin:5px 0}
+.card p{font-size:13.7px;margin:8px 0}
+.card.good{border-color:rgba(126,231,135,.32)}.card.good h6{color:var(--green)}
+.card.bad{border-color:rgba(255,123,114,.32)}.card.bad h6{color:var(--red)}
+.card.blue{border-color:rgba(88,166,255,.32)}.card.blue h6{color:var(--blue)}
+.card.warn{border-color:rgba(255,166,87,.32)}.card.warn h6{color:var(--orange)}
+.card.pur{border-color:rgba(210,168,255,.32)}.card.pur h6{color:var(--purple)}
+.card .big{font-family:var(--mono);font-size:22px;font-weight:800;color:var(--tx);
+  display:block;margin-bottom:4px;line-height:1.2}
+.card .cap{font-size:12.2px;color:var(--tx4)}
+
+/* ==========================================================================
+   图文（SVG 插图系统）—— 本教程的核心
+   ========================================================================== */
+.fig{margin:24px 0 26px;border:1px solid var(--bd);border-radius:var(--rad2);
+  background:linear-gradient(180deg,#0f141b,#0b0f14);overflow:hidden;box-shadow:var(--shadow)}
+.fig .fh{padding:10px 18px;background:var(--bg2);border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;gap:9px}
+.fig .fh .ic{color:var(--cyan);font-size:13px}
+.fig .fh .ft{font-size:13.2px;font-weight:700;color:var(--tx)}
+.fig .fh .fs{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--tx4);
+  letter-spacing:.5px;text-transform:uppercase}
+.fig .fb{padding:22px 18px 18px;overflow-x:auto}
+.fig .fb::-webkit-scrollbar{height:9px}
+.fig .fb::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+.fig svg{display:block;margin:0 auto;max-width:100%;height:auto}
+.fig .cap{padding:11px 18px 14px;font-size:13px;color:var(--tx3);border-top:1px solid rgba(48,54,61,.55);
+  line-height:1.7}
+.fig .cap b{color:var(--tx2)}
+/* SVG 通用类：所有插图复用，保证风格统一 */
+svg text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+svg .tt{font-size:14px;font-weight:700;fill:#e6edf3}
+svg .ts{font-size:12px;fill:#8b949e}
+svg .tx{font-size:12.5px;fill:#c9d1d9}
+svg .tm{font-size:12px;font-family:"JetBrains Mono",Consolas,monospace;fill:#e6edf3}
+svg .tm2{font-size:11px;font-family:"JetBrains Mono",Consolas,monospace;fill:#8b949e}
+svg .hd{font-size:11.5px;font-weight:700;fill:#e6edf3}
+svg .bd{fill:none;stroke:#30363d;stroke-width:1.5}
+svg .bd2{fill:none;stroke:#3d444d;stroke-width:1.5}
+svg .dash{fill:none;stroke:#3d444d;stroke-width:1.5;stroke-dasharray:5 4}
+svg .arw{fill:none;stroke:#8b949e;stroke-width:1.6;marker-end:url(#arw)}
+svg .arwb{fill:none;stroke:#58a6ff;stroke-width:1.8;marker-end:url(#arwb)}
+svg .arwg{fill:none;stroke:#7ee787;stroke-width:1.8;marker-end:url(#arwg)}
+svg .arwr{fill:none;stroke:#ff7b72;stroke-width:1.8;marker-end:url(#arwr)}
+svg .arwp{fill:none;stroke:#d2a8ff;stroke-width:1.8;marker-end:url(#arwp)}
+svg .arwy{fill:none;stroke:#e3b341;stroke-width:1.8;marker-end:url(#arwy)}
+svg .arw2{fill:none;stroke:#58a6ff;stroke-width:1.6;marker-end:url(#arwb);stroke-dasharray:6 4}
+svg .n-blue{fill:rgba(88,166,255,.10);stroke:#58a6ff;stroke-width:1.5}
+svg .n-green{fill:rgba(126,231,135,.10);stroke:#7ee787;stroke-width:1.5}
+svg .n-pur{fill:rgba(210,168,255,.10);stroke:#d2a8ff;stroke-width:1.5}
+svg .n-orange{fill:rgba(255,166,87,.10);stroke:#ffa657;stroke-width:1.5}
+svg .n-red{fill:rgba(255,123,114,.10);stroke:#ff7b72;stroke-width:1.5}
+svg .n-yellow{fill:rgba(227,179,65,.10);stroke:#e3b341;stroke-width:1.5}
+svg .n-cyan{fill:rgba(86,212,221,.10);stroke:#56d4dd;stroke-width:1.5}
+svg .n-gray{fill:rgba(139,148,158,.10);stroke:#8b949e;stroke-width:1.5}
+svg .c-blue{fill:#0f141b;stroke:#58a6ff;stroke-width:1.5}
+svg .c-green{fill:#0f141b;stroke:#7ee787;stroke-width:1.5}
+svg .c-pur{fill:#0f141b;stroke:#d2a8ff;stroke-width:1.5}
+svg .c-orange{fill:#0f141b;stroke:#ffa657;stroke-width:1.5}
+svg .c-red{fill:#0f141b;stroke:#ff7b72;stroke-width:1.5}
+svg .c-gray{fill:#161b22;stroke:#3d444d;stroke-width:1.5}
+svg .fill-blue{fill:#58a6ff}svg .fill-green{fill:#7ee787}svg .fill-pur{fill:#d2a8ff}
+svg .fill-orange{fill:#ffa657}svg .fill-red{fill:#ff7b72}svg .fill-cyan{fill:#56d4dd}
+svg .fill-yellow{fill:#e3b341}svg .fill-gray{fill:#8b949e}svg .fill-tx{fill:#e6edf3}
+svg .fill-dim{fill:#6e7681}
+svg .mono{font-family:"JetBrains Mono",Consolas,monospace}
+
+/* 图例 */
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0 4px;font-size:12.5px;color:var(--tx3)}
+.legend span{display:flex;align-items:center;gap:7px}
+.legend i{width:13px;height:13px;border-radius:4px;display:inline-block;flex:0 0 auto}
+
+/* ==========================================================================
+   键值对 / 输出面板
+   ========================================================================== */
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-family:var(--mono);
+  font-size:12.8px;margin:10px 0}
+.kv b{color:var(--tx2);font-weight:600}
+.kv span{color:var(--orange)}
+
+/* 对比双栏（好/坏） */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:20px 0;
+  border:1px solid var(--bd);border-radius:var(--rad2);overflow:hidden}
+.duo>div{padding:14px 16px}
+.duo>div:first-child{border-right:1px solid var(--bd);background:rgba(255,123,114,.045)}
+.duo>div:last-child{background:rgba(126,231,135,.045)}
+.duo .dh{font-size:12.5px;font-weight:800;margin-bottom:9px;letter-spacing:.3px}
+.duo>div:first-child .dh{color:var(--red)}
+.duo>div:last-child .dh{color:var(--green)}
+.duo pre{font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--tx2);
+  white-space:pre-wrap;margin:0;overflow-x:auto}
+
+footer{margin-top:90px;padding-top:28px;border-top:1px solid var(--bd);font-size:13px;color:var(--tx4)}
+footer b{color:var(--tx3)}
+#top{position:fixed;right:26px;bottom:26px;width:44px;height:44px;border-radius:50%;
+  background:var(--bg3);border:1px solid var(--bd2);color:var(--tx2);font-size:17px;
+  cursor:pointer;display:none;align-items:center;justify-content:center;
+  box-shadow:var(--shadow);transition:all .16s;z-index:50}
+#top:hover{background:var(--blue);color:#000;border-color:var(--blue)}
+#top.show{display:flex}
+
+@media(max-width:1220px){aside{display:none}main{padding:30px 26px 100px;max-width:100%}}
+@media(max-width:760px){
+  .grid2,.grid3,.grid4,.duo{grid-template-columns:1fr}
+  .duo>div:first-child{border-right:none;border-bottom:1px solid var(--bd)}
+  .hero h2{font-size:25px}h3.sec{font-size:20px}main{padding:22px 16px 80px}
+  body{font-size:15px}
+}
+
+
+/* ===== 单节文件附加样式：面包屑与翻页 ===== */
+.crumb{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:22px;
+  padding-bottom:14px;border-bottom:1px solid var(--bd);font-size:13px;color:var(--tx4)}
+.crumb .stage{font-size:11.5px;font-weight:700;color:var(--blue);
+  background:rgba(88,166,255,.13);border:1px solid rgba(88,166,255,.3);
+  padding:2px 10px;border-radius:20px;letter-spacing:.3px}
+.crumb .sep{color:var(--tx4);opacity:.5}
+.crumb .cur{color:var(--tx2)}
+.crumb a{color:var(--tx3);text-decoration:none;border-bottom:1px dotted var(--bd2)}
+.crumb a:hover{color:var(--blue)}
+.pager{display:flex;gap:14px;margin:64px 0 0;padding-top:26px;border-top:1px solid var(--bd)}
+.pager a{flex:1;display:block;padding:14px 18px;border:1px solid var(--bd);
+  border-radius:var(--rad2);text-decoration:none;transition:all .16s;background:var(--bg2);min-width:0}
+.pager a:hover{border-color:var(--blue);background:var(--bg3);transform:translateY(-2px)}
+.pager a .lbl{display:block;font-size:11.5px;color:var(--tx4);margin-bottom:5px;
+  letter-spacing:.4px;text-transform:uppercase}
+.pager a .ttl{display:block;font-size:14.5px;color:var(--tx);font-weight:700;
+  line-height:1.5;overflow:hidden;text-overflow:ellipsis}
+.pager a.next{text-align:right}
+.pager a.disabled{opacity:.35;pointer-events:none}
+.pager a.home{flex:0 0 130px;text-align:center;display:flex;align-items:center;justify-content:center}
+.pager a.home .ttl{font-size:13.5px;color:var(--blue2)}
+
+</style>
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 完全教程</h1></div>
+  <div class="brand-sub">图文详解版 · 基于 SVN 1.14 实测</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 认识 SVN</div>
+    <a href="01-intro.html">1. SVN 是什么</a>
+    <a href="02-architecture.html">2. 三层架构与通信协议</a>
+    <a href="03-install.html">3. 安装与环境准备</a>
+    <div class="grp">第二阶段 · 核心模型</div>
+    <a href="04-model.html">4. 仓库、版本号与工作副本</a>
+    <a href="05-layout.html">5. 标准目录结构</a>
+    <div class="grp">第三阶段 · 日常操作</div>
+    <a href="06-first-steps.html">6. 第一次完整上手：从零到提交</a>
+    <a href="07-status.html">7. status 状态码全解</a>
+    <a href="08-daily-loop.html">8. 日常开发循环与 diff / log 进阶</a>
+    <a href="09-rollback.html">9. 撤销与回退：五种后悔场景</a>
+    <div class="grp">第四阶段 · 冲突处理</div>
+    <a href="10-conflict.html">10. 冲突：产生、解剖与解决</a>
+    <div class="grp">第五阶段 · 分支与标签</div>
+    <a href="11-branch-essence.html">11. 分支的本质：一次廉价的复制</a>
+    <a href="12-branch-ops.html">12. 创建、切换与管理分支</a>
+    <a href="13-merge.html" class="on">13. 合并全流程与 mergeinfo 机制</a>
+    <a href="14-tags.html">14. 标签与发布管理</a>
+    <div class="grp">第六阶段 · 属性系统</div>
+    <a href="15-properties.html">15. 属性系统：SVN 的隐藏超能力</a>
+    <a href="16-locking.html">16. 锁机制：二进制文件的独占保护</a>
+    <div class="grp">第七阶段 · 服务端</div>
+    <a href="17-deploy-choice.html">17. 服务端部署：方案选型</a>
+    <a href="18-svnserve.html">18. svnserve 部署实战</a>
+    <a href="19-authz.html">19. 认证与权限：authz 精细控制</a>
+    <a href="20-hooks.html">20. 钩子脚本：让 SVN 按你的规矩办事</a>
+    <div class="grp">第八阶段 · 运维与进阶</div>
+    <a href="21-backup.html">21. 备份、恢复与仓库维护</a>
+    <a href="22-advanced.html">22. 高级技巧与效率提升</a>
+    <a href="23-troubleshooting.html">23. 故障排查速查</a>
+    <a href="24-cheatsheet.html">24. 命令速查表</a>
+    <a href="25-gui.html">25. 图形客户端与 IDE 集成</a>
+    <div class="grp">快速跳转</div>
+    <a href="index.html">总目录</a>
+
+  </nav>
+</aside>
+<main>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/>
+    </marker>
+    <marker id="arwb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/>
+    </marker>
+    <marker id="arwg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7ee787"/>
+    </marker>
+    <marker id="arwr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff7b72"/>
+    </marker>
+    <marker id="arwp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#d2a8ff"/>
+    </marker>
+    <marker id="arwy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#e3b341"/>
+    </marker>
+    <marker id="arwc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#56d4dd"/>
+    </marker>
+    <linearGradient id="g-blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#58a6ff" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#58a6ff" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-pur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d2a8ff" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#d2a8ff" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7ee787" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#7ee787" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-orange" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffa657" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#ffa657" stop-opacity=".04"/>
+    </linearGradient>
+  </defs>
+</svg>
+<div class="crumb">
+  <span class="stage">第五阶段 · 分支与标签</span>
+  <span class="sep">/</span>
+  <a href="index.html">总目录</a>
+  <span class="sep">/</span>
+  <span class="cur">第 13 节</span>
+</div>
+
+<h3 class="sec" id="s13"><span class="no">13</span>合并全流程与 mergeinfo 机制</h3>
+
+<p class="lead">
+  合并是 SVN 里<strong>最容易出错、也最能体现集中式设计</strong>的部分。
+  它的核心难点在于：SVN 必须记住「哪些提交已经合过了」，否则每次合并都会重复应用同样的改动。
+  这个记忆装置叫 <code class="ic">svn:mergeinfo</code>。
+</p>
+
+<h4 class="sub" id="s13-2">mergeinfo：SVN 怎么知道该合什么</h4>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 13-1　mergeinfo 属性：合并的「记账本」</span><span class="fs">Mergeinfo</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 480" width="980" height="480" role="img" aria-label="SVN mergeinfo 合并记账机制图">
+  <!-- 左：第一次合并 -->
+  <text class="hd" x="30" y="28" fill="#58a6ff">第一次合并：SVN 计算需要合并的范围</text>
+  <rect x="24" y="40" width="452" height="180" rx="10" fill="rgba(88,166,255,.06)" stroke="#58a6ff" stroke-width="1.3"/>
+
+  <text class="ts" x="44" y="66">分支上发生了 r5, r6；主干上发生了 r7</text>
+
+  <!-- 时间轴 -->
+  <line x1="44" y1="104" x2="456" y2="104" stroke="#3d444d" stroke-width="2"/>
+  <circle cx="90" cy="104" r="10" fill="#0d1117" stroke="#d2a8ff" stroke-width="2"/>
+  <text class="tm" x="90" y="109" text-anchor="middle" fill="#d2a8ff">5</text>
+  <circle cx="170" cy="104" r="10" fill="#0d1117" stroke="#d2a8ff" stroke-width="2"/>
+  <text class="tm" x="170" y="109" text-anchor="middle" fill="#d2a8ff">6</text>
+  <circle cx="250" cy="104" r="10" fill="#0d1117" stroke="#58a6ff" stroke-width="2"/>
+  <text class="tm" x="250" y="109" text-anchor="middle" fill="#58a6ff">7</text>
+  <circle cx="330" cy="104" r="10" fill="#0d1117" stroke="#ff7b72" stroke-width="2"/>
+  <text class="tm" x="330" y="109" text-anchor="middle" fill="#ff7b72">8</text>
+
+  <text class="tm2" x="90" y="132" text-anchor="middle" fill="#d2a8ff">建分支</text>
+  <text class="tm2" x="170" y="132" text-anchor="middle" fill="#d2a8ff">分支提交</text>
+  <text class="tm2" x="250" y="132" text-anchor="middle" fill="#58a6ff">主干提交</text>
+  <text class="tm2" x="330" y="132" text-anchor="middle" fill="#ff7b72">合并提交</text>
+
+  <text class="tm" x="44" y="164" fill="#7ee787">$ svn merge ^/branches/feature-login</text>
+  <text class="ts" x="44" y="186">SVN 读了 mergeinfo，发现分支的 r5、r6 还没合过</text>
+  <text class="ts" x="44" y="206">于是「只」应用 r5 和 r6 的改动，跳过 r7（那是主干自己的）</text>
+
+  <!-- 右：mergeinfo 记录 -->
+  <text class="hd" x="504" y="28" fill="#d2a8ff">合并提交后，mergeinfo 被自动写入</text>
+  <rect x="498" y="40" width="456" height="180" rx="10" fill="rgba(210,168,255,.06)" stroke="#d2a8ff" stroke-width="1.3"/>
+
+  <text class="tm" x="518" y="70" fill="#d2a8ff">$ svn propget svn:mergeinfo .</text>
+  <rect x="518" y="84" width="416" height="52" rx="7" fill="#0b0f14" stroke="#3d444d" stroke-width="1"/>
+  <text class="tm" x="534" y="106" fill="#7ee787">/branches/feature-login:5-7</text>
+  <text class="tm2" x="534" y="126">↑ 已合并的版本区间</text>
+
+  <text class="ts" x="518" y="160">含义：来自 /branches/feature-login 的 r5 到 r7，</text>
+  <text class="ts" x="518" y="180">其改动已经全部被合并进当前目录。</text>
+  <text class="ts" x="518" y="204" fill="#7ee787">下次再合并同一分支时，SVN 会自动跳过这个区间。</text>
+
+  <!-- 第二次合并 -->
+  <text class="hd" x="30" y="258" fill="#7ee787">第二次合并：新提交才会被合</text>
+  <rect x="24" y="270" width="930" height="88" rx="10" fill="rgba(126,231,135,.06)" stroke="#7ee787" stroke-width="1.3"/>
+
+  <line x1="44" y1="316" x2="456" y2="316" stroke="#3d444d" stroke-width="2"/>
+  <circle cx="90" cy="316" r="9" fill="#0d1117" stroke="#d2a8ff" stroke-width="2"/>
+  <text class="tm" x="90" y="321" text-anchor="middle" fill="#d2a8ff">5</text>
+  <circle cx="170" cy="316" r="9" fill="#0d1117" stroke="#d2a8ff" stroke-width="2"/>
+  <text class="tm" x="170" y="321" text-anchor="middle" fill="#d2a8ff">6</text>
+  <circle cx="270" cy="316" r="9" fill="#0d1117" stroke="#e3b341" stroke-width="2.5"/>
+  <text class="tm" x="270" y="321" text-anchor="middle" fill="#e3b341">9</text>
+  <text class="tm2" x="270" y="342" text-anchor="middle" fill="#e3b341">分支上的新提交</text>
+
+  <text class="ts" x="330" y="304">第二次执行 svn merge ^/branches/feature-login</text>
+  <text class="ts" x="330" y="326" fill="#e3b341">→ mergeinfo 显示 5-7 已合，所以只应用 r9</text>
+  <text class="ts" x="330" y="348" fill="#7ee787">→ 合并后 mergeinfo 变成 /branches/feature-login:5-7,9</text>
+
+  <!-- 底部警告 -->
+  <rect x="24" y="378" width="930" height="90" rx="10" fill="rgba(255,123,114,.07)" stroke="#ff7b72" stroke-width="1.4"/>
+  <text class="hd" x="44" y="402" fill="#ff7b72">如果 mergeinfo 被破坏会怎样</text>
+  <text class="ts" x="44" y="424">• 重复合并：同一个改动被应用两次，代码里出现重复代码块，或产生莫名其妙的冲突</text>
+  <text class="ts" x="44" y="444">• 漏合并：mergeinfo 记录了一个其实没合成功的区间，后续再也不会重试</text>
+  <text class="ts" x="44" y="462" fill="#ff7b72">所以：合并必须提交（mergeinfo 才会写进仓库），不要把合并结果 revert 掉又不清理</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>核心记忆点：</b><code class="ic">svn:mergeinfo</code> 是一个<strong>目录级属性</strong>，
+    格式是 <code class="ic">/路径:版本区间</code>。它不是给人看的，是给 <code class="ic">svn merge</code> 自己看的。
+    <em>你不需要手动维护它，但你必须理解它，才能解释「为什么这次合并什么都没做」。</em>
+  </div>
+</div>
+
+<h4 class="sub">合并的标准流程（实测走通）</h4>
+
+<div class="steps">
+  <div class="stitle"><span class="badge">MERGE</span>从分支合并回主干的六步</div>
+  <div class="step">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">① 切到目标分支（要合进哪里）</span>
+      <span class="sc"><code class="ic">cd wc-trunk &amp;&amp; svn switch ^/trunk</code></span>
+    </div>
+  </div>
+  <div class="step">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">② 更新到最新 —— 这一步绝对不能省</span>
+      <span class="sc"><code class="ic">svn update</code>。
+      实测教训：如果工作副本处于混合版本，merge 会直接报 <code class="ic">E195020: Cannot merge into mixed-revision working copy</code> 拒绝执行。</span>
+    </div>
+  </div>
+  <div class="step">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">③ 确认工作副本干净</span>
+      <span class="sc"><code class="ic">svn status</code> 应该无输出。有未提交改动就先 commit 或 revert。</span>
+    </div>
+  </div>
+  <div class="step">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">④ 先干跑一遍，看清楚要合什么</span>
+      <span class="sc"><code class="ic">svn merge --dry-run ^/branches/feature-login</code>。
+      <code class="ic">--dry-run</code> 不会改动任何文件，只告诉你「将要做什么」。</span>
+    </div>
+  </div>
+  <div class="step">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">⑤ 正式合并，处理冲突</span>
+      <span class="sc"><code class="ic">svn merge ^/branches/feature-login</code>。
+      遇到 C 冲突就按第 10 节的方法解决；处理完 <code class="ic">svn resolve</code>。</span>
+    </div>
+  </div>
+  <div class="step">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">⑥ 提交 —— mergeinfo 就是这一步写进去的</span>
+      <span class="sc"><code class="ic">svn commit -m "合并 feature-login 分支到 trunk"</code>。
+      <strong>不提交，这次的合并记录（mergeinfo）就不会保存，下次会重复合并。</strong></span>
+    </div>
+  </div>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：完整的合并过程（含踩坑与修复）</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># ---- 场景准备 ----</span>
+<span class="cmt"># r5 建分支，r6 分支上提交登录功能，r7 主干并行改了主页</span>
+
+<span class="cmt"># 【踩坑 1】混合版本直接 merge → 被拒绝</span>
+<span class="ps">$</span> <span class="cmd">svn merge file:///E:/repo/branches/feature-login</span>
+<span class="no">svn: E195020: Cannot merge into mixed-revision working copy [6:7];</span>
+<span class="no">              try updating first</span>
+<span class="cmt">↑ 报错说得很明白：工作副本里同时存在 r6 和 r7 的节点</span>
+
+<span class="cmt"># 【修复】先 update 拉平</span>
+<span class="ps">$</span> <span class="cmd">svn update</span>
+Updating '.':
+At revision 7.
+
+<span class="cmt"># 【正式合并】</span>
+<span class="ps">$</span> <span class="cmd">svn merge file:///E:/repo/branches/feature-login</span>
+<span class="hl">--- Merging r5 through r7 into '.':</span>
+<span class="cmt">↑ SVN 自动算出区间：r5 到 r7（分支存在的全部版本）</span>
+<span class="no">C</span>    README.md
+<span class="hl">--- Recording mergeinfo for merge of r5 through r7 into '.':</span>
+<span class="hl"> U</span>   .
+<span class="cmt">↑ mergeinfo 属性已写入（还没提交）</span>
+
+<span class="no">svn: Merge conflict discovered in file 'README.md'.</span>
+<span class="cmt">  主干改了主页、分支改了登录，都动到 README → 冲突</span>
+
+<span class="cmt"># 【查看冲突状态和辅助文件】</span>
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="hl"> M</span>      .                              <span class="cmt">← 属性 M（mergeinfo 被改了）</span>
+<span class="no">C</span>       README.md
+<span class="no">?</span>       README.md.merge-left.r4          <span class="cmt">← merge 场景下辅助文件命名不同</span>
+<span class="no">?</span>       README.md.merge-right.r7
+<span class="no">?</span>       README.md.working
+<span class="hl">Summary of conflicts:</span>
+  <span class="no">Text conflicts: 1</span>
+
+<span class="cmt"># 【冲突内容：merge 的标记和 update 的不一样】</span>
+<span class="ps">$</span> <span class="cmd">cat README.md</span>
+版本B+C：合并后的最终内容
+<span class="hl">&lt;&lt;&lt;&lt;&lt;&lt;&lt; .working</span>
+## 主页改版（trunk 并行开发）
+<span class="hl">||||||| .merge-left.r4</span>
+<span class="hl">=======</span>
+## 登录功能（分支开发）
+<span class="hl">&gt;&gt;&gt;&gt;&gt;&gt;&gt; .merge-right.r7</span>
+<span class="cmt">↑ 注意三处差异：.working（我的）、.merge-left（共同祖先）、.merge-right（源的）</span>
+
+<span class="cmt"># 【mergeinfo 已记录】</span>
+<span class="ps">$</span> <span class="cmd">svn propget svn:mergeinfo .</span>
+<span class="ok">/branches/feature-login:5-7</span>
+
+<span class="cmt"># 【手工解决 → resolve → 提交】</span>
+<span class="ps">$</span> <span class="cmd">Set-Content README.md "版本最终：包含登录功能 + 主页改版"</span>
+<span class="ps">$</span> <span class="cmd">svn resolve --accept working -R .</span>
+<span class="ok">Merge conflicts in 'README.md' marked as resolved.</span>
+
+<span class="ps">$</span> <span class="cmd">svn commit -m "合并 feature-login 分支（冲突已解决）"</span>
+Sending        .
+Sending        README.md
+Transmitting file data .done
+Committing transaction...
+<span class="ok">Committed revision 8.</span>
+<span class="cmt">↑ 注意 Sending . 这一行 —— 提交的就是那个 mergeinfo 属性</span></pre>
+  </div>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：重复合并会被 mergeinfo 自动跳过</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 已经合并过了，再合一次会怎样？</span>
+<span class="ps">$</span> <span class="cmd">svn update</span>
+At revision 8.
+
+<span class="ps">$</span> <span class="cmd">svn merge file:///E:/repo/branches/feature-login</span>
+<span class="ok">--- Recording mergeinfo for merge of r8 into '.':</span>
+<span class="ok"> U</span>   .
+<span class="cmt">↑ 没有任何文件被改动！因为 mergeinfo 显示 r5-7 已经合过了</span>
+<span class="cmt">  它只把 r8 本身（那个合并提交）也记进 mergeinfo</span>
+
+<span class="cmt"># 对比：如果没有 mergeinfo 会怎样？</span>
+<span class="cmt"># 那 SVN 会重新应用 r5-r7 的所有改动，导致重复代码或假冲突</span>
+
+<span class="cmt"># 用 log -g 看合并图谱，验证合并关系被正确记录</span>
+<span class="ps">$</span> <span class="cmd">svn log -g -l 4</span>
+------------------------------------------------------------------------
+r8 | kelang | 11:01:15 | 1 line
+合并 feature-login 分支（冲突已解决）
+------------------------------------------------------------------------
+<span class="hl">r6</span> | kelang | 10:59:05 | 1 line
+<span class="cy">Merged via: r8</span>     <span class="cmt">← 关键！r6 是通过 r8 合并进来的</span>
+分支：新增登录功能说明
+------------------------------------------------------------------------
+<span class="hl">r5</span> | kelang | 10:58:59 | 1 line
+<span class="cy">Merged via: r8</span>
+从 trunk 创建 feature-login 分支
+------------------------------------------------------------------------</pre>
+  </div>
+</div>
+
+<h4 class="sub">merge 的四种用法</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">merge 进阶</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ---- 用法 1：同步分支（最常用）----</span>
+<span class="c"># 从 源URL 合并到 当前目录，SVN 自动算区间</span>
+svn merge ^/branches/feature-login
+
+<span class="c"># ---- 用法 2：只合并特定的几个提交 ----</span>
+svn merge -c 5,7,9 ^/branches/feature-login        <span class="c"># 挑着合（cherry-pick）</span>
+svn merge -c -10 .                                <span class="c"># 反向合并（撤销，见第 9 节）</span>
+
+<span class="c"># ---- 用法 3：合并指定版本区间 ----</span>
+svn merge -r 5:9 ^/branches/feature-login
+svn merge -r 9:5 .                                <span class="c"># 反向区间 = 撤销</span>
+
+<span class="c"># ---- 用法 4：两个 URL 之间的差异，不涉及祖先关系 ----</span>
+svn merge ^/trunk ^/branches/other-branch .
+<span class="c"># 甚至可以把两个不相关的目录的差异打进当前目录</span>
+svn merge --ignore-ancestry ^/trunk ^/vendor/lib .
+
+<span class="c"># ---- 关键选项 ----</span>
+svn merge --dry-run ^/branches/f            <span class="c"># 预演，不改动任何文件（强烈推荐先用）</span>
+svn merge --reintegrate ^/branches/f        <span class="c"># 1.8 前的「重新整合」，把分支整个合回并结束它</span>
+svn merge --accept postpone ^/branches/f    <span class="c"># 冲突策略</span>
+svn merge --record-only ^/branches/f        <span class="c"># 只记 mergeinfo，不改文件（高级技巧）</span>
+svn merge --depth infinity .                <span class="c"># 递归深度</span>
+svn merge --ignore-ancestry                 <span class="c"># 忽略祖先关系，纯内容 diff 后覆盖</span>
+svn merge -x --ignore-space-change ^/b      <span class="c"># 传给内部 diff 的参数</span></pre>
+</div>
+
+<div class="box key">
+  <span class="bt">--dry-run 是保命选项</span>
+  <p>合并是个复杂操作，<strong>永远先跑 <code class="ic">svn merge --dry-run</code></strong>。
+  它会完整地输出「将要做什么」（U / C / G / D 标记），但<strong>不修改任何文件</strong>。</p>
+  <p>如果 dry-run 的输出里出现你意料之外的 <code class="ic">C</code>，说明这次合并会冲突——
+  先去了解一下为什么，别硬着头皮上。</p>
+</div>
+
+<div class="box warn">
+  <span class="bt">merge 冲突的辅助文件命名与 update 不同</span>
+  <p>实测发现的细节差异：</p>
+  <div class="tw">
+  <table>
+  <thead><tr><th>场景</th><th>辅助文件命名</th><th>标记里的三栏</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code class="ic">svn update</code> 冲突</td>
+      <td><code class="ic">.mine</code> / <code class="ic">.r2</code> / <code class="ic">.r3</code></td>
+      <td><code class="ic">&lt;&lt;&lt;&lt;&lt;&lt;&lt; .mine</code> ／ <code class="ic">||||||| .r2</code> ／ <code class="ic">&gt;&gt;&gt;&gt;&gt;&gt;&gt; .r3</code></td>
+    </tr>
+    <tr>
+      <td><code class="ic">svn merge</code> 冲突</td>
+      <td><code class="ic">.working</code> / <code class="ic">.merge-left.r4</code> / <code class="ic">.merge-right.r7</code></td>
+      <td><code class="ic">&lt;&lt;&lt;&lt;&lt;&lt;&lt; .working</code> ／ <code class="ic">||||||| .merge-left.r4</code> ／ <code class="ic">&gt;&gt;&gt;&gt;&gt;&gt;&gt; .merge-right.r7</code></td>
+    </tr>
+  </tbody>
+  </table>
+  </div>
+  <p>含义完全对应：<code class="ic">.working</code> = 我的，<code class="ic">.merge-left</code> = 共同祖先，<code class="ic">.merge-right</code> = 要合进来的源。
+  <strong>解决方式和 update 冲突一模一样</strong>，只是文件名不同，别被绕晕。</p>
+</div>
+
+<h4 class="sub">分支开发完整工作流</h4>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 13-2　功能分支的完整生命周期（含双向同步）</span><span class="fs">Branch Workflow</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 380" width="980" height="380" role="img" aria-label="SVN 功能分支完整工作流程图">
+  <!-- 主干线 -->
+  <line x1="40" y1="300" x2="940" y2="300" stroke="#58a6ff" stroke-width="3"/>
+  <text class="tm" x="40" y="332" fill="#58a6ff">trunk</text>
+
+  <!-- 分支线 -->
+  <path d="M180,300 C210,300 210,170 240,170" fill="none" stroke="#d2a8ff" stroke-width="3"/>
+  <line x1="240" y1="170" x2="720" y2="170" stroke="#d2a8ff" stroke-width="3"/>
+  <path d="M720,170 C750,170 750,300 780,300" fill="none" stroke="#d2a8ff" stroke-width="3"/>
+  <text class="tm" x="420" y="158" fill="#d2a8ff">branches/feature-login</text>
+
+  <!-- 节点：建分支 -->
+  <circle cx="180" cy="300" r="8" fill="#0d1117" stroke="#d2a8ff" stroke-width="2.5"/>
+  <text class="tm2" x="180" y="272" text-anchor="middle" fill="#d2a8ff">① svn copy 建分支</text>
+
+  <!-- 节点：分支开发 -->
+  <circle cx="320" cy="170" r="8" fill="#0d1117" stroke="#d2a8ff" stroke-width="2.5"/>
+  <text class="tm2" x="320" y="146" text-anchor="middle" fill="#d2a8ff">② 在分支上开发提交</text>
+
+  <!-- 节点：主干推进 -->
+  <circle cx="400" cy="300" r="8" fill="#0d1117" stroke="#58a6ff" stroke-width="2.5"/>
+  <text class="tm2" x="400" y="272" text-anchor="middle" fill="#58a6ff">③ 主干也在推进</text>
+
+  <!-- 同步箭头（主干 → 分支）-->
+  <path class="arwy" d="M405,292 C420,230 400,200 420,178" stroke="#e3b341" stroke-width="2"/>
+  <text class="tm2" x="452" y="234" fill="#e3b341">④ svn merge ^/trunk（反向同步）</text>
+  <text class="tm2" x="452" y="254" fill="#e3b341">   把主干的新改动合进分支，减少最终冲突</text>
+
+  <!-- 节点：继续开发 -->
+  <circle cx="540" cy="170" r="8" fill="#0d1117" stroke="#d2a8ff" stroke-width="2.5"/>
+  <text class="tm2" x="540" y="146" text-anchor="middle" fill="#d2a8ff">⑤ 继续功能开发</text>
+
+  <!-- 合并回主干 -->
+  <path class="arwg" d="M720,178 C760,190 770,250 778,292" stroke="#7ee787" stroke-width="2.5"/>
+  <circle cx="780" cy="300" r="8" fill="#0d1117" stroke="#7ee787" stroke-width="2.5"/>
+  <text class="tm2" x="790" y="272" text-anchor="middle" fill="#7ee787">⑥ svn merge ^/branches/f</text>
+
+  <!-- 收尾 -->
+  <circle cx="880" cy="300" r="8" fill="#0d1117" stroke="#8b949e" stroke-width="2.5"/>
+  <text class="tm2" x="880" y="332" text-anchor="middle" fill="#8b949e">⑦ 删分支（可选）</text>
+
+  <!-- 顶部说明 -->
+  <rect x="40" y="28" width="900" height="80" rx="10" fill="rgba(227,179,65,.07)" stroke="#e3b341" stroke-width="1.3"/>
+  <text class="hd" x="60" y="52" fill="#e3b341">第 ④ 步「反向同步」是 SVN 分支实践中最容易被忽略的一步</text>
+  <text class="ts" x="60" y="76">如果分支存活很久（几周），主干上已经堆了大量改动。等到最后一次性合并时，冲突会非常恐怖。</text>
+  <text class="ts" x="60" y="98">正确做法：每隔几天在分支上执行 <tspan class="mono" fill="#7ee787">svn merge ^/trunk</tspan>，把主干进展持续吸收进来，让冲突「小步发生」。</text>
+
+  <!-- 删除分支 -->
+  <rect x="40" y="344" width="900" height="30" rx="8" fill="rgba(139,148,158,.07)" stroke="#8b949e" stroke-width="1.2"/>
+  <text class="ts" x="60" y="364">删除分支：<tspan class="mono" fill="#e6edf3">svn delete ^/branches/feature-login -m "功能已合并，删除分支"</tspan>　历史提交仍然保留在仓库中，可随时回溯。</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>实践建议：</b>功能分支的生命周期控制在 <strong>1-2 周内</strong>。
+    超过两周，「反向同步」的成本会快速上升。如果功能太大，就拆成多个小分支串行合并，而不是一个巨型分支拖三个月。
+  </div>
+</div>
+
+<!-- ==========================================================================
+     第 14 节：标签与发布
+     ========================================================================== -->
+
+<div class="pager">
+  <a href="12-branch-ops.html"><span class="lbl">← 上一节</span><span class="ttl">12. 创建、切换与管理分支</span></a>
+  <a class="home" href="index.html"><span class="ttl">总目录</span></a>
+  <a class="next" href="14-tags.html"><span class="lbl">下一节 →</span><span class="ttl">14. 标签与发布管理</span></a>
+</div>
+
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+
+<script>
+
+(function () {
+  'use strict';
+
+  /* ============================================================
+     1. 代码块增强：语法高亮 + 复制按钮 + 换行切换
+     ============================================================ */
+
+  // 极简高亮器：只处理注释、字符串、SVN 命令、选项
+  function escapeHtml(t) {
+    return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function highlight(code) {
+    var lines = code.split('\n');
+    var out = [];
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var indented = escapeHtml(line);
+
+      // 整行注释（# 或 rem 或 :: 开头）
+      if (/^\s*(#|rem\s|::)/i.test(line) && !/^\s*#!/.test(line)) {
+        out.push('<span class="c">' + indented + '</span>');
+        continue;
+      }
+
+      // 行内注释：找到未被引号包裹的 #
+      var result = '';
+      var inStr = false;
+      var strChar = '';
+      var commentStart = -1;
+
+      for (var j = 0; j < line.length; j++) {
+        var ch = line[j];
+        if (!inStr && (ch === '"' || ch === "'")) {
+          inStr = true;
+          strChar = ch;
+        } else if (inStr && ch === strChar) {
+          if (line[j - 1] !== '\\') inStr = false;
+        } else if (!inStr && ch === '#' && j > 0 && line[j - 1] === ' ' && /^\s*#/.test(line.slice(j)) === false) {
+          commentStart = j;
+          break;
+        }
+      }
+
+      var codePart = commentStart >= 0 ? line.slice(0, commentStart) : line;
+      var commentPart = commentStart >= 0 ? line.slice(commentStart) : '';
+      var esc = escapeHtml(codePart);
+
+      // 字符串
+      esc = esc.replace(/(&quot;[^&]*?&quot;|&#39;[^&]*?&#39;)/g, '<span class="s">$1</span>');
+      // 注释里的 svn 命令名（行首后的第一个词）
+      esc = esc.replace(/^(\s*)(svn|svnadmin|svnserve|svnlook|svndumpfilter|svnrdump|svnauthz|svnmucc|sc|find|curl|mail|tar|export|cd|set|echo|if|for|chmod|xargs|grep|awk|sudo)\b/,
+        '$1<span class="k">$2</span>');
+      // 长选项
+      esc = esc.replace(/(\s)(--?[a-zA-Z][a-zA-Z0-9-]*)/g, '$1<span class="a">$2</span>');
+      // 数字（版本号之类）
+      esc = esc.replace(/\b(r\d+)\b/g, '<span class="m">$1</span>');
+
+      result = esc;
+      if (commentPart) result += '<span class="c">' + escapeHtml(commentPart) + '</span>';
+      out.push(result);
+    }
+    return out.join('\n');
+  }
+
+  // 处理所有 codewrap 里的 pre.code
+  var wraps = document.querySelectorAll('.codewrap');
+
+  Array.prototype.forEach.call(wraps, function (wrap) {
+    var pre = wrap.querySelector('pre.code');
+    if (!pre) return;
+
+    // 如果代码块里已经有手工写好的语法着色 span，就原样保留，不再重复处理
+    var alreadyStyled = pre.querySelector('span');
+    if (!alreadyStyled) {
+      var raw = pre.textContent;
+      var codeEl = pre.querySelector('code') || pre;
+      codeEl.innerHTML = highlight(raw);
+    }
+
+    // 加复制按钮（若无）
+    var acts = wrap.querySelector('.acts');
+    if (acts && !acts.querySelector('[data-copy]')) {
+      var b = document.createElement('button');
+      b.setAttribute('data-copy', '');
+      b.textContent = '复制';
+      acts.appendChild(b);
+    }
+  });
+
+  // 复制功能
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('[data-copy]');
+    if (!btn) return;
+
+    var wrap = btn.closest('.codewrap') || btn.closest('.term');
+    if (!wrap) return;
+    var pre = wrap.querySelector('pre');
+    if (!pre) return;
+
+    var text = pre.textContent;
+
+    function done() {
+      btn.textContent = '已复制';
+      btn.classList.add('ok');
+      setTimeout(function () {
+        btn.textContent = '复制';
+        btn.classList.remove('ok');
+      }, 1400);
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text, done); });
+    } else {
+      fallback(text, done);
+    }
+  });
+
+  function fallback(text, done) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done();
+    } catch (err) { /* 静默失败 */ }
+  }
+
+  /* ============================================================
+     2. 进度条 + 回到顶部
+     ============================================================ */
+  var prog = document.getElementById('prog');
+  var topBtn = document.getElementById('top');
+
+  function onScroll() {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var pct = max > 0 ? (h.scrollTop || document.body.scrollTop) / max * 100 : 0;
+    if (prog) prog.style.width = pct + '%';
+    if (topBtn) {
+      if ((h.scrollTop || document.body.scrollTop) > 600) topBtn.classList.add('show');
+      else topBtn.classList.remove('show');
+    }
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  if (topBtn) {
+    topBtn.onclick = function () { window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  }
+
+  /* ============================================================
+     3. 导航高亮：滚动时自动标记当前小节
+     ============================================================ */
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll('#nav a'));
+  var sections = navLinks.map(function (a) {
+    var id = a.getAttribute('href');
+    return { el: id && id.length > 1 ? document.querySelector(id) : null, a: a };
+  }).filter(function (s) { return s.el; });
+
+  function highlightNav() {
+    var pos = window.scrollY + 140;
+    var current = null;
+    for (var i = 0; i < sections.length; i++) {
+      if (sections[i].el.offsetTop <= pos) current = sections[i];
+    }
+    navLinks.forEach(function (a) { a.classList.remove('on'); });
+    if (current) {
+      current.a.classList.add('on');
+      // 让当前项在侧栏可见
+      var box = current.a.parentElement;
+      if (box && box.scrollHeight > box.clientHeight) {
+        var aTop = current.a.offsetTop;
+        if (aTop < box.scrollTop || aTop > box.scrollTop + box.clientHeight - 60) {
+          box.scrollTop = aTop - box.clientHeight / 2;
+        }
+      }
+    }
+  }
+
+  window.addEventListener('scroll', highlightNav, { passive: true });
+  highlightNav();
+
+  /* ============================================================
+     4. 表格首列若为空白则隐藏（防止空单元格）
+     ============================================================ */
+  Array.prototype.forEach.call(document.querySelectorAll('table'), function (t) {
+    var firstTh = t.querySelector('thead th');
+    var firstTd = t.querySelector('tbody td');
+    if (firstTh && firstTd && !firstTh.textContent.trim() && !firstTd.textContent.trim()) {
+      Array.prototype.forEach.call(t.querySelectorAll('tr'), function (tr) {
+        var c = tr.querySelector('th, td');
+        if (c) c.style.display = 'none';
+      });
+    }
+  });
+
+})();
+
+</script>
+</body>
+</html>

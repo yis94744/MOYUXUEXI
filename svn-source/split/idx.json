@@ -1,0 +1,126 @@
+{
+  "pageTitle": "SVN 完全教程 · 总目录",
+  "heroTag": "SVN 1.14 · 全流程实测 · 图文详解",
+  "heroTitle": "SVN 完全教程<br>从零到服务端运维",
+  "heroLead": "本教程按<strong>八个阶段、二十五个小节</strong>拆解 Subversion。每一节都是<strong>独立文件</strong>，可以单独打开、单独阅读。所有命令与输出均在 <em>SVN 1.14.5</em> 上真实执行并抓取，不是抄来的文档。",
+  "heroBody": "你会经历这条路径：<strong>搞懂原理 → 学会日常操作 → 处理冲突 → 玩转分支合并 → 吃透属性系统 → 部署服务端 → 配权限与钩子 → 备份运维</strong>。每一阶段都能独立落地，照着做就能用起来。",
+  "statSections": "节",
+  "statFigures": "29",
+  "statFiguresLabel": "张 SVG 插图",
+  "statOutputs": "40+",
+  "statOutputsLabel": "段实测输出",
+  "statVersion": "1.14.5",
+  "statVersionLabel": "验证环境",
+  "howtoTitle": "怎么用这份教程",
+  "howtoBody": "左侧导航可以直接跳到任意一节。每节底部有「上一节 / 下一节」按钮，从头读到尾也不迷路。全文的代码框右上角有<strong>复制</strong>按钮；标着「实测输出」的黑色终端框是真实运行结果，可以直接对照。",
+  "stagesTitle": "八个阶段总览",
+  "stagesIntro": "点击任意条目进入对应小节。建议按顺序读第一遍，之后当手册查。",
+  "sectionsUnit": "节",
+  "quickTitle": "三条常见路径",
+  "quickstart": [
+    {
+      "title": "路径 A：完全没接触过版本控制",
+      "body": "从第 1 节顺序读下去。前五节建立概念模型，第 6 节开始动手，第 7 到第 9 节是日常最常用的操作。读完这九节，你已经能胜任 90% 的日常工作。",
+      "link": "01-intro.html",
+      "linkText": "从第 1 节开始 →"
+    },
+    {
+      "title": "路径 B：搭服务器 / 做运维",
+      "body": "直接从第 17 节切入服务端。选型、部署 svnserve、配置 authz 权限、写钩子脚本、做备份恢复，一条龙。前面的基础知识遇到时再回查即可。",
+      "link": "17-deploy-choice.html",
+      "linkText": "跳到第 17 节 →"
+    },
+    {
+      "title": "路径 C：只要一份命令速查",
+      "body": "第 24 节是按功能分组的命令速查表，包含所有常用选项和危险操作清单，可以直接打印贴墙。遇到不认识的错误码就查第 23 节的故障排查。",
+      "link": "24-cheatsheet.html",
+      "linkText": "打开速查表 →"
+    },
+    {
+      "title": "路径 D：只想知道冲突怎么办",
+      "body": "第 10 节是完整的冲突处理专题：冲突怎么产生的、冲突文件里的标记怎么看、四种解决姿势怎么选、以及最常见的三个错误。五分钟能读完。",
+      "link": "10-conflict.html",
+      "linkText": "打开冲突处理 →"
+    }
+  ],
+  "verifiedTitle": "关于内容可靠性",
+  "verifiedBody": "本教程的全部命令、参数与输出，都在 Windows 上搭建的 SVN 1.14.5 环境中逐条执行并抓取真实回显。写作过程中发现并修正了多处常见文档的错误说法（例如 status 实际有七列而非两列、svn:keywords 在 commit 时展开而非 update 时、svnserve.conf 行首空格会导致 E200002 解析失败）。凡是标「实测输出」的代码块，都可以直接复制运行。",
+  "footerTitle": "SVN 完全教程 · 从零到服务端运维",
+  "footerBody": "八个阶段：认识 SVN（1-3）→ 核心模型（4-5）→ 日常操作（6-9）→ 冲突处理（10）→ 分支与标签（11-14）→ 属性系统（15-16）→ 服务端部署（17-20）→ 运维与进阶（21-25）。",
+  "footerNote": "遇到本教程未覆盖的问题，先查第 23 节故障排查，再查官方文档 Version Control with Subversion（svnbook.red-bean.com，免费电子书）。",
+  "stages": [
+    {
+      "title": "第一阶段 · 认识 SVN",
+      "desc": "搞清 SVN 是什么、为什么需要它、它的架构长什么样",
+      "blurbs": {
+        "1": "集中式 vs 分布式、SVN 与 Git 该选谁",
+        "2": "仓库/工作副本两层结构、四种 URL 协议对应四种部署方式",
+        "3": "Windows / Linux / macOS 安装，附环境自检脚本"
+      }
+    },
+    {
+      "title": "第二阶段 · 核心模型",
+      "desc": "版本号、工作副本三态、标准目录结构——这三个概念撑起后面所有命令",
+      "blurbs": {
+        "4": "全局版本号为什么是这个设计、文件状态怎么流转",
+        "5": "trunk / branches / tags 的约定，以及为什么合并依赖它"
+      }
+    },
+    {
+      "title": "第三阶段 · 日常操作",
+      "desc": "从检出到提交的完整链路，以及每天都会用到的六个命令",
+      "blurbs": {
+        "6": "checkout → add → status → diff → update → commit 全流程",
+        "7": "status 七列结构解剖，含 L / + / S / K / O / T / B 等冷门标记",
+        "8": "update 的冲突策略、log 默认从 BASE 起算的坑、diff 与 patch",
+        "9": "五种后悔场景：revert、反向 merge、update -r、cat -r、dump 过滤"
+      }
+    },
+    {
+      "title": "第四阶段 · 冲突处理",
+      "desc": "冲突的本质是三方合并失败，理解了就能从容解决",
+      "blurbs": {
+        "10": "三方合并原理、冲突文件裂变成四个、四种解决姿势决策树"
+      }
+    },
+    {
+      "title": "第五阶段 · 分支与标签",
+      "desc": "SVN 的分支是一次廉价的复制——这个认知是理解合并的前提",
+      "blurbs": {
+        "11": "为什么建分支不占空间：内容寻址与节点树共享",
+        "12": "svn copy 建分支、switch 切换、三种分支工作模式",
+        "13": "mergeinfo 记账机制、合并标准流程、merge 冲突的 aux 文件命名",
+        "14": "打标签、验证快照、用 authz 强制标签只读"
+      }
+    },
+    {
+      "title": "第六阶段 · 属性系统",
+      "desc": "属性是 SVN 最被低估的功能，解锁它才能用好 SVN",
+      "blurbs": {
+        "15": "svn:ignore 忽略（含结尾斜杠的坑）、keywords、eol-style、externals",
+        "16": "svn:needs-lock 独占锁，解决二进制文件无法合并的问题"
+      }
+    },
+    {
+      "title": "第七阶段 · 服务端",
+      "desc": "从选型到部署到权限到钩子，把 SVN 服务端跑起来",
+      "blurbs": {
+        "17": "svnserve / Apache / VisualSVN 三种方案对比选型",
+        "18": "svnserve 部署实战，含 svnserve.conf 前导空格导致的 E200002",
+        "19": "authz 权限模型、组与规则继承、权限矩阵实测、语法校验工具",
+        "20": "九个钩子触发时机、pre-commit 强制日志规范、Windows 钩子编码坑"
+      }
+    },
+    {
+      "title": "第八阶段 · 运维与进阶",
+      "desc": "备份恢复、效率技巧、故障排查、命令速查、图形客户端",
+      "blurbs": {
+        "21": "hotcopy / dump-load / svnrdump 三种备份、恢复演练与仓库维护",
+        "22": "稀疏检出、changelist 分组、svn move 历史、批量脚本技巧",
+        "23": "按错误码分类的排查手册，附万能恢复三步",
+        "24": "按功能分组的完整命令速查表，可直接打印",
+        "25": "TortoiseSVN 图标对照、IDE 集成、团队协作约定模板"
+      }
+    }
+  ]
+}

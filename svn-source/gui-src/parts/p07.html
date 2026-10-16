@@ -1,0 +1,261 @@
+<h3 class="sec" id="s7"><span class="no">7</span>新增、删除、重命名文件</h3>
+
+<p class="lead">
+  前面几节讲的都是「改文件内容」。这一节讲<strong>动文件本身</strong>：新建、删除、改名、挪位置。
+  这些操作有一个共同点——<strong>必须让 SVN 知道</strong>，不能像平时用 Windows 那样随手一按就完事。
+</p>
+
+<div class="box key">
+  <span class="bt">为什么「动文件」比「改内容」更需要小心</span>
+  <p>改内容的时候，文件还是那个文件，SVN 只要记下「这一版和上一版不一样」就够了。但<strong>删除、重命名、移动</strong>会改变文件在仓库里的存在方式，而 SVN 的历史是<strong>跟着「这个文件」走的</strong>。</p>
+  <ul>
+    <li>你用资源管理器改个名字，SVN 看到的是「老名字的文件不见了，多了个新名字的文件」——等于<strong>一刀两断</strong>，从此新名字的文件历史从零开始。</li>
+    <li>你用 SVN 的菜单改名字，SVN 记录的是「这个文件被改名为某某」——<strong>历史是连续的</strong>，往前翻能看到它改名之前的每一次修改。</li>
+  </ul>
+  <p>差别就在日常里：半年后你想查「这个文件当初为什么这么写」，走对路的人一查到底，走错路的人查到一个「新建文件」就断了。</p>
+</div>
+
+<h4 class="sub">新增（Add）：让 SVN 认识新文件</h4>
+
+<p>你在项目里新建了一个文件、或者拷进来一份新资料——此时 SVN <strong>完全不知道它的存在</strong>。它在你本地的角标是<strong>灰色问号</strong>，也不会出现在提交列表里。必须显式地告诉 SVN 一声，这个动作叫 <strong>Add（新增 / 加入版本控制）</strong>。</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">未版本控制文件的右键菜单（灰问号）</span><span class="fs">Unversioned File</span></div>
+  <div class="sb"><img src="img/ContextMenuFileIgnore.png" alt="未版本控制文件的右键菜单" class="mid"></div>
+  <div class="cap">
+    未版本控制的文件，右键菜单<strong>很短</strong>——TortoiseSVN 几乎不管它。这里面最有用的就是两项：<br>
+    <span class="k">Add...</span>：把它纳入版本控制，<strong>这是本次操作的第一步</strong>；<br>
+    <span class="k">Add to ignore list</span>：把它忽略掉，以后不再出现在待提交列表里——<strong>编译产物、日志、本机配置就走这条路</strong>（第 16 节）。<br><br>
+    <b>记住这个二选一</b>：新文件要么 Add，要么 Ignore，不要让它长期挂着灰问号。否则每次提交你都得重新判断一遍「这个要不要交」。
+  </div>
+</div>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">ADD</span>把新文件纳入版本控制</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">先确认这文件确实该进仓库</span><span class="sc">问自己一句：<strong>同事检出项目后，需要这个文件吗？</strong>需要就 Add；不需要（编译中间产物、本地数据库、临时导出）就 Ignore。这一秒的判断，决定了几百兆的仓库体积。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">对着新文件点右键</span><span class="sc">图标上是<strong>灰色问号</strong>，说明它还没被 SVN 管起来。<em>如果右键菜单里根本看不到 TortoiseSVN 那一组，说明这个位置不在工作副本里——检查一下是不是放错文件夹了。</em></span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">鼠标移到 TortoiseSVN 子菜单上</span><span class="sc">展开后面的子菜单，找到 <code class="ic">Add...</code>。<strong>注意带不带省略号的区别</strong>：带 <code class="ic">...</code> 的那项会弹出对话框让你挑文件；不带的那项按当前选择直接处理。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">在弹出的 Add 对话框里勾选要加入的文件</span><span class="sc">对话框会列出<strong>当前文件夹里所有还没被版本控制的文件</strong>，每项前面有<strong>勾选框</strong>。这是<strong>一次加入多个文件</strong>的入口——新写了一整个模块？在这里全部勾上，一次搞定，不用一个个右键。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">点 OK 确认</span><span class="sc">被选中的文件角标立刻从<strong>灰色问号</strong>变成<strong>蓝色加号</strong>。<em>注意：变蓝只代表「已标记要加入」，文件还在你本地，仓库里还没有它。</em></span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">提交一次，新文件才真正进仓库</span><span class="sc">回项目文件夹右键 → <code class="ic">SVN Commit...</code>，在列表里确认这些新文件<strong>已勾选</strong>（它们的状态是 <code class="ic">added</code>），写好提交说明，点 OK。这一步做完，同事更新后才能看到你的新文件。<br><em>忘了 Add 会怎样？提交列表里根本不会出现这个文件，你会以为「提交成功了」，同事更新完却发现少东西。提交前用第 5 节的检查对话框扫一眼，就能提前发现漏网的文件。</em></span></div>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">提交时顺手 Add，少走一趟</span>
+  <p>懒得先右键 Add 再右键提交？在 <code class="ic">SVN Commit...</code> 对话框里<strong>勾上 <code class="ic">Show unversioned files</code></strong>，那些还没纳入版本控制的新文件就会出现在列表里。在列表里<strong>勾选它们</strong>，再点 OK——<strong>提交和新增一次完成</strong>。文件多、新建了好几个的时候，这样最省事。</p>
+</div>
+
+<h4 class="sub">删除（Delete）：删文件也要走 SVN</h4>
+
+<p><strong>这是新手最容易犯错的地方。</strong>在资源管理器里选中文件按 <kbd>Delete</kbd>，文件确实消失了——但对 SVN 来说，这只是「<strong>文件莫名其妙不见了</strong>」，它不会记录「有人删除了它」这件事。</p>
+
+<div class="duo">
+  <div>
+    <div class="dh">✗ 按键盘 Delete 键删</div>
+    <p>文件从磁盘上消失了。SVN 那边显示的状态是 <code class="ic">missing</code>（<strong>文件不见了</strong>），不是「已删除」。</p>
+    <p>提交时它不会正常地作为「删除」提交，反而可能报错让你先处理；历史里<strong>查不到「谁在什么时候删的它」</strong>。</p>
+    <p style="margin-top:10px;color:#ff7b72">→ 等于偷偷摸摸扔掉一份档案，没人记录</p>
+  </div>
+  <div>
+    <div class="dh">✓ 用 TortoiseSVN → Delete</div>
+    <p>文件角标变成<strong>红色叉</strong>，SVN 明确知道「这个文件被标记删除了」。</p>
+    <p>提交后仓库里它才真正消失，并<strong>留下一条完整的删除记录</strong>（谁删的、什么时候、什么说明）；以后想找回，随时能从历史版本里翻出来。</p>
+    <p style="margin-top:10px;color:#7ee787">→ 走的是正规流程，有据可查</p>
+  </div>
+</div>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">DELETE</span>干净地删除一个文件</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">对着要删的文件（或文件夹）点右键</span><span class="sc">确认这个文件的角标是<strong>绿色对勾</strong>或<strong>红色叹号</strong>——说明它在版本控制里，这样删才有意义。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">选 TortoiseSVN → Delete</span><span class="sc">在子菜单里找 <code class="ic">Delete</code>。<em>别和系统菜单里的项搞混了——认准在 TortoiseSVN 那一组里的那个。</em></span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">确认对话框</span><span class="sc">它会列出即将删除的文件清单。一次删多个文件时，在这里核对一遍<strong>是不是真的都要删</strong>。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">提交，删除才真正生效</span><span class="sc">此时文件在磁盘上已经不见了，但仓库里还在。必须<strong>提交一次</strong>，服务器上的这个文件才会消失，同事更新后才会跟着删掉。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">删错了怎么办</span><span class="sc"><strong>还没提交</strong>：对着包含它的文件夹右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Revert...</span></span>，文件会从仓库里恢复回来。<br><strong>已经提交了</strong>：去 Show log 找到删除之前那个版本，看看能不能从历史里恢复（第 8、9 节）。<em>所以删除类操作，提交前多想三秒是值得的。</em></span></div>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">关于「提交后还能不能找回」</span>
+  <p><strong>能。</strong>这正是走 SVN 删除的价值所在——文件虽然在最新版本里没了，但它<strong>留在历史里</strong>。以后翻到删除之前的那个版本，还能看到它完整的内容。</p>
+  <p>反过来，<strong>用键盘 Delete 直接删、并且已经提交过的文件</strong>，虽然也可能在历史里找到，但那次「删除」在历史记录里是混乱的，别人查起来会一头雾水。</p>
+</div>
+
+<h4 class="sub">重命名（Rename）：千万别按 F2</h4>
+
+<p>和删除一样，重命名也有一个<strong>正确入口</strong>。用系统的方式改名，看结果好像「文件还是那个文件，只是名字变了」，但 SVN 看到的是两件事：<strong>一个旧文件被删了 + 一个新文件出现了</strong>。</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">RENAME</span>正确地给文件改名</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">对着文件点右键 → TortoiseSVN → Rename...</span><span class="sc">在子菜单里找 <code class="ic">Rename...</code>。<em>不要按 <kbd>F2</kbd>，也不要用右键菜单里的系统「重命名」项。</em></span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">在弹出的输入框里改名字</span><span class="sc">改完确认。此时文件的旧名字消失、新名字上位，角标变成<strong>蓝色加号</strong>（表示这个新名字等着被加入）。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">提交</span><span class="sc">提交之后，仓库里才是真的改名完成。同事更新时，SVN 会知道「这是同一个文件改了名」而不是「删了一个加了一个」。</span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">提交说明里写清楚为什么改</span><span class="sc">改名尤其要写：<em>「把 UserDao 改名为 UserRepository，因为拆分出接口」</em>。同事在日志里只看到「文件没了、又多了个文件」，一句说明能救他半小时。<strong>已经用 F2 改错了怎么办？</strong>只要还没提交，用 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Revert...</span></span> 把名字改回去，再用正确的方式重来一次就行。</span></div>
+  </div>
+</div>
+
+<div class="box err">
+  <span class="bt">系统 F2 改名 vs SVN Rename：事后查历史的真实差距</span>
+  <p>假设把 <code class="ic">UserDao.java</code> 改名为 <code class="ic">UserRepository.java</code>，半年后你查它的历史：</p>
+  <div class="duo" style="margin-top:12px">
+    <div>
+      <div class="dh">✗ 用 F2 改的名</div>
+      <p>历史里会看到两条互不相关的记录：</p>
+      <p>· <code class="ic">UserDao.java</code> —— 在某个版本<strong>被删除</strong>，之后一片空白</p>
+      <p>· <code class="ic">UserRepository.java</code> —— 在同一时间<strong>被新增</strong>，之前的历史是空的</p>
+      <p style="margin-top:10px;color:#ff7b72">→ 想知道「这个类以前长什么样」，你得先自己猜出它以前叫 UserDao，再去找那个已经被删掉的文件——<strong>如果对方改过三次名，基本就找不回来了</strong></p>
+    </div>
+    <div>
+      <div class="dh">✓ 用 SVN Rename 改的名</div>
+      <p>历史是<strong>一条连续的线</strong>：</p>
+      <p>· <code class="ic">UserRepository.java</code> 的历史里，直接包含它叫 <code class="ic">UserDao.java</code> 时的那几十次提交</p>
+      <p>· 一眼能看出「在版本 20500 改名为现在这个名字」</p>
+      <p>· 用 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Blame...</span></span> 逐行追责时，改名之前的每一行也照样能追到人</p>
+      <p style="margin-top:10px;color:#7ee787">→ 一次改名换来的是「历史不断」，这就是全部区别</p>
+    </div>
+  </div>
+</div>
+
+<h4 class="sub">移动文件：用右键拖动</h4>
+
+<p>把文件从一个目录挪到另一个目录，是「删除 + 新增」的组合动作——同样有正确姿势。而且这个姿势藏在<strong>右键拖动</strong>里，很多人从来不知道。</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">右键拖动松手后的菜单</span><span class="fs">Right-drag Menu</span></div>
+  <div class="sb"><img src="img/right-drag-menu.png" alt="右键拖动菜单" class="small"></div>
+  <div class="cap">
+    <b>怎么调出这个菜单</b>：用<strong>鼠标右键</strong>按住文件<strong>拖到目标文件夹上</strong>，松手时它就会弹出来。<em>注意必须用右键拖——左键拖出来的是普通的「复制/移动到这里」菜单，没有 SVN 选项。</em><br><br>
+    前三项才是本次操作的正主：<br>
+    <span class="k">SVN Move versioned files here</span> —— <strong>移动</strong>到这儿（最常用）。<br>
+    <span class="k">SVN Move and rename versioned files here</span> —— 移动<strong>并改名</strong>。<br>
+    <span class="k">SVN Copy versioned files here</span> —— <strong>复制</strong>一份到这儿（原文件保留）。<br><br>
+    下面还有 <span class="k">SVN Add files to this WC</span>（把文件加进这个工作副本）、<span class="k">SVN Export to here</span> / <span class="k">SVN Export all to here</span>（导出成不含版本信息的干净副本）。图片最下面那几项是 Windows 系统自己的菜单，<strong>不要点</strong>——用系统的方式挪文件，历史就断了，和本节开头说的问题一模一样。
+  </div>
+</div>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">MOVE</span>把文件挪到别的目录</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">选中要移动的文件，用右键拖到目标文件夹上</span><span class="sc">按住<strong>鼠标右键</strong>不放，把文件拖到目标文件夹图标上方再松开。<em>拖的时候会有提示光标，松手就会弹菜单。</em></span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">点 SVN Move versioned files here</span><span class="sc">这是<strong>移动</strong>——原位置的文件会消失，目标位置出现。<em>如果只是想留一份副本，选 <code class="ic">SVN Copy versioned files here</code>。</em></span></div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body"><span class="st">检查两边的状态，然后提交</span><span class="sc">原位置应显示为<strong>已删除</strong>状态，目标位置应显示为<strong>已添加</strong>状态——但这两件事<strong>属于同一次「移动」操作</strong>，提交时会一起记进去。提交后移动才真正生效；<em>移动大批文件时，先在提交对话框里核对一遍清单，确认没漏也没多。</em></span></div>
+  </div>
+</div>
+
+<h4 class="sub">操作对照表：正确菜单路径与后果</h4>
+
+<div class="tw">
+  <table>
+    <thead><tr><th>操作</th><th>正确菜单路径</th><th>做错了会怎样</th></tr></thead>
+    <tbody>
+      <tr><td><strong>新增文件</strong></td><td><span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Add...</span></span><br>或在提交对话框勾 <code class="ic">Show unversioned files</code> 后一起提交</td><td>不 Add 就提交：<strong>文件根本不会出现在提交列表里</strong>，你以为交上去了，同事更新后却找不到它</td></tr>
+      <tr><td><strong>删除文件</strong></td><td><span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Delete</span></span></td><td>按键盘 <kbd>Delete</kbd>：状态变成 <code class="ic">missing</code> 而不是「已删除」，提交不干净，<strong>历史里也查不到「谁删的它」</strong></td></tr>
+      <tr><td><strong>重命名</strong></td><td><span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Rename...</span></span></td><td>按 <kbd>F2</kbd> 或右键系统「重命名」：SVN 记成「删一个 + 加一个」，<strong>历史从现在开始断掉</strong>，之前的修改记录再也追不到这个新名字上</td></tr>
+      <tr><td><strong>移动文件</strong></td><td><strong>右键拖动</strong>文件到目标文件夹 → <code class="ic">SVN Move versioned files here</code></td><td>用左键拖、或 <kbd>Ctrl</kbd>+<kbd>X</kbd> 剪切粘贴：同样被记成「删一个 + 加一个」，<strong>历史断裂</strong>，这个文件「以前长什么样」查不到</td></tr>
+      <tr><td><strong>复制文件</strong></td><td><strong>右键拖动</strong>文件到目标文件夹 → <code class="ic">SVN Copy versioned files here</code></td><td>用 <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd> 粘贴：新文件是<strong>未版本控制的灰问号</strong>，得再走一次 Add，多一步不说，还容易漏</td></tr>
+      <tr><td><strong>整个目录改名</strong></td><td>对着<strong>文件夹</strong>右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Rename...</span></span></td><td>用系统方式改目录名：目录里<strong>所有文件</strong>的历史一起断掉，影响面比改单个文件大得多</td></tr>
+      <tr><td><strong>新建目录</strong></td><td>在资源管理器里建好新文件夹 → 右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Add...</span></span></td><td>不 Add 直接提交：文件夹不会进仓库，同事更新后没有这个目录，往里放的文件也一起提交不上去</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="grid2">
+  <div class="card bad">
+    <h6>一眼认出「做错了」的信号</h6>
+    <ul>
+      <li>提交列表里，同一个文件<strong>一个显示「已删除」、另一个显示「新增」</strong>，而你只是想给它改个名 → 说明用了系统方式</li>
+      <li>状态列出现 <code class="ic">missing</code> → 用了键盘 Delete；文件角标长期是<strong>灰色问号</strong> → 忘了 Add</li>
+      <li>同事说「你交的东西我这儿没有」→ 八成有文件没 Add 就提交了</li>
+    </ul>
+  </div>
+  <div class="card good">
+    <h6>养成这几个习惯</h6>
+    <ul>
+      <li>动文件（增、删、改名、挪位置）<strong>一律先右键看有没有 TortoiseSVN 那一组</strong>，有就走它，没有说明位置不对</li>
+      <li>记住两条口诀：<strong>重命名走 Rename，删文件走 Delete</strong></li>
+      <li>移动、复制文件的唯一正确姿势是<strong>右键拖动</strong></li>
+      <li>这些操作<strong>做完都要提交</strong>——不提交等于没做（对同事而言）</li>
+    </ul>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">最后一步永远是：提交</span>
+  <p>Add、Delete、Rename、Move 这四个操作<strong>都只是在本地打了个标记</strong>，它们改变的是「<strong>你打算对仓库做什么</strong>」，而不是仓库本身。</p>
+  <p><strong>只有提交（SVN Commit）之后，这些改动才会真正生效。</strong>在此之前，你完全可以反悔：对着文件夹右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Revert...</span></span> 就能把这些标记全部撤掉，回到原样。</p>
+  <p><em>也正因为如此，<strong>一气呵成地做完「操作 + 提交」是好习惯</strong>：改完名字就提交，删完文件就提交，别攒着。攒到最后一起提交，一旦中途发现问题，你就分不清哪一处改动是干什么的了。</em></p>
+</div>
+
+<div class="box ok">
+  <span class="bt">这一节的三句话</span>
+  <p>1. <strong>新文件先 Add，不然提交列表里根本没它。</strong></p>
+  <p>2. <strong>删文件用 Delete、改名用 Rename，按下键盘的那一刻历史就断了。</strong></p>
+  <p>3. <strong>移动和复制，用右键拖。</strong></p>
+</div>

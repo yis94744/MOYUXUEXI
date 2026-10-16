@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>10. 冲突处理：两人改了同一处 | SVN 图形化实战</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 图形化实战</h1></div>
+  <div class="brand-sub">TortoiseSVN + VisualSVN · 全鼠标操作</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 准备</div>
+    <a href="01-tools.html">1. 认识你的两个图形工具</a>
+    <a href="02-first-checkout.html">2. 第一次检出：把代码拉到本地</a>
+    <a href="03-icons.html">3. 看懂图标角标与右键菜单</a>
+    <div class="grp">第二阶段 · 日常使用</div>
+    <a href="04-daily.html">4. 日常三件事：改、更、提</a>
+    <a href="05-status.html">5. 查看改动：哪些文件变了</a>
+    <a href="06-diff.html">6. 比对差异：到底改了哪几行</a>
+    <a href="07-add-delete.html">7. 新增、删除、重命名文件</a>
+    <a href="08-history.html">8. 查看历史：Log 对话框详解</a>
+    <a href="09-revert.html">9. 撤销：改错了怎么退回</a>
+    <div class="grp">第三阶段 · 进阶操作</div>
+    <a href="10-conflict.html" class="on">10. 冲突处理：两人改了同一处</a>
+    <a href="11-merge-tool.html">11. 合并编辑器：逐行选择保留谁</a>
+    <a href="12-branch.html">12. 建分支：开一条独立开发线</a>
+    <a href="13-switch.html">13. 切换分支：在主干和分支间跳</a>
+    <a href="14-merge.html">14. 合并分支：把改动并回主干</a>
+    <a href="15-revision-graph.html">15. 版本拓扑图：看清分支走向</a>
+    <div class="grp">第四阶段 · 属性与锁</div>
+    <a href="16-ignore.html">16. 忽略文件：让编译产物别再烦我</a>
+    <a href="17-properties.html">17. 属性对话框：设置文件行为</a>
+    <a href="18-lock.html">18. 文件锁：二进制文件独占编辑</a>
+    <div class="grp">第五阶段 · 服务端管理</div>
+    <a href="19-server.html">19. 服务端：VisualSVN 建仓库</a>
+    <a href="20-users.html">20. 用户与权限：谁能看谁能改</a>
+    <a href="21-backup.html">21. 备份与恢复：图形界面操作</a>
+    <div class="grp">第六阶段 · 效率技巧</div>
+    <a href="22-patch-export.html">22. 补丁与导出：不走仓库传代码</a>
+    <a href="23-settings.html">23. 设置面板：常用选项怎么调</a>
+    <a href="24-troubleshoot.html">24. 常见问题：报错怎么处理</a>
+    <a href="25-cheatsheet.html">25. 图形操作速查表</a>
+
+  </nav>
+</aside>
+<main>
+<div class="crumb">
+  <span class="stage">第三阶段 · 进阶操作</span>
+  <span class="sep">/</span>
+  <a href="index.html">总目录</a>
+  <span class="sep">/</span>
+  <span class="cur">第 10 节</span>
+</div>
+
+<h3 class="sec" id="s10"><span class="no">10</span>冲突处理：两人改了同一处</h3>
+
+<p class="lead"> 两个人同时改同一个文件的同一行，后提交的那个人就会撞上冲突。 这一节讲清楚冲突长什么样、怎么一步步解决，以及<strong>怎么让它少发生</strong>。
+</p>
+
+<div class="box key"> <span class="bt">冲突是正常现象，不是错误</span>
+  <p>很多人第一次看到红色警告就以为「我把项目搞坏了」。其实并没有——冲突只说明一件事： <strong>你要改的这段内容，别人也改过了，SVN 不知道该听谁的</strong>。</p>
+  <p>它不删文件、不覆盖代码，只是<strong>把两种改法都保留下来，交给你决定</strong>。 这是 SVN 在保护你的工作：如果它自作聪明选一个，你可能就丢了别人的改动。</p>
+  <p><strong>处理冲突是 SVN 使用中的常规动作</strong>，每个团队每周都会遇到几次。</p>
+</div>
+
+<h4 class="sub">冲突是怎么产生的</h4>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">起因</span>冲突发生的典型经过</div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body"> <span class="st">你和同事各自更新到了同一个版本</span> <span class="sc">假设都是 <code class="ic">r1200</code>。此时你们手上的文件完全一样。</span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body"> <span class="st">同事先改并提交</span> <span class="sc">他改了文件里的<b>某一行</b>，提交成了 <code class="ic">r1201</code>。此时服务器上已经是新版，<strong>但你本地还是旧的 r1200</strong>。</span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body"> <span class="st">你又改了同一处，然后更新</span> <span class="sc">你改的是<b>同一行</b>（或紧挨着的几行），还没提交就点了 <code class="ic">SVN Update</code>。<br> <em>撞车点就在这</em>：SVN 想把 r1201 合并进你的工作副本，却发现这一处<b>你和你同事各写了一个版本</b>，它没法自动挑。</span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body"> <span class="st">更新对话框里出现红色提示</span> <span class="sc">进度窗口会<b>用亮红色</b>把那个文件标出来，提示这个文件处于冲突状态，需要人工处理。<em>其他没撞车的文件照常更新成功，只有一个文件被拦下。</em></span>
+    </div>
+  </div>
+</div>
+
+<div class="box warn"> <span class="bt">哪些情况会撞车，哪些不会</span>
+  <ul>
+    <li><strong>会冲突</strong>：改同一行、改紧邻的几行（SVN 划定的同一区块）。</li>
+    <li><strong>通常不冲突</strong>：两人改同一个文件，但改的是<strong>相隔较远的不同位置</strong>——SVN 能自动把两边改动合并到一起，你根本不会察觉。</li>
+    <li><strong>不一定冲突但要注意</strong>：一个改内容、另一个删文件或改名——这会产生<strong>树冲突</strong>，见下文。</li>
+  </ul>
+  <p><strong>结论</strong>：冲突和「文件被几个人改」没关系，只和「改的位置是否重叠」有关。</p>
+</div>
+
+<h4 class="sub">冲突长什么样</h4>
+
+<div class="grid2">
+  <div class="card bad">
+    <h6>信号一：更新对话框里的红色文件名</h6>
+    <ul>
+      <li>更新进度窗口里，冲突的文件名<b>用亮红色显示</b>，和其他文件明显不同</li>
+      <li>窗口底部的统计信息里会出现 <strong>Conflicts</strong> 字样和数量</li>
+      <li>如果一眼扫过去是绿的，说明这次更新很干净，没事</li>
+    </ul>
+  </div>
+  <div class="card warn">
+    <h6>信号二：文件角标变成黄底红叹号</h6>
+    <ul>
+      <li>资源管理器里这个文件的图标变成 <span class="tagmini r">黄色底 + 红色叹号</span></li>
+      <li>这是冲突的专属标记，和普通的「已修改」红叹号<b>不一样</b></li>
+      <li>只要角标还是黄的，就说明冲突还没解决，<strong>提交会被拦住</strong></li>
+    </ul>
+  </div>
+</div>
+
+<div class="iconrow">
+  <div class="ic-card"> <img src="img/ConflictIcon.png" alt="冲突图标"> <span class="nm">Conflicted</span> <span class="ds">黄底红叹号。看到它就必须处理，处理完才会变回绿色对勾。</span>
+  </div>
+  <div class="ic-card"> <img src="img/ModifiedIcon.png" alt="已修改图标"> <span class="nm">Modified</span> <span class="ds">普通的红色叹号，只表示「改了还没提交」，不会拦你提交。</span>
+  </div>
+  <div class="ic-card"> <img src="img/AddedIcon.png" alt="已添加图标"> <span class="nm">Added</span> <span class="ds">蓝色加号，新增待提交的文件。</span>
+  </div>
+  <div class="ic-card">
+    <img src="img/InSubVersionIcon.png" alt="版本控制中图标">
+    <span class="nm">Normal</span>
+    <span class="ds">绿色对勾，本地和服务器一致，一切正常。</span>
+  </div>
+</div>
+
+<h4 class="sub">处理流程：五步解决一个冲突</h4>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">CONFLICT</span>从发现到提交</div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body">
+      <span class="st">发现冲突：更新时看红色文件名</span>
+      <span class="sc">看到亮红色的文件，先<strong>把它的名字记下来</strong>。更新可以继续完成，冲突文件会停在冲突状态等你处理。</span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body">
+      <span class="st">打开冲突文件，找到标记</span>
+      <span class="sc">用你平时的文本编辑器打开它（VS、VS Code、记事本都行）。在冲突的位置会看到<strong>成对的标记行</strong>，它们把两个版本清楚地隔开，见下方表格。<em>这些标记是 SVN 加进去的，不是谁的手误。</em></span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body">
+      <span class="st">手工解决：决定这段代码到底要什么</span>
+      <span class="sc">读完两段内容，<strong>自己写出最终正确的版本</strong>，并且<strong>把那些标记行全部删掉</strong>。<br> <em>这一步需要你动脑子</em>：不是简单选一边，有时候两边各有可取之处，要把它们合成一个正确的版本。拿不准就问同事——<strong>对方是谁，日志里一查就知道</strong>。</span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body">
+      <span class="st">告诉 SVN「已解决」</span>
+      <span class="sc">编辑完保存，回到资源管理器，对着这个文件右键 →
+      <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Resolved</span></span>。<br> <strong>这一步不能省</strong>：文件内容改好了，但 SVN 还不知道你已经处理完，角标会一直是黄的，提交也会被拦。<b>点了它，角标才变回绿色。</b></span>
+    </div>
+  </div>
+
+  <div class="op"><div class="num"></div>
+    <div class="body">
+      <span class="st">提交，并在说明里写清楚</span>
+      <span class="sc"><span class="mp">SVN Commit... <span class="ar">→</span></span> 在 <code class="ic">Message</code> 里写明白，比如
+      <code class="ic">解决 XX 模块冲突：保留双方的校验逻辑</code>。如果和同事商量过，<strong>顺手在群里说一句</strong>，让他更新后确认一下你合并得对不对。</span>
+    </div>
+  </div>
+</div>
+
+<h4 class="sub">看懂冲突文件里的三种标记</h4>
+
+<p>冲突文件里会出现<strong>三组标记行</strong>，它们像书签一样把文件分成几段。认识这三行，你就知道该删什么、该留什么。</p>
+
+<div class="tw"><table>
+<thead><tr><th style="width:200px">标记行</th><th style="width:120px">含义</th><th>你要做什么</th></tr></thead>
+<tbody>
+  <tr>
+    <td><code class="ic">&lt;&lt;&lt;&lt;&lt;&lt;&lt; .mine</code></td>
+    <td><strong>从这里开始，是我的改动</strong></td>
+    <td>它下面紧跟的内容，是<strong>你本地改成的样子</strong>。<em><code class="ic">.mine</code> 就是「这份文件的我的版本」的意思。</em></td>
+  </tr>
+  <tr>
+    <td><code class="ic">=======</code></td>
+    <td><strong>分界线</strong></td>
+    <td>它把上面的「我的」和下面的「别人的」分开。<strong>这行本身没有任何代码含义，是纯标记。</strong></td>
+  </tr>
+  <tr>
+    <td><code class="ic">&gt;&gt;&gt;&gt;&gt;&gt;&gt; .r123</code></td>
+    <td><strong>别人的改动到这里结束</strong></td>
+    <td>这行上面的内容，是<strong>服务器上那个版本的样子</strong>。后面的数字说明它来自哪个版本，<em>想查是谁改的，就拿这个版本号去 Show log 里搜</em>。</td>
+  </tr>
+</tbody></table></div>
+
+<div class="grid2">
+  <div class="card warn">
+    <h6>冲突文件看起来是这样</h6>
+    <ul>
+      <li>标记行包裹起来的，就是<b>两边打架的那一段</b></li>
+      <li>从上到下读顺序是：标记 → 我的改动 → 分界线 → 别人的改动 → 标记</li>
+      <li>一个文件里可能<b>有好几组</b>这样的标记，每一组都要单独处理</li>
+      <li>标记之外的内容没冲突，不用动</li>
+    </ul>
+  </div>
+  <div class="card good">
+    <h6>处理时你要做的</h6>
+    <ul>
+      <li>逐组查看，决定最终保留哪些行</li>
+      <li><strong>把三行标记全部删掉</strong>——包括 <code class="ic">&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code>、<code class="ic">=======</code>、<code class="ic">&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code></li>
+      <li>结果应该是<b>一份语法正确、能正常编译的普通代码</b></li>
+      <li>保存 → 右键 Resolved → 提交</li>
+    </ul>
+  </div>
+</div>
+
+<div class="box err">
+  <span class="bt">格式一定要核对</span>
+  <p>处理完冲突后，<strong>一定要把文件打开再通读一遍</strong>，尤其确认两点：
+  <b>① 标记行确实一行不剩</b>；<b>② 拼起来的内容语法完整</b>（比如大括号成对、语句没被截断）。</p>
+  <p>冲突区域往往在代码块的中间，少删一行标记会让整段代码无法编译； 多删一行代码则可能悄悄改了逻辑，编译能过但运行出错——<strong>这种问题最难查</strong>。</p>
+</div>
+
+<h4 class="sub">用对话框解决：合并冲突对话框</h4>
+
+<p>如果不想手工读文件里的标记，也可以让 TortoiseSVN 弹出一个专门的对话框来处理。 在冲突文件上右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Edit conflicts</span></span>，就会出现它。</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">合并冲突对话框（点击图可放大）</span><span class="fs">Merge Conflict Callback</span></div>
+  <div class="sb"><img src="img/MergeConflictCallback.png" alt="合并冲突对话框"></div>
+  <div class="cap"> 这个对话框把「两个版本」摆出来，每个按钮就是一种态度。按钮名字都是英文，但意思很直白：<br><br> • <span class="k">Postpone</span>——<b>先放着，稍后再处理</b>。你还没想清楚、或者要先问同事时用它， 对话框关掉，文件保持冲突状态，角标仍是黄的。<em>新手看到一堆按钮时先点这个，最安全。</em><br> • <span class="k">Accept base</span>——<b>用「基础版本」</b>。也就是放弃你这次的改动， 回到你俩开始改之前的那个原始内容。<br> • <span class="k">Accept incoming</span>——<b>用别人的版本</b>。同事的改动留下，你这一处被覆盖。<br> • <span class="k">Reject incoming</span>——<b>拒绝别人的版本</b>。你这一处保持自己的写法。<br> • <span class="k">Accept incoming for conflicts</span> / <span class="k">Reject conflicts</span>——<b>批量</b>处理： 一次把所有冲突处都按「接受对方」或「拒绝对方」处理完。文件里冲突很多、而且你确定一律听某一方的时候， 用这两个最快。<br> • <span class="k">Mark as resolved</span>——<b>声明已经解决完了</b>。相当于右键菜单里的 Resolved， 点完角标才会变绿。<br> • <span class="k">Edit</span>——<b>打开编辑器手工改</b>。想自己逐行斟酌时用它， 会跳到合并工具或文本编辑器。<br><br>
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+    <b>用法建议</b>：冲突很少时，直接按上面几个按钮一个个决定；冲突多且交织在一起时， 点 <b>Edit</b> 用合并工具更省心（见第 11 节）。
+  </div>
+</div>
+
+<h4 class="sub">树冲突：不是内容打架，是「文件本身」打架</h4>
+
+<p>还有一种冲突叫<strong>树冲突</strong>（Tree conflict）。它和内容无关，而是<strong>文件或文件夹的存在状态对不上</strong>： 一方改了文件，另一方把文件删了或者改名了，SVN 不知道该保留哪个。常见情形有：</p>
+
+<ul>
+  <li><strong>你改了文件，同事把这个文件删了</strong>——你的改动无处可去。要么接受删除（放弃你的改动），要么把文件恢复回来。</li>
+  <li><strong>你改了文件，同事把它改名了</strong>——你的改动落在了「旧名字」上，而服务器上只剩「新名字」，需要把改动挪到新名字的文件上。</li>
+  <li><strong>两个人都改同一个文件的文件名/位置</strong>——移动方向不一致，SVN 无法自动决定最终路径。</li>
+  <li><strong>你要提交一个新文件夹，服务器上已经有人建了同名文件夹</strong>——路径撞车，需要决定用哪一份。</li>
+  <li><strong>你在改一个文件夹里的东西，同事把整个文件夹删了</strong>——涉及整棵树，处理时通常要连带决定里面所有文件的去向。</li>
+</ul>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">树冲突对话框</span><span class="fs">Tree Conflict Callback</span></div>
+  <div class="sb"><img src="img/MergeTreeConflictCallback.png" alt="树冲突对话框"></div>
+  <div class="cap"> 树冲突的对话框和内容冲突长得很像，但<b>它问的问题完全不同</b>：内容冲突问的是「这段文字用谁的」， 树冲突问的是<b>「这个文件/文件夹到底还要不要」</b>。<br><br> 对话框会先<b>用文字描述冲突的性质</b>——比如「本地修改了文件，但该文件在仓库中已被删除」，
+    <b>这一段说明一定要读完</b>，它直接告诉你选择的分量。<br><br> 然后同样是一组按钮，常见的是接受对方的处理（删除/改名）或<b>拒绝</b>对方的处理（把文件恢复回来）。
+    <em>如果拿不准，先点 Postpone 放着，去和同事确认清楚再决定</em>—— 树冲突往往涉及「这个文件到底该不该存在」的判断，<b>问一句比猜一个省事得多</b>。
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">避免冲突的最佳实践</span>
+  <ol>
+    <li><strong>开工第一件事：更新。</strong>每天打开电脑先 <code class="ic">SVN Update</code>，拿到同事昨晚的改动再动手。</li>
+    <li><strong>改之前先更新。</strong>准备改一个文件前，单独对它更新一次。尤其是你打算大改的文件——<b>先把最新的拿到手</b>。</li>
+    <li><strong>改完尽快提交，小步提交。</strong>改了三天再提交，别人早就改过同一块了。<b>一次提交只干一件事</b>，提交越勤，撞车窗口越小。</li>
+    <li><strong>提交前再更新一次。</strong>把冲突<b>留给自己处理</b>，而不是让下一个更新的人替你承担。</li>
+    <li><strong>别在公共文件上做长时间实验。</strong>要试一个新方案，先问一句，或者建个分支自己折腾（见第 12 节）。</li>
+    <li><strong>一次别改太宽。</strong>顺手把一个文件整体重排格式，会让别人所有改动都撞车；这类改动单独提交，并在说明里写清楚。</li>
+  </ol>
+</div>
+
+<div class="box err">
+  <span class="bt">新手最常犯的三个错误</span>
+  <ol>
+    <li><strong>忘了删冲突标记就提交。</strong>标记行是 SVN 加的，不是代码的一部分。留着它们会让程序直接编译失败， 或者把奇怪的字符带进最终产品。做法：解决完<b>先搜一遍 <code class="ic">&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> 这个符号</b>，确认一个都不剩，再提交。</li>
+    <li><strong>文件改好了，却忘了点 Resolved。</strong>内容是对的，但 SVN 还认为这个文件处于冲突中， 角标仍是黄底红叹号，提交会被拦住。看到这个角标就知道：<b>还差一步「已解决」没做</b>。</li>
+    <li><strong>用手工删除文件的方式「解决」冲突。</strong>直接在资源管理器里按 <kbd>Delete</kbd> 删掉冲突文件、 或者删掉 <code class="ic">.mine</code> / <code class="ic">.rXXX</code> 之类的辅助文件，只会让 SVN 的状态更加混乱——
+    <b>它以为文件还在，但文件已经不见了</b>。正确做法：<b>老老实实走「编辑 → Resolved → 提交」这条流程</b>； 真要删文件，用 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Delete</span></span>，让 SVN 知道你在删什么。</li>
+  </ol>
+</div>
+
+<div class="box ok">
+  <span class="bt">处理冲突的标准顺序（记这五步就够了）</span>
+  <p><strong>① 看红色文件名 → ② 打开文件读标记 → ③ 写出最终版本并删掉标记 → ④ 右键 Resolved → ⑤ Commit。</strong></p>
+  <p>整个过程里，<strong>只有第 ③ 步需要动脑子</strong>，其余都是点几下鼠标。拿不准第 ③ 步怎么选时， 去看 <code class="ic">Show log</code> 里那次提交的说明和作者，<b>直接去问人</b>——这是最快也最不容易出错的解法。</p>
+</div>
+
+
+<div class="pager">
+  <a href="09-revert.html"><span class="lbl">← 上一节</span><span class="ttl">9. 撤销：改错了怎么退回</span></a>
+  <a class="home" href="index.html"><span class="ttl">总目录</span></a>
+  <a class="next" href="11-merge-tool.html"><span class="lbl">下一节 →</span><span class="ttl">11. 合并编辑器：逐行选择保留谁</span></a>
+</div>
+
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+<script src="assets/app.js"></script>
+</body>
+</html>

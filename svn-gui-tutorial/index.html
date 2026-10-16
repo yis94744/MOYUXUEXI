@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SVN 图形化实战 · 总目录</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/index.css">
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 图形化实战</h1></div>
+  <div class="brand-sub">TortoiseSVN + VisualSVN · 全鼠标操作</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 准备</div>
+    <a href="01-tools.html">1. 认识你的两个图形工具</a>
+    <a href="02-first-checkout.html">2. 第一次检出：把代码拉到本地</a>
+    <a href="03-icons.html">3. 看懂图标角标与右键菜单</a>
+    <div class="grp">第二阶段 · 日常使用</div>
+    <a href="04-daily.html">4. 日常三件事：改、更、提</a>
+    <a href="05-status.html">5. 查看改动：哪些文件变了</a>
+    <a href="06-diff.html">6. 比对差异：到底改了哪几行</a>
+    <a href="07-add-delete.html">7. 新增、删除、重命名文件</a>
+    <a href="08-history.html">8. 查看历史：Log 对话框详解</a>
+    <a href="09-revert.html">9. 撤销：改错了怎么退回</a>
+    <div class="grp">第三阶段 · 进阶操作</div>
+    <a href="10-conflict.html">10. 冲突处理：两人改了同一处</a>
+    <a href="11-merge-tool.html">11. 合并编辑器：逐行选择保留谁</a>
+    <a href="12-branch.html">12. 建分支：开一条独立开发线</a>
+    <a href="13-switch.html">13. 切换分支：在主干和分支间跳</a>
+    <a href="14-merge.html">14. 合并分支：把改动并回主干</a>
+    <a href="15-revision-graph.html">15. 版本拓扑图：看清分支走向</a>
+    <div class="grp">第四阶段 · 属性与锁</div>
+    <a href="16-ignore.html">16. 忽略文件：让编译产物别再烦我</a>
+    <a href="17-properties.html">17. 属性对话框：设置文件行为</a>
+    <a href="18-lock.html">18. 文件锁：二进制文件独占编辑</a>
+    <div class="grp">第五阶段 · 服务端管理</div>
+    <a href="19-server.html">19. 服务端：VisualSVN 建仓库</a>
+    <a href="20-users.html">20. 用户与权限：谁能看谁能改</a>
+    <a href="21-backup.html">21. 备份与恢复：图形界面操作</a>
+    <div class="grp">第六阶段 · 效率技巧</div>
+    <a href="22-patch-export.html">22. 补丁与导出：不走仓库传代码</a>
+    <a href="23-settings.html">23. 设置面板：常用选项怎么调</a>
+    <a href="24-troubleshoot.html">24. 常见问题：报错怎么处理</a>
+    <a href="25-cheatsheet.html">25. 图形操作速查表</a>
+  </nav>
+</aside>
+<main>
+<div class="hero">
+  <span class="tag">TortoiseSVN + VisualSVN Server · 全鼠标操作</span>
+  <h2>SVN 图形化实战<br>不敲一行命令</h2>
+  <p class="lead">这是一份<strong>纯图形界面</strong>的 SVN 教程。所有操作都用右键菜单和对话框完成，每一步都配<strong>真实界面截图</strong>，说清「点哪个按钮、填什么、为什么」。</p>
+  <p>全教程按 <strong>6 个阶段、25 个小节</strong>展开。每个小节做成独立页面，可以单独打开阅读。主要面向 Windows 上的 <em>TortoiseSVN</em> 客户端 + <em>VisualSVN Server</em> 服务端这套标准组合。</p>
+  <div class="meta">
+    <div><b>25</b>节</div>
+    <div><b>60+</b>张界面截图</div>
+    <div><b>6</b>个阶段</div>
+    <div><b>2</b>个工具全覆盖</div>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">这份教程怎么用</span>
+  <p>左侧导航可以直接跳到任意一节，每节底部有「上一节 / 下一节」按钮。所有截图<strong>点击可以放大</strong>，看不清的按钮放大看即可。菜单路径都用这种样式标出来：<span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Commit...</span></span>，意思就是「右键 → 展开 TortoiseSVN 子菜单 → 点击 Commit」。</p>
+</div>
+
+<h3 class="sec" id="stages"><span class="no">#</span>六个阶段总览</h3>
+<p>从「装好软件第一次检出」到「服务端管理和常见问题排查」。建议第一次按顺序读前两个阶段，后面的用到再查。</p>
+
+  <div class="stageblock">
+    <div class="sh"><span class="sno">01</span><div><div class="stt">第一阶段 · 准备</div><div class="ssd">认识两个图形工具、把代码拉到本地、认全右键菜单</div></div><span class="scount">3 节</span></div>
+    <div class="slist">
+      <a href="01-tools.html"><span class="sn">1</span><span class="st">认识你的两个图形工具</span><span class="sbl">TortoiseSVN 客户端与 VisualSVN 服务端，各自管什么</span></a>
+      <a href="02-first-checkout.html"><span class="sn">2</span><span class="st">第一次检出：把代码拉到本地</span><span class="sbl">Checkout 对话框逐项说明，第一次检出到本地</span></a>
+      <a href="03-icons.html"><span class="sn">3</span><span class="st">看懂图标角标与右键菜单</span><span class="sbl">图标角标含义、文件夹/文件的右键菜单、右键拖动的妙用</span></a>
+    </div>
+  </div>
+  <div class="stageblock">
+    <div class="sh"><span class="sno">02</span><div><div class="stt">第二阶段 · 日常使用</div><div class="ssd">每天都要用的操作：更新、提交、查看改动、比对差异、看历史、撤销</div></div><span class="scount">6 节</span></div>
+    <div class="slist">
+      <a href="04-daily.html"><span class="sn">4</span><span class="st">日常三件事：改、更、提</span><span class="sbl">改、更、提三步循环，Update 与 Commit 对话框详解</span></a>
+      <a href="05-status.html"><span class="sn">5</span><span class="st">查看改动：哪些文件变了</span><span class="sbl">查看改动清单，提交前自查避免误提交</span></a>
+      <a href="06-diff.html"><span class="sn">6</span><span class="st">比对差异：到底改了哪几行</span><span class="sbl">比对差异，看清到底改了哪几行</span></a>
+      <a href="07-add-delete.html"><span class="sn">7</span><span class="st">新增、删除、重命名文件</span><span class="sbl">新增、删除、重命名的正确做法（别用 F2）</span></a>
+      <a href="08-history.html"><span class="sn">8</span><span class="st">查看历史：Log 对话框详解</span><span class="sbl">Show log 日志对话框详解，查谁改了什么</span></a>
+      <a href="09-revert.html"><span class="sn">9</span><span class="st">撤销：改错了怎么退回</span><span class="sbl">撤销本地改动与撤销已提交的改动，两者完全不同</span></a>
+    </div>
+  </div>
+  <div class="stageblock">
+    <div class="sh"><span class="sno">03</span><div><div class="stt">第三阶段 · 进阶操作</div><div class="ssd">冲突处理、分支合并、版本拓扑图——多人协作的核心</div></div><span class="scount">6 节</span></div>
+    <div class="slist">
+      <a href="10-conflict.html"><span class="sn">10</span><span class="st">冲突处理：两人改了同一处</span><span class="sbl">冲突是怎么产生的、冲突文件里的标记怎么看</span></a>
+      <a href="11-merge-tool.html"><span class="sn">11</span><span class="st">合并编辑器：逐行选择保留谁</span><span class="sbl">TortoiseMerge 三栏合并编辑器，逐行选择保留谁</span></a>
+      <a href="12-branch.html"><span class="sn">12</span><span class="st">建分支：开一条独立开发线</span><span class="sbl">Branch/tag 对话框建分支，开一条独立开发线</span></a>
+      <a href="13-switch.html"><span class="sn">13</span><span class="st">切换分支：在主干和分支间跳</span><span class="sbl">Switch 在主干和分支之间来回切换</span></a>
+      <a href="14-merge.html"><span class="sn">14</span><span class="st">合并分支：把改动并回主干</span><span class="sbl">Merge 向导把分支改动合并回主干，含 Test Merge 预演</span></a>
+      <a href="15-revision-graph.html"><span class="sn">15</span><span class="st">版本拓扑图：看清分支走向</span><span class="sbl">Revision graph 版本拓扑图，看清分支走向</span></a>
+    </div>
+  </div>
+  <div class="stageblock">
+    <div class="sh"><span class="sno">04</span><div><div class="stt">第四阶段 · 属性与锁</div><div class="ssd">让 SVN 按你的规矩对待文件：忽略规则、属性设置、文件锁</div></div><span class="scount">3 节</span></div>
+    <div class="slist">
+      <a href="16-ignore.html"><span class="sn">16</span><span class="st">忽略文件：让编译产物别再烦我</span><span class="sbl">忽略编译产物和临时文件，让提交列表干净</span></a>
+      <a href="17-properties.html"><span class="sn">17</span><span class="st">属性对话框：设置文件行为</span><span class="sbl">属性对话框：换行符、二进制标记、关键字替换</span></a>
+      <a href="18-lock.html"><span class="sn">18</span><span class="st">文件锁：二进制文件独占编辑</span><span class="sbl">二进制文件独占锁，防止两人改坏同一个 PSD</span></a>
+    </div>
+  </div>
+  <div class="stageblock">
+    <div class="sh"><span class="sno">05</span><div><div class="stt">第五阶段 · 服务端管理</div><div class="ssd">VisualSVN Server Manager 里的图形化管理</div></div><span class="scount">3 节</span></div>
+    <div class="slist">
+      <a href="19-server.html"><span class="sn">19</span><span class="st">服务端：VisualSVN 建仓库</span><span class="sbl">新建仓库、建标准目录、拿到仓库地址发给同事</span></a>
+      <a href="20-users.html"><span class="sn">20</span><span class="st">用户与权限：谁能看谁能改</span><span class="sbl">创建用户和组，按目录分配读写权限</span></a>
+      <a href="21-backup.html"><span class="sn">21</span><span class="st">备份与恢复：图形界面操作</span><span class="sbl">备份与恢复，含定时任务和恢复演练建议</span></a>
+    </div>
+  </div>
+  <div class="stageblock">
+    <div class="sh"><span class="sno">06</span><div><div class="stt">第六阶段 · 效率技巧</div><div class="ssd">补丁导出、设置调优、问题排查、速查表</div></div><span class="scount">4 节</span></div>
+    <div class="slist">
+      <a href="22-patch-export.html"><span class="sn">22</span><span class="st">补丁与导出：不走仓库传代码</span><span class="sbl">创建和应用补丁、Export 干净副本、Import 导入</span></a>
+      <a href="23-settings.html"><span class="sn">23</span><span class="st">设置面板：常用选项怎么调</span><span class="sbl">设置面板：精简右键菜单、清除认证数据等实用调整</span></a>
+      <a href="24-troubleshoot.html"><span class="sn">24</span><span class="st">常见问题：报错怎么处理</span><span class="sbl">常见报错按症状排查，附 Clean up 万能修复</span></a>
+      <a href="25-cheatsheet.html"><span class="sn">25</span><span class="st">图形操作速查表</span><span class="sbl">全套图形操作速查表 + 团队协作约定模板</span></a>
+    </div>
+  </div>
+
+
+<h3 class="sec" id="quick"><span class="no">#</span>四条常见路径</h3>
+<div class="grid2">
+  <div class="qa"><h6>路径 A：今天第一次用 SVN</h6><p>从第 1 节顺序读。第 1 节认识两个软件，第 2 节把代码拉到本地，第 3 节认全右键菜单，第 4 节学会「改、更、提」这个日常循环。读完前四节就能正常干活了。</p><a class="qgo" href="01-tools.html">从第 1 节开始 →</a></div>
+  <div class="qb"><h6>路径 B：代码撞车了 / 出现冲突</h6><p>直接看第 10 节和第 11 节。第 10 节讲冲突是怎么产生的、冲突文件里的标记怎么看、什么时候该找谁；第 11 节讲怎么用合并工具逐行解决，不用手工删标记。</p><a class="qgo" href="10-conflict.html">打开冲突处理 →</a></div>
+  <div class="qa"><h6>路径 C：我要搭服务器 / 管权限</h6><p>从第 19 节进入服务端部分。建仓库、加用户、配权限、做备份，全部在 VisualSVN Server Manager 里点鼠标完成，不用碰配置文件。</p><a class="qgo" href="19-server.html">跳到第 19 节 →</a></div>
+  <div class="qb"><h6>路径 D：报错了 / 不知道点哪里</h6><p>第 24 节按「症状」组织，列出常见问题和图形界面的解决办法。第 25 节是全套图形操作的速查表，可以打印贴墙。</p><a class="qgo" href="24-troubleshoot.html">打开问题排查 →</a></div>
+</div>
+
+<div class="box key" style="margin-top:34px">
+  <span class="bt">关于截图来源</span>
+  <p>教程中的界面截图取自 TortoiseSVN 官方文档与 VisualSVN 官方站点，对应的是 TortoiseSVN 1.14 与 VisualSVN Server 5.x 版本的界面。你实际安装的版本如果界面略有差异（比如按钮位置微调），属正常情况，功能位置是一致的。</p>
+</div>
+
+<footer>
+  <p><b>SVN 图形化实战 · 全鼠标操作</b></p>
+  <p style="margin-top:8px">六个阶段：准备（1-3）→ 日常使用（4-9）→ 进阶操作（10-15）→ 属性与锁（16-18）→ 服务端管理（19-21）→ 效率技巧（22-25）。</p>
+  <p style="margin-top:8px;color:var(--tx4)">需要命令行版本的完整参考，可以查官方文档 Version Control with Subversion（svnbook.red-bean.com，免费电子书）；TortoiseSVN 的完整帮助手册在 tortoisesvn.net/support.html。</p>
+</footer>
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+<script src="assets/app.js"></script>
+</body>
+</html>

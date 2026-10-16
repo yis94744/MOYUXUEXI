@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>11. 合并编辑器：逐行选择保留谁 | SVN 图形化实战</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 图形化实战</h1></div>
+  <div class="brand-sub">TortoiseSVN + VisualSVN · 全鼠标操作</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 准备</div>
+    <a href="01-tools.html">1. 认识你的两个图形工具</a>
+    <a href="02-first-checkout.html">2. 第一次检出：把代码拉到本地</a>
+    <a href="03-icons.html">3. 看懂图标角标与右键菜单</a>
+    <div class="grp">第二阶段 · 日常使用</div>
+    <a href="04-daily.html">4. 日常三件事：改、更、提</a>
+    <a href="05-status.html">5. 查看改动：哪些文件变了</a>
+    <a href="06-diff.html">6. 比对差异：到底改了哪几行</a>
+    <a href="07-add-delete.html">7. 新增、删除、重命名文件</a>
+    <a href="08-history.html">8. 查看历史：Log 对话框详解</a>
+    <a href="09-revert.html">9. 撤销：改错了怎么退回</a>
+    <div class="grp">第三阶段 · 进阶操作</div>
+    <a href="10-conflict.html">10. 冲突处理：两人改了同一处</a>
+    <a href="11-merge-tool.html" class="on">11. 合并编辑器：逐行选择保留谁</a>
+    <a href="12-branch.html">12. 建分支：开一条独立开发线</a>
+    <a href="13-switch.html">13. 切换分支：在主干和分支间跳</a>
+    <a href="14-merge.html">14. 合并分支：把改动并回主干</a>
+    <a href="15-revision-graph.html">15. 版本拓扑图：看清分支走向</a>
+    <div class="grp">第四阶段 · 属性与锁</div>
+    <a href="16-ignore.html">16. 忽略文件：让编译产物别再烦我</a>
+    <a href="17-properties.html">17. 属性对话框：设置文件行为</a>
+    <a href="18-lock.html">18. 文件锁：二进制文件独占编辑</a>
+    <div class="grp">第五阶段 · 服务端管理</div>
+    <a href="19-server.html">19. 服务端：VisualSVN 建仓库</a>
+    <a href="20-users.html">20. 用户与权限：谁能看谁能改</a>
+    <a href="21-backup.html">21. 备份与恢复：图形界面操作</a>
+    <div class="grp">第六阶段 · 效率技巧</div>
+    <a href="22-patch-export.html">22. 补丁与导出：不走仓库传代码</a>
+    <a href="23-settings.html">23. 设置面板：常用选项怎么调</a>
+    <a href="24-troubleshoot.html">24. 常见问题：报错怎么处理</a>
+    <a href="25-cheatsheet.html">25. 图形操作速查表</a>
+
+  </nav>
+</aside>
+<main>
+<div class="crumb">
+  <span class="stage">第三阶段 · 进阶操作</span>
+  <span class="sep">/</span>
+  <a href="index.html">总目录</a>
+  <span class="sep">/</span>
+  <span class="cur">第 11 节</span>
+</div>
+
+<h3 class="sec" id="s11"><span class="no">11</span>合并编辑器：逐行选择保留谁</h3>
+
+<p class="lead"> 冲突时最舒服的解决方式，是让专门的工具帮你<strong>逐行挑选保留谁</strong>。 TortoiseSVN 自带的 <strong>TortoiseMerge</strong> 就是干这个的—— 左右两版并排摆开，你只管在中间那份上做决定。
+</p>
+
+<div class="box key"> <span class="bt">为什么值得用工具，而不是硬啃标记</span>
+  <p> 上一节讲的「手工删标记」当然可行，但冲突一多就会很累： 你要在成百上千行里找到那些 <code class="ic">&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code>， 还得记住哪一段是谁的。
+  </p>
+  <p> TortoiseMerge 把这些工作接了过去：<strong>两边的内容<em>并排</em>摆给你看， 差异<em>用颜色</em>标出来，冲突的地方<em>自动跳过去</em></strong>， 你只需要一处一处点「用我的」或「用他的」。
+  </p>
+  <p>而且它自带语法高亮、行号对齐，比在记事本里对着标记发呆高效得多。</p>
+</div>
+
+<h4 class="sub">三栏模式：左右对照，中间出结果</h4>
+
+<p> 冲突时打开的就是三栏模式。它的布局非常直观： <strong>两个来源在两边，结果在中间</strong>。你要做的就是照看中间那一栏。
+</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">TortoiseMerge 三栏模式（点击图可放大）</span><span class="fs">Three-Pane Merge</span></div>
+  <div class="sb"><img src="img/merge-three-pane.png" alt="TortoiseMerge 三栏模式"></div>
+  <div class="cap"> 这个窗口分三栏，<b>每一栏的职责完全不同，认清了就不会乱</b>：<br><br> <b>① 左栏 · 我的版本（Mine）</b>——你本地改完的样子，也就是文件里 <code class="ic">&lt;&lt;&lt;&lt;&lt;&lt;&lt; .mine</code> 那一段的内容。 <b>这一栏是只读的参照</b>，你在上面点选，决定要不要把某一块搬到中间。<br><br> <b>② 右栏 · 别人的版本（Theirs）</b>——服务器上最新的样子， 也就是同事提交过来的内容。同样作为参照摆在右边。<br> <b>左右两栏的作用是「给你看两个候选」，不要指望在这里改东西。</b><br><br>
+  <b>③ 中栏 · 合并结果</b>——这才是<b>最终会被保存进文件的内容</b>。 它一开始是 SVN 自动拼出来的半成品（两边不冲突的部分已经拼好了，冲突部分留了标记）， <b>你在这里做决定：每一处冲突到底留谁的</b>。 改完之后保存，写回磁盘的就是这一栏。<br> <em>记住这个分工：两边看，中间改。</em><br><br>
+  <b>④ 顶部的颜色条</b>——三栏上方各有一条细细的指示条， 上面<b>红色的块</b>标出「哪些行还有问题」。 它能让你一眼看出<em>整个文件一共几处需要决策、以及它们分布在文件的什么位置</em>， 不用滚到底才发现下面还埋着好几处。<br> 点颜色条上的红块，视图会<b>直接跳到那一处</b>，比滚轮快得多。<br><br> <b>⑤ 工具栏按钮</b>——最常用的几个是： <span class="k">跳到上一处 / 下一处冲突</span>（一处一处过，不用自己找）、 <span class="k">选用我的 / 选用别人的</span>（把当前这一块整体替换成某一方，
+    <b>这是使用频率最高的操作</b>）、 以及 <span class="k">保存</span>。<br>
+    <em>按钮的具体位置和图标在不同版本里略有差异，但功能就是这几类。</em>
+  </div>
+</div>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:170px">界面区域</th><th style="width:200px">它是什么</th><th>你要在这里做什么</th></tr></thead>
+<tbody>
+  <tr>
+    <td><strong>左栏 · Mine</strong></td>
+    <td>我的改动</td>
+    <td>不需要编辑。<strong>对照用</strong>：想留自己写法时就往中间搬。</td>
+  </tr>
+  <tr>
+    <td><strong>右栏 · Theirs</strong></td>
+    <td>别人的改动</td>
+    <td>同样只作对照。想采纳同事的写法时用它。</td>
+  </tr>
+  <tr>
+    <td><strong>中栏 · 合并结果</strong></td>
+    <td>即将保存的内容</td>
+    <td><strong>唯一需要你动手的地方。</strong>冲突处选一边， 或者两边都留、手工调成最终版。</td>
+  </tr>
+  <tr>
+    <td><strong>顶部颜色条</strong></td>
+    <td>问题分布图</td>
+    <td>看<b>红色块</b>的数量和位置，确认没有漏掉任何一处冲突。</td>
+  </tr>
+  <tr>
+    <td><strong>工具栏</strong></td>
+    <td>跳转与选用</td>
+    <td>上一处/下一处、选用我的/选用别人的、保存。</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box warn">
+  <span class="bt">三栏模式里最容易搞反的两件事</span>
+  <ul>
+    <li><strong>认「我的」和「别人的」别靠位置靠文字。</strong> 左栏是<b>你自己</b>改的，右栏是<b>同事</b>提交的。 分不清的时候，看一眼栏目标题上的 <code class="ic">Mine</code> / <code class="ic">Theirs</code>。</li>
+    <li><strong>别在左右两栏里编辑。</strong>它们只是参照。 你真正要负责的只有中间那一栏——<b>左右栏改了不会生效，会白白浪费时间</b>。</li>
+  </ul>
+</div>
+
+<h4 class="sub">双栏模式：单纯比对两个文件</h4>
+
+<p> 如果不是冲突，只是想知道<strong>两个文件到底哪里不一样</strong>， 打开的就是双栏模式。它没有中间那一栏，只是左右对照。
+</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">TortoiseMerge 双栏模式</span><span class="fs">Two-Pane Diff</span></div>
+  <div class="sb"><img src="img/merge-two-pane.png" alt="TortoiseMerge 双栏模式" class="mid"></div>
+  <div class="cap"> 双栏模式把<b>两个文件并排铺开</b>，中间有连接线把对应的行牵起来，一眼就能看出哪里被增删了。<br><br>
+    <b>它什么时候出现</b>：<br> • 右键文件选 <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Diff with previous version</span></span> 时（看这个文件比上一版改了什么）<br> • 在 <code class="ic">Show log</code> 里双击某个文件时<br> • 用 <code class="ic">Diff</code> 类功能做「设置 TortoiseMerge 为默认比对工具」之后的各种比对场景<br><br>
+    <b>它和冲突处理的关系</b>：双栏只看不改，是「读」的工具； 三栏是要产出结果的，是「写」的工具。
+    <b>冲突解决用三栏，日常比对用双栏，不要混着用</b>——在双栏里改是改不出合并结果的。<br><br>
+    <b>和图片比对的区别</b>：如果要比的是 PSD、PNG 这类图片， TortoiseSVN 会自动改用 <span class="k">TortoiseIDiff</span>， 左右两张图并排显示、同步缩放，专门用来比对美术资源。
+  </div>
+</div>
+
+<h4 class="sub">用 TortoiseMerge 解决冲突的完整步骤</h4>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">MERGE</span>从打开到标记已解决</div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">在冲突文件上右键，选择编辑冲突</span>
+      <span class="sc">已经处于冲突状态的文件，右键菜单里都能找到打开合并工具的入口 （<code class="ic">Edit conflicts</code> 这类选项）。<br>
+      <em>也可以先看 <code class="ic">Show log</code> 弄清对方那次提交的意图，再动手——先读后改，少返工。</em></span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">工具打开，先别急着点，扫一遍顶部颜色条</span>
+      <span class="sc">数一数<b>红色块大概有几处</b>。心里有数了再开始， 能避免「以为改完了、结果往下滚还有一堆」。<em>冲突少就是几分钟的事，冲突多要有心理准备。</em></span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">用「下一处冲突」逐处跳过去</span>
+      <span class="sc">不用自己拿滚轮找。<strong>点一次跳一处</strong>， 每一处都会把「我的」和「别人的」并排展示给你看。
+      <em>一处处理完，它自动带你去下一处。</em></span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">每一处决定：用我的、用别人的，还是自己合</span>
+      <span class="sc">大多数情况点一下就完事。但也有些情况<b>两边都不能直接要</b>—— 比如你的改动和新逻辑得一起进来，这时候就在<b>中栏手工编辑</b>， 把它调成最终正确的样子。<br>
+      <em>判断依据是「业务上哪个对」，不是「谁先提交的」。</em></span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">保存</span>
+      <span class="sc">点工具栏的保存按钮，中栏的内容写回文件。
+      <strong>这一步不做，前面全白忙</strong>——工具里改的东西只存在内存里。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">关掉工具，回到资源管理器右键 Resolved</span>
+      <span class="sc">保存只是把文件内容改好了，<strong>SVN 还不知道你已经处理完</strong>。 对着文件右键 → <span class="mp">TortoiseSVN <span class="ar">→</span> <span class="item">Resolved</span></span>， 角标才会从黄底红叹号变回绿色对勾。</span>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="num"></div>
+    <div class="body">
+      <span class="st">提交，说明里写清怎么合的</span>
+      <span class="sc">在 <code class="ic">Message</code> 里写明白哪一处留了谁、为什么。 比如 <code class="ic">解决登录校验冲突：沿用对方的新接口，保留本地的参数校验</code>。
+      <em>这样以后别人查这一版，能看懂你当时的取舍。</em></span>
+    </div>
+  </div>
+</div>
+
+<h4 class="sub">颜色含义：看一眼就知道这段属于什么</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:120px">颜色</th><th style="width:160px">代表什么</th><th>怎么处理</th></tr></thead>
+<tbody>
+  <tr>
+    <td><span class="tagmini y">黄色</span></td>
+    <td><strong>冲突块</strong></td>
+    <td>两边在这段打架了，<strong>必须由你决定留谁</strong>。 这是唯一你必须动脑子的部分。</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini g">绿色</span></td>
+    <td><strong>新增</strong></td>
+    <td>这段内容是相对另一侧多出来的（新加的行/块）。
+    <strong>通常直接采纳</strong>，但要留意它会不会和别处重复。</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini r">红色</span></td>
+    <td><strong>删除</strong></td>
+    <td>这段内容在另一侧被删掉了。
+    <strong>要判断是「真的该删」还是「误删」</strong>——这是最容易被忽略的一类。</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini c">正常色</span></td>
+    <td>两边一致</td>
+    <td>没有任何差异。<strong>完全不用管</strong>，工具已经自动处理好了。</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box err">
+  <span class="bt">「红色 = 删除」这两类的判断不能偷懒</span>
+  <p> 新增（绿）一般不用纠结：多出来的东西留着多半没坏处。 但<strong>删除（红）要当心</strong>：
+  </p>
+  <ul>
+    <li>如果同事删除的是<strong>废弃代码</strong>，那删得对，采纳。</li>
+    <li>如果同事删除的是<strong>你还要用的东西</strong>（比如他重构时顺手删掉的一个分支）， 采纳就会<b>悄悄丢掉功能</b>——编译能过、运行到那条路才报错，这是最难查的一类问题。</li>
+  </ul>
+  <p><strong>看到红色的整块删除时，停下来读一眼，别一路点「下一处」冲过去。</strong></p>
+</div>
+
+<div class="box tip">
+  <span class="bt">什么时候用三栏，什么时候干脆手工改</span>
+  <p>两种方式不是对立的，按冲突量选就行：</p>
+  <ul>
+    <li><strong>冲突只有一两处</strong>——用三栏最快。 打开、跳过去、点两下、保存，一分钟搞定，而且<b>不容易漏掉标记</b>。</li>
+    <li><strong>冲突特别多、遍布整个文件</strong>——直接在文本编辑器里手工改反而更快。 几十处冲突在工具里一处处点，光是等待和切换就很累； 这时候把文件整个打开，用编辑器的<b>查找功能直接搜
+    <code class="ic">&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> 这个符号</b>，一处一处往下跳着改， 反而更顺手、更有全局感。</li>
+    <li><strong>改动是「重写式」的</strong>（这一版基本推翻上一版）——三栏的意义不大， 直接确定用哪一版更省事。</li>
+  </ul>
+  <p><strong>核心原则</strong>：工具是为了省力，不是为了好看。 哪个方式让你更快、更不容易出错，就用哪个。</p>
+</div>
+
+<h4 class="sub">两种方式怎么选</h4>
+
+<div class="duo">
+  <div>
+    <div class="dh">✗ 手工编辑冲突文件</div>
+    <p><strong>优点</strong>：只要有文本编辑器就能干，不用切换窗口； 对文件全局改动有整体感，改大段内容时更顺。</p>
+    <p><strong>缺点</strong>：要自己找标记行，容易漏掉藏在文件深处的某一处； 一旦忘了删掉标记，编译直接失败；<b>看不出哪些是新增、哪些是删除</b>， 只能靠读代码判断。</p>
+    <p><strong>适合</strong>：冲突特别多、而且改动是重写式的场景； 或者你手上的编辑器有很强的版本对比插件。</p>
+    <p><strong>最大风险</strong>：漏删标记、漏改某处 —
+    <em>提交后才发现，损失更大</em>。</p>
+  </div>
+  <div>
+    <div class="dh">✓ 用 TortoiseMerge</div>
+    <p><strong>优点</strong>：两边并排看得一清二楚，<strong>不用自己找标记</strong>； 顶部颜色条把问题点全标出来，<b>漏不了</b>； 保存后标记清理得干干净净。</p>
+    <p><strong>缺点</strong>：冲突几十处时要一处处点，比较费耐心； 初次打开这种工具需要一点适应时间。</p>
+    <p><strong>适合</strong>：日常绝大部分冲突场景 — 尤其是冲突集中在几个位置、你想快速处理掉的情况。</p>
+    <p><strong>最佳组合</strong>：<em>三栏过一遍确保不遗漏， 遇到需要大改的段落切回编辑器细调，最后再回来存一次。</em></p>
+  </div>
+</div>
+
+<div class="box ok">
+  <span class="bt">把冲突处理变轻松的几条习惯</span>
+  <ul>
+    <li><strong>动手前先看日志。</strong>弄清对方那次提交想干什么， 再决定留谁。这一步花两分钟，能省掉后面反复返工。</li>
+    <li><strong>一次只处理一个文件。</strong>冲突文件多的时候， 一个一个来，处理完一个就右键 Resolved 一个，<b>别攒着一起做</b>。</li>
+    <li><strong>处理完通读一遍。</strong>工具帮你解决了差异，但 「合起来语法对不对、逻辑通不通」只有你能判断。</li>
+    <li><strong>拿不准就问人。</strong>冲突的本质是<b>两个人对同一处代码有不同理解</b>， 这时候最快的方式是直接沟通，而不是猜。</li>
+    <li><strong>提交前再更新一次。</strong>你解决冲突的这段时间里， 别人可能又提交了——再更新一次，避免马上又撞一次。</li>
+  </ul>
+</div>
+
+
+<div class="pager">
+  <a href="10-conflict.html"><span class="lbl">← 上一节</span><span class="ttl">10. 冲突处理：两人改了同一处</span></a>
+  <a class="home" href="index.html"><span class="ttl">总目录</span></a>
+  <a class="next" href="12-branch.html"><span class="lbl">下一节 →</span><span class="ttl">12. 建分支：开一条独立开发线</span></a>
+</div>
+
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+<script src="assets/app.js"></script>
+</body>
+</html>

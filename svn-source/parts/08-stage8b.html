@@ -1,0 +1,991 @@
+<!-- ==========================================================================
+     第 24 节：命令速查表
+     ========================================================================== -->
+<h3 class="sec" id="s24"><span class="no">24</span>命令速查表</h3>
+
+<p class="lead">
+  这一节是<strong>可以贴在墙上</strong>的参考页。按功能分组，包含最常用的选项。
+  记不住没关系——会查就行。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 24-1　SVN 命令全景图：按使用频率分层</span><span class="fs">Command Map</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 570" width="980" height="570" role="img" aria-label="SVN 命令按使用频率分层图">
+  <!-- 第 3 环：进阶命令（最外圈） -->
+  <circle cx="490" cy="250" r="210" fill="none" stroke="#d2a8ff" stroke-width="1.5" stroke-dasharray="7 5"/>
+
+  <rect class="c-pur" x="435" y="23" width="110" height="34" rx="7"/>
+  <text class="tm2" x="490" y="45" text-anchor="middle">export / patch</text>
+
+  <rect class="c-pur" x="286" y="84" width="110" height="34" rx="7"/>
+  <text class="tm2" x="341" y="106" text-anchor="middle">copy / move</text>
+
+  <rect class="c-pur" x="225" y="233" width="110" height="34" rx="7"/>
+  <text class="tm2" x="280" y="255" text-anchor="middle">switch</text>
+
+  <rect class="c-pur" x="286" y="381" width="110" height="34" rx="7"/>
+  <text class="tm2" x="341" y="403" text-anchor="middle">lock / unlock</text>
+
+  <rect class="c-pur" x="435" y="443" width="110" height="34" rx="7"/>
+  <text class="tm2" x="490" y="465" text-anchor="middle">propset 等</text>
+
+  <rect class="c-pur" x="583" y="381" width="110" height="34" rx="7"/>
+  <text class="tm2" x="638" y="403" text-anchor="middle">changelist</text>
+
+  <rect class="c-pur" x="645" y="233" width="110" height="34" rx="7"/>
+  <text class="tm2" x="700" y="255" text-anchor="middle">merge</text>
+
+  <rect class="c-pur" x="583" y="84" width="110" height="34" rx="7"/>
+  <text class="tm2" x="638" y="106" text-anchor="middle">blame</text>
+
+  <!-- 第 2 环：日常必备 -->
+  <circle cx="490" cy="250" r="145" fill="none" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="7 5"/>
+
+  <rect class="c-blue" x="435" y="88" width="110" height="34" rx="7"/>
+  <text class="tm2" x="490" y="110" text-anchor="middle">log</text>
+
+  <rect class="c-blue" x="309" y="160" width="110" height="34" rx="7"/>
+  <text class="tm2" x="364" y="182" text-anchor="middle">revert</text>
+
+  <rect class="c-blue" x="309" y="305" width="110" height="34" rx="7"/>
+  <text class="tm2" x="364" y="327" text-anchor="middle">cleanup</text>
+
+  <rect class="c-blue" x="435" y="378" width="110" height="34" rx="7"/>
+  <text class="tm2" x="490" y="400" text-anchor="middle">list</text>
+
+  <rect class="c-blue" x="561" y="305" width="110" height="34" rx="7"/>
+  <text class="tm2" x="616" y="327" text-anchor="middle">resolve</text>
+
+  <rect class="c-blue" x="561" y="160" width="110" height="34" rx="7"/>
+  <text class="tm2" x="616" y="182" text-anchor="middle">info</text>
+
+  <!-- 第 1 环：核心 -->
+  <circle cx="490" cy="250" r="78" fill="rgba(126,231,135,.10)" stroke="#7ee787" stroke-width="2"/>
+  <text class="hd" x="490" y="230" text-anchor="middle" fill="#7ee787" font-size="13">核心 6 条</text>
+  <text class="tm2" x="490" y="252" text-anchor="middle">checkout　update</text>
+  <text class="tm2" x="490" y="270" text-anchor="middle">commit　add</text>
+  <text class="tm2" x="490" y="288" text-anchor="middle">status　diff</text>
+
+  <!-- 图例 -->
+  <rect x="24" y="492" width="932" height="66" rx="10" fill="#0b0f14" stroke="#30363d" stroke-width="1.2"/>
+  <circle cx="46" cy="512" r="6" fill="#7ee787"/>
+  <text class="ts" x="62" y="516">核心 6 条 —— 练到不用查文档</text>
+  <circle cx="352" cy="512" r="6" fill="#58a6ff"/>
+  <text class="ts" x="368" y="516">第 2 环 日常必备 —— 遇到问题时用</text>
+  <circle cx="678" cy="512" r="6" fill="#d2a8ff"/>
+  <text class="ts" x="694" y="516">第 3 环 进阶 —— 按需查阅</text>
+  <circle cx="46" cy="538" r="6" fill="#ffa657"/>
+  <text class="ts" x="62" y="542">服务端工具 —— svnadmin · svnserve · svnlook · svndumpfilter · svnrdump · svnauthz</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>学习优先级：</b>先把<strong>绿色核心 6 条</strong>练到不用查文档，
+    再补<strong>蓝色第 2 环</strong>（这些是「遇到问题时会用」的）。
+    紫色进阶命令按需学——用到的时候再回来查。
+  </div>
+</div>
+
+<h4 class="sub">客户端命令</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:14%">命令</th><th style="width:30%">作用</th><th>最常用选项</th></tr></thead>
+<tbody>
+  <tr class="group-row"><td colspan="3" style="background:rgba(88,166,255,.07);font-weight:700;color:#58a6ff">取仓库 —— 把代码弄到本地</td></tr>
+  <tr>
+    <td><code class="ic g">checkout</code></td>
+    <td>把仓库内容检出成工作副本</td>
+    <td><code class="ic">-r REV</code> 检出指定版本　<code class="ic">--depth ARG</code> 稀疏检出　<code class="ic">--username/-password</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic">export</code></td>
+    <td>导出干净副本（无 <code class="ic">.svn</code>）</td>
+    <td><code class="ic">-r REV</code>　<code class="ic">--force</code> 覆盖已有　<code class="ic">--ignore-externals</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic">list</code> (ls)</td>
+    <td>列出仓库目录（不用检出）</td>
+    <td><code class="ic">-v</code> 带版本作者　<code class="ic">-R</code> 递归　<code class="ic">-r REV</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic">cat</code></td>
+    <td>看仓库里某个文件的内容</td>
+    <td><code class="ic">-r REV</code>　<code class="ic">URL@PEG</code> 语法</td>
+  </tr>
+  <tr>
+    <td><code class="ic">import</code></td>
+    <td>把现成目录导入仓库（不留工作副本）</td>
+    <td><code class="ic">-m MSG</code> 必填　<code class="ic">--no-ignore</code></td>
+  </tr>
+
+  <tr class="group-row"><td colspan="3" style="background:rgba(126,231,135,.07);font-weight:700;color:#7ee787">改内容 —— 日常开发主力</td></tr>
+  <tr>
+    <td><code class="ic g">update</code></td>
+    <td>从仓库拉取最新改动到工作副本</td>
+    <td><code class="ic">-r REV</code>　<code class="ic">--accept ARG</code> 冲突策略　<code class="ic">--non-interactive</code>　<code class="ic">--set-depth</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic g">commit</code></td>
+    <td>把工作副本改动提交到仓库</td>
+    <td><code class="ic">-m MSG</code>　<code class="ic">--file F</code>　<code class="ic">--changelist ARG</code>　<code class="ic">-N</code> 非递归</td>
+  </tr>
+  <tr>
+    <td><code class="ic g">add</code></td>
+    <td>把新文件纳入版本控制</td>
+    <td><code class="ic">--force</code>　<code class="ic">--no-ignore</code>　<code class="ic">--depth ARG</code>　<code class="ic">--auto-props</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic">delete</code> (rm)</td>
+    <td>从版本控制中删除</td>
+    <td><code class="ic">--force</code>　<code class="ic">--keep-local</code> 保留本地文件</td>
+  </tr>
+  <tr>
+    <td><code class="ic">copy</code> (cp)</td>
+    <td>复制（建分支/标签的核心）</td>
+    <td><code class="ic">-r REV</code> 从历史版本复制　<code class="ic">--parents</code> 自动建父目录</td>
+  </tr>
+  <tr>
+    <td><code class="ic">move</code> (mv)</td>
+    <td>移动/重命名（保留历史）</td>
+    <td><code class="ic">--force</code>　<code class="ic">--parents</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic g">revert</code></td>
+    <td>撤销本地未提交的改动</td>
+    <td><code class="ic">-R</code> 递归　<code class="ic">--depth ARG</code>　<code class="ic">--changelist ARG</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic">mkdir</code></td>
+    <td>建目录（本地或服务端）</td>
+    <td><code class="ic">-m MSG</code> URL 形式必填　<code class="ic">--parents</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic">resolve</code></td>
+    <td>标记冲突已解决</td>
+    <td><code class="ic">--accept working|mine-full|theirs-full|base|mine-conflict|theirs-conflict</code>　<code class="ic">-R</code></td>
+  </tr>
+
+  <tr class="group-row"><td colspan="3" style="background:rgba(227,179,65,.07);font-weight:700;color:#e3b341">看状态 —— 提交前的自查</td></tr>
+  <tr>
+    <td><code class="ic g">status</code> (st)</td>
+    <td>查看工作副本状态（最重要）</td>
+    <td><code class="ic">-u</code> 对比服务器　<code class="ic">-v</code> 带版本号　<code class="ic">-q</code> 精简　<code class="ic">--no-ignore</code> 显示被忽略的</td>
+  </tr>
+  <tr>
+    <td><code class="ic g">diff</code> (di)</td>
+    <td>比较差异</td>
+    <td><code class="ic">-r N:M</code> 版本区间　<code class="ic">-c N</code> 单次提交　<code class="ic">--summarize</code> 只列文件　<code class="ic">--git</code>　<code class="ic">--file F</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic">log</code></td>
+    <td>查看提交历史</td>
+    <td><code class="ic">-l N</code> 条数　<code class="ic">-r N:M</code>　<code class="ic">-v</code> 带路径　<code class="ic">-g</code> 合并图谱　<code class="ic">-q</code> 精简　<code class="ic">--search</code>　<code class="ic">--xml</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic">info</code></td>
+    <td>查看工作副本/URL 的详细信息</td>
+    <td><code class="ic">--show-item ARG</code> 只输出一个字段　<code class="ic">--xml</code>　<code class="ic">-R</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic">blame</code> (praise)</td>
+    <td>逐行显示最后修改者</td>
+    <td><code class="ic">-r N:M</code>　<code class="ic">-v</code> 带日期　<code class="ic">-x -w</code> 忽略空白　<code class="ic">--xml</code></td>
+  </tr>
+
+  <tr class="group-row"><td colspan="3" style="background:rgba(210,168,255,.07);font-weight:700;color:#d2a8ff">分支合并 —— 多人协作核心</td></tr>
+  <tr>
+    <td><code class="ic p">switch</code> (sw)</td>
+    <td>切换工作副本对应的 URL（换分支）</td>
+    <td><code class="ic">--relocate OLD NEW</code>　<code class="ic">--ignore-ancestry</code>　<code class="ic">--depth ARG</code>　<code class="ic">--accept ARG</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic p">merge</code></td>
+    <td>合并分支改动</td>
+    <td><code class="ic">-c N</code> / <code class="ic">-c -N</code> 反向　<code class="ic">-r N:M</code>　<code class="ic">--dry-run</code>　<code class="ic">--record-only</code>　<code class="ic">--reintegrate</code>　<code class="ic">--ignore-ancestry</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic p">patch</code></td>
+    <td>应用 unidiff 格式的补丁</td>
+    <td><code class="ic">--dry-run</code>　<code class="ic">--reverse-diff</code>　<code class="ic">--strip N</code></td>
+  </tr>
+
+  <tr class="group-row"><td colspan="3" style="background:rgba(255,166,87,.07);font-weight:700;color:#ffa657">属性 —— 解锁隐藏能力</td></tr>
+  <tr>
+    <td><code class="ic a">propset</code> (pset)</td>
+    <td>设置属性</td>
+    <td><code class="ic">--file F</code> 从文件读多行值　<code class="ic">-R</code> 递归　<code class="ic">--revprop -r N</code> 改版本属性</td>
+  </tr>
+  <tr>
+    <td><code class="ic a">propget</code> (pget)</td>
+    <td>读取属性值</td>
+    <td><code class="ic">-R</code>　<code class="ic">--revprop -r N</code>　<code class="ic">--strict</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic a">proplist</code> (plist)</td>
+    <td>列出所有属性名</td>
+    <td><code class="ic">-v</code> 带值　<code class="ic">-R</code> 递归</td>
+  </tr>
+  <tr>
+    <td><code class="ic a">propdel</code> (pdel)</td>
+    <td>删除属性</td>
+    <td><code class="ic">-R</code>　<code class="ic">--revprop -r N</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic a">propedit</code> (pedit)</td>
+    <td>用编辑器编辑属性（多行值必备）</td>
+    <td><code class="ic">--editor-cmd CMD</code>　<code class="ic">--revprop -r N</code></td>
+  </tr>
+
+  <tr class="group-row"><td colspan="3" style="background:rgba(255,123,114,.07);font-weight:700;color:#ff7b72">锁与清理 —— 二进制与救急</td></tr>
+  <tr>
+    <td><code class="ic r">lock</code></td>
+    <td>加锁（配合 <code class="ic">svn:needs-lock</code>）</td>
+    <td><code class="ic">-m MSG</code> 加锁说明　<code class="ic">--force</code> 强制抢锁</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">unlock</code></td>
+    <td>解锁</td>
+    <td><code class="ic">--force</code> 强制解他人锁　<code class="ic">-R</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic r">cleanup</code></td>
+    <td><strong>清理工作副本的锁和中间状态</strong></td>
+    <td><code class="ic">--remove-unversioned</code> 删未跟踪文件　<code class="ic">--remove-ignored</code>　<code class="ic">--vacuum-pristines</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic">changelist</code> (cl)</td>
+    <td>变更列表分组</td>
+    <td><code class="ic">--remove</code>　<code class="ic">--recursive</code>　<code class="ic">--depth ARG</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic">upgrade</code></td>
+    <td>升级旧格式工作副本</td>
+    <td><code class="ic">--quiet</code></td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<h4 class="sub">服务端命令</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:20%">命令</th><th style="width:30%">作用</th><th>关键参数与说明</th></tr></thead>
+<tbody>
+  <tr class="group-row"><td colspan="3" style="background:rgba(86,212,221,.07);font-weight:700;color:#56d4dd">svnadmin —— 仓库管理（最常和 svnadmin 打交道）</td></tr>
+  <tr>
+    <td><code class="ic c">svnadmin create</code></td>
+    <td>创建仓库</td>
+    <td><code class="ic">--fs-type fsfs</code>（默认，别用 bdb）　<code class="ic">--compatible-version 1.8</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic c">svnadmin dump</code></td>
+    <td>导出仓库为 dump 文件（逻辑备份）</td>
+    <td><code class="ic">--file F</code> ★避免 PowerShell 重定向　<code class="ic">-r N:M</code>　<code class="ic">--incremental</code>　<code class="ic">--deltas</code>　<code class="ic">--quiet</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic c">svnadmin load</code></td>
+    <td>从 dump 文件恢复</td>
+    <td><code class="ic">--file F</code>　<code class="ic">--ignore-uuid</code>　<code class="ic">--force-uuid</code>　<code class="ic">--revision N:M</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic c">svnadmin hotcopy</code></td>
+    <td>完整热备（复制整个仓库）</td>
+    <td><code class="ic">--clean-logs</code>　—— 速度快，但格式绑定版本</td>
+  </tr>
+  <tr>
+    <td><code class="ic c">svnadmin verify</code></td>
+    <td>校验仓库完整性</td>
+    <td><code class="ic">-r N:M</code>　—— 定期跑，提前发现磁盘问题</td>
+  </tr>
+  <tr>
+    <td><code class="ic c">svnadmin pack</code></td>
+    <td>合并小版本文件（减少文件数）</td>
+    <td>FSFS 专用，大仓库定期执行</td>
+  </tr>
+  <tr>
+    <td><code class="ic c">svnadmin freeze</code></td>
+    <td>冻结仓库执行外部命令（打包/rsync）</td>
+    <td><code class="ic">svnadmin freeze REPO -- tar czf out.tgz</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic c">svnadmin recover</code></td>
+    <td>灾难恢复</td>
+    <td>需停服务；BDB 时代的常用命令，FSFS 下很少用</td>
+  </tr>
+  <tr>
+    <td><code class="ic c">svnadmin upgrade</code></td>
+    <td>升级仓库格式</td>
+    <td>升级 SVN 版本后执行</td>
+  </tr>
+  <tr>
+    <td><code class="ic c">svnadmin info</code></td>
+    <td>查看仓库元信息</td>
+    <td>UUID / Revisions / Format / FSFS 信息</td>
+  </tr>
+  <tr>
+    <td><code class="ic c">svnadmin lstxns</code></td>
+    <td>列出未完成事务</td>
+    <td>配合 <code class="ic">rmtxns</code> 清理钩子崩溃留下的垃圾</td>
+  </tr>
+  <tr>
+    <td><code class="ic c">svnadmin lslocks</code></td>
+    <td>列出仓库中所有锁</td>
+    <td>配合 <code class="ic">rmlocks</code> 清理</td>
+  </tr>
+  <tr>
+    <td><code class="ic c">svnadmin setlog</code></td>
+    <td>修改提交日志</td>
+    <td>需要 pre-revprop-change 钩子支持</td>
+  </tr>
+  <tr>
+    <td><code class="ic c">svnadmin setuuid</code></td>
+    <td>修改仓库 UUID</td>
+    <td>克隆仓库后必须改，否则两个库互相冲突</td>
+  </tr>
+  <tr>
+    <td><code class="ic c">svnadmin rev-size</code></td>
+    <td>查看各版本占用空间</td>
+    <td>找「哪个提交引入了大文件」时很有用</td>
+  </tr>
+
+  <tr class="group-row"><td colspan="3" style="background:rgba(210,168,255,.07);font-weight:700;color:#d2a8ff">svnserve —— 服务进程</td></tr>
+  <tr>
+    <td><code class="ic p">svnserve -d</code></td>
+    <td>守护进程模式</td>
+    <td><code class="ic">-r /var/svn</code> 仓库根目录（必填）　<code class="ic">--listen-port 3690</code>　<code class="ic">--listen-host 0.0.0.0</code>　<code class="ic">--log-file F</code>　<code class="ic">--pid-file F</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic p">svnserve -i</code></td>
+    <td>inetd 模式（由 inetd/xinetd 拉起）</td>
+    <td>老式部署，现在少用</td>
+  </tr>
+  <tr>
+    <td><code class="ic p">svnserve -t</code></td>
+    <td>隧道模式（配合 svn+ssh://）</td>
+    <td>由 SSH 调用</td>
+  </tr>
+  <tr>
+    <td><code class="ic p">svnserve -X</code></td>
+    <td>Windows 服务模式</td>
+    <td><code class="ic">sc create</code> 注册时用</td>
+  </tr>
+  <tr>
+    <td><code class="ic p">--foreground</code></td>
+    <td>前台运行（调试用）</td>
+    <td>首次部署强烈建议这样启动，能立刻看到报错</td>
+  </tr>
+
+  <tr class="group-row"><td colspan="3" style="background:rgba(227,179,65,.07);font-weight:700;color:#e3b341">svnlook / 其他工具 —— 只读检查与服务端运维</td></tr>
+  <tr>
+    <td><code class="ic a">svnlook log</code></td>
+    <td>查看提交日志</td>
+    <td><code class="ic">-r REV</code> 看已提交的　<code class="ic">-t TXN</code> 看事务中的（钩子里必用）</td>
+  </tr>
+  <tr>
+    <td><code class="ic a">svnlook changed</code></td>
+    <td>查看某版本改了哪些路径</td>
+    <td><code class="ic">-r REV</code> / <code class="ic">-t TXN</code>　<code class="ic">--copy-info</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic a">svnlook author / date</code></td>
+    <td>查看提交者 / 时间</td>
+    <td>post-commit 钩子里做通知时必用</td>
+  </tr>
+  <tr>
+    <td><code class="ic a">svnlook youngest</code></td>
+    <td>查看仓库最新版本号</td>
+    <td>脚本里判断「需不需要备份」常用</td>
+  </tr>
+  <tr>
+    <td><code class="ic a">svnlook filesize</code></td>
+    <td>查看文件大小</td>
+    <td>pre-commit 里拦截大文件用</td>
+  </tr>
+  <tr>
+    <td><code class="ic a">svnlook diff</code></td>
+    <td>查看某版本的差异</td>
+    <td>钩子里发详细通知邮件时用</td>
+  </tr>
+  <tr>
+    <td><code class="ic a">svnlook tree</code></td>
+    <td>查看仓库目录树</td>
+    <td><code class="ic">-r REV</code>　<code class="ic">--full-paths</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic a">svnlook youngest/verify</code></td>
+    <td>仓库健康检查</td>
+    <td>只读，不影响运行中的仓库</td>
+  </tr>
+  <tr>
+    <td><code class="ic">svndumpfilter</code></td>
+    <td>过滤 dump 文件（去掉/只保留某些路径）</td>
+    <td><code class="ic">include /exclude PATH</code>　<code class="ic">--drop-empty-revs</code>　<code class="ic">--renumber-revs</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic">svnrdump</code></td>
+    <td>远程 dump/load（无需登录服务器）</td>
+    <td><code class="ic">dump URL -r N:M --file F</code>　<code class="ic">load URL --file F</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic">svnauthz</code></td>
+    <td>校验/查询 authz 权限</td>
+    <td><code class="ic">svnauthz access --username U --path /p AUTHZ</code></td>
+  </tr>
+  <tr>
+    <td><code class="ic">svnmucc</code></td>
+    <td>单次提交执行多个操作（不需要工作副本）</td>
+    <td><code class="ic">put / cp / mv / rm / mkdir</code> 组合，一条命令一次提交</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<h4 class="sub">高频参数速查</h4>
+
+<div class="grid2">
+  <div class="card blue">
+    <h6>版本相关</h6>
+    <ul>
+      <li><code class="ic">-r 5</code>　指定版本 5</li>
+      <li><code class="ic">-r 5:8</code>　从 5 到 8</li>
+      <li><code class="ic">-c 8</code>　等同于 <code class="ic">-r 7:8</code>，单次提交</li>
+      <li><code class="ic">-c -8</code>　反向（撤销 r8）</li>
+      <li><code class="ic">-r HEAD</code>　最新</li>
+      <li><code class="ic">-r BASE</code>　工作副本基准</li>
+      <li><code class="ic">-r PREV</code>　上一个版本</li>
+      <li><code class="ic">-r COMMITTED</code>　上次提交的版本</li>
+      <li><code class="ic">URL@PEG</code>　peg revision（路径在 PEG 版本下的样子）</li>
+      <li><code class="ic">{2026-10-01}:HEAD</code>　按日期</li>
+    </ul>
+  </div>
+  <div class="card green">
+    <h6>递归与深度</h6>
+    <ul>
+      <li><code class="ic">-R</code> / <code class="ic">--recursive</code>　递归</li>
+      <li><code class="ic">-N</code> / <code class="ic">--non-recursive</code>　不递归</li>
+      <li><code class="ic">--depth empty</code>　只有目录本身</li>
+      <li><code class="ic">--depth files</code>　目录+文件</li>
+      <li><code class="ic">--depth immediates</code>　+子目录（空）</li>
+      <li><code class="ic">--depth infinity</code>　完全递归（默认）</li>
+      <li><code class="ic">--set-depth ARG</code>　修改已检出目录的深度</li>
+    </ul>
+  </div>
+  <div class="card pur">
+    <h6>认证与交互</h6>
+    <ul>
+      <li><code class="ic">--username U</code>　用户名</li>
+      <li><code class="ic">--password P</code>　密码</li>
+      <li><code class="ic">--no-auth-cache</code>　不缓存凭据</li>
+      <li><code class="ic">--non-interactive</code>　<strong>脚本必加</strong>，防止卡住等输入</li>
+      <li><code class="ic">--trust-server-cert</code>　信任自签名证书</li>
+      <li><code class="ic">--config-dir DIR</code>　用指定配置目录</li>
+    </ul>
+  </div>
+  <div class="card warn">
+    <h6>输出控制</h6>
+    <ul>
+      <li><code class="ic">-v</code> / <code class="ic">--verbose</code>　详细输出</li>
+      <li><code class="ic">-q</code> / <code class="ic">--quiet</code>　精简输出</li>
+      <li><code class="ic">--xml</code>　XML 格式（脚本解析用）</li>
+      <li><code class="ic">--summarize</code>　只列出文件，不显示内容</li>
+      <li><code class="ic">--no-diff-added</code>　新增文件不显示内容</li>
+      <li><code class="ic">--show-item ARG</code>　只输出一个字段</li>
+      <li><code class="ic">--no-newline</code>　不输出结尾换行</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h6>冲突处理（--accept 取值）</h6>
+    <ul>
+      <li><code class="ic">postpone</code>　保留冲突，人工解决（默认）</li>
+      <li><code class="ic">working</code>　接受当前工作副本内容</li>
+      <li><code class="ic">mine-full</code>　整个文件用我的</li>
+      <li><code class="ic">theirs-full</code>　整个文件用服务器的</li>
+      <li><code class="ic">mine-conflict</code>　只在冲突块用我的</li>
+      <li><code class="ic">theirs-conflict</code>　只在冲突块用服务器的</li>
+      <li><code class="ic">base</code>　回到原始版本，丢弃双方改动</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h6>危险操作（用前想清楚）</h6>
+    <ul>
+      <li><code class="ic">--force</code>　强制覆盖，会丢本地改动</li>
+      <li><code class="ic">--ignore-ancestry</code>　忽略历史关系，直接覆盖内容</li>
+      <li><code class="ic">--no-ignore</code>　连被忽略的文件也一起操作</li>
+      <li><code class="ic">--keep-local</code>　删除版本控制但保留本地文件</li>
+      <li><code class="ic">svn revert -R .</code>　撤销所有本地改动，不可逆</li>
+      <li><code class="ic">svnadmin rmtxns</code>　删事务，可能丢数据</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     第 25 节：图形客户端
+     ========================================================================== -->
+<h3 class="sec" id="s25"><span class="no">25</span>图形客户端与 IDE 集成</h3>
+
+<h4 class="sub">TortoiseSVN：Windows 上事实标准</h4>
+
+<p>
+  TortoiseSVN 把 SVN 操作集成到资源管理器的<strong>右键菜单</strong>和<strong>图标覆盖</strong>上。
+  对不习惯命令行的用户，这是最友好的选择。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 25-1　TortoiseSVN 图标覆盖与右键菜单对照</span><span class="fs">GUI Mapping</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 460" width="980" height="460" role="img" aria-label="TortoiseSVN 图标覆盖与菜单对照图">
+  <!-- 左：图标覆盖 -->
+  <text class="hd" x="30" y="28" fill="#58a6ff">图标覆盖（icon overlay）：一眼看出文件状态</text>
+
+  <rect x="30" y="46" width="440" height="34" rx="6" fill="#161b22" stroke="#3d444d" stroke-width="1"/>
+  <circle cx="52" cy="63" r="9" fill="#3fb950"/>
+  <path d="M47,63 L50,67 L58,58" stroke="#fff" stroke-width="2" fill="none"/>
+  <text class="tm" x="74" y="68">绿色对勾</text>
+  <text class="ts" x="200" y="68">文件与仓库一致，无改动</text>
+
+  <rect x="30" y="88" width="440" height="34" rx="6" fill="#161b22" stroke="#3d444d" stroke-width="1"/>
+  <circle cx="52" cy="105" r="9" fill="#ff5f57"/>
+  <path d="M48,101 L56,109 M56,101 L48,109" stroke="#fff" stroke-width="2"/>
+  <text class="tm" x="74" y="110">红色感叹号</text>
+  <text class="ts" x="200" y="110">本地有未提交的修改（对应 M）</text>
+
+  <rect x="30" y="130" width="440" height="34" rx="6" fill="#161b22" stroke="#3d444d" stroke-width="1"/>
+  <circle cx="52" cy="147" r="9" fill="#58a6ff"/>
+  <text class="tm" x="52" y="152" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">+</text>
+  <text class="tm" x="74" y="152">蓝色加号</text>
+  <text class="ts" x="200" y="152">已加入版本控制待提交（对应 A）</text>
+
+  <rect x="30" y="172" width="440" height="34" rx="6" fill="#161b22" stroke="#3d444d" stroke-width="1"/>
+  <circle cx="52" cy="189" r="9" fill="#febc2e"/>
+  <text class="tm" x="52" y="194" text-anchor="middle" fill="#000" font-weight="700" font-size="11">!</text>
+  <text class="tm" x="74" y="194">黄色感叹号</text>
+  <text class="ts" x="200" y="194">冲突，需要人工解决（对应 C）</text>
+
+  <rect x="30" y="214" width="440" height="34" rx="6" fill="#161b22" stroke="#3d444d" stroke-width="1"/>
+  <circle cx="52" cy="231" r="9" fill="#8b949e"/>
+  <text class="tm" x="52" y="236" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">?</text>
+  <text class="tm" x="74" y="236">灰色问号</text>
+  <text class="ts" x="200" y="236">未版本控制（对应 ?）</text>
+
+  <rect x="30" y="256" width="440" height="34" rx="6" fill="#161b22" stroke="#3d444d" stroke-width="1"/>
+  <circle cx="52" cy="273" r="9" fill="#ff7b72"/>
+  <text class="tm" x="52" y="278" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">-</text>
+  <text class="tm" x="74" y="278">红色减号</text>
+  <text class="ts" x="200" y="278">已标记删除待提交（对应 D）</text>
+
+  <rect x="30" y="298" width="440" height="34" rx="6" fill="#161b22" stroke="#3d444d" stroke-width="1"/>
+  <circle cx="52" cy="315" r="9" fill="#d2a8ff"/>
+  <text class="tm" x="52" y="320" text-anchor="middle" fill="#000" font-weight="700" font-size="11">!</text>
+  <text class="tm" x="74" y="315">紫色感叹号</text>
+  <text class="ts" x="200" y="315">被 svn:needs-lock 锁定</text>
+
+  <!-- 右：右键菜单 -->
+  <text class="hd" x="510" y="28" fill="#d2a8ff">右键菜单 → 对应命令</text>
+  <rect x="504" y="46" width="446" height="286" rx="9" fill="#161b22" stroke="#3d444d" stroke-width="1.3"/>
+
+  <text class="tm" x="524" y="72" fill="#e6edf3">SVN Checkout...</text>
+  <text class="tm2" x="820" y="72" fill="#7ee787">→ svn checkout</text>
+  <line x1="524" y1="84" x2="930" y2="84" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="106" fill="#e6edf3">SVN Update</text>
+  <text class="tm2" x="820" y="106" fill="#7ee787">→ svn update</text>
+  <line x1="524" y1="118" x2="930" y2="118" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="140" fill="#e6edf3">SVN Commit...</text>
+  <text class="tm2" x="820" y="140" fill="#7ee787">→ svn commit</text>
+  <line x1="524" y1="152" x2="930" y2="152" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="174" fill="#e6edf3">TortoiseSVN → Add</text>
+  <text class="tm2" x="820" y="174" fill="#7ee787">→ svn add</text>
+  <line x1="524" y1="186" x2="930" y2="186" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="208" fill="#e6edf3">TortoiseSVN → Revert</text>
+  <text class="tm2" x="820" y="208" fill="#7ee787">→ svn revert</text>
+  <line x1="524" y1="220" x2="930" y2="220" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="242" fill="#e6edf3">TortoiseSVN → Diff</text>
+  <text class="tm2" x="820" y="242" fill="#7ee787">→ svn diff + TortoiseMerge</text>
+  <line x1="524" y1="254" x2="930" y2="254" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="276" fill="#e6edf3">TortoiseSVN → Revision Graph</text>
+  <text class="tm2" x="820" y="276" fill="#7ee787">→ 可视化分支合并图</text>
+  <line x1="524" y1="288" x2="930" y2="288" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="310" fill="#e6edf3">TortoiseSVN → Repo-browser</text>
+  <text class="tm2" x="820" y="310" fill="#7ee787">→ 浏览仓库（无需检出）</text>
+
+  <!-- 底部提示 -->
+  <rect x="30" y="352" width="920" height="96" rx="10" fill="rgba(227,179,65,.07)" stroke="#e3b341" stroke-width="1.3"/>
+  <text class="hd" x="50" y="376" fill="#e3b341">GUI 很好用，但仍建议掌握命令行</text>
+  <text class="ts" x="50" y="398">理由一：服务器、CI、Docker 里没有 GUI，脚本必须用命令行。</text>
+  <text class="ts" x="50" y="420">理由二：GUI 会隐藏细节。比如它不告诉你 mergeinfo 被改了、不显示冲突文件的 .mine/.r2/.r3。</text>
+  <text class="ts" x="50" y="442">最佳实践：<tspan fill="#7ee787">日常用 GUI 提高效率，出问题用命令行定位</tspan>。两者查的是同一个 .svn 目录，完全兼容。</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>对照表：</b>左边每个图标颜色都对应第 7 节的 status 状态码。
+    学会看图标，就能在资源管理器里<strong>一眼扫出</strong>哪些文件需要处理，而不必打开命令行。
+  </div>
+</div>
+
+<div class="grid3">
+  <div class="card blue">
+    <h6>Windows</h6>
+    <ul>
+      <li><strong>TortoiseSVN</strong>　右键集成，事实标准</li>
+      <li><strong>VisualSVN</strong>（商业）　VS 插件</li>
+      <li><strong>AnkhSVN</strong>　Visual Studio 开源插件</li>
+      <li><strong>RapidSVN</strong>　跨平台独立客户端</li>
+    </ul>
+  </div>
+  <div class="card green">
+    <h6>macOS</h6>
+    <ul>
+      <li><strong>Cornerstone</strong>（商业）　功能最全</li>
+      <li><strong>Versions</strong>（商业）　界面简洁</li>
+      <li><strong>SnailSVN</strong>　仿 TortoiseSVN 的 Finder 扩展</li>
+      <li><strong>SmartSVN</strong>　跨平台，有免费版</li>
+    </ul>
+  </div>
+  <div class="card pur">
+    <h6>Linux / 跨平台</h6>
+    <ul>
+      <li><strong>RabbitVCS</strong>　Nautilus/Thunar 集成</li>
+      <li><strong>SmartSVN</strong>　商业，跨三平台</li>
+      <li><strong>kdesvn</strong>　KDE 环境</li>
+      <li><strong>TortoiseGit 风格插件</strong>　IDE 内置</li>
+    </ul>
+  </div>
+</div>
+
+<h4 class="sub">IDE 内置集成</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:22%">IDE</th><th style="width:20%">SVN 支持方式</th><th>说明</th></tr></thead>
+<tbody>
+  <tr>
+    <td><strong>Visual Studio</strong></td>
+    <td>AnkhSVN / VisualSVN 插件<br>或 TortoiseSVN 右键</td>
+    <td>AnkhSVN 开源免费，在解决方案资源管理器里直接显示状态图标。VisualSVN 是商业版，集成度更高。也可以完全不用插件，用 TortoiseSVN 的右键菜单操作。</td>
+  </tr>
+  <tr>
+    <td><strong>IntelliJ IDEA<br>PyCharm / WebStorm</strong></td>
+    <td>内置（无需插件）</td>
+    <td>JetBrains 全家桶<strong>原生支持 SVN</strong>。在 <code class="ic">Settings → Version Control</code> 里加 SVN 映射即可。
+      提交界面、diff、冲突解决工具都是内置的，体验很好。快捷键 <code class="ic">Ctrl+K</code> 提交、<code class="ic">Ctrl+T</code> 更新。</td>
+  </tr>
+  <tr>
+    <td><strong>Eclipse</strong></td>
+    <td>Subclipse / Subversive</td>
+    <td>两个都是老牌插件。Subclipse 由 SVN 社区维护，Subversive 是 Eclipse 官方项目。现在 Eclipse 用户少了，但企业里仍有存量。</td>
+  </tr>
+  <tr>
+    <td><strong>VS Code</strong></td>
+    <td>SVN 插件（第三方）</td>
+    <td>比如 <code class="ic">johnstoncode.svn-scm</code>。功能相对基础（状态显示、diff、提交），复杂操作还是得回命令行。
+      注意：VS Code 的插件用的是系统安装的 <code class="ic">svn</code> 命令，所以必须先装好命令行客户端。</td>
+  </tr>
+  <tr>
+    <td><strong>Unity / Unreal</strong></td>
+    <td>编辑器内置版本控制面板</td>
+    <td>Unity 的 <code class="ic">Version Control</code> 设置里选 <code class="ic">Subversion</code> 模式，能显示资源状态。
+      <strong>但真正提交还是建议用 TortoiseSVN 或命令行</strong>——编辑器面板容易漏提交 <code class="ic">.meta</code>、<code class="ic">.asset</code> 这类文件。</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box warn">
+  <span class="bt">GUI 与命令行混用的一个注意事项</span>
+  <p>GUI 客户端和命令行<strong>操作的是同一个 <code class="ic">.svn</code> 工作副本</strong>，可以随意混用，不会冲突。
+  但要注意两点：</p>
+  <ul>
+    <li><strong>不要在 GUI 操作进行中同时跑命令行</strong>——
+      比如 TortoiseSVN 正在提交时，你在命令行执行 <code class="ic">svn commit</code>，会导致工作副本锁冲突（E155004）。
+      遇到就 <code class="ic">svn cleanup</code>。</li>
+    <li><strong>GUI 的「刷新」不会自动</strong>——
+      命令行改完后，TortoiseSVN 的图标覆盖可能还是旧状态，按 <code class="ic">F5</code> 或右键 → <code class="ic">Refresh</code> 才更新。</li>
+  </ul>
+</div>
+
+<div class="box ok">
+  <span class="bt">推荐的工具组合</span>
+  <div class="grid2" style="margin-top:10px">
+    <div class="card">
+      <h6>Windows 开发团队</h6>
+      <ul>
+        <li><strong>命令行</strong>：SlikSVN（纯净，不进 PATH 干扰）</li>
+        <li><strong>GUI</strong>：TortoiseSVN（勾选 command line tools）</li>
+        <li><strong>IDE</strong>：IDEA / VS + AnkhSVN</li>
+        <li><strong>服务端</strong>：VisualSVN Server</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h6>Linux 开发团队</h6>
+      <ul>
+        <li><strong>命令行</strong>：<code class="ic">apt install subversion</code></li>
+        <li><strong>GUI</strong>：RabbitVCS 或 SmartSVN</li>
+        <li><strong>IDE</strong>：IDEA（原生支持）</li>
+        <li><strong>服务端</strong>：svnserve + systemd</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">最后：一套完整团队协作约定（可直接抄）</span>
+  <p>把前面所有内容浓缩成一份可落地的团队规范。</p>
+  <div class="tw" style="margin-top:10px">
+  <table>
+  <thead><tr><th style="width:22%">项目</th><th>约定</th></tr></thead>
+  <tbody>
+    <tr><td><strong>目录结构</strong></td><td><code class="ic">/trunk</code> 主干 · <code class="ic">/branches/&lt;功能名&gt;</code> 功能分支 · <code class="ic">/tags/v1.2.3</code> 发布标签</td></tr>
+    <tr><td><strong>分支命名</strong></td><td><code class="ic">feature-登录</code> / <code class="ic">bugfix-1024</code> / <code class="ic">hotfix-crash</code> / <code class="ic">release-2.0</code>，一眼看出用途</td></tr>
+    <tr><td><strong>提交日志</strong></td><td><code class="ic">[模块] 做了什么 + 为什么</code>，至少 10 字；关联任务号写 <code class="ic">[PROJ-123]</code></td></tr>
+    <tr><td><strong>提交粒度</strong></td><td>一个完整的小功能一提交，别攒一整天；提交前必 <code class="ic">svn update</code></td></tr>
+    <tr><td><strong>分支生命</strong></td><td>功能分支 ≤ 2 周；每周至少一次 <code class="ic">svn merge ^/trunk</code> 反向同步</td></tr>
+    <tr><td><strong>Tags 保护</strong></td><td>authz 里 <code class="ic">[/tags] * = r</code>，只有 admins 能写</td></tr>
+    <tr><td><strong>忽略规则</strong></td><td>编译产物（<code class="ic">bin</code> <code class="ic">obj</code> <code class="ic">node_modules</code>）、IDE 配置（<code class="ic">.vs</code> <code class="ic">.idea</code>）、日志一律进 <code class="ic">svn:ignore</code></td></tr>
+    <tr><td><strong>二进制文件</strong></td><td>美术源文件（psd/max/fbx）设 <code class="ic">svn:needs-lock</code>，改前先 <code class="ic">svn lock</code></td></tr>
+    <tr><td><strong>换行符</strong></td><td>源码统一 <code class="ic">svn:eol-style native</code>，用 auto-props 自动设置</td></tr>
+    <tr><td><strong>提交前检查</strong></td><td>① <code class="ic">svn status</code> 确认范围 ② <code class="ic">svn diff</code> 核对内容 ③ <code class="ic">grep -rn "^&lt;&lt;&lt;&lt;&lt;&lt;&lt;" .</code> 确认无冲突标记</td></tr>
+    <tr><td><strong>钩子强制</strong></td><td>pre-commit 检查日志规范 + 拦截编译产物；pre-revprop-change 保护历史不可篡改</td></tr>
+    <tr><td><strong>备份策略</strong></td><td>每日 <code class="ic">hotcopy</code> + 每周增量 <code class="ic">dump</code>；每季度做一次恢复演练</td></tr>
+  </tbody>
+  </table>
+  </div>
+</div>
+
+<footer>
+  <p><b>SVN 完全教程 · 从零到服务端运维</b></p>
+  <p style="margin-top:8px">
+    全部命令与输出基于 <b>Subversion 1.14.5 (r1922182)</b> 实测抓取。
+    教程中的仓库环境（<code class="ic">svn-admin create</code> 创建的 fsfs 格式仓库、
+    <code class="ic">svnserve</code> 协议服务、authz 权限矩阵、pre-commit / post-commit / pre-revprop-change 钩子、
+    dump / hotcopy 备份链路）均为真实搭建并逐步验证。
+  </p>
+  <p style="margin-top:8px">
+    <b>八个阶段回顾：</b>
+    认识 SVN（1-3）→ 核心模型（4-5）→ 日常操作（6-9）→ 冲突处理（10）→
+    分支与标签（11-14）→ 属性系统（15-16）→ 服务端部署（17-20）→ 运维与进阶（21-25）。
+  </p>
+  <p style="margin-top:8px;color:var(--tx4)">
+    遇到本教程未覆盖的问题，先查 <a class="ref" href="#s23">第 23 节故障排查</a>，
+    再查官方文档 <a class="ref" href="https://svnbook.red-bean.com/" target="_blank" rel="noreferrer">Version Control with Subversion</a>（免费电子书）。
+  </p>
+</footer>
+</main>
+</div>
+<button id="top" title="回到顶部">↑</button>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+     1. 代码块增强：语法高亮 + 复制按钮 + 换行切换
+     ============================================================ */
+
+  // 极简高亮器：只处理注释、字符串、SVN 命令、选项
+  function escapeHtml(t) {
+    return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function highlight(code) {
+    var lines = code.split('\n');
+    var out = [];
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var indented = escapeHtml(line);
+
+      // 整行注释（# 或 rem 或 :: 开头）
+      if (/^\s*(#|rem\s|::)/i.test(line) && !/^\s*#!/.test(line)) {
+        out.push('<span class="c">' + indented + '</span>');
+        continue;
+      }
+
+      // 行内注释：找到未被引号包裹的 #
+      var result = '';
+      var inStr = false;
+      var strChar = '';
+      var commentStart = -1;
+
+      for (var j = 0; j < line.length; j++) {
+        var ch = line[j];
+        if (!inStr && (ch === '"' || ch === "'")) {
+          inStr = true;
+          strChar = ch;
+        } else if (inStr && ch === strChar) {
+          if (line[j - 1] !== '\\') inStr = false;
+        } else if (!inStr && ch === '#' && j > 0 && line[j - 1] === ' ' && /^\s*#/.test(line.slice(j)) === false) {
+          commentStart = j;
+          break;
+        }
+      }
+
+      var codePart = commentStart >= 0 ? line.slice(0, commentStart) : line;
+      var commentPart = commentStart >= 0 ? line.slice(commentStart) : '';
+      var esc = escapeHtml(codePart);
+
+      // 字符串
+      esc = esc.replace(/(&quot;[^&]*?&quot;|&#39;[^&]*?&#39;)/g, '<span class="s">$1</span>');
+      // 注释里的 svn 命令名（行首后的第一个词）
+      esc = esc.replace(/^(\s*)(svn|svnadmin|svnserve|svnlook|svndumpfilter|svnrdump|svnauthz|svnmucc|sc|find|curl|mail|tar|export|cd|set|echo|if|for|chmod|xargs|grep|awk|sudo)\b/,
+        '$1<span class="k">$2</span>');
+      // 长选项
+      esc = esc.replace(/(\s)(--?[a-zA-Z][a-zA-Z0-9-]*)/g, '$1<span class="a">$2</span>');
+      // 数字（版本号之类）
+      esc = esc.replace(/\b(r\d+)\b/g, '<span class="m">$1</span>');
+
+      result = esc;
+      if (commentPart) result += '<span class="c">' + escapeHtml(commentPart) + '</span>';
+      out.push(result);
+    }
+    return out.join('\n');
+  }
+
+  // 处理所有 codewrap 里的 pre.code
+  var wraps = document.querySelectorAll('.codewrap');
+
+  Array.prototype.forEach.call(wraps, function (wrap) {
+    var pre = wrap.querySelector('pre.code');
+    if (!pre) return;
+
+    // 如果代码块里已经有手工写好的语法着色 span，就原样保留，不再重复处理
+    var alreadyStyled = pre.querySelector('span');
+    if (!alreadyStyled) {
+      var raw = pre.textContent;
+      var codeEl = pre.querySelector('code') || pre;
+      codeEl.innerHTML = highlight(raw);
+    }
+
+    // 加复制按钮（若无）
+    var acts = wrap.querySelector('.acts');
+    if (acts && !acts.querySelector('[data-copy]')) {
+      var b = document.createElement('button');
+      b.setAttribute('data-copy', '');
+      b.textContent = '复制';
+      acts.appendChild(b);
+    }
+  });
+
+  // 复制功能
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('[data-copy]');
+    if (!btn) return;
+
+    var wrap = btn.closest('.codewrap') || btn.closest('.term');
+    if (!wrap) return;
+    var pre = wrap.querySelector('pre');
+    if (!pre) return;
+
+    var text = pre.textContent;
+
+    function done() {
+      btn.textContent = '已复制';
+      btn.classList.add('ok');
+      setTimeout(function () {
+        btn.textContent = '复制';
+        btn.classList.remove('ok');
+      }, 1400);
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text, done); });
+    } else {
+      fallback(text, done);
+    }
+  });
+
+  function fallback(text, done) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done();
+    } catch (err) { /* 静默失败 */ }
+  }
+
+  /* ============================================================
+     2. 进度条 + 回到顶部
+     ============================================================ */
+  var prog = document.getElementById('prog');
+  var topBtn = document.getElementById('top');
+
+  function onScroll() {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var pct = max > 0 ? (h.scrollTop || document.body.scrollTop) / max * 100 : 0;
+    if (prog) prog.style.width = pct + '%';
+    if (topBtn) {
+      if ((h.scrollTop || document.body.scrollTop) > 600) topBtn.classList.add('show');
+      else topBtn.classList.remove('show');
+    }
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  if (topBtn) {
+    topBtn.onclick = function () { window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  }
+
+  /* ============================================================
+     3. 导航高亮：滚动时自动标记当前小节
+     ============================================================ */
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll('#nav a'));
+  var sections = navLinks.map(function (a) {
+    var id = a.getAttribute('href');
+    return { el: id && id.length > 1 ? document.querySelector(id) : null, a: a };
+  }).filter(function (s) { return s.el; });
+
+  function highlightNav() {
+    var pos = window.scrollY + 140;
+    var current = null;
+    for (var i = 0; i < sections.length; i++) {
+      if (sections[i].el.offsetTop <= pos) current = sections[i];
+    }
+    navLinks.forEach(function (a) { a.classList.remove('on'); });
+    if (current) {
+      current.a.classList.add('on');
+      // 让当前项在侧栏可见
+      var box = current.a.parentElement;
+      if (box && box.scrollHeight > box.clientHeight) {
+        var aTop = current.a.offsetTop;
+        if (aTop < box.scrollTop || aTop > box.scrollTop + box.clientHeight - 60) {
+          box.scrollTop = aTop - box.clientHeight / 2;
+        }
+      }
+    }
+  }
+
+  window.addEventListener('scroll', highlightNav, { passive: true });
+  highlightNav();
+
+  /* ============================================================
+     4. 表格首列若为空白则隐藏（防止空单元格）
+     ============================================================ */
+  Array.prototype.forEach.call(document.querySelectorAll('table'), function (t) {
+    var firstTh = t.querySelector('thead th');
+    var firstTd = t.querySelector('tbody td');
+    if (firstTh && firstTd && !firstTh.textContent.trim() && !firstTd.textContent.trim()) {
+      Array.prototype.forEach.call(t.querySelectorAll('tr'), function (tr) {
+        var c = tr.querySelector('th, td');
+        if (c) c.style.display = 'none';
+      });
+    }
+  });
+
+})();
+</script>
+</body>
+</html>

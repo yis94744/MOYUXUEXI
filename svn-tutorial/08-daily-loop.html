@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>8. 日常开发循环与 diff / log 进阶 — SVN 完全教程</title>
+<style>
+
+/* ==========================================================================
+   设计令牌
+   ========================================================================== */
+:root{
+  --bg:#0d1117; --bg2:#161b22; --bg3:#1c2128; --bg4:#21262d;
+  --bd:#30363d; --bd2:#3d444d;
+  --tx:#e6edf3; --tx2:#c9d1d9; --tx3:#8b949e; --tx4:#6e7681;
+  --blue:#58a6ff; --blue2:#79c0ff; --green:#7ee787; --green2:#3fb950;
+  --orange:#ffa657; --red:#ff7b72; --purple:#d2a8ff; --cyan:#56d4dd;
+  --yellow:#e3b341;
+  --mono:"JetBrains Mono","Cascadia Code",Consolas,Monaco,"Courier New",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --rad:10px; --rad2:14px; --shadow:0 8px 24px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{background:var(--bg);color:var(--tx2);font-family:var(--sans);
+  font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+#prog{position:fixed;top:0;left:0;height:3px;width:0;z-index:999;
+  background:linear-gradient(90deg,var(--blue),var(--purple),var(--green));transition:width .1s linear}
+.wrap{display:flex;max-width:1600px;margin:0 auto;align-items:flex-start}
+
+/* ==========================================================================
+   侧边导航
+   ========================================================================== */
+aside{position:sticky;top:0;flex:0 0 300px;height:100vh;overflow-y:auto;
+  border-right:1px solid var(--bd);padding:26px 16px 80px;background:var(--bg)}
+aside::-webkit-scrollbar{width:8px}
+aside::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:4px}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.brand .dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;
+  background:linear-gradient(135deg,var(--blue),var(--purple))}
+.brand h1{font-size:15px;font-weight:700;color:var(--tx);letter-spacing:.2px}
+.brand-sub{font-size:12px;color:var(--tx4);margin:0 0 18px 21px;line-height:1.5}
+nav a{display:block;padding:6px 11px;margin:2px 0;font-size:13.5px;color:var(--tx3);
+  text-decoration:none;border-radius:7px;border-left:2px solid transparent;transition:all .14s;line-height:1.5}
+nav a:hover{background:var(--bg3);color:var(--tx)}
+nav a.h3{padding-left:24px;font-size:12.8px;color:var(--tx4)}
+nav a.on{background:var(--bg4);color:var(--blue);border-left-color:var(--blue);font-weight:600}
+nav .grp{margin:16px 0 6px 11px;font-size:11px;font-weight:700;color:var(--tx4);
+  text-transform:uppercase;letter-spacing:.9px}
+
+/* ==========================================================================
+   主体排版
+   ========================================================================== */
+main{flex:1;min-width:0;padding:44px 52px 140px;max-width:1180px}
+.hero{margin-bottom:46px;padding-bottom:30px;border-bottom:1px solid var(--bd)}
+.hero .tag{display:inline-block;font-size:11.5px;font-weight:700;color:var(--blue);
+  background:rgba(88,166,255,.13);border:1px solid rgba(88,166,255,.3);
+  padding:3px 11px;border-radius:20px;margin-bottom:16px;letter-spacing:.4px}
+.hero h2{font-size:34px;font-weight:800;color:var(--tx);line-height:1.25;margin-bottom:12px;
+  background:linear-gradient(135deg,#fff 30%,var(--blue) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-.5px}
+.hero p{font-size:15px;color:var(--tx3);max-width:860px}
+.hero .meta{display:flex;gap:22px;margin-top:20px;flex-wrap:wrap}
+.hero .meta div{font-size:12.5px;color:var(--tx4)}
+.hero .meta b{color:var(--tx2);font-weight:600}
+h3.sec{font-size:25px;font-weight:700;color:var(--tx);margin:66px 0 8px;
+  padding-top:8px;scroll-margin-top:20px;letter-spacing:-.3px}
+h3.sec::before{content:"";display:block;width:38px;height:3px;border-radius:2px;
+  background:linear-gradient(90deg,var(--blue),var(--purple));margin-bottom:16px}
+h3.sec .no{color:var(--blue);font-family:var(--mono);font-size:19px;font-weight:700;margin-right:8px}
+h4.sub{font-size:17.5px;font-weight:700;color:var(--tx);margin:36px 0 12px;scroll-margin-top:20px}
+h4.sub::before{content:"▍";color:var(--blue);margin-right:7px;font-size:14px}
+h5.mini{font-size:14.5px;font-weight:700;color:var(--blue2);margin:26px 0 10px}
+p{margin:12px 0;color:var(--tx2)}
+p.lead{font-size:16px;color:var(--tx3);margin:14px 0 22px}
+ul,ol{margin:12px 0 12px 24px}
+li{margin:6px 0}
+li::marker{color:var(--tx4)}
+strong{color:var(--tx);font-weight:700}
+em{color:var(--orange);font-style:normal;font-weight:600}
+a.ref{color:var(--blue2);text-decoration:none;border-bottom:1px dotted var(--bd2)}
+a.ref:hover{color:var(--cyan)}
+hr.sep{border:none;border-top:1px solid var(--bd);margin:38px 0}
+code.ic{font-family:var(--mono);font-size:13px;color:var(--orange);
+  background:rgba(110,118,129,.16);padding:2px 6px;border-radius:5px;
+  border:1px solid rgba(110,118,129,.22);white-space:nowrap}
+code.ic.b{color:var(--blue2)}
+code.ic.g{color:var(--green)}
+code.ic.p{color:var(--purple)}
+
+/* ==========================================================================
+   代码块
+   ========================================================================== */
+.codewrap{position:relative;margin:18px 0 22px;border-radius:var(--rad2);
+  border:1px solid var(--bd);background:#0b0f14;overflow:hidden;box-shadow:var(--shadow)}
+.codehead{display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px;background:var(--bg2);border-bottom:1px solid var(--bd);gap:10px}
+.codehead .lang{font-family:var(--mono);font-size:11.5px;font-weight:700;
+  color:var(--tx3);letter-spacing:.6px;text-transform:uppercase;white-space:nowrap}
+.codehead .fn{font-family:var(--mono);font-size:11.5px;color:var(--tx4);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;flex:1}
+.codehead .acts{display:flex;gap:7px;flex:0 0 auto}
+.codehead button{background:var(--bg4);border:1px solid var(--bd2);color:var(--tx3);
+  font-family:var(--sans);font-size:11.5px;padding:3px 10px;border-radius:6px;cursor:pointer;transition:all .14s}
+.codehead button:hover{background:var(--blue);color:#000;border-color:var(--blue)}
+.codehead button.ok{background:var(--green2);color:#000;border-color:var(--green2)}
+pre.code{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mono);
+  font-size:13.2px;line-height:1.68;tab-size:4}
+pre.code::-webkit-scrollbar{height:9px}
+pre.code::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+pre.code code{color:var(--tx2);white-space:pre;display:block}
+.k{color:#ff7b72}.t{color:#79c0ff}.s{color:#a5d6ff}.c{color:#8b949e;font-style:italic}
+.n{color:#79c0ff}.m{color:#d2a8ff}.a{color:#ffa657}.p{color:#8b949e}
+
+/* 终端输出块 —— 显示真实命令回显 */
+.term{margin:16px 0 20px;border-radius:var(--rad2);border:1px solid var(--bd);
+  background:#080b0f;overflow:hidden}
+.term .th{display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--bg2);
+  border-bottom:1px solid var(--bd);font-family:var(--mono);font-size:11.5px;color:var(--tx4)}
+.term .th .dotr{width:9px;height:9px;border-radius:50%;background:#ff5f57}
+.term .th .doty{width:9px;height:9px;border-radius:50%;background:#febc2e}
+.term .th .dotg{width:9px;height:9px;border-radius:50%;background:#28c840}
+.term pre{margin:0;padding:14px 16px;overflow-x:auto;font-family:var(--mono);
+  font-size:12.9px;line-height:1.7;color:#c9d1d9;white-space:pre}
+.term pre::-webkit-scrollbar{height:9px}
+.term pre::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+.term .ps{color:var(--green);font-weight:700}       /* 提示符 $ */
+.term .cmd{color:var(--tx)}                          /* 命令本体 */
+.term .cmt{color:var(--tx4);font-style:italic}       /* 注释 */
+.term .ok{color:var(--green)}                        /* 成功 */
+.term .no{color:var(--red)}                          /* 失败 */
+.term .hl{color:var(--yellow);font-weight:600}       /* 重点 */
+.term .dim{color:var(--tx4)}                         /* 弱化 */
+.term .cy{color:var(--cyan)}
+
+/* ==========================================================================
+   提示框
+   ========================================================================== */
+.box{margin:20px 0;padding:15px 18px 15px 46px;border-radius:var(--rad);
+  position:relative;font-size:14.3px;line-height:1.72;border:1px solid;border-left-width:3px}
+.box::before{position:absolute;left:15px;top:14px;font-size:16px;line-height:1}
+.box .bt{display:block;font-weight:700;margin-bottom:5px;font-size:13.5px}
+.box p{margin:6px 0;font-size:14.3px}
+.box ul,.box ol{margin:7px 0 7px 18px}
+.box li{margin:4px 0}
+.box.tip{background:rgba(88,166,255,.07);border-color:rgba(88,166,255,.28)}
+.box.tip::before{content:"★"}.box.tip .bt{color:var(--blue)}
+.box.warn{background:rgba(255,166,87,.07);border-color:rgba(255,166,87,.3)}
+.box.warn::before{content:"!"}.box.warn .bt{color:var(--orange)}
+.box.err{background:rgba(255,123,114,.07);border-color:rgba(255,123,114,.3)}
+.box.err::before{content:"X"}.box.err .bt{color:var(--red)}
+.box.ok{background:rgba(126,231,135,.07);border-color:rgba(126,231,135,.3)}
+.box.ok::before{content:"✓"}.box.ok .bt{color:var(--green)}
+.box.key{background:rgba(210,168,255,.07);border-color:rgba(210,168,255,.3)}
+.box.key::before{content:"◈"}.box.key .bt{color:var(--purple)}
+.box.termbox{background:rgba(86,212,221,.06);border-color:rgba(86,212,221,.28)}
+.box.termbox::before{content:"⌘"}.box.termbox .bt{color:var(--cyan)}
+
+/* ==========================================================================
+   表格
+   ========================================================================== */
+.tw{overflow-x:auto;margin:18px 0;border-radius:var(--rad);border:1px solid var(--bd)}
+table{width:100%;border-collapse:collapse;font-size:13.8px}
+thead th{background:var(--bg3);color:var(--tx);font-weight:700;text-align:left;
+  padding:11px 14px;border-bottom:1px solid var(--bd2);white-space:nowrap;font-size:13px;letter-spacing:.2px}
+tbody td{padding:9px 14px;border-bottom:1px solid rgba(48,54,61,.6);vertical-align:top;line-height:1.65}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:rgba(88,166,255,.045)}
+tbody td:first-child{color:var(--tx)}
+td .ic,th .ic{font-size:12.3px}
+.tagmini{display:inline-block;font-size:11px;padding:2px 7px;border-radius:5px;
+  font-weight:700;font-family:var(--mono);white-space:nowrap}
+.tagmini.g{background:rgba(126,231,135,.15);color:var(--green)}
+.tagmini.r{background:rgba(255,123,114,.15);color:var(--red)}
+.tagmini.y{background:rgba(227,179,65,.15);color:var(--yellow)}
+.tagmini.b{background:rgba(88,166,255,.15);color:var(--blue)}
+.tagmini.p{background:rgba(210,168,255,.15);color:var(--purple)}
+.tagmini.c{background:rgba(86,212,221,.15);color:var(--cyan)}
+
+/* ==========================================================================
+   步骤条
+   ========================================================================== */
+.steps{counter-reset:st;margin:20px 0;border:1px solid var(--bd);
+  border-radius:var(--rad2);overflow:hidden;background:var(--bg2)}
+.steps>.stitle{display:flex;align-items:center;gap:9px;padding:11px 16px;
+  background:linear-gradient(90deg,rgba(210,168,255,.11),transparent);
+  border-bottom:1px solid var(--bd);font-size:13.5px;font-weight:700;color:var(--purple)}
+.steps>.stitle .badge{background:var(--purple);color:#000;font-size:10.5px;
+  padding:2px 8px;border-radius:20px;letter-spacing:.4px;font-weight:800}
+.step{display:flex;gap:14px;padding:13px 16px;border-bottom:1px solid rgba(48,54,61,.55)}
+.step:last-child{border-bottom:none}
+.step:hover{background:rgba(210,168,255,.035)}
+.step .num{counter-increment:st;flex:0 0 26px;height:26px;border-radius:50%;
+  background:rgba(210,168,255,.14);border:1px solid rgba(210,168,255,.35);
+  color:var(--purple);font-family:var(--mono);font-size:12.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;margin-top:2px}
+.step .num::before{content:counter(st)}
+.step .body{flex:1;min-width:0;font-size:14px;line-height:1.7}
+.step .body .st{font-weight:700;color:var(--tx);display:block;margin-bottom:3px}
+.step .body .sc{color:var(--tx3);font-size:13.6px}
+.step .body .menu{font-family:var(--mono);font-size:12.8px;color:var(--yellow);
+  background:rgba(227,179,65,.1);border:1px solid rgba(227,179,65,.25);
+  padding:1px 7px;border-radius:5px;white-space:nowrap;display:inline-block;margin:1px 0}
+
+/* ==========================================================================
+   卡片
+   ========================================================================== */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}
+.card{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rad2);padding:16px 18px}
+.card h6{font-size:13.5px;font-weight:700;margin-bottom:9px;display:flex;
+  align-items:center;gap:7px;color:var(--tx)}
+.card ul{margin:8px 0 0 18px;font-size:13.6px}
+.card ul li{margin:5px 0}
+.card p{font-size:13.7px;margin:8px 0}
+.card.good{border-color:rgba(126,231,135,.32)}.card.good h6{color:var(--green)}
+.card.bad{border-color:rgba(255,123,114,.32)}.card.bad h6{color:var(--red)}
+.card.blue{border-color:rgba(88,166,255,.32)}.card.blue h6{color:var(--blue)}
+.card.warn{border-color:rgba(255,166,87,.32)}.card.warn h6{color:var(--orange)}
+.card.pur{border-color:rgba(210,168,255,.32)}.card.pur h6{color:var(--purple)}
+.card .big{font-family:var(--mono);font-size:22px;font-weight:800;color:var(--tx);
+  display:block;margin-bottom:4px;line-height:1.2}
+.card .cap{font-size:12.2px;color:var(--tx4)}
+
+/* ==========================================================================
+   图文（SVG 插图系统）—— 本教程的核心
+   ========================================================================== */
+.fig{margin:24px 0 26px;border:1px solid var(--bd);border-radius:var(--rad2);
+  background:linear-gradient(180deg,#0f141b,#0b0f14);overflow:hidden;box-shadow:var(--shadow)}
+.fig .fh{padding:10px 18px;background:var(--bg2);border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;gap:9px}
+.fig .fh .ic{color:var(--cyan);font-size:13px}
+.fig .fh .ft{font-size:13.2px;font-weight:700;color:var(--tx)}
+.fig .fh .fs{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--tx4);
+  letter-spacing:.5px;text-transform:uppercase}
+.fig .fb{padding:22px 18px 18px;overflow-x:auto}
+.fig .fb::-webkit-scrollbar{height:9px}
+.fig .fb::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+.fig svg{display:block;margin:0 auto;max-width:100%;height:auto}
+.fig .cap{padding:11px 18px 14px;font-size:13px;color:var(--tx3);border-top:1px solid rgba(48,54,61,.55);
+  line-height:1.7}
+.fig .cap b{color:var(--tx2)}
+/* SVG 通用类：所有插图复用，保证风格统一 */
+svg text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+svg .tt{font-size:14px;font-weight:700;fill:#e6edf3}
+svg .ts{font-size:12px;fill:#8b949e}
+svg .tx{font-size:12.5px;fill:#c9d1d9}
+svg .tm{font-size:12px;font-family:"JetBrains Mono",Consolas,monospace;fill:#e6edf3}
+svg .tm2{font-size:11px;font-family:"JetBrains Mono",Consolas,monospace;fill:#8b949e}
+svg .hd{font-size:11.5px;font-weight:700;fill:#e6edf3}
+svg .bd{fill:none;stroke:#30363d;stroke-width:1.5}
+svg .bd2{fill:none;stroke:#3d444d;stroke-width:1.5}
+svg .dash{fill:none;stroke:#3d444d;stroke-width:1.5;stroke-dasharray:5 4}
+svg .arw{fill:none;stroke:#8b949e;stroke-width:1.6;marker-end:url(#arw)}
+svg .arwb{fill:none;stroke:#58a6ff;stroke-width:1.8;marker-end:url(#arwb)}
+svg .arwg{fill:none;stroke:#7ee787;stroke-width:1.8;marker-end:url(#arwg)}
+svg .arwr{fill:none;stroke:#ff7b72;stroke-width:1.8;marker-end:url(#arwr)}
+svg .arwp{fill:none;stroke:#d2a8ff;stroke-width:1.8;marker-end:url(#arwp)}
+svg .arwy{fill:none;stroke:#e3b341;stroke-width:1.8;marker-end:url(#arwy)}
+svg .arw2{fill:none;stroke:#58a6ff;stroke-width:1.6;marker-end:url(#arwb);stroke-dasharray:6 4}
+svg .n-blue{fill:rgba(88,166,255,.10);stroke:#58a6ff;stroke-width:1.5}
+svg .n-green{fill:rgba(126,231,135,.10);stroke:#7ee787;stroke-width:1.5}
+svg .n-pur{fill:rgba(210,168,255,.10);stroke:#d2a8ff;stroke-width:1.5}
+svg .n-orange{fill:rgba(255,166,87,.10);stroke:#ffa657;stroke-width:1.5}
+svg .n-red{fill:rgba(255,123,114,.10);stroke:#ff7b72;stroke-width:1.5}
+svg .n-yellow{fill:rgba(227,179,65,.10);stroke:#e3b341;stroke-width:1.5}
+svg .n-cyan{fill:rgba(86,212,221,.10);stroke:#56d4dd;stroke-width:1.5}
+svg .n-gray{fill:rgba(139,148,158,.10);stroke:#8b949e;stroke-width:1.5}
+svg .c-blue{fill:#0f141b;stroke:#58a6ff;stroke-width:1.5}
+svg .c-green{fill:#0f141b;stroke:#7ee787;stroke-width:1.5}
+svg .c-pur{fill:#0f141b;stroke:#d2a8ff;stroke-width:1.5}
+svg .c-orange{fill:#0f141b;stroke:#ffa657;stroke-width:1.5}
+svg .c-red{fill:#0f141b;stroke:#ff7b72;stroke-width:1.5}
+svg .c-gray{fill:#161b22;stroke:#3d444d;stroke-width:1.5}
+svg .fill-blue{fill:#58a6ff}svg .fill-green{fill:#7ee787}svg .fill-pur{fill:#d2a8ff}
+svg .fill-orange{fill:#ffa657}svg .fill-red{fill:#ff7b72}svg .fill-cyan{fill:#56d4dd}
+svg .fill-yellow{fill:#e3b341}svg .fill-gray{fill:#8b949e}svg .fill-tx{fill:#e6edf3}
+svg .fill-dim{fill:#6e7681}
+svg .mono{font-family:"JetBrains Mono",Consolas,monospace}
+
+/* 图例 */
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0 4px;font-size:12.5px;color:var(--tx3)}
+.legend span{display:flex;align-items:center;gap:7px}
+.legend i{width:13px;height:13px;border-radius:4px;display:inline-block;flex:0 0 auto}
+
+/* ==========================================================================
+   键值对 / 输出面板
+   ========================================================================== */
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-family:var(--mono);
+  font-size:12.8px;margin:10px 0}
+.kv b{color:var(--tx2);font-weight:600}
+.kv span{color:var(--orange)}
+
+/* 对比双栏（好/坏） */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:20px 0;
+  border:1px solid var(--bd);border-radius:var(--rad2);overflow:hidden}
+.duo>div{padding:14px 16px}
+.duo>div:first-child{border-right:1px solid var(--bd);background:rgba(255,123,114,.045)}
+.duo>div:last-child{background:rgba(126,231,135,.045)}
+.duo .dh{font-size:12.5px;font-weight:800;margin-bottom:9px;letter-spacing:.3px}
+.duo>div:first-child .dh{color:var(--red)}
+.duo>div:last-child .dh{color:var(--green)}
+.duo pre{font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--tx2);
+  white-space:pre-wrap;margin:0;overflow-x:auto}
+
+footer{margin-top:90px;padding-top:28px;border-top:1px solid var(--bd);font-size:13px;color:var(--tx4)}
+footer b{color:var(--tx3)}
+#top{position:fixed;right:26px;bottom:26px;width:44px;height:44px;border-radius:50%;
+  background:var(--bg3);border:1px solid var(--bd2);color:var(--tx2);font-size:17px;
+  cursor:pointer;display:none;align-items:center;justify-content:center;
+  box-shadow:var(--shadow);transition:all .16s;z-index:50}
+#top:hover{background:var(--blue);color:#000;border-color:var(--blue)}
+#top.show{display:flex}
+
+@media(max-width:1220px){aside{display:none}main{padding:30px 26px 100px;max-width:100%}}
+@media(max-width:760px){
+  .grid2,.grid3,.grid4,.duo{grid-template-columns:1fr}
+  .duo>div:first-child{border-right:none;border-bottom:1px solid var(--bd)}
+  .hero h2{font-size:25px}h3.sec{font-size:20px}main{padding:22px 16px 80px}
+  body{font-size:15px}
+}
+
+
+/* ===== 单节文件附加样式：面包屑与翻页 ===== */
+.crumb{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:22px;
+  padding-bottom:14px;border-bottom:1px solid var(--bd);font-size:13px;color:var(--tx4)}
+.crumb .stage{font-size:11.5px;font-weight:700;color:var(--blue);
+  background:rgba(88,166,255,.13);border:1px solid rgba(88,166,255,.3);
+  padding:2px 10px;border-radius:20px;letter-spacing:.3px}
+.crumb .sep{color:var(--tx4);opacity:.5}
+.crumb .cur{color:var(--tx2)}
+.crumb a{color:var(--tx3);text-decoration:none;border-bottom:1px dotted var(--bd2)}
+.crumb a:hover{color:var(--blue)}
+.pager{display:flex;gap:14px;margin:64px 0 0;padding-top:26px;border-top:1px solid var(--bd)}
+.pager a{flex:1;display:block;padding:14px 18px;border:1px solid var(--bd);
+  border-radius:var(--rad2);text-decoration:none;transition:all .16s;background:var(--bg2);min-width:0}
+.pager a:hover{border-color:var(--blue);background:var(--bg3);transform:translateY(-2px)}
+.pager a .lbl{display:block;font-size:11.5px;color:var(--tx4);margin-bottom:5px;
+  letter-spacing:.4px;text-transform:uppercase}
+.pager a .ttl{display:block;font-size:14.5px;color:var(--tx);font-weight:700;
+  line-height:1.5;overflow:hidden;text-overflow:ellipsis}
+.pager a.next{text-align:right}
+.pager a.disabled{opacity:.35;pointer-events:none}
+.pager a.home{flex:0 0 130px;text-align:center;display:flex;align-items:center;justify-content:center}
+.pager a.home .ttl{font-size:13.5px;color:var(--blue2)}
+
+</style>
+</head>
+<body>
+<div id="prog"></div>
+<div class="wrap">
+<aside>
+  <div class="brand"><span class="dot"></span><h1>SVN 完全教程</h1></div>
+  <div class="brand-sub">图文详解版 · 基于 SVN 1.14 实测</div>
+  <nav id="nav">
+    <div class="grp">第一阶段 · 认识 SVN</div>
+    <a href="01-intro.html">1. SVN 是什么</a>
+    <a href="02-architecture.html">2. 三层架构与通信协议</a>
+    <a href="03-install.html">3. 安装与环境准备</a>
+    <div class="grp">第二阶段 · 核心模型</div>
+    <a href="04-model.html">4. 仓库、版本号与工作副本</a>
+    <a href="05-layout.html">5. 标准目录结构</a>
+    <div class="grp">第三阶段 · 日常操作</div>
+    <a href="06-first-steps.html">6. 第一次完整上手：从零到提交</a>
+    <a href="07-status.html">7. status 状态码全解</a>
+    <a href="08-daily-loop.html" class="on">8. 日常开发循环与 diff / log 进阶</a>
+    <a href="09-rollback.html">9. 撤销与回退：五种后悔场景</a>
+    <div class="grp">第四阶段 · 冲突处理</div>
+    <a href="10-conflict.html">10. 冲突：产生、解剖与解决</a>
+    <div class="grp">第五阶段 · 分支与标签</div>
+    <a href="11-branch-essence.html">11. 分支的本质：一次廉价的复制</a>
+    <a href="12-branch-ops.html">12. 创建、切换与管理分支</a>
+    <a href="13-merge.html">13. 合并全流程与 mergeinfo 机制</a>
+    <a href="14-tags.html">14. 标签与发布管理</a>
+    <div class="grp">第六阶段 · 属性系统</div>
+    <a href="15-properties.html">15. 属性系统：SVN 的隐藏超能力</a>
+    <a href="16-locking.html">16. 锁机制：二进制文件的独占保护</a>
+    <div class="grp">第七阶段 · 服务端</div>
+    <a href="17-deploy-choice.html">17. 服务端部署：方案选型</a>
+    <a href="18-svnserve.html">18. svnserve 部署实战</a>
+    <a href="19-authz.html">19. 认证与权限：authz 精细控制</a>
+    <a href="20-hooks.html">20. 钩子脚本：让 SVN 按你的规矩办事</a>
+    <div class="grp">第八阶段 · 运维与进阶</div>
+    <a href="21-backup.html">21. 备份、恢复与仓库维护</a>
+    <a href="22-advanced.html">22. 高级技巧与效率提升</a>
+    <a href="23-troubleshooting.html">23. 故障排查速查</a>
+    <a href="24-cheatsheet.html">24. 命令速查表</a>
+    <a href="25-gui.html">25. 图形客户端与 IDE 集成</a>
+    <div class="grp">快速跳转</div>
+    <a href="index.html">总目录</a>
+
+  </nav>
+</aside>
+<main>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/>
+    </marker>
+    <marker id="arwb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/>
+    </marker>
+    <marker id="arwg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7ee787"/>
+    </marker>
+    <marker id="arwr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff7b72"/>
+    </marker>
+    <marker id="arwp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#d2a8ff"/>
+    </marker>
+    <marker id="arwy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#e3b341"/>
+    </marker>
+    <marker id="arwc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#56d4dd"/>
+    </marker>
+    <linearGradient id="g-blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#58a6ff" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#58a6ff" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-pur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d2a8ff" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#d2a8ff" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7ee787" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#7ee787" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="g-orange" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffa657" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="#ffa657" stop-opacity=".04"/>
+    </linearGradient>
+  </defs>
+</svg>
+<div class="crumb">
+  <span class="stage">第三阶段 · 日常操作</span>
+  <span class="sep">/</span>
+  <a href="index.html">总目录</a>
+  <span class="sep">/</span>
+  <span class="cur">第 8 节</span>
+</div>
+
+<h3 class="sec" id="s8"><span class="no">8</span>日常开发循环与 diff / log 进阶</h3>
+
+<p class="lead">
+  单人开发、多人协作、紧急修复——所有场景最后都收敛成同一个循环：
+  <strong>update → 改 → status → diff → update → commit</strong>。
+  这一节把循环里的 <code class="ic">update</code>、<code class="ic">log</code>、<code class="ic">diff</code> 三个命令挖到底。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 8-1　多人协作的日常循环与冲突预防</span><span class="fs">Daily Loop</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 400" width="980" height="400" role="img" aria-label="SVN 多人协作日常循环图">
+  <!-- 中央循环 -->
+  <circle cx="240" cy="200" r="105" fill="none" stroke="#30363d" stroke-width="2" stroke-dasharray="6 5"/>
+  <text class="hd" x="240" y="118" text-anchor="middle" fill="#58a6ff">日常循环</text>
+
+  <!-- 四个节点 -->
+  <rect class="c-blue" x="176" y="86" width="128" height="38" rx="8"/>
+  <text class="tm" x="240" y="110" text-anchor="middle">svn update</text>
+
+  <rect class="c-green" x="306" y="182" width="128" height="38" rx="8"/>
+  <text class="tm" x="370" y="206" text-anchor="middle">编辑代码</text>
+
+  <rect class="c-orange" x="176" y="278" width="128" height="38" rx="8"/>
+  <text class="tm" x="240" y="302" text-anchor="middle">svn diff</text>
+
+  <rect class="c-pur" x="48" y="182" width="128" height="38" rx="8"/>
+  <text class="tm" x="112" y="206" text-anchor="middle">svn commit</text>
+
+  <!-- 循环箭头 -->
+  <path class="arwb" d="M306,110 C350,124 372,150 372,182"/>
+  <path class="arwg" d="M370,220 C370,254 348,278 306,296"/>
+  <path class="arwo" d="M176,296 C132,278 112,254 112,220"/>
+  <path class="arwp" d="M112,182 C112,150 132,124 176,110"/>
+
+  <text class="tm2" x="352" y="152">改</text>
+  <text class="tm2" x="352" y="268">查</text>
+  <text class="tm2" x="128" y="268">提</text>
+  <text class="tm2" x="128" y="152">更</text>
+
+  <!-- 右侧：预防冲突 -->
+  <rect x="500" y="40" width="452" height="146" rx="11" fill="rgba(126,231,135,.07)" stroke="#7ee787" stroke-width="1.4"/>
+  <text class="hd" x="522" y="66" fill="#7ee787">缩短「持有时间」是避免冲突的唯一办法</text>
+  <text class="ts" x="522" y="92">冲突的产生条件：</text>
+  <text class="tx" x="538" y="114">① 你改了一个文件，② 同事也改了同一个文件，</text>
+  <text class="tx" x="538" y="136">③ 同事先提交了，④ 你 update 时撞上他的改动。</text>
+  <text class="ts" x="522" y="162">持有时间越长（比如三天不提交），撞车概率越高。</text>
+  <text class="ts" x="522" y="182" fill="#7ee787">对策：小步提交，一个功能一提交，别攒。</text>
+
+  <!-- 右下 -->
+  <rect x="500" y="200" width="452" height="146" rx="11" fill="rgba(255,123,114,.07)" stroke="#ff7b72" stroke-width="1.4"/>
+  <text class="hd" x="522" y="226" fill="#ff7b72">每天开工第一件事：update</text>
+  <text class="ts" x="522" y="252">很多人习惯「想起来才更新」，这会导致：</text>
+  <text class="tx" x="538" y="274">• 本地基线与服务器越来越远</text>
+  <text class="tx" x="538" y="296">• 一次 update 拉回几百个改动，冲突爆炸</text>
+  <text class="tx" x="538" y="318">• 提交时发现文件全「过期」，被迫先合并</text>
+  <text class="ts" x="522" y="342" fill="#7ee787">习惯：开始写代码前 update，写完提交前再 update 一次。</text>
+
+  <!-- 底部提示 -->
+  <rect x="30" y="346" width="440" height="42" rx="9" fill="rgba(210,168,255,.07)" stroke="#d2a8ff" stroke-width="1.2"/>
+  <text class="ts" x="50" y="372">循环里没有「先提交再更新」这个顺序 —— 顺序反了就会冲突。</text>
+</svg>
+  </div>
+</div>
+
+<h4 class="sub" id="s8-2">update：不只是「拉代码」</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">update 的高级用法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">svn update                          <span class="c"># 把整个工作副本更新到 HEAD</span>
+svn update src/                     <span class="c"># 只更新某个目录</span>
+svn update README.md config.json    <span class="c"># 只更新指定文件</span>
+svn update -r 100                   <span class="c"># 更新到指定版本 r100（不是最新）</span>
+svn update --revision PREV          <span class="c"># 回退到上一个版本（常用！）</span>
+svn update --revision BASE          <span class="c"># 回到工作副本的基准版本（丢弃所有更新）</span>
+
+<span class="c"># 冲突处理策略（重要，脚本里必用）</span>
+svn update --accept postpone        <span class="c"># 冲突了就放着，产生冲突标记（默认行为）</span>
+svn update --accept mine-full       <span class="c"># 冲突时全用我的</span>
+svn update --accept theirs-full     <span class="c"># 冲突时全用服务器的</span>
+svn update --accept mine-conflict   <span class="c"># 只在本文件的冲突块用我的</span>
+svn update --accept theirs-conflict <span class="c"># 只在冲突块用服务器的</span>
+svn update --accept base            <span class="c"># 丢弃双方改动，回到原始版本</span>
+
+<span class="c"># 其他常用</span>
+svn update --force                  <span class="c"># 强制覆盖，即使有未版本控制的同名文件</span>
+svn update --ignore-ancestry        <span class="c"># 忽略祖先关系，直接覆盖（慎用）</span>
+svn update --set-depth infinity .   <span class="c"># 把稀疏工作副本变回完整（第 22 节）</span>
+svn update --non-interactive        <span class="c"># 脚本必备，遇冲突不卡住等输入</span></pre>
+</div>
+
+<div class="box warn">
+  <span class="bt">脚本里必须加 --non-interactive 和 --accept</span>
+  <p>SVN 默认遇到冲突会<strong>弹出交互式选择菜单</strong>，等待你输入字母。
+  在 CI / 定时任务 / 批处理脚本里，这会让进程<em>永久挂起</em>。</p>
+  <p>本教程在实测阶段就踩过这个坑——一个看似简单的 update 命令阻塞了 120 秒后被强制中断。
+  正确写法：</p>
+  <div class="codewrap">
+    <div class="codehead"><span class="lang">bash</span><span class="fn">CI 里的安全写法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">svn update --non-interactive --accept postpone
+svn commit -m <span class="s">"auto build"</span> --non-interactive</pre>
+  </div>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：update 输出的字母含义</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn update</span>
+Updating '.':
+<span class="hl">A</span>    bob-test                        <span class="cmt">← 服务器新增的，添加到本地</span>
+<span class="hl">U</span>    src\main.cs                     <span class="cmt">← 文件被更新（Updated）</span>
+<span class="hl">D</span>    old-file.txt                    <span class="cmt">← 服务器删除了，本地也删掉</span>
+<span class="hl">G</span>    config.json                     <span class="cmt">← 自动合并成功（merGed），无冲突！</span>
+<span class="no">C</span>    README.md                       <span class="cmt">← 冲突（Conflicted），需要人工介入</span>
+Updated to revision 12.
+
+<span class="cmt"># 输出字母速查</span>
+<span class="dim">A</span> Added     服务器上新增的条目
+<span class="dim">U</span> Updated   内容是服务器的版本（本地没改过）
+<span class="dim">D</span> Deleted   服务器上删除了
+<span class="dim">G</span> merGed    本地和服务器都改了，SVN 自动合并成功
+<span class="dim">C</span> Conflicted 自动合并失败，产生冲突，必须人工解决
+<span class="dim">E</span> Existed   已存在（通常是添加时同名文件在）</pre>
+  </div>
+</div>
+
+<h4 class="sub">log：查历史，但有个大坑</h4>
+
+<div class="box err">
+  <span class="bt">实测踩坑：svn log -l 1 显示的不是最新提交！</span>
+  <p>这是 SVN 新手最困惑的行为之一。<code class="ic">svn log</code> 默认<strong>从工作副本的 BASE 版本开始往回走</strong>，
+  而不是从服务器的最新版本。<strong>如果你很久没 update 过，log 给你看的就是「你本地那个古老时间点」的历史。</strong></p>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：这个坑长什么样</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 工作副本停在 r9，但服务器上已经有 r10 了</span>
+<span class="ps">$</span> <span class="cmd">svn log -l 1</span>
+------------------------------------------------------------------------
+<span class="hl">r9</span> | kelang | 2026-10-08 11:02:52 | 1 line
+<span class="cmt">↑ 显示的是 r9 而不是 r10！</span>
+<span class="cmt">  因为 log 从工作副本 BASE（r9）开始往回数</span>
+
+<span class="cmt"># 正确写法一：显式指定从 HEAD 开始</span>
+<span class="ps">$</span> <span class="cmd">svn log -r HEAD -l 1</span>
+------------------------------------------------------------------------
+<span class="ok">r10</span> | kelang | 2026-10-08 11:02:58 | 1 line
+<span class="cmt">↑ 这才是服务器上真正的最后一次提交</span>
+
+<span class="cmt"># 正确写法二：先 update 再 log</span>
+<span class="ps">$</span> <span class="cmd">svn update; svn log -l 1</span>
+Updating '.':
+At revision <span class="hl">10</span>.
+------------------------------------------------------------------------
+<span class="ok">r10</span> | kelang | 2026-10-08 11:02:58 | 1 line
+
+<span class="cmt"># 正确写法三：用 URL 而不是工作副本路径</span>
+<span class="ps">$</span> <span class="cmd">svn log -l 1 file:///E:/repo/trunk</span>
+<span class="cmt">URL 形式默认从 HEAD 开始，没有这个坑</span></pre>
+  </div>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">log 的完整用法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">svn log                              <span class="c"># 全部历史（从 BASE 往回），大仓库会刷屏</span>
+svn log -l 10                        <span class="c"># 只看最近 10 条</span>
+svn log -r HEAD -l 1                 <span class="c"># 看服务器最新那一条（避开 BASE 坑）</span>
+svn log -r 5:10                      <span class="c"># 指定区间</span>
+svn log -r <span class="s">"{2026-10-01}:{2026-10-08}"</span>  <span class="c"># 按日期区间（1.8+）</span>
+svn log -r <span class="s">"{2026-10-01}:HEAD"</span>
+
+<span class="c"># 输出控制</span>
+svn log -q                           <span class="c"># 只要版本号/作者/时间，不要日志正文</span>
+svn log -v                           <span class="c"># 显示每次提交具体改了哪些路径（重要！）</span>
+svn log --xml                        <span class="c"># XML 格式，给脚本解析用</span>
+svn log -g                           <span class="c"># 显示合并追踪信息（Merged via: rXX）</span>
+svn log --search <span class="s">"修复登录"</span>          <span class="c"># 按关键字搜日志（1.8+）</span>
+svn log --diff                       <span class="c"># 直接带上 diff 内容，非常直观</span>
+
+<span class="c"># 看某个文件的完整历史（含重命名追踪）</span>
+svn log -v src/main.cs
+svn log --stop-on-copy               <span class="c"># 追到创建该分支的那次提交就停（分析分支起点）</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：svn log -v 显示变更的路径</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn log -v -l 1</span>
+------------------------------------------------------------------------
+r2 | kelang | 2026-10-08 10:56:03 +0800 | 1 line
+<span class="hl">Changed paths:</span>
+   <span class="ok">A</span> /trunk/README.md             <span class="cmt">← A=Added U=Updated D=Deleted R=Replaced</span>
+   <span class="ok">A</span> /trunk/src
+   <span class="ok">A</span> /trunk/src/main.cs
+
+初始化项目结构与说明文档
+------------------------------------------------------------------------
+
+<span class="cmt"># 路径首字母含义（和 status 的字母不同！）</span>
+<span class="dim">A</span> 新增   <span class="dim">M</span> 修改   <span class="dim">D</span> 删除
+<span class="dim">R</span> 替换（删除+新增同名）  <span class="dim">C</span> 复制  <span class="dim">G</span> 属性改动
+
+<span class="cmt"># 用 -g 看合并关系，这一步是理解分支的关键</span>
+<span class="ps">$</span> <span class="cmd">svn log -g -l 4</span>
+------------------------------------------------------------------------
+r8 | kelang | 2026-10-08 11:01:15 | 1 line
+合并 feature-login 分支（冲突已解决）
+------------------------------------------------------------------------
+<span class="hl">r6</span> | kelang | 2026-10-08 10:59:05 | 1 line
+<span class="cy">Merged via: r8</span>                    <span class="cmt">← 关键！这个提交通过 r8 被合并进来了</span>
+分支：新增登录功能说明
+------------------------------------------------------------------------
+<span class="hl">r5</span> | kelang | 2026-10-08 10:58:59 | 1 line
+<span class="cy">Merged via: r8</span>
+从 trunk 创建 feature-login 分支
+------------------------------------------------------------------------</pre>
+  </div>
+</div>
+
+<div class="box key">
+  <span class="bt">-g 是分支调试的杀手锏</span>
+  <p><code class="ic">svn log -g</code> 会显示 <code class="ic">Merged via: rXX</code> 标记，
+  告诉你「这个分支上的提交是被哪个主干版本合并进去的」。
+  分支合并出问题时，这条命令能瞬间定位是哪一步合漏了。</p>
+</div>
+
+<h4 class="sub">diff：三种比较维度</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">diff 的三种比较对象</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 【维度一】工作副本 vs BASE —— 看我自己改了什么（最常用）</span>
+svn diff
+<span class="c"># 等价于 svn diff -r BASE，BASE 就是最近一次 update 拿到的那份</span>
+
+<span class="c"># 【维度二】任意两个版本之间 —— 看别人/历史改了什么</span>
+svn diff -r 5:8
+svn diff -r 5:HEAD
+svn diff -c 8                  <span class="c"># 只看 r8 这一次提交引入的改动（= -r 7:8 的简写）</span>
+svn diff -r <span class="s">"{2026-10-01}:HEAD"</span>
+
+<span class="c"># 【维度三】URL 之间 —— 比较分支/标签</span>
+svn diff file:///repo/trunk file:///repo/branches/feature
+svn diff ^/trunk ^/branches/feature        <span class="c"># 用 ^ 简写仓库根（工作副本内可用）</span>
+
+<span class="c"># 输出控制（很实用）</span>
+svn diff --summarize           <span class="c"># 只列文件名，不要内容（大改动时先扫一遍）</span>
+svn diff --git                  <span class="c"># 1.9+ 支持的 git 风格 diff，方便贴到别处</span>
+svn diff --diff-cmd meld        <span class="c"># 调用外部图形化对比工具</span>
+svn diff --internal-diff        <span class="c"># 强制用内置引擎（当外部工具配置出错时救急）</span>
+svn diff --no-diff-added        <span class="c"># 新增文件不显示全部内容（新增大文件时避免刷屏）</span>
+
+<span class="c"># 保存为补丁文件</span>
+svn diff &gt; my.patch
+svn diff --file my.patch        <span class="c"># 等价写法，Windows PowerShell 下推荐这个</span>
+
+<span class="c"># 应用补丁</span>
+svn patch my.patch
+svn patch my.patch --dry-run    <span class="c"># 试运行，不实际改动（先验证再应用）</span>
+svn patch --reverse-diff my.patch  <span class="c"># 反向应用（撤销补丁）</span>
+
+<span class="c"># 用第三方 diff 工具（配置在 ~/.subversion/config 的 diff-cmd）</span>
+svn diff --diff-cmd diff -x <span class="s">"-u"</span></pre>
+</div>
+
+<div class="box warn">
+  <span class="bt">Windows PowerShell 下重定向会毁掉补丁文件</span>
+  <p>实测踩过的坑：在 PowerShell 里执行 <code class="ic">svn diff &gt; my.patch</code>，
+  PowerShell 默认用 <strong>UTF-16 LE 编码</strong>写文件，结果补丁开头多了 <code class="ic">FF FE</code> BOM 字节，
+  用 <code class="ic">svn patch</code> 应用时会报 <code class="ic">Malformed dumpfile header</code> 之类的解析错误。</p>
+  <p><strong>解决方案（三选一）：</strong></p>
+  <ul>
+    <li>用内置参数：<code class="ic">svn diff --file my.patch</code>（推荐，跨平台一致）</li>
+    <li>用 cmd 重定向：<code class="ic">cmd /c "svn diff &gt; my.patch"</code></li>
+    <li>改用 Git Bash / WSL 执行命令</li>
+  </ul>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：diff 生成补丁并应用</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 1. 产生一个改动</span>
+<span class="ps">$</span> <span class="cmd">Set-Content src\main.cs "class Main { /* patched */ }"</span>
+
+<span class="cmt"># 2. 生成补丁（用 --file 避开编码坑）</span>
+<span class="ps">$</span> <span class="cmd">svn diff --file E:\my.patch</span>
+
+<span class="cmt"># 3. 补丁内容</span>
+<span class="ps">$</span> <span class="cmd">Get-Content E:\my.patch</span>
+Index: src/main.cs
+===================================================================
+--- src/main.cs     (revision 17)
++++ src/main.cs     (working copy)
+@@ -1 +1 @@
+<span class="no">-</span>﻿class Main {}
+<span class="ok">+</span>class Main { /* patched */ }
+
+<span class="cmt"># 4. 撤销改动，再从补丁恢复</span>
+<span class="ps">$</span> <span class="cmd">svn revert src\main.cs</span>
+Reverted 'src\main.cs'
+
+<span class="ps">$</span> <span class="cmd">svn patch E:\my.patch</span>
+<span class="hl">U</span>         src\main.cs
+<span class="cmt">          ↑ U = Updated，补丁成功应用</span>
+
+<span class="cmt"># 5. 验证内容确实恢复了</span>
+<span class="ps">$</span> <span class="cmd">Get-Content src\main.cs</span>
+class Main { /* patched */ }        <span class="cmt">← 补丁内容已生效</span></pre>
+  </div>
+  <p><code class="ic">svn patch</code> 的返回值很直观：
+  <code class="ic">U</code> 表示更新成功，<code class="ic">A</code> 表示新增了文件，<code class="ic">D</code> 表示删除了文件，
+  <code class="ic">C</code> 表示补丁上下文对不上、需要人工处理，
+  <code class="ic">G</code> 表示自动合并成功。</p>
+</div>
+
+<!-- ==========================================================================
+     第 9 节：撤销与回退
+     ========================================================================== -->
+
+<div class="pager">
+  <a href="07-status.html"><span class="lbl">← 上一节</span><span class="ttl">7. status 状态码全解</span></a>
+  <a class="home" href="index.html"><span class="ttl">总目录</span></a>
+  <a class="next" href="09-rollback.html"><span class="lbl">下一节 →</span><span class="ttl">9. 撤销与回退：五种后悔场景</span></a>
+</div>
+
+</main>
+</div>
+<button id="top" title="回到顶部">&uarr;</button>
+
+<script>
+
+(function () {
+  'use strict';
+
+  /* ============================================================
+     1. 代码块增强：语法高亮 + 复制按钮 + 换行切换
+     ============================================================ */
+
+  // 极简高亮器：只处理注释、字符串、SVN 命令、选项
+  function escapeHtml(t) {
+    return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function highlight(code) {
+    var lines = code.split('\n');
+    var out = [];
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var indented = escapeHtml(line);
+
+      // 整行注释（# 或 rem 或 :: 开头）
+      if (/^\s*(#|rem\s|::)/i.test(line) && !/^\s*#!/.test(line)) {
+        out.push('<span class="c">' + indented + '</span>');
+        continue;
+      }
+
+      // 行内注释：找到未被引号包裹的 #
+      var result = '';
+      var inStr = false;
+      var strChar = '';
+      var commentStart = -1;
+
+      for (var j = 0; j < line.length; j++) {
+        var ch = line[j];
+        if (!inStr && (ch === '"' || ch === "'")) {
+          inStr = true;
+          strChar = ch;
+        } else if (inStr && ch === strChar) {
+          if (line[j - 1] !== '\\') inStr = false;
+        } else if (!inStr && ch === '#' && j > 0 && line[j - 1] === ' ' && /^\s*#/.test(line.slice(j)) === false) {
+          commentStart = j;
+          break;
+        }
+      }
+
+      var codePart = commentStart >= 0 ? line.slice(0, commentStart) : line;
+      var commentPart = commentStart >= 0 ? line.slice(commentStart) : '';
+      var esc = escapeHtml(codePart);
+
+      // 字符串
+      esc = esc.replace(/(&quot;[^&]*?&quot;|&#39;[^&]*?&#39;)/g, '<span class="s">$1</span>');
+      // 注释里的 svn 命令名（行首后的第一个词）
+      esc = esc.replace(/^(\s*)(svn|svnadmin|svnserve|svnlook|svndumpfilter|svnrdump|svnauthz|svnmucc|sc|find|curl|mail|tar|export|cd|set|echo|if|for|chmod|xargs|grep|awk|sudo)\b/,
+        '$1<span class="k">$2</span>');
+      // 长选项
+      esc = esc.replace(/(\s)(--?[a-zA-Z][a-zA-Z0-9-]*)/g, '$1<span class="a">$2</span>');
+      // 数字（版本号之类）
+      esc = esc.replace(/\b(r\d+)\b/g, '<span class="m">$1</span>');
+
+      result = esc;
+      if (commentPart) result += '<span class="c">' + escapeHtml(commentPart) + '</span>';
+      out.push(result);
+    }
+    return out.join('\n');
+  }
+
+  // 处理所有 codewrap 里的 pre.code
+  var wraps = document.querySelectorAll('.codewrap');
+
+  Array.prototype.forEach.call(wraps, function (wrap) {
+    var pre = wrap.querySelector('pre.code');
+    if (!pre) return;
+
+    // 如果代码块里已经有手工写好的语法着色 span，就原样保留，不再重复处理
+    var alreadyStyled = pre.querySelector('span');
+    if (!alreadyStyled) {
+      var raw = pre.textContent;
+      var codeEl = pre.querySelector('code') || pre;
+      codeEl.innerHTML = highlight(raw);
+    }
+
+    // 加复制按钮（若无）
+    var acts = wrap.querySelector('.acts');
+    if (acts && !acts.querySelector('[data-copy]')) {
+      var b = document.createElement('button');
+      b.setAttribute('data-copy', '');
+      b.textContent = '复制';
+      acts.appendChild(b);
+    }
+  });
+
+  // 复制功能
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('[data-copy]');
+    if (!btn) return;
+
+    var wrap = btn.closest('.codewrap') || btn.closest('.term');
+    if (!wrap) return;
+    var pre = wrap.querySelector('pre');
+    if (!pre) return;
+
+    var text = pre.textContent;
+
+    function done() {
+      btn.textContent = '已复制';
+      btn.classList.add('ok');
+      setTimeout(function () {
+        btn.textContent = '复制';
+        btn.classList.remove('ok');
+      }, 1400);
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text, done); });
+    } else {
+      fallback(text, done);
+    }
+  });
+
+  function fallback(text, done) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done();
+    } catch (err) { /* 静默失败 */ }
+  }
+
+  /* ============================================================
+     2. 进度条 + 回到顶部
+     ============================================================ */
+  var prog = document.getElementById('prog');
+  var topBtn = document.getElementById('top');
+
+  function onScroll() {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var pct = max > 0 ? (h.scrollTop || document.body.scrollTop) / max * 100 : 0;
+    if (prog) prog.style.width = pct + '%';
+    if (topBtn) {
+      if ((h.scrollTop || document.body.scrollTop) > 600) topBtn.classList.add('show');
+      else topBtn.classList.remove('show');
+    }
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  if (topBtn) {
+    topBtn.onclick = function () { window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  }
+
+  /* ============================================================
+     3. 导航高亮：滚动时自动标记当前小节
+     ============================================================ */
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll('#nav a'));
+  var sections = navLinks.map(function (a) {
+    var id = a.getAttribute('href');
+    return { el: id && id.length > 1 ? document.querySelector(id) : null, a: a };
+  }).filter(function (s) { return s.el; });
+
+  function highlightNav() {
+    var pos = window.scrollY + 140;
+    var current = null;
+    for (var i = 0; i < sections.length; i++) {
+      if (sections[i].el.offsetTop <= pos) current = sections[i];
+    }
+    navLinks.forEach(function (a) { a.classList.remove('on'); });
+    if (current) {
+      current.a.classList.add('on');
+      // 让当前项在侧栏可见
+      var box = current.a.parentElement;
+      if (box && box.scrollHeight > box.clientHeight) {
+        var aTop = current.a.offsetTop;
+        if (aTop < box.scrollTop || aTop > box.scrollTop + box.clientHeight - 60) {
+          box.scrollTop = aTop - box.clientHeight / 2;
+        }
+      }
+    }
+  }
+
+  window.addEventListener('scroll', highlightNav, { passive: true });
+  highlightNav();
+
+  /* ============================================================
+     4. 表格首列若为空白则隐藏（防止空单元格）
+     ============================================================ */
+  Array.prototype.forEach.call(document.querySelectorAll('table'), function (t) {
+    var firstTh = t.querySelector('thead th');
+    var firstTd = t.querySelector('tbody td');
+    if (firstTh && firstTd && !firstTh.textContent.trim() && !firstTd.textContent.trim()) {
+      Array.prototype.forEach.call(t.querySelectorAll('tr'), function (tr) {
+        var c = tr.querySelector('th, td');
+        if (c) c.style.display = 'none';
+      });
+    }
+  });
+
+})();
+
+</script>
+</body>
+</html>

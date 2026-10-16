@@ -1,0 +1,174 @@
+<h3 class="sec" id="s16"><span class="no">16</span>锁机制：解决二进制文件不能合并的问题</h3>
+
+<p class="lead">
+  文本文件冲突了可以人工合并，但 <strong>PSD、FBX、Unity 场景文件冲突了根本没法合</strong>。
+  对这些文件，唯一的办法是「一个人改的时候别人别动」——这就是 <code class="ic">svn lock</code> 的用途。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 16-1　svn:needs-lock 的完整工作流</span><span class="fs">Locking</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 440" width="980" height="440" role="img" aria-label="SVN 文件锁工作流程图">
+  <!-- 顶部状态 -->
+  <text class="hd" x="30" y="28" fill="#58a6ff">设置 svn:needs-lock 之后，文件的生命周期</text>
+
+  <!-- 流程 1 -->
+  <rect class="n-gray" x="30" y="48" width="180" height="76" rx="10"/>
+  <text class="hd" x="120" y="74" text-anchor="middle" fill="#8b949e">① 检出后：只读</text>
+  <text class="ts" x="120" y="96" text-anchor="middle">文件权限被设为只读</text>
+  <text class="ts" x="120" y="114" text-anchor="middle">防止你无意中修改</text>
+
+  <path class="arwb" d="M210,86 L250,86"/>
+  <text class="tm2" x="230" y="76" text-anchor="middle">想改</text>
+
+  <rect class="n-blue" x="250" y="48" width="180" height="76" rx="10"/>
+  <text class="hd" x="340" y="74" text-anchor="middle" fill="#58a6ff">② svn lock</text>
+  <text class="ts" x="340" y="96" text-anchor="middle">向服务器申请独占锁</text>
+  <text class="ts" x="340" y="114" text-anchor="middle">成功后文件变可写</text>
+
+  <path class="arwg" d="M430,86 L470,86"/>
+  <text class="tm2" x="450" y="76" text-anchor="middle">加锁成功</text>
+
+  <rect class="n-green" x="470" y="48" width="180" height="76" rx="10"/>
+  <text class="hd" x="560" y="74" text-anchor="middle" fill="#7ee787">③ 编辑并提交</text>
+  <text class="ts" x="560" y="96" text-anchor="middle">现在只有你能改</text>
+  <text class="ts" x="560" y="114" text-anchor="middle">提交后锁自动释放</text>
+
+  <path class="arwp" d="M650,86 L690,86"/>
+  <text class="tm2" x="670" y="76" text-anchor="middle">完成</text>
+
+  <rect class="n-pur" x="690" y="48" width="264" height="76" rx="10"/>
+  <text class="hd" x="822" y="74" text-anchor="middle" fill="#d2a8ff">④ 回到只读状态</text>
+  <text class="ts" x="822" y="96" text-anchor="middle">commit 成功后服务器自动释放锁</text>
+  <text class="ts" x="822" y="114" text-anchor="middle">文件在别人那里也更新成你的版本</text>
+
+  <!-- 别人的遭遇 -->
+  <text class="hd" x="30" y="164" fill="#ff7b72">与此同时，你的同事</text>
+  <rect x="24" y="180" width="440" height="130" rx="11" fill="rgba(255,123,114,.07)" stroke="#ff7b72" stroke-width="1.4"/>
+
+  <text class="ts" x="44" y="206">同事检出文件后，发现它是只读的，尝试修改会被系统拒绝：</text>
+
+  <rect x="44" y="220" width="400" height="34" rx="7" fill="#0b0f14" stroke="#3d444d" stroke-width="1"/>
+  <text class="tm2" x="56" y="242" fill="#ff7b72">$ echo "x" &gt;&gt; art.psd</text>
+  <text class="tm2" x="200" y="242" fill="#ff7b72">→ Permission denied</text>
+
+  <text class="ts" x="44" y="276">如果同事也想改，他必须加锁——但锁已经被你拿走了：</text>
+
+  <rect x="44" y="286" width="400" height="16" rx="4" fill="none"/>
+  <text class="tm2" x="44" y="298" fill="#ff7b72">$ svn lock art.psd  →  svn: E160035: File is already locked</text>
+
+  <!-- 右侧：锁的可视化 -->
+  <text class="hd" x="500" y="164" fill="#e3b341">锁在服务器上的存储</text>
+  <rect x="494" y="180" width="460" height="130" rx="11" fill="rgba(227,179,65,.07)" stroke="#e3b341" stroke-width="1.4"/>
+  <text class="ts" x="514" y="206">锁不是存在文件内容里，而是仓库中一条独立记录：</text>
+  <rect x="514" y="218" width="420" height="76" rx="7" fill="#0b0f14" stroke="#3d444d" stroke-width="1"/>
+  <text class="tm2" x="528" y="240" fill="#7ee787">$ svnadmin lslocks /var/svn/repo</text>
+  <text class="tm2" x="528" y="260">Path: /trunk/art.psd</text>
+  <text class="tm2" x="528" y="278">Owner: alice     Created: 2026-10-08 11:03:25</text>
+
+  <!-- 底部：何时用 -->
+  <rect x="24" y="326" width="930" height="96" rx="11" fill="rgba(88,166,255,.06)" stroke="#58a6ff" stroke-width="1.3"/>
+  <text class="hd" x="44" y="350" fill="#58a6ff">该给哪些文件设 svn:needs-lock</text>
+  <text class="ts" x="44" y="374">✓ 应该设：美术源文件（.psd .max .blend .fbx）、Unity 场景（.unity .prefab）、Excel/Word 文档、大型二进制包</text>
+  <text class="ts" x="44" y="396">✗ 不用设：普通文本源码（.cs .java .py）、配置文件——这些应该靠自动合并解决，加锁反而降低效率</text>
+  <text class="ts" x="44" y="416" fill="#ffa657">⚠ 副作用：所有协作的人都必须记得先 lock 再改，忘了解锁会阻塞别人。锁有生命周期，注意及时释放。</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>核心机制：</b><code class="ic">svn:needs-lock</code> 让文件签出后<strong>只读</strong>，
+    强制你必须 <code class="ic">svn lock</code> 才能编辑。锁在服务器上是一条独立记录，
+    <strong>提交时自动释放</strong>，也可以用 <code class="ic">svn unlock</code> 主动释放。
+  </div>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">锁的完整操作</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ---- 1. 给文件设置 needs-lock 属性 ----</span>
+svn propset svn:needs-lock <span class="s">"*"</span> art.psd
+svn propset svn:needs-lock <span class="s">"*"</span> scene.unity
+svn commit -m <span class="s">"为美术源文件设置 svn:needs-lock"</span>
+
+<span class="c"># 批量设置</span>
+find art -type f \( -name <span class="s">"*.psd"</span> -o -name <span class="s">"*.max"</span> \) \
+  -exec svn propset svn:needs-lock <span class="s">"*"</span> {} \;
+svn commit -m <span class="s">"美术资源统一加锁保护"</span>
+
+<span class="c"># ---- 2. 加锁（编辑前必须做）----</span>
+svn lock art.psd
+svn lock art.psd -m <span class="s">"正在调整封面配色，预计 2 小时"</span>   <span class="c"># 带说明更友好</span>
+svn lock art/*.psd                                      <span class="c"># 批量加锁</span>
+
+<span class="c"># ---- 3. 查看锁 ----</span>
+svn info art.psd                     <span class="c"># 输出里的 Lock Owner / Lock Created</span>
+svn status                           <span class="c"># 加锁的文件在第 6 列显示 K</span>
+svnadmin lslocks /var/svn/repo       <span class="c"># 服务端查看所有锁</span>
+svnadmin lstxns /var/svn/repo        <span class="c"># 查看未完成的事务</span>
+
+<span class="c"># ---- 4. 解锁（提交时会自动解，也可手动）----</span>
+svn unlock art.psd
+svn unlock --force art.psd           <span class="c"># 强制解锁别人的锁（需要权限，慎用）</span>
+svn unlock --force -R art/           <span class="c"># 递归强制解锁整个目录</span>
+
+<span class="c"># ---- 5. 别人要抢锁 ----</span>
+svn lock art.psd --force             <span class="c"># 强制抢锁（会破坏对方的工作，需要沟通！）</span>
+<span class="c"># 服务端管理员也可以：</span>
+svnadmin rmlocks /var/svn/repo art.psd   <span class="c"># 管理员移除锁</span>
+
+<span class="c"># ---- 6. 查看工作副本里的锁状态 ----</span>
+svn status -u                        <span class="c"># 显示服务器上的锁</span>
+svn status --show-updates            <span class="c"># 同上</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：加锁与信息查看</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 设置 needs-lock 属性</span>
+<span class="ps">$</span> <span class="cmd">svn propset svn:needs-lock "*" art.psd</span>
+<span class="ok">property 'svn:needs-lock' set on 'art.psd'</span>
+
+<span class="cmt"># 加锁</span>
+<span class="ps">$</span> <span class="cmd">svn lock art.psd -m "正在编辑美术源文件"</span>
+<span class="ok">'art.psd' locked by user 'kelang'.</span>
+
+<span class="cmt"># 查看锁信息</span>
+<span class="ps">$</span> <span class="cmd">svn info art.psd | Select-String 'Lock'</span>
+<span class="hl">Lock Token:</span> opaquelocktoken:10b46cff-b818-da4a-a2b5-826b6b38c097
+<span class="hl">Lock Owner:</span> kelang
+<span class="hl">Lock Created:</span> 2026-10-08 11:03:25 +0800
+Lock Comment (1 line):
+
+<span class="cmt"># 服务端视角：列出仓库中的所有锁</span>
+<span class="ps">$</span> <span class="cmd">svnadmin lslocks E:\repo</span>
+Path: <span class="cy">/trunk/art.psd</span>
+UUID Token: opaquelocktoken:6f7e43cf-61cc-6b46-83b3-1c3e3d8b92b6
+Owner: <span class="hl">kelang</span>
+Created: 2026-10-08 11:03:25 +0800
+Expires:
+Comment (0 lines):
+
+<span class="cmt"># 解锁</span>
+<span class="ps">$</span> <span class="cmd">svn unlock art.psd</span>
+<span class="ok">'art.psd' unlocked.</span></pre>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">锁 vs 分支：什么时候用哪个</span>
+  <div class="tw">
+  <table>
+  <thead><tr><th>场景</th><th>推荐方案</th><th>理由</th></tr></thead>
+  <tbody>
+    <tr><td>改一个 PSD 的配色</td><td><code class="ic">svn lock</code></td><td>二进制无法合并，加锁最直接</td></tr>
+    <tr><td>重构整个模块（多个文件）</td><td><strong>建分支</strong></td><td>涉及多文件，锁不住；分支让改动隔离</td></tr>
+    <tr><td>修一行 bug</td><td>直接改 + commit</td><td>改动小，冲突概率极低</td></tr>
+    <tr><td>给旧版本打补丁</td><td>从标签建 <strong>热修分支</strong></td><td>主干已经走远，不能直接在上面改</td></tr>
+    <tr><td>多个美术同时改同一个场景文件</td><td><code class="ic">lock</code> + 沟通</td><td>Unity 场景是二进制，必须串行</td></tr>
+  </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     第七阶段 · 第 17 节：部署方案选型
+     ========================================================================== -->

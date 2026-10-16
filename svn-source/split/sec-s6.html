@@ -1,0 +1,317 @@
+<h3 class="sec" id="s6"><span class="no">6</span>第一次完整上手：从零到提交</h3>
+
+<p class="lead">
+  这一节把「拿到一个仓库地址」到「成功提交第一份代码」的完整链路走一遍，
+  每一步都配真实输出。<strong>照着敲一遍，你就掌握了 SVN 80% 的日常。</strong>
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 6-1　首次上手六步流程</span><span class="fs">Workflow</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 330" width="980" height="330" role="img" aria-label="SVN 首次使用六步流程图">
+  <!-- 步骤条 -->
+  <rect class="n-blue" x="20" y="40" width="140" height="86" rx="11"/>
+  <circle cx="42" cy="62" r="11" fill="#58a6ff"/>
+  <text class="tm" x="42" y="67" text-anchor="middle" fill="#0d1117" font-weight="700">1</text>
+  <text class="hd" x="62" y="67">checkout</text>
+  <text class="ts" x="36" y="92">从服务器拉一份</text>
+  <text class="ts" x="36" y="112">工作副本到本地</text>
+
+  <rect class="n-green" x="186" y="40" width="140" height="86" rx="11"/>
+  <circle cx="208" cy="62" r="11" fill="#7ee787"/>
+  <text class="tm" x="208" y="67" text-anchor="middle" fill="#0d1117" font-weight="700">2</text>
+  <text class="hd" x="228" y="67">add</text>
+  <text class="ts" x="202" y="92">把新文件纳入</text>
+  <text class="ts" x="202" y="112">版本控制（? → A）</text>
+
+  <rect class="n-yellow" x="352" y="40" width="140" height="86" rx="11"/>
+  <circle cx="374" cy="62" r="11" fill="#e3b341"/>
+  <text class="tm" x="374" y="67" text-anchor="middle" fill="#0d1117" font-weight="700">3</text>
+  <text class="hd" x="394" y="67">status</text>
+  <text class="ts" x="368" y="92">确认要提交什么</text>
+  <text class="ts" x="368" y="112">本地操作，不联网</text>
+
+  <rect class="n-pur" x="518" y="40" width="140" height="86" rx="11"/>
+  <circle cx="540" cy="62" r="11" fill="#d2a8ff"/>
+  <text class="tm" x="540" y="67" text-anchor="middle" fill="#0d1117" font-weight="700">4</text>
+  <text class="hd" x="560" y="67">diff</text>
+  <text class="ts" x="534" y="92">核对改了什么</text>
+  <text class="ts" x="534" y="112">防止误提交</text>
+
+  <rect class="n-orange" x="684" y="40" width="140" height="86" rx="11"/>
+  <circle cx="706" cy="62" r="11" fill="#ffa657"/>
+  <text class="tm" x="706" y="67" text-anchor="middle" fill="#0d1117" font-weight="700">5</text>
+  <text class="hd" x="726" y="67">update</text>
+  <text class="ts" x="700" y="92">先拉别人改动</text>
+  <text class="ts" x="700" y="112">减少冲突</text>
+
+  <rect class="n-cyan" x="850" y="40" width="110" height="86" rx="11"/>
+  <circle cx="872" cy="62" r="11" fill="#56d4dd"/>
+  <text class="tm" x="872" y="67" text-anchor="middle" fill="#0d1117" font-weight="700">6</text>
+  <text class="hd" x="892" y="67">commit</text>
+  <text class="ts" x="866" y="92">推送并拿到</text>
+  <text class="ts" x="866" y="112">新版本号</text>
+
+  <!-- 箭头 -->
+  <path class="arwb" d="M160,83 L186,83"/>
+  <path class="arwg" d="M326,83 L352,83"/>
+  <path class="arwy" d="M492,83 L518,83"/>
+  <path class="arwp" d="M658,83 L684,83"/>
+  <path class="arwo" d="M824,83 L850,83"/>
+
+  <!-- 关键提示 -->
+  <rect x="20" y="152" width="460" height="86" rx="10" fill="rgba(126,231,135,.07)" stroke="#7ee787" stroke-width="1.3"/>
+  <text class="hd" x="40" y="176" fill="#7ee787">为什么第 5 步要「先 update 再 commit」</text>
+  <text class="ts" x="40" y="200">这是 SVN 与 Git 最大的习惯差异。SVN 提交时，服务器会检查你</text>
+  <text class="ts" x="40" y="220">要改的文件是不是已经落后于服务器——落后就会直接拒绝提交。</text>
+
+  <rect x="500" y="152" width="460" height="86" rx="10" fill="rgba(255,166,87,.07)" stroke="#ffa657" stroke-width="1.3"/>
+  <text class="hd" x="520" y="176" fill="#ffa657">不做第 5 步会怎样</text>
+  <text class="ts" x="520" y="200">会收到 svn: E155011 / E170014 之类的「过期」错误，或者</text>
+  <text class="ts" x="520" y="220">在 update 时撞出冲突。养成「先 update 后 commit」能省掉大半麻烦。</text>
+
+  <!-- 版本号 -->
+  <rect x="20" y="254" width="940" height="56" rx="10" fill="rgba(210,168,255,.07)" stroke="#d2a8ff" stroke-width="1.3"/>
+  <text class="hd" x="40" y="278" fill="#d2a8ff">版本号在说什么</text>
+  <text class="ts" x="40" y="299">checkout 后你拿到 <tspan class="mono" fill="#e6edf3">Checked out revision N</tspan>；提交后服务器回你 <tspan class="mono" fill="#e6edf3">Committed revision N+1</tspan>。这两个数字就是你的「坐标」，务必记下来。</text>
+</svg>
+  </div>
+</div>
+
+<h4 class="sub">步骤 1：checkout 拉取工作副本</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">checkout 的三种写法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 写法一：最常用，把 trunk 检出到当前目录下的 wc 文件夹</span>
+svn checkout https://svn.example.com/repo/trunk wc
+
+<span class="c"># 写法二：检出到当前目录（省略目标目录名，会直接铺在当前目录）</span>
+mkdir myproject &amp;&amp; cd myproject
+svn checkout https://svn.example.com/repo/trunk .
+
+<span class="c"># 写法三：简写 co（SVN 几乎所有命令都有简写）</span>
+svn co https://svn.example.com/repo/trunk wc
+
+<span class="c"># 常用选项</span>
+svn checkout --username alice --password 'secret' URL wc   <span class="c"># 指定账号</span>
+svn checkout --non-interactive URL wc                     <span class="c"># 不交互，脚本里必备</span>
+svn checkout --depth immediates URL wc                    <span class="c"># 稀疏检出，只拉一层（第 22 节）</span>
+svn checkout -r 100 URL wc                                <span class="c"># 检出历史版本 r100</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn checkout file:///C:/Work/svn-demo/repo/trunk wc</span>
+A    wc\README.md
+A    wc\src
+A    wc\src\main.cs
+Checked out revision <span class="hl">2</span>.
+<span class="cmt">    ↑ 每个 A 表示这个文件被「添加」到本地工作副本</span></pre>
+  </div>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn info</span>
+Path: .
+Working Copy Root Path: C:\Work\svn-demo\wc
+URL: file:///C:/Work/svn-demo/repo/trunk
+<span class="hl">Relative URL: ^/trunk</span>              <span class="cmt">← 相对仓库根的位置（^ 代表仓库根）</span>
+Repository Root: file:///C:/Work/svn-demo/repo
+Repository UUID: 021a334f-9907-c84d-81c4-e10db7ecd948
+Revision: 1                        <span class="cmt">← 整个工作副本的版本</span>
+Node Kind: directory
+Schedule: normal
+Last Changed Author: kelang
+Last Changed Rev: 1
+Last Changed Date: 2026-10-08 10:55:51 +0800</pre>
+  </div>
+</div>
+
+<div class="box key">
+  <span class="bt">看懂 svn info 输出里的三个版本号</span>
+  <ul>
+    <li><code class="ic">Revision: 1</code> —— <strong>整个工作副本</strong>的基准版本（刚 checkout 时等于检出的版本）</li>
+    <li><code class="ic">Last Changed Rev: 1</code> —— <strong>当前这个目录/文件</strong>最后一次被改动的版本</li>
+    <li><code class="ic">Last Changed Author</code> / <code class="ic">Date</code> —— 那次改动是谁、什么时候做的</li>
+  </ul>
+  <p>刚 checkout 完这两个值往往不同，那很正常。<strong>Revision 是「你手上这份数据处于哪个时间点」，Last Changed Rev 是「这个路径上次被改是在哪个时间点」。</strong></p>
+</div>
+
+<h4 class="sub">步骤 2：add 纳入版本控制</h4>
+
+<p>
+  新建的文件 SVN <strong>默认完全无视</strong>。你必须显式告诉它「这个文件我要管」——
+  这就是 <code class="ic">svn add</code>。
+</p>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">add 的各种姿势</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">svn add README.md            <span class="c"># 添加单个文件</span>
+svn add src/                 <span class="c"># 递归添加整个目录（含其中所有未忽略的文件）</span>
+svn add *.py                 <span class="c"># 通配符（bash 会先展开，Windows 下 SVN 自己展开）</span>
+svn add --force .            <span class="c"># 添加当前目录下所有未版本控制的东西</span>
+
+<span class="c"># 只想标记、不实际加入（很少用）</span>
+svn add --depth empty src/
+
+<span class="c"># 危险选项：--no-ignore 会把 svn:ignore 忽略的文件也加进来，慎用</span>
+svn add --no-ignore .</pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：add 前后 status 的变化</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 先创建两个文件和一个目录</span>
+<span class="ps">$</span> <span class="cmd">Set-Content README.md "# 我的项目"; Set-Content src\main.cs "class Main {}"</span>
+
+<span class="cmt"># add 之前：全是 ? 号</span>
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="no">?</span>       README.md
+<span class="no">?</span>       src
+<span class="cmt">        ↑ ? = 未版本控制，提交时会被完全忽略</span>
+
+<span class="cmt"># 执行 add</span>
+<span class="ps">$</span> <span class="cmd">svn add README.md src</span>
+<span class="ok">A</span>         README.md
+<span class="ok">A</span>         src
+<span class="ok">A</span>         src\main.cs
+<span class="cmt">        ↑ A = 已添加到版本控制，但尚未提交到服务器</span>
+
+<span class="cmt"># add 之后再看 status：? 变成了 A</span>
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="ok">A</span>       README.md
+<span class="ok">A</span>       src
+<span class="ok">A</span>       src\main.cs
+
+<span class="cmt"># 注意：svn add 目录时会递归列出其中每个文件</span>
+<span class="cmt"># 所以 src 和 src\main.cs 都各占一行</span></pre>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">常见误区：svn add 不等于提交</span>
+  <p>新手最容易犯的错：以为 <code class="ic">svn add</code> 之后文件就在服务器上了。
+  <strong>不是的。</strong><code class="ic">add</code> 只是<em>在本地登记</em>，必须在同一个工作副本里执行
+  <code class="ic">svn commit</code> 才会真正上传。</p>
+  <p>判断方法：<code class="ic">svn status</code> 看到 <code class="ic">A</code> 就是还没提交；提交干净后这一行会消失。</p>
+</div>
+
+<h4 class="sub">步骤 3-4：status 与 diff 自查</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">提交前的自查清单</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 1. 我到底改了哪些东西？（本地操作，秒出）</span>
+svn status
+
+<span class="c"># 2. 排除那些我不关心的（比如编辑器临时文件）</span>
+svn status --no-ignore           <span class="c"># 连被忽略的也显示（排查「为什么文件传不上去」时有用）</span>
+svn status -q                    <span class="c"># 只显示有改动的，不显示 ? 未跟踪文件</span>
+svn status -u                    <span class="c"># 联网对比服务器，显示哪些文件服务器上有更新</span>
+svn status -v                    <span class="c"># 显示每个文件的版本号和最后修改者</span>
+svn status --depth immediates     <span class="c"># 只看当前层，不递归子目录</span>
+
+<span class="c"># 3. 逐行看我改了什么</span>
+svn diff
+svn diff README.md               <span class="c"># 只看某个文件</span>
+svn diff -r 5:8                  <span class="c"># 比较仓库里 r5 和 r8 的差异</span>
+svn diff -r 5:HEAD               <span class="c"># 从 r5 到现在</span>
+svn diff --summarize             <span class="c"># 只列出改了哪些文件，不显示内容（大改动时好用）</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：status 与 diff</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 修改 README.md 后</span>
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="hl">M</span>       README.md
+<span class="cmt">        ↑ M = Modified，与 pristine 副本（最近一次 update 时的快照）不同</span>
+
+<span class="ps">$</span> <span class="cmd">svn diff</span>
+Index: README.md
+===================================================================
+--- README.md   <span class="dim">(revision 2)</span>       <span class="cmt">← 左：服务器 BASE 版本</span>
++++ README.md   <span class="dim">(working copy)</span>     <span class="cmt">← 右：你磁盘上的当前内容</span>
+@@ -1 +1,5 @@
+ ﻿# 我的项目
+<span class="ok">+</span>
+<span class="ok">+## 安装</span>
+<span class="ok">+</span>
+<span class="ok">+1. 克隆仓库</span>
+<span class="cmt">   ↑ + 号是新增行；对应地，- 号是删除行，无前缀是上下文</span>
+
+<span class="ps">$</span> <span class="cmd">svn diff --summarize</span>
+M       README.md
+<span class="cmt">        ↑ 只给文件名，不显示逐行内容，适合大改动时快速扫一遍</span>
+<span class="cmt">          注意：--summarize 是 svn diff 的选项，svn status 没有这个选项</span></pre>
+  </div>
+</div>
+
+<h4 class="sub">步骤 5-6：update 再 commit</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">提交的完整动作</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 第 5 步：先拉取别人的改动</span>
+svn update
+
+<span class="c"># 第 6 步：提交</span>
+svn commit -m <span class="s">"初始化项目结构与说明文档"</span>
+
+<span class="c"># 只提交指定文件（危险：容易漏掉相关文件，但有场景需要）</span>
+svn commit README.md src/main.cs -m <span class="s">"修改文档与主程序"</span>
+
+<span class="c"># 从文件读提交日志（日志很长、或要嵌入特殊字符时用）</span>
+svn commit --file commit-msg.txt
+
+<span class="c"># 只提交某个变更列表（第 22 节 changelist）</span>
+svn commit --changelist doc-fix -m <span class="s">"文档修正"</span>
+
+<span class="c"># 常用选项</span>
+svn commit --depth immediates -m <span class="s">"只提交当前层"</span>
+svn commit --username alice --password secret -m <span class="s">"..."</span>
+svn commit --non-interactive -m <span class="s">"..."</span>      <span class="c"># 脚本里必备</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：commit 的完整回显</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn commit -m "初始化项目结构与说明文档"</span>
+<span class="hl">Adding</span>         README.md
+<span class="hl">Adding</span>         src
+<span class="hl">Adding</span>         src\main.cs
+Transmitting file data <span class="cy">..done</span>
+Committing transaction...
+<span class="ok">Committed revision 2.</span>
+<span class="cmt">   ↑ 拿到了新版本号 r2 —— 记下来，这就是你这次提交的「身份证」</span>
+
+<span class="cmt"># 提交后 status 应该完全干净（无输出）</span>
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="dim">&lt;空输出 = 工作副本干净&gt;</span>
+
+<span class="cmt"># 用 svn status -v 确认版本号已经更新</span>
+<span class="ps">$</span> <span class="cmd">svn status -v</span>
+                 <span class="hl">1</span>        <span class="hl">1</span> kelang       .
+                 <span class="hl">2</span>        <span class="hl">2</span> kelang       README.md
+                 <span class="hl">2</span>        <span class="hl">2</span> kelang       src
+                 <span class="hl">2</span>        <span class="hl">2</span> kelang       src\main.cs
+<span class="cmt">                 ↑ 工作版本  ↑ 最后改动版本  ↑ 作者  ↑ 路径</span>
+
+<span class="cmt"># 确认工作副本版本已跟上</span>
+<span class="ps">$</span> <span class="cmd">svn update</span>
+Updating '.':
+At revision <span class="hl">2</span>.</pre>
+  </div>
+</div>
+
+<div class="box ok">
+  <span class="bt">到这里你已经会用的命令</span>
+  <p><code class="ic">checkout</code> / <code class="ic">add</code> / <code class="ic">status</code> / <code class="ic">diff</code> / <code class="ic">update</code> / <code class="ic">commit</code> / <code class="ic">info</code> / <code class="ic">list</code></p>
+  <p>这八个命令覆盖了<strong>单人日常开发的全部</strong>。接下来第 7-9 节会把它们各自的高级用法和坑挖透。</p>
+</div>
+
+<!-- ==========================================================================
+     第 7 节：status 状态码全解
+     ========================================================================== -->

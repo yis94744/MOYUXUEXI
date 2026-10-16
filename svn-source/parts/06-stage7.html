@@ -1,0 +1,1148 @@
+<!-- ==========================================================================
+     第七阶段 · 第 17 节：部署方案选型
+     ========================================================================== -->
+<h3 class="sec" id="s17"><span class="no">17</span>服务端部署：方案选型</h3>
+
+<p class="lead">
+  服务端怎么搭，取决于三件事：<strong>要什么协议、要不要精细权限、运维能力如何</strong>。
+  这一节先把三条路线摊开对比，再手把手走一遍最常用的 <code class="ic">svnserve</code> 路线。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 17-1　三种部署方案的架构对比</span><span class="fs">Deployment</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 480" width="980" height="480" role="img" aria-label="SVN 三种服务端部署方案对比图">
+  <!-- 方案 A：svnserve -->
+  <text class="hd" x="30" y="30" fill="#d2a8ff">方案 A：svnserve（轻量，内网首选）</text>
+  <rect x="24" y="44" width="300" height="196" rx="11" fill="rgba(210,168,255,.06)" stroke="#d2a8ff" stroke-width="1.4"/>
+
+  <rect class="c-gray" x="44" y="64" width="120" height="40" rx="8"/>
+  <text class="tm2" x="104" y="89" text-anchor="middle">svn 客户端</text>
+
+  <path class="arwp" d="M164,84 L214,84"/>
+  <text class="tm2" x="189" y="74" text-anchor="middle">svn://3690</text>
+
+  <rect class="c-pur" x="214" y="64" width="92" height="40" rx="8"/>
+  <text class="tm2" x="260" y="89" text-anchor="middle">svnserve</text>
+
+  <path class="arwp" d="M260,104 L260,124"/>
+  <rect class="c-pur" x="192" y="124" width="136" height="38" rx="8"/>
+  <text class="tm2" x="260" y="148" text-anchor="middle">仓库 Repository</text>
+
+  <text class="ts" x="44" y="184">优点：</text>
+  <text class="ts" x="44" y="204">• 极简，一个进程搞定，无额外依赖</text>
+  <text class="ts" x="44" y="224">• 性能好（原生协议，开销小）</text>
+
+  <text class="ts" x="44" y="248" fill="#ffa657">局限：明文传输，无 SSL；认证靠 passwd 文件</text>
+
+  <!-- 方案 B：Apache -->
+  <text class="hd" x="340" y="30" fill="#58a6ff">方案 B：Apache + mod_dav_svn（企业首选）</text>
+  <rect x="334" y="44" width="300" height="196" rx="11" fill="rgba(88,166,255,.06)" stroke="#58a6ff" stroke-width="1.4"/>
+
+  <rect class="c-gray" x="354" y="64" width="120" height="40" rx="8"/>
+  <text class="tm2" x="414" y="89" text-anchor="middle">svn 浏览器 客户端</text>
+
+  <path class="arwb" d="M474,84 L524,84"/>
+  <text class="tm2" x="499" y="70" text-anchor="middle">https://443</text>
+  <text class="tm2" x="499" y="100" text-anchor="middle">SSL加密</text>
+
+  <rect class="c-blue" x="524" y="64" width="92" height="40" rx="8"/>
+  <text class="tm2" x="570" y="89" text-anchor="middle">Apache</text>
+
+  <path class="arwb" d="M570,104 L570,124"/>
+  <rect class="c-blue" x="502" y="124" width="136" height="38" rx="8"/>
+  <text class="tm2" x="570" y="148" text-anchor="middle">mod_dav_svn</text>
+
+  <path class="arwb" d="M570,162 L570,176"/>
+  <rect class="c-blue" x="502" y="176" width="136" height="38" rx="8"/>
+  <text class="tm2" x="570" y="200" text-anchor="middle">仓库</text>
+
+  <text class="ts" x="354" y="234">优点：HTTPS 加密、可接 AD/LDAP、走 80/443 过防火墙</text>
+
+  <!-- 方案 C：VisualSVN -->
+  <text class="hd" x="650" y="30" fill="#7ee787">方案 C：VisualSVN Server（Windows 图形化）</text>
+  <rect x="644" y="44" width="310" height="196" rx="11" fill="rgba(126,231,135,.06)" stroke="#7ee787" stroke-width="1.4"/>
+
+  <rect class="c-gray" x="664" y="64" width="120" height="40" rx="8"/>
+  <text class="tm2" x="724" y="89" text-anchor="middle">TortoiseSVN</text>
+
+  <path class="arwg" d="M784,84 L834,84"/>
+  <text class="tm2" x="809" y="74" text-anchor="middle">https://443</text>
+
+  <rect class="c-green" x="834" y="64" width="100" height="40" rx="8"/>
+  <text class="tm2" x="884" y="82" text-anchor="middle">VisualSVN</text>
+  <text class="tm2" x="884" y="98" text-anchor="middle">Server</text>
+
+  <rect class="c-green" x="812" y="124" width="122" height="90" rx="8"/>
+  <text class="tm2" x="873" y="148" text-anchor="middle">图形管理器</text>
+  <text class="tm2" x="873" y="170" text-anchor="middle">内嵌 Apache</text>
+  <text class="tm2" x="873" y="192" text-anchor="middle">Windows 认证集成</text>
+
+  <path class="arwg" d="M884,104 L884,124"/>
+
+  <text class="ts" x="664" y="234">优点：点鼠标就配好，无需手写配置；免费版够用</text>
+
+  <!-- 对比表 -->
+  <rect x="24" y="264" width="930" height="200" rx="11" fill="#0b0f14" stroke="#30363d" stroke-width="1.3"/>
+
+  <text class="hd" x="44" y="290" fill="#e6edf3">选型对照表</text>
+  <line x1="44" y1="302" x2="934" y2="302" stroke="#3d444d" stroke-width="1"/>
+
+  <text class="hd" x="60" y="326" fill="#8b949e">维度</text>
+  <text class="hd" x="250" y="326" fill="#d2a8ff">svnserve</text>
+  <text class="hd" x="450" y="326" fill="#58a6ff">Apache</text>
+  <text class="hd" x="660" y="326" fill="#7ee787">VisualSVN</text>
+
+  <line x1="44" y1="338" x2="934" y2="338" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tx" x="60" y="360">配置复杂度</text>
+  <text class="ts" x="250" y="360" fill="#7ee787">低（改 3 个文件）</text>
+  <text class="ts" x="450" y="360" fill="#ffa657">中（Apache 配置）</text>
+  <text class="ts" x="660" y="360" fill="#7ee787">极低（图形界面）</text>
+
+  <text class="tx" x="60" y="384">传输加密</text>
+  <text class="ts" x="250" y="384" fill="#ff7b72">无（需 SSH 隧道）</text>
+  <text class="ts" x="450" y="384" fill="#7ee787">原生 HTTPS</text>
+  <text class="ts" x="660" y="384" fill="#7ee787">原生 HTTPS</text>
+
+  <text class="tx" x="60" y="408">认证方式</text>
+  <text class="ts" x="250" y="408">passwd 文件</text>
+  <text class="ts" x="450" y="408">文件 / LDAP / AD</text>
+  <text class="ts" x="660" y="408">Windows 账号 / AD</text>
+
+  <text class="tx" x="60" y="432">精细权限（目录级）</text>
+  <text class="ts" x="250" y="432" fill="#7ee787">支持（authz）</text>
+  <text class="ts" x="450" y="432" fill="#7ee787">支持（authz）</text>
+  <text class="ts" x="660" y="432" fill="#7ee787">支持（图形配置）</text>
+
+  <text class="tx" x="60" y="456">适用规模</text>
+  <text class="ts" x="250" y="456">5-50 人内网团队</text>
+  <text class="ts" x="450" y="456">50 人以上 / 有合规要求</text>
+  <text class="ts" x="660" y="456">Windows 环境团队</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>决策建议：</b>内网小团队、追求省事 → <strong>svnserve</strong>；
+    需要加密或对接域账号、公司有安全审计 → <strong>Apache</strong>；
+    Windows 环境、没人愿意碰配置文件 → <strong>VisualSVN Server</strong>。
+    三者可以共存（比如内网用 svnserve，外网出口用 Apache），仓库目录是同一份。
+  </div>
+</div>
+
+<!-- ==========================================================================
+     第 18 节：svnserve 部署
+     ========================================================================== -->
+<h3 class="sec" id="s18"><span class="no">18</span>svnserve 部署实战</h3>
+
+<h4 class="sub">第一步：创建仓库</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">建仓库</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 推荐目录规划</span>
+<span class="c"># /var/svn/            仓库根目录（svnserve -r 指向这里）</span>
+<span class="c"># /var/svn/repo        项目仓库</span>
+<span class="c"># /var/svn/backup      备份目录</span>
+
+sudo mkdir -p /var/svn
+sudo svnadmin create /var/svn/repo
+
+<span class="c"># 初始化标准结构（用 file:// 本地协议，无需服务）</span>
+svn mkdir file:///var/svn/repo/trunk \
+          file:///var/svn/repo/branches \
+          file:///var/svn/repo/tags \
+          -m <span class="s">"建立标准目录结构"</span>
+
+<span class="c"># 权限：svnserve 通常以特定用户运行</span>
+sudo chown -R svn:svn /var/svn
+sudo chmod -R 770 /var/svn</pre>
+</div>
+
+<h4 class="sub">第二步：配置 svnserve.conf</h4>
+
+<div class="box err">
+  <span class="bt">最常见的坑：配置项前面有空格 → 整个仓库无法访问（实测确认）</span>
+  <p><code class="ic">svnserve.conf</code> 的 ini 格式对<strong>前导空格极其敏感</strong>。
+  模板文件里所有配置项都是 <code class="ic"># 注释</code> 开头、前面带一个空格。
+  如果你只删掉 <code class="ic">#</code> 却<strong>留下了那个空格</strong>，配置解析会直接失败。</p>
+  <p>实测结果<strong>比「被忽略」更严重</strong>：svnserve 进程能正常启动、端口也处于监听状态，
+  但客户端一连接就报解析错误，<em>整个仓库彻底无法访问</em>：</p>
+  <div class="term" style="margin:12px 0 0">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">实测报错</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn list svn://127.0.0.1/repo/trunk</span>
+<span class="no">svn: E170013: Unable to connect to a repository at URL 'svn://127.0.0.1/repo/trunk'</span>
+<span class="no">svn: E200002: Error while parsing config file: /var/svn/repo/conf/svnserve.conf:</span>
+<span class="no">svn: E200002: line 1: Option expected</span>
+<span class="cmt">↑ "Option expected" 就是「这一行不是合法的配置项」</span>
+<span class="cmt">  排查时看到这个错误，第一件事就是检查行首有没有多余空格</span></pre>
+  </div>
+  <div class="duo" style="margin-top:12px">
+    <div>
+      <div class="dh">✗ 错误：行首有空格</div>
+<pre> <span style="color:#ff7b72">anon-access = none</span>
+ ↑ 前面有一个空格
+
+svn: E200002: line 1: Option expected
+<span style="color:#ff7b72">→ 整个仓库无法访问</span></pre>
+    </div>
+    <div>
+      <div class="dh">✓ 正确：顶格写</div>
+<pre><span style="color:#7ee787">anon-access = none</span>
+ ↑ 从第 1 列开始，不留空格
+
+配置生效，服务正常</pre>
+    </div>
+  </div>
+  <p style="margin-top:10px"><strong>快速自检命令：</strong>
+  <code class="ic">grep -n "^[[:space:]]\+[a-z-]\+ *=" conf/svnserve.conf</code> ——
+  能匹配到任何行，就说明有配置项前面带了空格。</p>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">ini</span><span class="fn">/var/svn/repo/conf/svnserve.conf</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">[general]
+<span class="c">### 匿名用户权限：none / read / write</span>
+<span class="c">### 生产环境一律用 none，强制登录</span>
+anon-access = none
+
+<span class="c">### 已认证用户的权限：read / write</span>
+auth-access = write
+
+<span class="c">### 账号密码文件（相对 conf 目录，或写绝对路径）</span>
+password-db = passwd
+
+<span class="c">### 权限控制文件（不写这行 = 所有登录用户都有全部权限！）</span>
+authz-db = authz
+
+<span class="c">### 认证域名称，会出现在客户端的密码缓存里</span>
+<span class="c">### 不同仓库应设不同 realm，否则凭据会串用</span>
+realm = SVN Demo Repository
+
+<span class="c">### 其他可选配置</span>
+<span class="c"># 强制要求客户端提供日志</span>
+# force-username-case = none
+<span class="c"># 密码存储方式（默认明文，可用 sasl 加密）</span>
+# use-sasl = false</pre>
+</div>
+
+<h4 class="sub">第三步：配置账号密码</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">ini</span><span class="fn">/var/svn/repo/conf/passwd</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">[users]
+<span class="c"># 格式：用户名 = 密码（明文）</span>
+alice = alice123
+bob   = bob123
+carol = carol123
+
+<span class="c">### 注意：passwd 是明文的，必须保护好文件权限</span>
+<span class="c">### sudo chmod 600 /var/svn/repo/conf/passwd</span>
+<span class="c">### 且不要放在 Web 可访问的目录下</span></pre>
+</div>
+
+<h4 class="sub">第四步：启动服务</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">启动与测试</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># ---- 前台调试启动（第一次部署强烈建议这样）----</span>
+svnserve --foreground --root /var/svn --listen-port 3690
+<span class="c"># 另开一个终端测试，有问题立刻能在这里看到报错</span>
+
+<span class="c"># ---- 后台守护进程（生产环境）----</span>
+svnserve --daemon --root /var/svn --listen-port 3690 \
+         --log-file /var/log/svnserve.log \
+         --pid-file /var/run/svnserve.pid
+
+<span class="c"># ---- 指定监听地址（默认监听所有网卡 0.0.0.0）----</span>
+svnserve --daemon --root /var/svn --listen-host 192.168.1.10 --listen-port 3690
+
+<span class="c"># ---- 测试连接 ----</span>
+svn list svn://127.0.0.1/repo --username alice --password alice123
+
+<span class="c"># ---- 检查端口 ----</span>
+ss -tlnp | grep 3690
+netstat -ano | findstr 3690          <span class="c"># Windows</span>
+
+<span class="c"># ---- 停止服务 ----</span>
+kill $(cat /var/run/svnserve.pid)
+pkill svnserve                        <span class="c"># 简单粗暴</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：启动并验证认证</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 启动（Windows 上--daemon 需要简写 -d）</span>
+<span class="ps">$</span> <span class="cmd">svnserve -d -r E:\svn-demo --listen-port 3690</span>
+
+<span class="cmt"># 确认进程与端口</span>
+<span class="ps">$</span> <span class="cmd">Get-Process svnserve | Select Id,ProcessName</span>
+  Id ProcessName
+  -- -----------
+<span class="hl">27744</span> svnserve
+
+<span class="ps">$</span> <span class="cmd">netstat -ano | Select-String ':3690'</span>
+  TCP    0.0.0.0:3690    0.0.0.0:0    LISTENING    <span class="hl">27744</span>
+
+<span class="cmt"># ---- 匿名访问：被拒绝（anon-access = none）----</span>
+<span class="ps">$</span> <span class="cmd">svn list --non-interactive --no-auth-cache svn://127.0.0.1/repo</span>
+<span class="no">svn: E170001: Can't get password</span>
+<span class="cmt">↑ 服务器要求认证，但客户端没提供凭据</span>
+
+<span class="cmt"># ---- alice 认证：成功 ----</span>
+<span class="ps">$</span> <span class="cmd">svn list --username alice --password alice123 --no-auth-cache svn://127.0.0.1/repo</span>
+<span class="ok">branches/</span>
+<span class="ok">tags/</span>
+<span class="ok">trunk/</span>
+
+<span class="cmt"># ---- 错误密码：明确报错 ----</span>
+<span class="ps">$</span> <span class="cmd">svn list --username alice --password WRONG --non-interactive svn://127.0.0.1/repo</span>
+<span class="no">svn: E170001: Authentication error from server: Password incorrect</span></pre>
+  </div>
+</div>
+
+<h4 class="sub">第五步：注册为系统服务（生产环境必需）</h4>
+
+<div class="grid2">
+  <div class="card blue">
+    <h6>Linux：systemd</h6>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">ini</span><span class="fn">/etc/systemd/system/svnserve.service</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">[Unit]
+Description=Subversion protocol daemon
+After=network.target
+
+[Service]
+Type=forking
+<span class="c"># -d 守护模式, -r 仓库根目录</span>
+ExecStart=/usr/bin/svnserve --daemon \
+  --root /var/svn \
+  --pid-file /run/svnserve.pid
+ExecStop=/bin/kill -TERM $MAINPID
+Restart=on-failure
+User=svn
+Group=svn
+
+[Install]
+WantedBy=multi-user.target</pre>
+    </div>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">启用</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">sudo systemctl daemon-reload
+sudo systemctl enable svnserve
+sudo systemctl start svnserve
+sudo systemctl status svnserve</pre>
+    </div>
+  </div>
+  <div class="card green">
+    <h6>Windows：sc 注册服务</h6>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">cmd</span><span class="fn">注册为 Windows 服务</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">:: 注册（注意 daemon 模式在 Windows 上要加引号）
+sc create svnserve binPath= <span class="s">"\"C:\Program Files\Subversion\bin\svnserve.exe\" --service -r E:\svn"</span> displayname= <span class="s">"Subversion Server"</span> depend= Tcpip start= auto
+
+:: 启动
+sc start svnserve
+
+:: 查看状态
+sc query svnserve
+
+:: 删除服务
+sc delete svnserve</pre>
+    </div>
+    <div class="box warn" style="margin:10px 0 0">
+      <span class="bt">注意 sc 的参数格式</span>
+      <p><code class="ic">sc</code> 命令要求等号后面<strong>紧跟一个空格</strong>再跟值：
+      <code class="ic">binPath= "..."</code> 正确，<code class="ic">binPath="..."</code> 会失败。</p>
+    </div>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">防火墙记得放行 3690</span>
+  <div class="codewrap">
+    <div class="codehead"><span class="lang">bash</span><span class="fn">放行端口</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># Linux (firewalld)</span>
+sudo firewall-cmd --permanent --add-port=3690/tcp
+sudo firewall-cmd --reload
+
+<span class="c"># Linux (ufw)</span>
+sudo ufw allow 3690/tcp
+
+<span class="c"># Windows PowerShell（管理员）</span>
+New-NetFirewallRule -DisplayName <span class="s">"SVN Server"</span> -Direction Inbound -Protocol TCP -LocalPort 3690 -Action Allow</pre>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     第 19 节：认证与权限
+     ========================================================================== -->
+<h3 class="sec" id="s19"><span class="no">19</span>认证与权限：authz 精细控制</h3>
+
+<p class="lead">
+  <code class="ic">authz</code> 是 SVN 相对 Git 的<strong>杀手级优势</strong>：
+  它能精确到「某个目录，某个组，只能读不能写」。这一节把语法和坑一次讲透。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 19-1　authz 权限模型：从路径到权限的映射</span><span class="fs">Authorization</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 480" width="980" height="480" role="img" aria-label="SVN authz 权限模型图">
+  <!-- 左：用户与组 -->
+  <text class="hd" x="30" y="28" fill="#58a6ff">第一步：定义组（[groups]）</text>
+  <rect x="24" y="44" width="300" height="150" rx="11" fill="rgba(88,166,255,.06)" stroke="#58a6ff" stroke-width="1.4"/>
+
+  <rect class="c-blue" x="44" y="64" width="120" height="52" rx="8"/>
+  <text class="tm" x="104" y="86" text-anchor="middle">alice</text>
+  <text class="tm2" x="104" y="104" text-anchor="middle">admins + devs</text>
+
+  <rect class="c-blue" x="44" y="126" width="120" height="52" rx="8"/>
+  <text class="tm" x="104" y="148" text-anchor="middle">bob</text>
+  <text class="tm2" x="104" y="166" text-anchor="middle">devs</text>
+
+  <rect class="c-orange" x="184" y="94" width="120" height="52" rx="8"/>
+  <text class="tm" x="244" y="116" text-anchor="middle">carol</text>
+  <text class="tm2" x="244" y="134" text-anchor="middle">outsource</text>
+
+  <!-- 中间：规则 -->
+  <text class="hd" x="350" y="28" fill="#d2a8ff">第二步：按路径配规则（[/path]）</text>
+  <rect x="344" y="44" width="300" height="150" rx="11" fill="rgba(210,168,255,.06)" stroke="#d2a8ff" stroke-width="1.4"/>
+
+  <text class="tm" x="364" y="70" fill="#d2a8ff">[/]</text>
+  <text class="tm2" x="380" y="90">* =                    ← 默认无权限</text>
+  <text class="tm2" x="380" y="110">@admins = rw</text>
+
+  <text class="tm" x="364" y="138" fill="#7ee787">[/trunk]</text>
+  <text class="tm2" x="380" y="158">@devs = rw             ← 开发可读写</text>
+  <text class="tm2" x="380" y="178">* = r                  ← 其他人只读</text>
+
+  <!-- 右侧：结果 -->
+  <text class="hd" x="670" y="28" fill="#7ee787">第三步：生效结果</text>
+  <rect x="664" y="44" width="292" height="150" rx="11" fill="rgba(126,231,135,.06)" stroke="#7ee787" stroke-width="1.4"/>
+
+  <text class="tm2" x="684" y="70">/trunk</text>
+  <text class="tm2" x="810" y="70" fill="#7ee787">alice: rw  bob: rw</text>
+
+  <text class="tm2" x="684" y="94">/branches</text>
+  <text class="tm2" x="810" y="94" fill="#7ee787">alice: rw  bob: rw</text>
+
+  <text class="tm2" x="684" y="118">/tags</text>
+  <text class="tm2" x="810" y="118" fill="#ffa657">bob: 只读</text>
+
+  <text class="tm2" x="684" y="142">仓库根 /</text>
+  <text class="tm2" x="810" y="142" fill="#ff7b72">carol: 拒绝访问</text>
+
+  <text class="tm2" x="684" y="170" fill="#8b949e">（未在 authz 中出现的用户 = 无权限）</text>
+
+  <!-- 继承模型 -->
+  <text class="hd" x="30" y="228" fill="#e3b341">权限的继承规则（理解这个才不会配错）</text>
+  <rect x="24" y="244" width="460" height="220" rx="11" fill="rgba(227,179,65,.06)" stroke="#e3b341" stroke-width="1.4"/>
+
+  <text class="ts" x="44" y="270">SVN 从仓库根开始，逐级向下匹配路径，</text>
+  <text class="ts" x="44" y="290"><tspan fill="#e6edf3" font-weight="700">每一级都可能有自己的规则</tspan>。规则来源：</text>
+
+  <text class="tm2" x="44" y="320" fill="#7ee787">① 最具体（最长路径）的匹配 → 优先</text>
+  <text class="tm2" x="44" y="346" fill="#58a6ff">② 具体路径里，用户名 &gt; 组名 &gt; * 通配</text>
+  <text class="tm2" x="44" y="372" fill="#d2a8ff">③ 都没有 → 向上找父目录的规则</text>
+  <text class="tm2" x="44" y="398" fill="#ff7b72">④ 一直找到 / 都没有 → 拒绝</text>
+
+  <text class="ts" x="44" y="428" fill="#ffa657">★ 关键：[ / ] 段里的规则会影响所有子路径，</text>
+  <text class="ts" x="44" y="448" fill="#ffa657">　 除非子路径有自己的、更具体的规则覆盖它。</text>
+
+  <!-- 权限值 -->
+  <rect x="504" y="244" width="452" height="220" rx="11" fill="rgba(88,166,255,.06)" stroke="#58a6ff" stroke-width="1.4"/>
+  <text class="hd" x="524" y="270" fill="#58a6ff">权限值的五种写法</text>
+
+  <line x1="524" y1="284" x2="936" y2="284" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="308" fill="#8b949e">空（什么都不写）</text>
+  <text class="ts" x="700" y="308">无任何权限，连看都不能看</text>
+
+  <line x1="524" y1="320" x2="936" y2="320" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="344" fill="#58a6ff">r</text>
+  <text class="ts" x="700" y="344">只读：可 checkout、update、log</text>
+
+  <line x1="524" y1="356" x2="936" y2="356" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="380" fill="#7ee787">rw</text>
+  <text class="ts" x="700" y="380">读写：可 commit、建分支、改属性</text>
+
+  <line x1="524" y1="392" x2="936" y2="392" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="416" fill="#d2a8ff">=</text>
+  <text class="ts" x="700" y="416">显式清空权限（用于覆盖父级给的权限）</text>
+
+  <line x1="524" y1="428" x2="936" y2="428" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="452" fill="#ffa657">~ 或留空</text>
+  <text class="ts" x="700" y="452">1.8+ 支持 @组 = 特殊语法，此处不建议依赖</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>核心心法：</b>authz 是<strong>白名单模型</strong>——没有明确授权的就是拒绝。
+    所以第一行永远写 <code class="ic">[/]</code> + <code class="ic">* =</code>（全部拒绝），
+    再逐条放开需要的路径和组。这样最安全，也最容易排查。
+  </div>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">ini</span><span class="fn">conf/authz　完整企业级配置示例</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c">#############################################################
+# authz —— SVN 权限控制文件
+# 格式：[路径] 后面跟 "用户/组 = 权限"
+# 路径以 / 开头，相对于仓库根（注意：不是相对于仓库目录）
+#############################################################</span>
+
+<span class="c"># ============ 用户组定义 ============</span>
+[groups]
+admins    = alice, bob          <span class="c"># 管理员：能改标签、能改权限</span>
+devs      = alice, bob, carol   <span class="c"># 开发：能读写主干和分支</span>
+qa        = dave, erin          <span class="c"># 测试：只读代码，能写测试报告</span>
+outsource = frank               <span class="c"># 外包：只能看一个目录</span>
+
+<span class="c"># ============ 仓库根：默认拒绝一切 ============</span>
+[/]
+* =                        <span class="c"># 所有用户，无权限</span>
+@admins = rw               <span class="c"># 管理员全权</span>
+
+<span class="c"># ============ 主干：开发可读写，全员可读 ============</span>
+[/trunk]
+@devs = rw
+@qa   = r
+@admins = rw
+* = r                      <span class="c"># 其他登录用户只读（比上面 [/] 更具体，覆盖它）</span>
+
+<span class="c"># 主干下的机密子目录：只有 admins 能看</span>
+[/trunk/secret]
+@admins = rw
+* =                        <span class="c"># 其他人依然被 [/] 的 * = 挡住</span>
+
+<span class="c"># 外包只读这一个目录</span>
+[/trunk/art/external]
+@outsource = r
+@devs = rw
+* = r
+
+<span class="c"># ============ 分支：开发可读写 ============</span>
+[/branches]
+@devs = rw
+@qa   = r
+@admins = rw
+
+<span class="c"># ============ 标签：只读！只有 admins 能打标签 ============</span>
+[/tags]
+* = r                      <span class="c"># 所有人只读 —— 这就是「标签不可变」的实现</span>
+@admins = rw               <span class="c"># 只有管理员能创建/删除标签</span>
+
+<span class="c"># ============ 特殊场景：允许所有人提交日志修正 ============</span>
+<span class="c"># （revprop 修改的权限控制，需要配合 pre-revprop-change 钩子）</span>
+[revprop]
+<span class="c"># 这里不写具体路径规则，revprop 权限在钩子里控制</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：权限矩阵验证</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 配置：alice 在 admins+devs 组，bob 只在 devs 组
+# authz: [/trunk] @devs = rw   [/tags] @admins = rw, * = r</span>
+
+<span class="cmt"># ---- bob 读 /trunk：允许 ----</span>
+<span class="ps">$</span> <span class="cmd">svn list --username bob --password bob123 --no-auth-cache svn://127.0.0.1/repo/trunk</span>
+<span class="ok">art.psd</span>
+<span class="ok">docs.md</span>
+<span class="ok">src/</span>
+
+<span class="cmt"># ---- bob 写 /trunk：允许 ----</span>
+<span class="ps">$</span> <span class="cmd">svn mkdir --username bob --password bob123 svn://127.0.0.1/repo/trunk/bob-test -m "bob 建目录"</span>
+Committing transaction...
+<span class="ok">Committed revision 13.</span>
+
+<span class="cmt"># ---- bob 写 /tags：被拒绝（他只读）----</span>
+<span class="ps">$</span> <span class="cmd">svn mkdir --username bob --password bob123 svn://127.0.0.1/repo/tags/v2.0 -m "bob 打标签"</span>
+<span class="no">svn: E220004: Access denied</span>
+<span class="cmt">↑ 这就是「标签只读」的实际效果</span>
+
+<span class="cmt"># ---- alice 写 /tags：允许（她在 admins 组）----</span>
+<span class="ps">$</span> <span class="cmd">svn mkdir --username alice --password alice123 svn://127.0.0.1/repo/tags/v2.0 -m "alice 打标签"</span>
+Committing transaction...
+<span class="ok">Committed revision 15.</span>
+
+<span class="cmt"># ---- bob 访问仓库根：被拒绝（[/] 里 * = 无权限）----</span>
+<span class="ps">$</span> <span class="cmd">svn list --username bob --password bob123 svn://127.0.0.1/repo</span>
+<span class="no">svn: E170001: Authorization failed</span>
+
+<span class="cmt"># ---- 未认证访问：被拒绝（anon-access = none）----</span>
+<span class="ps">$</span> <span class="cmd">svn list --non-interactive svn://127.0.0.1/repo/trunk</span>
+<span class="no">svn: E170001: Can't get password</span></pre>
+  </div>
+</div>
+
+<div class="box err">
+  <span class="bt">authz 的五个高频坑</span>
+  <ol>
+    <li><strong>路径写错基准</strong> —— authz 里的路径是<strong>相对仓库根</strong>的，
+      写 <code class="ic">[/repo/trunk]</code> 是错的，应该是 <code class="ic">[/trunk]</code>。</li>
+    <li><strong>忘记 <code class="ic">authz-db</code> 配置</strong> ——
+      <code class="ic">svnserve.conf</code> 里不写 <code class="ic">authz-db = authz</code>，
+      整个权限文件<strong>根本不会被读取</strong>，所有登录用户都是全权。</li>
+    <li><strong>以为没写 = 没权限，但有父级规则兜着</strong> ——
+      <code class="ic">[/trunk/secret]</code> 里不写规则，不代表无人可访问；
+      它会继承 <code class="ic">[/]</code> 或 <code class="ic">[/trunk]</code> 的规则。要真正锁死必须显式写 <code class="ic">* =</code>。</li>
+    <li><strong>组名前的 @ 忘了写</strong> —— <code class="ic">devs = rw</code> 会被理解为「用户 devs」而不是「组 devs」，
+      正确写法是 <code class="ic">@devs = rw</code>。</li>
+    <li><strong>权限改完不生效</strong> —— svnserve 每次请求都会重读 authz，通常立即生效。
+      如果没生效，检查是不是改错了仓库的 conf 目录（多仓库时容易改串）。</li>
+  </ol>
+</div>
+
+<div class="box tip">
+  <span class="bt">调试权限问题的利器：svnauthz-validate</span>
+  <div class="codewrap">
+    <div class="codehead"><span class="lang">bash</span><span class="fn">校验 authz 语法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 检查语法错误（拼错、格式不对会明确报错）</span>
+svnauthz-validate /var/svn/repo/conf/authz
+
+<span class="c"># 1.9+ 还能直接查询某个用户对某路径的权限</span>
+svnauthz access --username bob --path /tags /var/svn/repo/conf/authz
+<span class="c"># 输出：r   （只读）</span>
+
+svnauthz access --username alice --path /tags /var/svn/repo/conf/authz
+<span class="c"># 输出：rw  （读写）</span>
+
+svnauthz access --username carol --path /trunk /var/svn/repo/conf/authz
+<span class="c"># 输出：（空） = 无权限</span></pre>
+  </div>
+  <p>改完权限先跑一遍这个，能省掉大量「为什么还是拒绝」的排查时间。</p>
+</div>
+
+<!-- ==========================================================================
+     第 20 节：钩子脚本
+     ========================================================================== -->
+<h3 class="sec" id="s20"><span class="no">20</span>钩子脚本：让 SVN 按你的规矩办事</h3>
+
+<p class="lead">
+  钩子（Hook）是服务端在特定操作前后<strong>自动执行的脚本</strong>。
+  提交日志格式检查、自动发通知、触发 CI、防止误删——都靠它。
+  这是把 SVN 从「能用」变成「好用」的关键一步。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 20-1　九个钩子的触发时机</span><span class="fs">Hooks Timeline</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 460" width="980" height="460" role="img" aria-label="SVN 九个钩子触发时机图">
+  <!-- 时间段 -->
+  <text class="hd" x="30" y="26" fill="#8b949e">提交（commit）流程</text>
+
+  <!-- 时间轴 -->
+  <line x1="60" y1="70" x2="920" y2="70" stroke="#3d444d" stroke-width="2"/>
+
+  <!-- 阶段 -->
+  <rect class="n-blue" x="80" y="100" width="180" height="60" rx="9"/>
+  <text class="tx" x="170" y="126" text-anchor="middle">客户端发起提交</text>
+  <text class="ts" x="170" y="146" text-anchor="middle">传输文件数据</text>
+
+  <rect class="n-yellow" x="300" y="100" width="180" height="60" rx="9"/>
+  <text class="tx" x="390" y="126" text-anchor="middle">服务器创建事务</text>
+  <text class="ts" x="390" y="146" text-anchor="middle">（临时 tx）</text>
+
+  <rect class="n-red" x="520" y="100" width="180" height="60" rx="9"/>
+  <text class="tx" x="610" y="126" text-anchor="middle">校验事务</text>
+  <text class="ts" x="610" y="146" text-anchor="middle">日志/权限/格式</text>
+
+  <rect class="n-green" x="740" y="100" width="180" height="60" rx="9"/>
+  <text class="tx" x="830" y="126" text-anchor="middle">写入版本库</text>
+  <text class="ts" x="830" y="146" text-anchor="middle">生成新版本号</text>
+
+  <!-- 箭头 -->
+  <path class="arwb" d="M260,130 L300,130"/>
+  <path class="arwy" d="M480,130 L520,130"/>
+  <path class="arwr" d="M700,130 L740,130"/>
+
+  <!-- 钩子标注 -->
+  <path class="dash" d="M170,100 L170,76"/>
+  <circle cx="170" cy="70" r="6" fill="#58a6ff"/>
+  <text class="tm2" x="134" y="56" fill="#58a6ff">start-commit</text>
+
+  <path class="dash" d="M610,100 L610,76"/>
+  <circle cx="610" cy="70" r="6" fill="#ff7b72"/>
+  <text class="tm2" x="576" y="56" fill="#ff7b72">pre-commit</text>
+
+  <path class="dash" d="M830,100 L830,76"/>
+  <circle cx="830" cy="70" r="6" fill="#7ee787"/>
+  <text class="tm2" x="790" y="56" fill="#7ee787">post-commit</text>
+
+  <!-- 说明 -->
+  <rect x="80" y="176" width="400" height="100" rx="10" fill="rgba(88,166,255,.07)" stroke="#58a6ff" stroke-width="1.3"/>
+  <text class="hd" x="100" y="200" fill="#58a6ff">start-commit</text>
+  <text class="ts" x="100" y="222">在提交开始前触发，此时还不知道改了哪些文件。</text>
+  <text class="ts" x="100" y="242">参数：仓库路径，用户名</text>
+  <text class="ts" x="100" y="262">用途：拉黑某个用户、限制提交时段（如禁止周五上线）</text>
+
+  <rect x="500" y="176" width="420" height="100" rx="10" fill="rgba(255,123,114,.07)" stroke="#ff7b72" stroke-width="1.3"/>
+  <text class="hd" x="520" y="200" fill="#ff7b72">pre-commit　★ 最重要</text>
+  <text class="ts" x="520" y="222">提交被写入版本库之前的最后一道关卡。</text>
+  <text class="ts" x="520" y="242">参数：仓库路径，事务名（tx）</text>
+  <text class="ts" x="520" y="262" fill="#7ee787">返回非 0 → 提交被拒绝，错误信息回显给客户端</text>
+
+  <!-- 锁流程 -->
+  <text class="hd" x="30" y="308" fill="#8b949e">锁（lock）流程</text>
+  <line x1="60" y1="340" x2="920" y2="340" stroke="#3d444d" stroke-width="2"/>
+
+  <circle cx="200" cy="340" r="6" fill="#ffa657"/>
+  <text class="tm2" x="150" y="326" fill="#ffa657">pre-lock</text>
+  <circle cx="400" cy="340" r="6" fill="#7ee787"/>
+  <text class="tm2" x="355" y="326" fill="#7ee787">post-lock</text>
+  <circle cx="620" cy="340" r="6" fill="#ffa657"/>
+  <text class="tm2" x="570" y="326" fill="#ffa657">pre-unlock</text>
+  <circle cx="820" cy="340" r="6" fill="#7ee787"/>
+  <text class="tm2" x="775" y="326" fill="#7ee787">post-unlock</text>
+
+  <text class="ts" x="100" y="368">pre-lock / pre-unlock：决定「能不能加锁/解锁」——可用于防止抢锁</text>
+  <text class="ts" x="100" y="390">post-lock / post-unlock：加锁/解锁发生后 —— 可用于自动发邮件通知相关人</text>
+
+  <!-- revprop -->
+  <text class="hd" x="30" y="424" fill="#8b949e">日志修改流程</text>
+  <circle cx="200" cy="448" r="6" fill="#ffa657"/>
+  <text class="tm2" x="86" y="452" fill="#ffa657">pre-revprop-change</text>
+  <circle cx="520" cy="448" r="6" fill="#7ee787"/>
+  <text class="tm2" x="400" y="452" fill="#7ee787">post-revprop-change</text>
+  <text class="ts" x="640" y="452">默认不存在 = 所有 revprop 修改被禁止（安全默认值）</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>钩子部署的关键规则：</b>
+    ① 钩子文件必须放在 <code class="ic">{仓库}/hooks/</code> 目录下；
+    ② 必须<strong>去掉 <code class="ic">.tmpl</code> 后缀</strong>才会生效（<code class="ic">pre-commit.tmpl</code> → <code class="ic">pre-commit</code>）；
+    ③ Linux 上必须有<strong>可执行权限</strong>（<code class="ic">chmod +x</code>）；
+    ④ Windows 上要写成 <code class="ic">.bat</code> / <code class="ic">.cmd</code> / <code class="ic">.exe</code>。
+  </div>
+</div>
+
+<h4 class="sub" id="s20-2">pre-commit 实战：强制日志规范</h4>
+
+<div class="cards grid2">
+  <div class="card red">
+    <h6>需求</h6>
+    <p>团队里总有人写「fix」「update」「111」这种毫无信息量的提交日志，
+    或者干脆留空。事后查历史时完全看不懂。</p>
+    <p><strong>目标：强制提交日志至少 10 个字符，并且必须包含关联的任务号。</strong></p>
+  </div>
+  <div class="card green">
+    <h6>方案</h6>
+    <p>用 <code class="ic">pre-commit</code> 钩子，在提交写入前检查日志：
+    不符合规则就 <code class="ic">exit 1</code>，把错误信息回显给提交者。</p>
+    <p>关键工具：<code class="ic">svnlook log -t TXN 仓库</code> 读取本次提交的日志。</p>
+  </div>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">hooks/pre-commit　Linux / macOS 版本</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c">#!/bin/sh
+#############################################################################
+# pre-commit 钩子：强制提交日志规范
+#
+# 参数：
+#   $1 = 仓库路径
+#   $2 = 事务名（transaction，本次提交的临时 ID）
+#
+# 退出码：
+#   0 = 允许提交
+#   非 0 = 拒绝提交，stderr 的内容会回显给客户端
+#############################################################################</span>
+
+REPOS=<span class="s">"$1"</span>
+TXN=<span class="s">"$2"</span>
+
+<span class="c"># ---- 读取本次提交的日志 ----</span>
+LOGMSG=$(svnlook log -t <span class="s">"$TXN"</span> <span class="s">"$REPOS"</span>)
+
+<span class="c"># ---- 去掉首尾空白字符 ----</span>
+TRIMMED=$(echo <span class="s">"$LOGMSG"</span> | sed <span class="s">'s/^[[:space:]]*//;s/[[:space:]]*$//'</span>)
+
+<span class="c"># ---- 规则 1：日志不能为空 ----</span>
+<span class="k">if</span> [ -z <span class="s">"$TRIMMED"</span> ]; <span class="k">then</span>
+  echo <span class="s">""</span> &gt;&amp;2
+  echo <span class="s">"══════════════════════════════════════════════"</span> &gt;&amp;2
+  echo <span class="s">" 提交被拒绝：必须填写提交日志"</span> &gt;&amp;2
+  echo <span class="s">"══════════════════════════════════════════════"</span> &gt;&amp;2
+  echo <span class="s">" 原因：空的提交日志会让历史完全无法追溯。"</span> &gt;&amp;2
+  echo <span class="s">" 正确示例："</span> &gt;&amp;2
+  echo <span class="s">"   svn commit -m \"[PROJ-123] 修复登录接口空指针异常\""</span> &gt;&amp;2
+  echo <span class="s">""</span> &gt;&amp;2
+  exit 1
+<span class="k">fi</span>
+
+<span class="c"># ---- 规则 2：日志长度至少 10 个字符 ----</span>
+LEN=${#TRIMMED}
+<span class="k">if</span> [ <span class="s">"$LEN"</span> -lt 10 ]; <span class="k">then</span>
+  echo <span class="s">""</span> &gt;&amp;2
+  echo <span class="s">"══════════════════════════════════════════════"</span> &gt;&amp;2
+  echo <span class="s">" 提交被拒绝：提交日志太短（当前 $LEN 字符，最少 10 字符）"</span> &gt;&amp;2
+  echo <span class="s">"══════════════════════════════════════════════"</span> &gt;&amp;2
+  echo <span class="s">" 你的日志：$TRIMMED"</span> &gt;&amp;2
+  echo <span class="s">" 请说明「做了什么 + 为什么改」。"</span> &gt;&amp;2
+  echo <span class="s">""</span> &gt;&amp;2
+  exit 1
+<span class="k">fi</span>
+
+<span class="c"># ---- 规则 3：必须包含任务编号（[PROJ-数字] 格式，可按需调整）----</span>
+<span class="c"># 如需强制，取消下面的注释</span>
+<span class="c"># if ! echo "$TRIMMED" | grep -qE '\[[A-Z]+-[0-9]+\]'; then</span>
+<span class="c">#   echo "" >&amp;2</span>
+<span class="c">#   echo "提交被拒绝：日志必须包含任务编号，格式 [PROJ-123]" >&amp;2</span>
+<span class="c">#   echo "你的日志：$TRIMMED" >&amp;2</span>
+<span class="c">#   exit 1</span>
+<span class="c"># fi</span>
+
+<span class="c"># ---- 规则 4：禁止无意义日志（黑名单）----</span>
+<span class="k">case</span> <span class="s">"$(echo "$TRIMMED" | tr '[:upper:]' '[:lower:]')"</span> <span class="k">in</span>
+  fix|update|commit|test|111|aaa|test1|临时提交|修改|更新)
+    echo <span class="s">""</span> &gt;&amp;2
+    echo <span class="s">"提交被拒绝：'$TRIMMED' 是无意义日志，请描述具体改动内容"</span> &gt;&amp;2
+    exit 1
+    ;;
+<span class="k">esac</span>
+
+<span class="c"># ---- 规则 5：检查文件后缀黑名单（防止误传编译产物）----</span>
+CHANGED=$(svnlook changed -t <span class="s">"$TXN"</span> <span class="s">"$REPOS"</span>)
+<span class="k">if</span> echo <span class="s">"$CHANGED"</span> | grep -qE <span class="s">'\.(exe|dll|so|a|class|pyc|o|obj|log|tmp)$'</span>; <span class="k">then</span>
+  echo <span class="s">""</span> &gt;&amp;2
+  echo <span class="s">"提交被拒绝：检测到编译产物/临时文件，请勿提交这些内容"</span> &gt;&amp;2
+  echo <span class="s">"$(echo "$CHANGED" | grep -E '\.(exe|dll|so|a|class|pyc|o|obj|log|tmp)$')"</span> &gt;&amp;2
+  echo <span class="s">"建议：在 svn:ignore 中加入这些模式"</span> &gt;&amp;2
+  exit 1
+<span class="k">fi</span>
+
+<span class="c"># ---- 规则 6：禁止提交超大文件（比如大于 50MB）----</span>
+<span class="k">for</span> f in $(svnlook changed -t <span class="s">"$TXN"</span> <span class="s">"$REPOS"</span> | awk <span class="s">'{print $2}'</span>); <span class="k">do</span>
+  SIZE=$(svnlook filesize -t <span class="s">"$TXN"</span> <span class="s">"$REPOS"</span> <span class="s">"$f"</span> 2&gt;/dev/null || echo 0)
+  <span class="k">if</span> [ <span class="s">"$SIZE"</span> -gt 52428800 ]; <span class="k">then</span>
+    echo <span class="s">"提交被拒绝：文件 $f 大小 $(($SIZE/1024/1024))MB，超过 50MB 限制"</span> &gt;&amp;2
+    echo <span class="s">"大文件请使用独立的二进制仓库或制品库"</span> &gt;&amp;2
+    exit 1
+  <span class="k">fi</span>
+<span class="k">done</span>
+
+<span class="c"># ---- 全部通过 ----</span>
+exit 0</pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：钩子拦截提交</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 提交时用很短的日志</span>
+<span class="ps">$</span> <span class="cmd">svn commit -m "fix"</span>
+Sending        version.txt
+Transmitting file data .done
+Committing transaction...
+<span class="no">svn: E165001: Commit failed (details follow):</span>
+<span class="no">svn: E165001: Commit blocked by pre-commit hook (exit code 1) with output:</span>
+<span class="no">[pre-commit] REJECTED: log must be at least 10 chars. Got: fix</span>
+<span class="cmt">↑ 关键：钩子的 stderr 内容完整回显给了提交者</span>
+<span class="cmt">  客户端退出码 = 1</span>
+
+<span class="cmt"># 用合规的日志再提交</span>
+<span class="ps">$</span> <span class="cmd">svn commit -m "abcd efgh ij"</span>
+Transmitting file data .done
+Committing transaction...
+<span class="ok">Committed revision 19.</span>
+<span class="cmt">↑ 通过钩子检查，正常提交</span></pre>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">Windows 上写钩子的三个坑（全部实测踩过）</span>
+  <ol>
+    <li><strong>必须用 ASCII 无 BOM 编码写文件</strong> ——
+      如果用 UTF-8 with BOM 保存，CMD 会把 BOM 字节当成命令的一部分，
+      出现 <code class="ic">'∩╗┐@echo' is not recognized as an internal or external command</code> 这种莫名其妙的错误。
+      用 PowerShell 的话：<code class="ic">[System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::ASCII)</code></li>
+    <li><strong>批处理里的变量替换语法</strong> ——
+      <code class="ic">%LOG:~9%</code> 这种子串语法在普通批处理里可用，
+      但在 <code class="ic">if</code> 块内部会出问题，需要 <code class="ic">setlocal enabledelayedexpansion</code> + <code class="ic">!LOG:~9!</code>。
+      更稳妥的写法是<strong>避免在 if 块里做字符串操作</strong>。</li>
+    <li><strong>必须写到 stderr</strong> —— <code class="ic">echo 消息 1&gt;&amp;2</code>。
+      如果只写 stdout，有的 SVN 版本不会把内容回显给客户端，提交者只会看到「Commit blocked」而不知道原因。</li>
+  </ol>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bat</span><span class="fn">hooks/pre-commit.bat　Windows 版本</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">@echo off
+<span class="c">rem =====================================================================
+rem pre-commit 钩子（Windows）：强制提交日志规范
+rem 参数：%1 = 仓库路径    %2 = 事务名
+rem 注意：本文件必须保存为 ASCII 无 BOM 编码！
+rem =====================================================================</span>
+
+set REPOS=%1
+set TXN=%2
+set LOGFILE=%TEMP%\svn_precommit_%RANDOM%.txt
+
+<span class="c">rem ---- 读取本次提交的日志 ----</span>
+svnlook log "%REPOS%" -t "%TXN%" &gt; "%LOGFILE%"
+
+<span class="c">rem ---- 读入变量（只取第一行做长度判断）----</span>
+set LOG=
+for /f "usebackq delims=" %%a in ("%LOGFILE%") do set LOG=%%a
+
+del "%LOGFILE%" &gt;nul 2&gt;&amp;1
+
+<span class="c">rem ---- 规则 1：日志不能为空 ----</span>
+if "%LOG%"=="" (
+  echo. 1&gt;&amp;2
+  echo ============================================== 1&gt;&amp;2
+  echo  REJECTED: commit message is required. 1&gt;&amp;2
+  echo ============================================== 1&gt;&amp;2
+  echo  Example: svn commit -m "[PROJ-123] fix login NPE" 1&gt;&amp;2
+  echo. 1&gt;&amp;2
+  exit /b 1
+)
+
+<span class="c">rem ---- 规则 2：日志至少 10 个字符 ----</span>
+<span class="c">rem 通过「取第 10 个字符之后的子串是否为空」来判断长度</span>
+set TAIL=%LOG:~9%
+if "%TAIL%"=="" (
+  echo. 1&gt;&amp;2
+  echo ============================================== 1&gt;&amp;2
+  echo  REJECTED: log must be at least 10 chars. 1&gt;&amp;2
+  echo  Got: [%LOG%] 1&gt;&amp;2
+  echo ============================================== 1&gt;&amp;2
+  echo  Please describe WHAT you changed and WHY. 1&gt;&amp;2
+  echo. 1&gt;&amp;2
+  exit /b 1
+)
+
+<span class="c">rem ---- 规则 3：禁止无意义日志 ----</span>
+echo %LOG% | findstr /i /x "fix update commit test 111 aaa" &gt;nul
+if not errorlevel 1 (
+  echo REJECTED: '%LOG%' is a meaningless message. 1&gt;&amp;2
+  exit /b 1
+)
+
+<span class="c">rem ---- 规则 4：拒绝编译产物 ----</span>
+svnlook changed "%REPOS%" -t "%TXN%" | findstr /i /r "\.exe$ \.dll$ \.pyc$ \.class$ \.obj$ \.log$ \.tmp$" &gt;nul
+if not errorlevel 1 (
+  echo. 1&gt;&amp;2
+  echo REJECTED: build artifacts / temp files detected. 1&gt;&amp;2
+  echo Add them to svn:ignore instead of committing. 1&gt;&amp;2
+  exit /b 1
+)
+
+<span class="c">rem ---- 全部通过 ----</span>
+exit /b 0</pre>
+</div>
+
+<h4 class="sub" id="s20-3">其余八个钩子的实用脚本</h4>
+
+<div class="grid2">
+  <div class="card blue">
+    <h6>post-commit　提交后自动通知</h6>
+    <p>最常用的用途：提交后自动发邮件、触发 CI 构建、写审计日志。</p>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">hooks/post-commit</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">#!/bin/sh
+REPOS="$1"
+REV="$2"
+
+<span class="c"># 收集本次提交的信息</span>
+AUTHOR=$(svnlook author -r "$REV" "$REPOS")
+DATE=$(svnlook date -r "$REV" "$REPOS")
+LOG=$(svnlook log -r "$REV" "$REPOS")
+CHANGED=$(svnlook changed -r "$REV" "$REPOS")
+
+<span class="c"># ---- 1. 写审计日志 ----</span>
+{
+  echo "==================================================="
+  echo "Revision : $REV"
+  echo "Author   : $AUTHOR"
+  echo "Date     : $DATE"
+  echo "Message  : $LOG"
+  echo "Changed  :"
+  echo "$CHANGED"
+} &gt;&gt; /var/log/svn-commits.log
+
+<span class="c"># ---- 2. 发邮件通知（需装 mailutils）----</span>
+{
+  echo "提交版本：r$REV"
+  echo "提交者：$AUTHOR"
+  echo "时间：$DATE"
+  echo ""
+  echo "日志：$LOG"
+  echo ""
+  echo "变更文件："
+  echo "$CHANGED"
+} | mail -s "[SVN] r$REV by $AUTHOR" dev-team@example.com
+
+<span class="c"># ---- 3. 触发 CI 构建（调用 Jenkins/GitLab CI 的 webhook）----</span>
+curl -s -X POST "https://jenkins.example.com/job/myproject/build?token=BUILD_TOKEN" &gt;/dev/null 2&gt;&amp;1
+
+<span class="c"># post-commit 的返回值不影响提交（已经提交成功了）</span>
+exit 0</pre>
+    </div>
+  </div>
+
+  <div class="card pur">
+    <h6>pre-revprop-change　防止日志被改</h6>
+    <p>SVN 默认<strong>禁止</strong>修改版本库属性（包括提交日志），因为该钩子不存在。
+    想允许修改必须显式创建它并 <code class="ic">exit 0</code>；想禁止篡改就 <code class="ic">exit 1</code>。</p>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">方案 A：完全禁止修改（推荐）</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">#!/bin/sh
+<span class="c"># 拒绝一切 revprop 修改，保证历史不可篡改</span>
+echo "revision properties are immutable" &gt;&amp;2
+exit 1</pre>
+    </div>
+    <div class="codewrap" style="margin:10px 0 0">
+      <div class="codehead"><span class="lang">bash</span><span class="fn">方案 B：只允许管理员改日志，且记录审计</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">#!/bin/sh
+REPOS="$1"; REV="$2"; USER="$3"
+PROPNAME="$4"; ACTION="$5"
+
+<span class="c"># 只允许修改 svn:log，不允许改 svn:author / svn:date</span>
+if [ "$PROPNAME" != "svn:log" ]; then
+  echo "only svn:log can be changed (attempted: $PROPNAME)" &gt;&amp;2
+  exit 1
+fi
+
+<span class="c"># 只允许 admin 用户</span>
+if [ "$USER" != "admin" ]; then
+  echo "only 'admin' can modify revision properties" &gt;&amp;2
+  exit 1
+fi
+
+<span class="c"># 记审计日志</span>
+OLD=$(svnlook propget -r "$REV" --revprop svn:log "$REPOS" 2&gt;/dev/null)
+echo "[$(date -Iseconds)] $USER modified svn:log of r$REV" &gt;&gt; /var/log/svn-revprop-audit.log
+echo "  old: $OLD" &gt;&gt; /var/log/svn-revprop-audit.log
+
+exit 0</pre>
+    </div>
+  </div>
+</div>
+
+<div class="tw">
+<table>
+<thead><tr><th>钩子</th><th>触发时机</th><th>参数</th><th>典型用途</th></tr></thead>
+<tbody>
+  <tr>
+    <td><code class="ic b">start-commit</code></td>
+    <td>提交开始前（还不知道改了哪些文件）</td>
+    <td><code class="ic">仓库 用户</code></td>
+    <td>拉黑用户、限制提交时段、检查用户是否有提交权限</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">pre-commit</code></td>
+    <td>提交写入前（<strong>最后一道关卡</strong>）</td>
+    <td><code class="ic">仓库 事务名</code></td>
+    <td><strong>日志规范检查</strong>、禁止提交编译产物、大文件拦截、代码风格检查</td>
+  </tr>
+  <tr>
+    <td><code class="ic g">post-commit</code></td>
+    <td>提交成功后</td>
+    <td><code class="ic">仓库 版本号</code></td>
+    <td>邮件通知、触发 CI、写审计日志、更新文档站</td>
+  </tr>
+  <tr>
+    <td><code class="ic y">pre-lock</code></td>
+    <td>加锁前</td>
+    <td><code class="ic">仓库 路径 用户 [注释] [force]</code></td>
+    <td>限制谁可以加锁、禁止抢占他人锁</td>
+  </tr>
+  <tr>
+    <td><code class="ic g">post-lock</code></td>
+    <td>加锁成功后</td>
+    <td><code class="ic">仓库 用户</code> (stdin 传路径列表)</td>
+    <td>通知相关人「某文件已被锁定」</td>
+  </tr>
+  <tr>
+    <td><code class="ic y">pre-unlock</code></td>
+    <td>解锁前</td>
+    <td><code class="ic">仓库 路径 用户 [token] [break-lock]</code></td>
+    <td>禁止强制解除他人锁</td>
+  </tr>
+  <tr>
+    <td><code class="ic g">post-unlock</code></td>
+    <td>解锁成功后</td>
+    <td><code class="ic">仓库 用户</code></td>
+    <td>通知「文件已释放，可以编辑了」</td>
+  </tr>
+  <tr>
+    <td><code class="ic y">pre-revprop-change</code></td>
+    <td>修改版本库属性前</td>
+    <td><code class="ic">仓库 版本号 用户 属性名 动作</code></td>
+    <td>防止日志被篡改；或仅允许管理员修改并审计</td>
+  </tr>
+  <tr>
+    <td><code class="ic g">post-revprop-change</code></td>
+    <td>修改版本库属性后</td>
+    <td><code class="ic">仓库 版本号 用户 属性名 动作</code></td>
+    <td>记录属性修改的审计日志、发通知</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：revprop 保护的两个方向</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># ===== 方向一：钩子返回 1 → 拒绝修改历史日志 =====</span>
+<span class="ps">$</span> <span class="cmd">svn propset --revprop -r 19 svn:log "篡改历史日志"</span>
+<span class="no">svn: E165001: Revprop change blocked by pre-revprop-change hook (exit code 1) with output:</span>
+<span class="no">[pre-revprop-change] REJECTED: revision properties are immutable.</span>
+<span class="cmt">↑ 历史不可篡改，符合审计要求</span>
+
+<span class="cmt"># ===== 方向二：钩子返回 0 → 允许修改 =====</span>
+<span class="cmt"># 把钩子内容改成：@echo off / exit /b 0</span>
+<span class="ps">$</span> <span class="cmd">svn propset --revprop -r 19 svn:log "Corrected commit message for r19"</span>
+<span class="ok">property 'svn:log' set on repository revision 19</span>
+
+<span class="cmt"># 验证修改生效</span>
+<span class="ps">$</span> <span class="cmd">svn log -r 19</span>
+------------------------------------------------------------------------
+r19 | kelang | 2026-10-08 11:14:04 | 1 line
+
+<span class="ok">Corrected commit message for r19</span>
+------------------------------------------------------------------------
+
+<span class="cmt"># ===== 未创建钩子时（默认状态）=====</span>
+<span class="ps">$</span> <span class="cmd">svn propset --revprop -r 20 svn:log "test"</span>
+<span class="no">svn: E165006: Repository has not been enabled to accept revision propchanges;</span>
+<span class="no">              ask the administrator to create a pre-revprop-change hook</span>
+<span class="cmt">↑ 这是 SVN 的安全默认值：没有钩子 = 不允许改</span></pre>
+  </div>
+</div>
+
+<div class="box key">
+  <span class="bt">钩子调试的三个建议</span>
+  <ol>
+    <li><strong>钩子里的输出一定要写到 stderr</strong>（<code class="ic">&gt;&amp;2</code>）。
+      写到 stdout 的内容在多数情况下不会回显给提交者。</li>
+    <li><strong>先在命令行手工测一遍</strong>再部署。比如测 pre-commit：
+      <div class="codewrap" style="margin:8px 0 0">
+        <div class="codehead"><span class="lang">bash</span><span class="fn">手工测试钩子</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 先制造一个事务（不提交）</span>
+svnmucc -U svn://localhost/repo mkdir /trunk/tmp <span class="c"># 或在客户端执行提交但取消</span>
+
+<span class="c"># 更实用的方式：直接手工调用钩子脚本</span>
+/var/svn/repo/hooks/pre-commit /var/svn/repo <span class="s">"1-abc"</span>
+echo $?   <span class="c"># 看退出码</span>
+
+<span class="c"># 查看某个事务的信息</span>
+svnlook changed -t <span class="s">"1-abc"</span> /var/svn/repo
+svnlook log -t <span class="s">"1-abc"</span> /var/svn/repo
+
+<span class="c"># 清理卡住的事务（钩子崩溃可能留下垃圾事务）</span>
+svnadmin lstxns /var/svn/repo
+svnadmin rmtxns /var/svn/repo <span class="s">"1-abc"</span></pre>
+      </div>
+    </li>
+    <li><strong>注意执行环境</strong>——钩子运行时的工作目录、<code class="ic">PATH</code>、环境变量与你登录时<strong>完全不同</strong>。
+      命令一定要写<strong>绝对路径</strong>（比如 <code class="ic">/usr/bin/svnlook</code> 而不是 <code class="ic">svnlook</code>），
+      否则会出现「我在终端能跑，钩子一跑就失败」。
+      更稳妥的做法是用 <code class="ic">hooks/hooks-env.tmpl</code> 配置环境变量。</li>
+  </ol>
+</div>

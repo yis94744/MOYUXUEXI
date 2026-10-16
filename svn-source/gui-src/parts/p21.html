@@ -1,0 +1,250 @@
+<h3 class="sec" id="s21"><span class="no">21</span>备份与恢复：图形界面操作</h3>
+
+<p class="lead">
+  版本库里装着团队<strong>全部的代码和全部的历史</strong>——每一行代码是怎么来的、谁在什么时候改的、当时为什么改，都只存在这一个地方。
+  服务器硬盘坏了、误删了仓库、中了勒索病毒，丢的不只是当前代码，而是<strong>过去几年所有的改动记录</strong>。
+  这一节在 VisualSVN Server Manager 里把备份配起来，全部是点鼠标。
+</p>
+
+<div class="box key">
+  <span class="bt">关于备份的三个基本认知</span>
+  <ul>
+    <li><strong>备份必须自动。</strong>靠「记得手动点一下」的备份，等于没有备份——忙起来一定会忘。正确做法是配一个每天自动跑的定时任务，配一次管几年。</li>
+    <li><strong>备份必须在别的地方。</strong>和仓库放在同一块硬盘、同一台机器上的备份，硬盘一坏就一起没了，起不到保护作用。</li>
+    <li><strong>备份必须验证过。</strong>没恢复过的备份文件，你并不知道它是不是完整的。这一点本节最后会用红框专门强调。</li>
+  </ul>
+</div>
+
+<h4 class="sub">手动备份一个仓库</h4>
+
+<p>平时靠定时任务，但遇到「我要改一下仓库结构」「准备升级服务器」这类操作前，手动做一次备份最踏实。整个流程就是一个向导。</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">BACKUP</span>手动做一次仓库备份</div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">在仓库节点上右键</span>
+    <span class="sc">左边树里 <code class="ic">Repositories</code> 下面找到要备份的那个仓库，在它上面右键。<em>备份是<strong>一个一个仓库</strong>做的，没有「一键备全部」的按钮——仓库多的时候，用定时任务一次建多条更省事。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">走 All Tasks 子菜单</span>
+    <span class="sc">点 <span class="mp"><span class="item">All Tasks</span> <span class="ar">→</span> <span class="item">Backup Repository...</span></span>。仓库相关的运维操作（备份、恢复、校验）都收在这个子菜单里，<strong>找不到某个运维功能时先翻它</strong>。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">选择备份类型</span>
+    <span class="sc">向导里有备份方式的选择。<strong>第一次备份、或者准备做重大改动前，选全量</strong>；日常的例行备份可以选增量，省空间也更快。<em>两种方式的差别见下面的对比表。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">选择备份文件存到哪</span>
+    <span class="sc">在 <code class="ic">Backup File Name</code> 里选目标路径和一个文件名，<strong>强烈建议指到另一块硬盘、另一台机器或网络存储上</strong>，不要留在仓库所在的盘上。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">完成，看进度</span>
+    <span class="sc">点 <code class="ic">Finish</code> 后会有进度显示。仓库大的话可能要跑一会儿，<em>这期间别去关窗口或重启服务器</em>。完成后到目标路径确认文件存在、大小正常。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">做重大改动前，先手动备一次再动手</span>
+    <span class="sc">要改仓库名、迁移服务器、升级版本之前，<strong>先手动全量备份一次，把它复制到别的地方，再进行操作</strong>。这一步花几分钟，万一出事能救回来。</span>
+  </div></div>
+</div>
+
+<h4 class="sub">两种备份方式怎么选</h4>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:150px">备份方式</th><th style="width:110px">耗时</th><th style="width:130px">占用空间</th><th>适用场景</th></tr></thead>
+<tbody>
+  <tr>
+    <td><strong>全量备份</strong><br><span class="tagmini g">Full</span></td>
+    <td>慢，<strong>随仓库总大小增长</strong>，大仓库可能几十分钟</td>
+    <td>大，每次都是一份完整拷贝</td>
+    <td><strong>恢复最省事——一个文件就是全部。</strong>适合：第一次备份、重大改动前、每季度做一次留底、给异地存储发一份。</td>
+  </tr>
+  <tr>
+    <td><strong>增量备份</strong><br><span class="tagmini y">Incremental</span></td>
+    <td>快，<strong>只处理上次之后的改动</strong>，日常几乎无感</td>
+    <td>小，只存变化的部分</td>
+    <td>适合：<b>每天自动跑的例行任务</b>。缺点：恢复时要按顺序把增量一个个叠上去，所以需要一个可靠的全量做基准。</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box tip">
+  <span class="bt">推荐的组合：全量打底 + 增量日常</span>
+  <p>两种不是二选一，而是<strong>搭配着用</strong>：<strong>每周（或每月）一次全量</strong>作为基准放在异地存储上；<strong>每天一次增量</strong>，攒到下一个全量为止。恢复时先恢复最近一次全量，再把之后的增量按时间顺序叠上去，就能回到最近的状态。</p>
+  <p><em>如果团队规模不大、仓库也就几百兆，那全量每天跑一次也完全可以接受，还省去叠加的麻烦。按你们的实际体积定。</em></p>
+</div>
+
+<h4 class="sub">配置定时备份，让它自己跑</h4>
+
+<p>这才是备份真正起作用的方式。配好之后服务器每天自动备，你不需要记得任何事。</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">JOB</span>建一个每天自动备份的任务</div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">在 Jobs 节点上右键</span>
+    <span class="sc">左边树里找到 <code class="ic">Jobs</code>（定时任务节点），右键 → <span class="mp"><span class="item">New</span> <span class="ar">→</span> <span class="item">Backup Job...</span></span>。<em>如果里面已经有别的任务（比如日志清理），也可以在这里一起管理。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">选择要备份哪些仓库</span>
+    <span class="sc">任务对话框里勾选要包含的仓库，可以<strong>一次勾多个</strong>——这样一条任务就能把整个团队的仓库都覆盖掉。新加仓库后记得回来把它也勾上。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">设置备份目标位置</span>
+    <span class="sc">指定一个<strong>和仓库不同盘、最好是网络位置</strong>的目录。网络共享路径、外接硬盘、NAS 都可以。<em>这一项是整节里最关键的一次选择，位置选错，后面全白做。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">选择备份类型（全量还是增量）</span>
+    <span class="sc">日常任务建议选增量；如果你希望<strong>每个备份文件都能独立恢复</strong>，就选全量，代价是每天多花些时间和空间。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">设定运行时间</span>
+    <span class="sc">安排一个<strong>没人用服务器的时间点</strong>，比如凌晨两三点。选好开始的日期和重复周期（每天 / 每周）。<em>避开大家提交的高峰，备份更完整、也不影响别人。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">完成，然后第二天来检查一次</span>
+    <span class="sc">任务建好后会出现在 <code class="ic">Jobs</code> 下面。<strong>第二天务必回来确认它真的跑了、文件真的生成了</strong>——配好就不管，是备份最常见的翻车方式。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">顺便考虑：老备份怎么清理</span>
+    <span class="sc">备份只增不减，半年就把盘塞满了。<strong>定一个保留策略</strong>（比如本地留 7 天、异地留 30 天），按策略定期把过期的删掉。<em>可以在任务属性里设置保留份数，也可以人工周期性清理。</em></span>
+  </div></div>
+</div>
+
+<h4 class="sub">从备份还原一个仓库</h4>
+
+<p>还原的时机：硬盘出问题、仓库被误删、或者你想把某个历史状态在一台测试机上复原出来看看。整个操作也是向导。</p>
+
+<div class="ops">
+  <div class="otitle"><span class="badge">RESTORE</span>把仓库从备份里恢复出来</div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">在 Repositories 节点上右键</span>
+    <span class="sc">注意是<strong>在 <code class="ic">Repositories</code> 这一层</strong>，不是在某个具体仓库上——因为你要恢复的这个仓库可能已经被删掉了，它下面根本没有对应的节点。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">走 All Tasks → Restore Repository</span>
+    <span class="sc">点 <span class="mp"><span class="item">All Tasks</span> <span class="ar">→</span> <span class="item">Restore Repository...</span></span>，弹出恢复向导。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">选择备份文件</span>
+    <span class="sc">浏览到存放备份的目录，选中那个备份文件。<strong>是增量备份的话，要按顺序把全量和后续增量都挂上</strong>，才能在向导里还原到想要的状态。</span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">给恢复出来的仓库起名</span>
+    <span class="sc">如果原仓库还在、你只是想看看历史状态，<strong>一定要换个不同的名字</strong>（比如 <code class="ic">MyProject-restore</code>）。<em>重名会把现有的仓库覆盖掉，那就从「摔了一跤」变成「伤筋动骨」了。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">恢复完成后在仓库浏览器里验一遍</span>
+    <span class="sc">恢复完，右键新仓库 → <code class="ic">Repo-browser</code>，展开看看<strong>目录结构对不对、日志列表里版本号到不到你预期的位置</strong>。<em>能看到完整的提交历史，才算真的恢复成功。</em></span>
+  </div></div>
+  <div class="op"><div class="num"></div><div class="body">
+    <span class="st">确认无误后再处理旧的</span>
+    <span class="sc">如果是为了替换损坏的仓库，先<strong>让新的跑通、同事能正常更新提交</strong>，确认几天之后，再决定要不要清理旧的那份。<em>顺序永远是「先确认新的好用，再删旧的」。</em></span>
+  </div></div>
+</div>
+
+<h4 class="sub">恢复之后：怎么确认「真的恢复了」</h4>
+
+<p>恢复向导点完 Finish 不代表事情结束。<strong>必须打开仓库浏览器亲眼验一遍</strong>——这是区分「备份文件存在」和「数据真的可用」的唯一办法。</p>
+
+<div class="shot">
+  <div class="sh"><span class="ic">◈</span><span class="ft">仓库浏览器（Repo-browser）：恢复后验收主战场</span><span class="fs">REPO-BROWSER</span></div>
+  <div class="sb"><img src="img/Repobrowser.png" alt="仓库浏览器验证恢复结果"></div>
+  <div class="cap">
+    恢复完成后，右键新仓库选 <code class="ic">Repo-browser</code>，就打开这个窗口。它是<strong>直接读服务器上的仓库</strong>，不依赖你本地任何工作副本，所以最适合做验收。三块内容挨个看：<br><br>
+
+    <b>① 左栏：目录树</b><br>
+    从仓库根往下展开，确认 <span class="k">trunk</span> / <span class="k">branches</span> / <span class="k">tags</span> 三个目录都在，位置没串。图里还带了一个 <span class="k">Bookmarks</span> 折叠项，那是你自己收藏的地址，和仓库数据无关。<br>
+    <em>如果这里少目录、或者层级明显不对，说明恢复没成功。</em><br><br>
+
+    <b>② 右栏：文件列表</b><br>
+    四列是 <span class="k">File</span>（文件名）、<span class="k">Extension</span>（扩展名）、<strong><span class="k">Revision</span></strong>、<span class="k">Author</span>（最后修改者）、<span class="k">Size</span>（大小）、<span class="k">Date</span>（时间）。<strong>重点看 Revision 和 Date 两列</strong>——它们能反映每个文件最后一次改动是什么时候。文件名后面带 <code class="ic">/</code> 的是文件夹，可以用工具栏按钮切换成「每个文件夹占一行」的视图。<br><br>
+
+    <b>③ 顶部：地址栏与版本框</b><br>
+    左边是当前路径，右边 <span class="k">Revision</span> 默认显示 <code class="ic">HEAD</code>，表示<strong>看最新状态</strong>。你也可以把它改成某个具体的版本号，或直接点 <span class="k">Show log</span>，去看完整的提交历史。<br><br>
+
+    <b>验收时具体核对这几项：</b>
+  </div>
+</div>
+
+<div class="tw">
+<table>
+<thead><tr><th style="width:180px">核对项</th><th style="width:230px">在哪里看</th><th>合格标准</th></tr></thead>
+<tbody>
+  <tr>
+    <td><strong>版本号到没到位</strong></td>
+    <td>点 <code class="ic">Show log</code>，看最大的版本号</td>
+    <td>应该等于备份那一刻的版本号。差得远 = 恢复了旧的备份</td>
+  </tr>
+  <tr>
+    <td><strong>提交历史完不完整</strong></td>
+    <td>日志列表往下翻，看最早的版本</td>
+    <td>能一直翻到仓库创建时的第一个版本，说明历史没断</td>
+  </tr>
+  <tr>
+    <td><strong>目录结构对不对</strong></td>
+    <td>左栏目录树展开各级</td>
+    <td>trunk / branches / tags 齐全，深层目录都在</td>
+  </tr>
+  <tr>
+    <td><strong>最近一次提交在不在</strong></td>
+    <td>日志列表第一条</td>
+    <td>时间、作者、日志内容都对得上。少了最后几次 = 增量链断了</td>
+  </tr>
+  <tr>
+    <td><strong>能不能正常检出</strong></td>
+    <td>换台机器，用 <code class="ic">SVN Checkout...</code> 检验出一次</td>
+    <td>能完整拉下来、文件和预期一致。<strong>这一步最有说服力</strong></td>
+  </tr>
+  <tr>
+    <td><strong>能不能正常提交</strong></td>
+    <td>在检出的工作副本里改个文件、提交一次</td>
+    <td>提交成功。能写才是真的活的仓库</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box ok">
+  <span class="bt">验收口诀：能看、能检、能提</span>
+  <p>恢复一个仓库到底行不行，三步就能确认：</p>
+  <ol>
+    <li><strong>能看</strong>——在 Repo-browser 里能看到完整的目录和日志历史。</li>
+    <li><strong>能检</strong>——在另一台机器上把代码完整检出下来。</li>
+    <li><strong>能提</strong>——往里面提交一次，服务器正常接受。</li>
+  </ol>
+  <p>三步都过，这次恢复才算真的成功。<em>只做了第一步就宣布「恢复完成」，是运维里最常见的自欺欺人。</em></p>
+</div>
+
+<div class="box tip">
+  <span class="bt">一套够用的备份策略</span>
+  <ul>
+    <li><strong>本地留 7 天</strong>——服务器旁边的另一块盘或 NAS。出事当天就能就近恢复，速度最快。</li>
+    <li><strong>异地留 30 天</strong>——另一栋楼、另一个机房，或者云端存储。这一层防的是「机器连同备份一起没了」：火灾、被盗、勒索病毒加密整个网络。</li>
+    <li><strong>每季度做一次恢复演练</strong>——建一个测试仓库，从备份真的恢复一次，看看能不能打开、历史完不完整。<strong>这一步最能暴露问题</strong>：备份文件损坏、路径写错、权限不对，都会在这时候现出来，而不是在真出事那天。</li>
+    <li><strong>备份文件不要和生产环境用同一套账号密码</strong>——勒索病毒专门找有写权限的共享目录下手。</li>
+  </ul>
+</div>
+
+<div class="box err">
+  <span class="bt">没验证过能恢复的备份，等于没有备份</span>
+  <p>这句话在运维圈被反复讲，是因为它永远在发生：</p>
+  <ul>
+    <li>任务配了两年，从来没人打开过那个目录——结果<strong>路径早就失效了，一个文件都没生成</strong>。</li>
+    <li>每天生成的文件看着都在，实际上<strong>文件是空的或者中断的</strong>，恢复时才发现打不开。</li>
+    <li>备份是好的，但<strong>恢复步骤没人会</strong>。真出事那天，全公司盯着你研究向导怎么点，压力比平时大一百倍。</li>
+    <li>增量备份链某一天断了，<strong>后面所有的增量都叠不上去</strong>，只能退回最后一次全量。</li>
+  </ul>
+  <p><strong>所以：把「每季度恢复演练」当成一条硬性任务写进你们的运维清单，谁负责、什么时候做，写清楚。</strong>十五分钟的演练，抵得过事后的一切努力。</p>
+</div>
+
+<div class="box ok">
+  <span class="bt">备份做完，你应该能回答这四个问题</span>
+  <ul>
+    <li><strong>备份在哪？</strong>给出确切路径，且这个位置和仓库<strong>不在同一块盘上</strong>。</li>
+    <li><strong>多久备一次？</strong>有一条每天自动跑的定时任务，并且你验证过它真的跑了。</li>
+    <li><strong>保留多久？</strong>本地多少天、异地多少天，谁来清理，过期备份怎么处理，都有约定。</li>
+    <li><strong>怎么恢复？</strong>自己亲手恢复过一次，知道从哪个菜单点、选哪个文件、大概要多久。</li>
+  </ul>
+  <p>四个都能答上来，你的团队就比较稳了。<em>答不出来的那个，就是下一步要去补的。</em></p>
+</div>

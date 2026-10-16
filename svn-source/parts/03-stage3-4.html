@@ -1,0 +1,1306 @@
+<!-- ==========================================================================
+     第 7 节：status 状态码全解
+     ========================================================================== -->
+<h3 class="sec" id="s7"><span class="no">7</span>status 状态码全解</h3>
+
+<p class="lead">
+  <code class="ic">svn status</code> 是 SVN 里<strong>使用频率最高</strong>的命令，也是信息密度最高的。
+  它的输出<strong>前七列每列一个字符宽</strong>，每列表示一种不同维度的状态。
+  很多人以为只有两列——这是最常见的误读，会导致完全相反的结论。
+</p>
+
+<div class="box key">
+  <span class="bt">先记住这个结论：status 有七列，不是两列</span>
+  <p>官方文档（<code class="ic">svn help status</code>）原文：<em>The first seven columns in the output are each one character wide</em>。
+  下面这七列各管一件事：内容、属性、工作副本锁、复制历史、切换/外部、仓库锁、树冲突。
+  用 <code class="ic">-u</code> 时还有<strong>第 9 列</strong>表示服务器是否有更新。</p>
+</div>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 7-1　status 输出的七列结构解剖（依据 svn help status 实测）</span><span class="fs">Output Anatomy</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 470" width="980" height="470" role="img" aria-label="svn status 输出七列结构解剖图">
+  <!-- 输出示例 -->
+  <rect class="c-gray" x="30" y="52" width="520" height="212" rx="10"/>
+  <text class="tm2" x="50" y="74">列号 1234567</text>
+  <text class="tm" x="50" y="98">M       README.md</text>
+  <text class="tm" x="50" y="122"> M      src/</text>
+  <text class="tm" x="50" y="146">A  +    newfile.txt</text>
+  <text class="tm" x="50" y="170">D       old.txt</text>
+  <text class="tm" x="50" y="194">C       conflict.md</text>
+  <text class="tm" x="50" y="218">?       untracked.log</text>
+  <text class="tm" x="50" y="242">!       missing.cs</text>
+
+  <!-- 列标注（精确到字符位） -->
+  <path class="arwy" d="M96,90 L215,470" stroke="#e3b341" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text class="tm2" x="100" y="86" fill="#e3b341">①</text>
+
+  <path class="arwc" d="M114,114 L262,470" stroke="#56d4dd" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text class="tm2" x="118" y="110" fill="#56d4dd">②</text>
+
+  <path class="arwg" d="M172,138 L309,470" stroke="#7ee787" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text class="tm2" x="176" y="134" fill="#7ee787">④</text>
+
+  <path class="arwp" d="M270,210 L356,470" stroke="#d2a8ff" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text class="tm2" x="274" y="206" fill="#d2a8ff">路径</text>
+
+  <!-- 七列定义 -->
+  <rect x="566" y="40" width="392" height="424" rx="11" fill="rgba(88,166,255,.05)" stroke="#58a6ff" stroke-width="1.3"/>
+
+  <text class="hd" x="586" y="64" fill="#e3b341">① 第 1 列：内容状态</text>
+  <text class="tm2" x="594" y="86">A 新增  M 修改  D 删除  R 替换</text>
+  <text class="tm2" x="594" y="104">C 冲突  ? 未跟踪  ! 缺失  I 忽略</text>
+  <text class="tm2" x="594" y="122">X 由 externals 创建的外部目录</text>
+  <text class="tm2" x="594" y="140">~ 类型不符（版本控制对象被占用）</text>
+
+  <line x1="586" y1="152" x2="938" y2="152" stroke="#30363d" stroke-width="1"/>
+
+  <text class="hd" x="586" y="174" fill="#56d4dd">② 第 2 列：属性状态</text>
+  <text class="tm2" x="594" y="196">M 属性被修改　C 属性冲突</text>
+
+  <line x1="586" y1="208" x2="938" y2="208" stroke="#30363d" stroke-width="1"/>
+
+  <text class="hd" x="586" y="230" fill="#8b949e">③ 第 3 列：工作副本写锁</text>
+  <text class="tm2" x="594" y="252">L 被另一个客户端锁定（正在操作）</text>
+
+  <line x1="586" y1="264" x2="938" y2="264" stroke="#30363d" stroke-width="1"/>
+
+  <text class="hd" x="586" y="286" fill="#7ee787">④ 第 4 列：是否带复制历史</text>
+  <text class="tm2" x="594" y="308">+ 提交时将创建副本（svn copy 过来的）</text>
+
+  <line x1="586" y1="320" x2="938" y2="320" stroke="#30363d" stroke-width="1"/>
+
+  <text class="hd" x="586" y="342" fill="#d2a8ff">⑤ 第 5 列：切换与文件外部</text>
+  <text class="tm2" x="594" y="364">S 该条目被 switch 到其他 URL</text>
+  <text class="tm2" x="594" y="382">X 由 externals 定义的版本控制文件</text>
+
+  <line x1="586" y1="394" x2="938" y2="394" stroke="#30363d" stroke-width="1"/>
+
+  <text class="hd" x="586" y="416" fill="#ffa657">⑥ 第 6 列：仓库独占锁</text>
+  <text class="tm2" x="594" y="438">K 本工作副本持有该锁（或锁已被偷/失效）</text>
+  <text class="ts" x="594" y="456" fill="#8b949e">加 -u 时：K 我持有 / O 他人持有 / T 被偷 / B 已失效</text>
+
+  <!-- 第7列与第9列 -->
+  <rect x="30" y="280" width="520" height="76" rx="10" fill="rgba(255,123,114,.06)" stroke="#ff7b72" stroke-width="1.3"/>
+  <text class="hd" x="50" y="304" fill="#ff7b72">⑦ 第 7 列：树冲突（tree conflict）</text>
+  <text class="ts" x="50" y="326">C 条目是树冲突的受害者。出现时下一行会多打印一条说明。</text>
+  <text class="ts" x="50" y="346" fill="#7ee787">例：!     C wc/qaz.c   ← 第1列!缺失 + 第7列C树冲突</text>
+
+  <rect x="30" y="368" width="520" height="96" rx="10" fill="rgba(86,212,221,.06)" stroke="#56d4dd" stroke-width="1.3"/>
+  <text class="hd" x="50" y="392" fill="#56d4dd">⑨ 第 9 列：服务器是否有更新（仅 -u）</text>
+  <text class="ts" x="50" y="414">* 服务器上有更新的版本存在</text>
+  <text class="ts" x="50" y="434">后面紧跟「工作版本号」「最后提交版本号」「作者」等变量宽字段，以空格分隔。</text>
+  <text class="ts" x="50" y="454" fill="#8b949e">末尾还会有一行：Status against revision: 981</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>最容易踩的坑：</b><code class="ic">M</code> 出现在第 1 列还是第 2 列，含义完全不同——
+    第 1 列是<strong>文件内容</strong>变了，第 2 列（前面有个空格）是<strong>属性</strong>变了。
+    同理 <code class="ic">X</code> 在第 1 列是「externals 创建的外部<strong>目录</strong>」，
+    在第 5 列是「externals 定义的版本控制<strong>文件</strong>」——两者都不是同一个意思。
+  </div>
+</div>
+
+<h4 class="sub">所有状态码实测</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">构造所有状态码并观察</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 在一个干净的工作副本里依次制造各种状态</span>
+
+<span class="c"># A —— 新增待提交（目录会递归展开成多行）</span>
+touch newfile.txt &amp;&amp; svn add newfile.txt
+mkdir src &amp;&amp; echo <span class="s">"code"</span> &gt; src/main.cs &amp;&amp; svn add src
+
+<span class="c"># M —— 修改已跟踪文件（第 1 列）</span>
+echo <span class="s">"append"</span> &gt;&gt; docs.md
+
+<span class="c"># M —— 修改属性（第 2 列！注意前导空格）</span>
+svn propset svn:ignore <span class="s">"*.log"</span> .
+
+<span class="c"># D —— 标记删除</span>
+svn delete test-hook.txt
+
+<span class="c"># ? —— 未版本控制</span>
+touch untracked.txt
+
+<span class="c"># ! —— 缺失（绕过 svn delete 直接删）</span>
+rm src/main.cs
+
+<span class="c"># I —— 被 svn:ignore 忽略（默认不显示）</span>
+touch debug.log
+
+<span class="c"># 一次性看全部</span>
+svn status
+svn status --no-ignore      <span class="c"># 连被忽略的也列出来</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：一次看全各种状态码</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="hl"> M</span>      .                  <span class="cmt">← 第2列 M：当前目录的【属性】被改了（设了 svn:ignore）</span>
+<span class="hl">M</span>       docs.md            <span class="cmt">← 第1列 M：文件【内容】已修改</span>
+<span class="ok">A</span>       newfile.txt        <span class="cmt">← 新增，等待提交</span>
+<span class="ok">A</span>       src                <span class="cmt">← 新增目录</span>
+<span class="ok">A</span>       src\main.cs        <span class="cmt">← 目录里的文件也被递归添加</span>
+<span class="no">D</span>       test-hook.txt      <span class="cmt">← 已用 svn delete 标记删除</span>
+<span class="no">?</span>       untracked.txt      <span class="cmt">← 未版本控制，提交时会被忽略</span>
+
+<span class="cmt"># 注意：debug.log 没有出现在上面 —— 它被 svn:ignore 规则挡住了</span>
+<span class="cmt"># 用 --no-ignore 让被忽略的也现形</span>
+<span class="ps">$</span> <span class="cmd">svn status --no-ignore</span>
+<span class="dim">I</span>       debug.log          <span class="cmt">← I = Ignored，被 svn:ignore 规则匹配</span>
+
+<span class="cmt"># 再看第2列的 M 具体改了什么属性</span>
+<span class="ps">$</span> <span class="cmd">svn propget svn:ignore .</span>
+*.log</pre>
+  </div>
+  <p><strong>这张输出值得多看两眼</strong>：第一行 <code class="ic">&nbsp;M&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.</code> 的 <code class="ic">M</code> 出现在<strong>第 2 列</strong>——
+  它表示「当前目录的属性被改了」，而不是「有文件内容被改了」。
+  如果你误读成第 1 列，就会以为某个文件被修改，从而找错方向。<br>
+  另外注意 <code class="ic">A&nbsp;&nbsp;src</code> 和 <code class="ic">A&nbsp;&nbsp;src\main.cs</code> 是两行——
+  添加目录时 SVN 会把里面的每个条目<strong>逐条列出</strong>，这是它的默认行为（可以用 <code class="ic">-q</code> 精简）。</p>
+</div>
+
+<h4 class="sub">状态码速查表</h4>
+
+<p>
+  下表列出<strong>第 1 列</strong>（内容状态）可能出现的主要取值。
+  另有几个只在特定列出现的标记，单独标注在「所在列」一栏。
+</p>
+
+<div class="tw">
+<table>
+<thead>
+  <tr><th>代码</th><th>所在列</th><th>英文</th><th>中文含义</th><th>怎么办</th></tr>
+</thead>
+<tbody>
+  <tr>
+    <td><span class="tagmini">无</span></td><td>1</td><td>—</td>
+    <td>干净，与 BASE 一致</td>
+    <td>无需处理</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini g">A</span></td><td>1</td><td>Added</td>
+    <td>已添加到版本控制，但还没提交</td>
+    <td><code class="ic">svn commit</code> 提交；<code class="ic">svn revert</code> 撤销添加</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini y">M</span></td><td><strong>1 或 2</strong></td><td>Modified</td>
+    <td>第 1 列 = 文件<strong>内容</strong>已修改<br>第 2 列 = <strong>属性</strong>已修改（内容没动）</td>
+    <td>提交；或 <code class="ic">svn revert</code> 丢弃修改</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini r">D</span></td><td>1</td><td>Deleted</td>
+    <td>已用 <code class="ic">svn delete</code> 标记删除，提交后真删</td>
+    <td>提交；或 <code class="ic">svn revert</code> 恢复文件</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini r">C</span></td><td>1 / 2 / 7</td><td>Conflicted</td>
+    <td>第 1 列 = 内容冲突<br>第 2 列 = 属性冲突<br>第 7 列 = <strong>树冲突</strong></td>
+    <td>编辑文件 → <code class="ic">svn resolve --accept working</code>（第 10 节）</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini c">?</span></td><td>1</td><td>Unversioned</td>
+    <td>未版本控制，SVN 完全不管它</td>
+    <td><code class="ic">svn add</code> 纳入；或写进 <code class="ic">svn:ignore</code> 让它闭嘴</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini r">!</span></td><td>1</td><td>Missing</td>
+    <td>文件被手工删除（脱离版本控制）</td>
+    <td><code class="ic">svn update</code> 找回；或 <code class="ic">svn delete --force</code> 补登记</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini">I</span></td><td>1</td><td>Ignored</td>
+    <td>匹配了忽略规则（默认不显示，需 <code class="ic">--no-ignore</code>）</td>
+    <td>无需处理；真想追踪就 <code class="ic">svn add --no-ignore</code></td>
+  </tr>
+  <tr>
+    <td><span class="tagmini p">R</span></td><td>1</td><td>Replaced</td>
+    <td>文件被删除后又新建了同名文件</td>
+    <td>正常<code class="ic">commit</code>；如需保留历史考虑 <code class="ic">svn move</code></td>
+  </tr>
+  <tr>
+    <td><span class="tagmini c">X</span></td><td><strong>1 或 5</strong></td><td>External</td>
+    <td>第 1 列 = <code class="ic">svn:externals</code> 创建的<strong>未版本控制目录</strong><br>
+        第 5 列 = <code class="ic">svn:externals</code> 定义的<strong>版本控制文件</strong></td>
+    <td>在父目录提交；外部内容本身单独管理</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini b">~</span></td><td>1</td><td>Obstructed</td>
+    <td>类型不符（SVN 认为是文件，磁盘上是目录，或反之）</td>
+    <td>删掉重来 / 改名，然后 <code class="ic">svn update</code></td>
+  </tr>
+  <tr>
+    <td><span class="tagmini g">S</span></td><td><strong>5</strong></td><td>Switched</td>
+    <td>该子目录被 <code class="ic">svn switch</code> 切到了别的 URL</td>
+    <td>正常现象；<code class="ic">svn info</code> 可看实际 URL</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini">L</span></td><td><strong>3</strong></td><td>Locked</td>
+    <td>工作副本被<strong>另一个 SVN 客户端</strong>锁定（正在执行操作）</td>
+    <td>等对方操作完；若进程已死，<code class="ic">svn cleanup</code></td>
+  </tr>
+  <tr>
+    <td><span class="tagmini y">K</span></td><td><strong>6</strong></td><td>Locked (repo)</td>
+    <td>条目在仓库中被独占锁保护，且<strong>锁由本工作副本持有</strong></td>
+    <td>正常，你持有锁；提交后自动释放</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini">O / T / B</span></td><td><strong>6</strong></td>
+    <td>—</td>
+    <td>仅 <code class="ic">-u</code> 时出现：<br><strong>O</strong> 锁被他人持有　<strong>T</strong> 我的锁被偷　<strong>B</strong> 我的锁已失效</td>
+    <td>O 需等待或沟通；T/B 说明锁状态异常，需重新加锁</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini c">+</span></td><td><strong>4</strong></td>
+    <td>History</td>
+    <td>提交时将创建带历史的副本（由 <code class="ic">svn copy</code> 产生）</td>
+    <td>正常，说明移动/复制的历史会被保留</td>
+  </tr>
+  <tr>
+    <td><span class="tagmini c">*</span></td><td><strong>9</strong></td>
+    <td>Out of date</td>
+    <td>仅 <code class="ic">-u</code> 时出现：服务器上有更新的版本</td>
+    <td><code class="ic">svn update</code> 拉取最新</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box tip">
+  <span class="bt">怎么快速记住列号</span>
+  <p>不必死记。实战中只需要盯住<strong>前两列</strong>——它们覆盖了 95% 的日常判断。
+  第 3~7 列属于「出现时再去查」的类型。把 <code class="ic">svn help status</code> 的输出留着，
+  遇到不认识的字母搜一下就有答案。</p>
+</div>
+
+<h4 class="sub">!  缺失：最需要立刻处理的异常状态</h4>
+
+<p>
+  <code class="ic">!</code> 产生的原因只有一个：<strong>你绕过了 SVN 直接删文件</strong>——
+  用 <code class="ic">rm</code> / <code class="ic">del</code> / 在资源管理器里按 Delete。
+  SVN 的元数据里还记着这个文件，但磁盘上找不到了。
+</p>
+
+<div class="duo">
+  <div>
+    <div class="dh">✗ 错误做法：直接删文件</div>
+<pre>rm src/old.cpp
+
+$ svn status
+<span style="color:#ff7b72">!</span>       src/old.cpp
+<span style="color:#6e7681"># 状态异常，提交时会报错</span>
+
+$ svn commit -m "删除旧文件"
+<span style="color:#ff7b72">svn: E200009: Commit failed</span>
+<span style="color:#ff7b72">'src/old.cpp' is scheduled for addition,</span>
+<span style="color:#ff7b72">but is missing from the working copy</span></pre>
+  </div>
+  <div>
+    <div class="dh">✓ 正确做法：用 svn delete</div>
+<pre>svn delete src/old.cpp
+
+$ svn status
+<span style="color:#ffa657">D</span>       src/old.cpp
+<span style="color:#6e7681"># 状态正常，文件也从磁盘移除了</span>
+
+$ svn commit -m "删除旧文件"
+Deleting       src/old.cpp
+Committed revision 12.
+<span style="color:#7ee787"># 顺利提交，历史里留下了完整记录</span></pre>
+  </div>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：! 状态的两种补救方式</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 场景：误删了 src\main.cs</span>
+<span class="ps">$</span> <span class="cmd">Remove-Item src\main.cs -Force</span>
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="no">!</span>       src\main.cs
+
+<span class="cmt"># 补救方式一：我其实不想删 → update 找回来</span>
+<span class="ps">$</span> <span class="cmd">svn update</span>
+Updating '.':
+<span class="ok">Restored 'src\main.cs'</span>          <span class="cmt">← 从 pristine / 服务器恢复</span>
+At revision 17.
+
+<span class="cmt"># 补救方式二：确实要删 → 补一个登记动作</span>
+<span class="ps">$</span> <span class="cmd">svn delete --force old-file.txt</span>
+<span class="hl">D</span>         old-file.txt               <span class="cmt">← 即使文件已经不在，也能标记删除</span>
+
+<span class="cmt"># 补救方式三：批量处理一堆 ! （比如清空了一个目录）</span>
+<span class="ps">$</span> <span class="cmd">svn status | Select-String "^!" | % { svn delete --force $_.ToString().Substring(8).Trim() }</span></pre>
+  </div>
+</div>
+
+<div class="box tip">
+  <span class="bt">铁律：删除文件永远用 svn delete，不要用 rm</span>
+  <p>同理，<strong>重命名永远用 <code class="ic">svn move</code>，不要用 <code class="ic">mv</code> / 右键重命名</strong>。
+  原因见第 22 节：<code class="ic">svn move</code> 会记录「这是同一次移动」，历史才不会断；
+  而 <code class="ic">mv</code> 在 SVN 看来是「删了一个文件 + 加了一个新文件」，追溯历史时会断掉。</p>
+</div>
+
+<!-- ==========================================================================
+     第 8 节：日常开发循环
+     ========================================================================== -->
+<h3 class="sec" id="s8"><span class="no">8</span>日常开发循环与 diff / log 进阶</h3>
+
+<p class="lead">
+  单人开发、多人协作、紧急修复——所有场景最后都收敛成同一个循环：
+  <strong>update → 改 → status → diff → update → commit</strong>。
+  这一节把循环里的 <code class="ic">update</code>、<code class="ic">log</code>、<code class="ic">diff</code> 三个命令挖到底。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 8-1　多人协作的日常循环与冲突预防</span><span class="fs">Daily Loop</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 400" width="980" height="400" role="img" aria-label="SVN 多人协作日常循环图">
+  <!-- 中央循环 -->
+  <circle cx="240" cy="200" r="105" fill="none" stroke="#30363d" stroke-width="2" stroke-dasharray="6 5"/>
+  <text class="hd" x="240" y="118" text-anchor="middle" fill="#58a6ff">日常循环</text>
+
+  <!-- 四个节点 -->
+  <rect class="c-blue" x="176" y="86" width="128" height="38" rx="8"/>
+  <text class="tm" x="240" y="110" text-anchor="middle">svn update</text>
+
+  <rect class="c-green" x="306" y="182" width="128" height="38" rx="8"/>
+  <text class="tm" x="370" y="206" text-anchor="middle">编辑代码</text>
+
+  <rect class="c-orange" x="176" y="278" width="128" height="38" rx="8"/>
+  <text class="tm" x="240" y="302" text-anchor="middle">svn diff</text>
+
+  <rect class="c-pur" x="48" y="182" width="128" height="38" rx="8"/>
+  <text class="tm" x="112" y="206" text-anchor="middle">svn commit</text>
+
+  <!-- 循环箭头 -->
+  <path class="arwb" d="M306,110 C350,124 372,150 372,182"/>
+  <path class="arwg" d="M370,220 C370,254 348,278 306,296"/>
+  <path class="arwo" d="M176,296 C132,278 112,254 112,220"/>
+  <path class="arwp" d="M112,182 C112,150 132,124 176,110"/>
+
+  <text class="tm2" x="352" y="152">改</text>
+  <text class="tm2" x="352" y="268">查</text>
+  <text class="tm2" x="128" y="268">提</text>
+  <text class="tm2" x="128" y="152">更</text>
+
+  <!-- 右侧：预防冲突 -->
+  <rect x="500" y="40" width="452" height="146" rx="11" fill="rgba(126,231,135,.07)" stroke="#7ee787" stroke-width="1.4"/>
+  <text class="hd" x="522" y="66" fill="#7ee787">缩短「持有时间」是避免冲突的唯一办法</text>
+  <text class="ts" x="522" y="92">冲突的产生条件：</text>
+  <text class="tx" x="538" y="114">① 你改了一个文件，② 同事也改了同一个文件，</text>
+  <text class="tx" x="538" y="136">③ 同事先提交了，④ 你 update 时撞上他的改动。</text>
+  <text class="ts" x="522" y="162">持有时间越长（比如三天不提交），撞车概率越高。</text>
+  <text class="ts" x="522" y="182" fill="#7ee787">对策：小步提交，一个功能一提交，别攒。</text>
+
+  <!-- 右下 -->
+  <rect x="500" y="200" width="452" height="146" rx="11" fill="rgba(255,123,114,.07)" stroke="#ff7b72" stroke-width="1.4"/>
+  <text class="hd" x="522" y="226" fill="#ff7b72">每天开工第一件事：update</text>
+  <text class="ts" x="522" y="252">很多人习惯「想起来才更新」，这会导致：</text>
+  <text class="tx" x="538" y="274">• 本地基线与服务器越来越远</text>
+  <text class="tx" x="538" y="296">• 一次 update 拉回几百个改动，冲突爆炸</text>
+  <text class="tx" x="538" y="318">• 提交时发现文件全「过期」，被迫先合并</text>
+  <text class="ts" x="522" y="342" fill="#7ee787">习惯：开始写代码前 update，写完提交前再 update 一次。</text>
+
+  <!-- 底部提示 -->
+  <rect x="30" y="346" width="440" height="42" rx="9" fill="rgba(210,168,255,.07)" stroke="#d2a8ff" stroke-width="1.2"/>
+  <text class="ts" x="50" y="372">循环里没有「先提交再更新」这个顺序 —— 顺序反了就会冲突。</text>
+</svg>
+  </div>
+</div>
+
+<h4 class="sub" id="s8-2">update：不只是「拉代码」</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">update 的高级用法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">svn update                          <span class="c"># 把整个工作副本更新到 HEAD</span>
+svn update src/                     <span class="c"># 只更新某个目录</span>
+svn update README.md config.json    <span class="c"># 只更新指定文件</span>
+svn update -r 100                   <span class="c"># 更新到指定版本 r100（不是最新）</span>
+svn update --revision PREV          <span class="c"># 回退到上一个版本（常用！）</span>
+svn update --revision BASE          <span class="c"># 回到工作副本的基准版本（丢弃所有更新）</span>
+
+<span class="c"># 冲突处理策略（重要，脚本里必用）</span>
+svn update --accept postpone        <span class="c"># 冲突了就放着，产生冲突标记（默认行为）</span>
+svn update --accept mine-full       <span class="c"># 冲突时全用我的</span>
+svn update --accept theirs-full     <span class="c"># 冲突时全用服务器的</span>
+svn update --accept mine-conflict   <span class="c"># 只在本文件的冲突块用我的</span>
+svn update --accept theirs-conflict <span class="c"># 只在冲突块用服务器的</span>
+svn update --accept base            <span class="c"># 丢弃双方改动，回到原始版本</span>
+
+<span class="c"># 其他常用</span>
+svn update --force                  <span class="c"># 强制覆盖，即使有未版本控制的同名文件</span>
+svn update --ignore-ancestry        <span class="c"># 忽略祖先关系，直接覆盖（慎用）</span>
+svn update --set-depth infinity .   <span class="c"># 把稀疏工作副本变回完整（第 22 节）</span>
+svn update --non-interactive        <span class="c"># 脚本必备，遇冲突不卡住等输入</span></pre>
+</div>
+
+<div class="box warn">
+  <span class="bt">脚本里必须加 --non-interactive 和 --accept</span>
+  <p>SVN 默认遇到冲突会<strong>弹出交互式选择菜单</strong>，等待你输入字母。
+  在 CI / 定时任务 / 批处理脚本里，这会让进程<em>永久挂起</em>。</p>
+  <p>本教程在实测阶段就踩过这个坑——一个看似简单的 update 命令阻塞了 120 秒后被强制中断。
+  正确写法：</p>
+  <div class="codewrap">
+    <div class="codehead"><span class="lang">bash</span><span class="fn">CI 里的安全写法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">svn update --non-interactive --accept postpone
+svn commit -m <span class="s">"auto build"</span> --non-interactive</pre>
+  </div>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：update 输出的字母含义</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn update</span>
+Updating '.':
+<span class="hl">A</span>    bob-test                        <span class="cmt">← 服务器新增的，添加到本地</span>
+<span class="hl">U</span>    src\main.cs                     <span class="cmt">← 文件被更新（Updated）</span>
+<span class="hl">D</span>    old-file.txt                    <span class="cmt">← 服务器删除了，本地也删掉</span>
+<span class="hl">G</span>    config.json                     <span class="cmt">← 自动合并成功（merGed），无冲突！</span>
+<span class="no">C</span>    README.md                       <span class="cmt">← 冲突（Conflicted），需要人工介入</span>
+Updated to revision 12.
+
+<span class="cmt"># 输出字母速查</span>
+<span class="dim">A</span> Added     服务器上新增的条目
+<span class="dim">U</span> Updated   内容是服务器的版本（本地没改过）
+<span class="dim">D</span> Deleted   服务器上删除了
+<span class="dim">G</span> merGed    本地和服务器都改了，SVN 自动合并成功
+<span class="dim">C</span> Conflicted 自动合并失败，产生冲突，必须人工解决
+<span class="dim">E</span> Existed   已存在（通常是添加时同名文件在）</pre>
+  </div>
+</div>
+
+<h4 class="sub">log：查历史，但有个大坑</h4>
+
+<div class="box err">
+  <span class="bt">实测踩坑：svn log -l 1 显示的不是最新提交！</span>
+  <p>这是 SVN 新手最困惑的行为之一。<code class="ic">svn log</code> 默认<strong>从工作副本的 BASE 版本开始往回走</strong>，
+  而不是从服务器的最新版本。<strong>如果你很久没 update 过，log 给你看的就是「你本地那个古老时间点」的历史。</strong></p>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：这个坑长什么样</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 工作副本停在 r9，但服务器上已经有 r10 了</span>
+<span class="ps">$</span> <span class="cmd">svn log -l 1</span>
+------------------------------------------------------------------------
+<span class="hl">r9</span> | kelang | 2026-10-08 11:02:52 | 1 line
+<span class="cmt">↑ 显示的是 r9 而不是 r10！</span>
+<span class="cmt">  因为 log 从工作副本 BASE（r9）开始往回数</span>
+
+<span class="cmt"># 正确写法一：显式指定从 HEAD 开始</span>
+<span class="ps">$</span> <span class="cmd">svn log -r HEAD -l 1</span>
+------------------------------------------------------------------------
+<span class="ok">r10</span> | kelang | 2026-10-08 11:02:58 | 1 line
+<span class="cmt">↑ 这才是服务器上真正的最后一次提交</span>
+
+<span class="cmt"># 正确写法二：先 update 再 log</span>
+<span class="ps">$</span> <span class="cmd">svn update; svn log -l 1</span>
+Updating '.':
+At revision <span class="hl">10</span>.
+------------------------------------------------------------------------
+<span class="ok">r10</span> | kelang | 2026-10-08 11:02:58 | 1 line
+
+<span class="cmt"># 正确写法三：用 URL 而不是工作副本路径</span>
+<span class="ps">$</span> <span class="cmd">svn log -l 1 file:///E:/repo/trunk</span>
+<span class="cmt">URL 形式默认从 HEAD 开始，没有这个坑</span></pre>
+  </div>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">log 的完整用法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code">svn log                              <span class="c"># 全部历史（从 BASE 往回），大仓库会刷屏</span>
+svn log -l 10                        <span class="c"># 只看最近 10 条</span>
+svn log -r HEAD -l 1                 <span class="c"># 看服务器最新那一条（避开 BASE 坑）</span>
+svn log -r 5:10                      <span class="c"># 指定区间</span>
+svn log -r <span class="s">"{2026-10-01}:{2026-10-08}"</span>  <span class="c"># 按日期区间（1.8+）</span>
+svn log -r <span class="s">"{2026-10-01}:HEAD"</span>
+
+<span class="c"># 输出控制</span>
+svn log -q                           <span class="c"># 只要版本号/作者/时间，不要日志正文</span>
+svn log -v                           <span class="c"># 显示每次提交具体改了哪些路径（重要！）</span>
+svn log --xml                        <span class="c"># XML 格式，给脚本解析用</span>
+svn log -g                           <span class="c"># 显示合并追踪信息（Merged via: rXX）</span>
+svn log --search <span class="s">"修复登录"</span>          <span class="c"># 按关键字搜日志（1.8+）</span>
+svn log --diff                       <span class="c"># 直接带上 diff 内容，非常直观</span>
+
+<span class="c"># 看某个文件的完整历史（含重命名追踪）</span>
+svn log -v src/main.cs
+svn log --stop-on-copy               <span class="c"># 追到创建该分支的那次提交就停（分析分支起点）</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：svn log -v 显示变更的路径</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn log -v -l 1</span>
+------------------------------------------------------------------------
+r2 | kelang | 2026-10-08 10:56:03 +0800 | 1 line
+<span class="hl">Changed paths:</span>
+   <span class="ok">A</span> /trunk/README.md             <span class="cmt">← A=Added U=Updated D=Deleted R=Replaced</span>
+   <span class="ok">A</span> /trunk/src
+   <span class="ok">A</span> /trunk/src/main.cs
+
+初始化项目结构与说明文档
+------------------------------------------------------------------------
+
+<span class="cmt"># 路径首字母含义（和 status 的字母不同！）</span>
+<span class="dim">A</span> 新增   <span class="dim">M</span> 修改   <span class="dim">D</span> 删除
+<span class="dim">R</span> 替换（删除+新增同名）  <span class="dim">C</span> 复制  <span class="dim">G</span> 属性改动
+
+<span class="cmt"># 用 -g 看合并关系，这一步是理解分支的关键</span>
+<span class="ps">$</span> <span class="cmd">svn log -g -l 4</span>
+------------------------------------------------------------------------
+r8 | kelang | 2026-10-08 11:01:15 | 1 line
+合并 feature-login 分支（冲突已解决）
+------------------------------------------------------------------------
+<span class="hl">r6</span> | kelang | 2026-10-08 10:59:05 | 1 line
+<span class="cy">Merged via: r8</span>                    <span class="cmt">← 关键！这个提交通过 r8 被合并进来了</span>
+分支：新增登录功能说明
+------------------------------------------------------------------------
+<span class="hl">r5</span> | kelang | 2026-10-08 10:58:59 | 1 line
+<span class="cy">Merged via: r8</span>
+从 trunk 创建 feature-login 分支
+------------------------------------------------------------------------</pre>
+  </div>
+</div>
+
+<div class="box key">
+  <span class="bt">-g 是分支调试的杀手锏</span>
+  <p><code class="ic">svn log -g</code> 会显示 <code class="ic">Merged via: rXX</code> 标记，
+  告诉你「这个分支上的提交是被哪个主干版本合并进去的」。
+  分支合并出问题时，这条命令能瞬间定位是哪一步合漏了。</p>
+</div>
+
+<h4 class="sub">diff：三种比较维度</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">diff 的三种比较对象</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 【维度一】工作副本 vs BASE —— 看我自己改了什么（最常用）</span>
+svn diff
+<span class="c"># 等价于 svn diff -r BASE，BASE 就是最近一次 update 拿到的那份</span>
+
+<span class="c"># 【维度二】任意两个版本之间 —— 看别人/历史改了什么</span>
+svn diff -r 5:8
+svn diff -r 5:HEAD
+svn diff -c 8                  <span class="c"># 只看 r8 这一次提交引入的改动（= -r 7:8 的简写）</span>
+svn diff -r <span class="s">"{2026-10-01}:HEAD"</span>
+
+<span class="c"># 【维度三】URL 之间 —— 比较分支/标签</span>
+svn diff file:///repo/trunk file:///repo/branches/feature
+svn diff ^/trunk ^/branches/feature        <span class="c"># 用 ^ 简写仓库根（工作副本内可用）</span>
+
+<span class="c"># 输出控制（很实用）</span>
+svn diff --summarize           <span class="c"># 只列文件名，不要内容（大改动时先扫一遍）</span>
+svn diff --git                  <span class="c"># 1.9+ 支持的 git 风格 diff，方便贴到别处</span>
+svn diff --diff-cmd meld        <span class="c"># 调用外部图形化对比工具</span>
+svn diff --internal-diff        <span class="c"># 强制用内置引擎（当外部工具配置出错时救急）</span>
+svn diff --no-diff-added        <span class="c"># 新增文件不显示全部内容（新增大文件时避免刷屏）</span>
+
+<span class="c"># 保存为补丁文件</span>
+svn diff &gt; my.patch
+svn diff --file my.patch        <span class="c"># 等价写法，Windows PowerShell 下推荐这个</span>
+
+<span class="c"># 应用补丁</span>
+svn patch my.patch
+svn patch my.patch --dry-run    <span class="c"># 试运行，不实际改动（先验证再应用）</span>
+svn patch --reverse-diff my.patch  <span class="c"># 反向应用（撤销补丁）</span>
+
+<span class="c"># 用第三方 diff 工具（配置在 ~/.subversion/config 的 diff-cmd）</span>
+svn diff --diff-cmd diff -x <span class="s">"-u"</span></pre>
+</div>
+
+<div class="box warn">
+  <span class="bt">Windows PowerShell 下重定向会毁掉补丁文件</span>
+  <p>实测踩过的坑：在 PowerShell 里执行 <code class="ic">svn diff &gt; my.patch</code>，
+  PowerShell 默认用 <strong>UTF-16 LE 编码</strong>写文件，结果补丁开头多了 <code class="ic">FF FE</code> BOM 字节，
+  用 <code class="ic">svn patch</code> 应用时会报 <code class="ic">Malformed dumpfile header</code> 之类的解析错误。</p>
+  <p><strong>解决方案（三选一）：</strong></p>
+  <ul>
+    <li>用内置参数：<code class="ic">svn diff --file my.patch</code>（推荐，跨平台一致）</li>
+    <li>用 cmd 重定向：<code class="ic">cmd /c "svn diff &gt; my.patch"</code></li>
+    <li>改用 Git Bash / WSL 执行命令</li>
+  </ul>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：diff 生成补丁并应用</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 1. 产生一个改动</span>
+<span class="ps">$</span> <span class="cmd">Set-Content src\main.cs "class Main { /* patched */ }"</span>
+
+<span class="cmt"># 2. 生成补丁（用 --file 避开编码坑）</span>
+<span class="ps">$</span> <span class="cmd">svn diff --file E:\my.patch</span>
+
+<span class="cmt"># 3. 补丁内容</span>
+<span class="ps">$</span> <span class="cmd">Get-Content E:\my.patch</span>
+Index: src/main.cs
+===================================================================
+--- src/main.cs     (revision 17)
++++ src/main.cs     (working copy)
+@@ -1 +1 @@
+<span class="no">-</span>﻿class Main {}
+<span class="ok">+</span>class Main { /* patched */ }
+
+<span class="cmt"># 4. 撤销改动，再从补丁恢复</span>
+<span class="ps">$</span> <span class="cmd">svn revert src\main.cs</span>
+Reverted 'src\main.cs'
+
+<span class="ps">$</span> <span class="cmd">svn patch E:\my.patch</span>
+<span class="hl">U</span>         src\main.cs
+<span class="cmt">          ↑ U = Updated，补丁成功应用</span>
+
+<span class="cmt"># 5. 验证内容确实恢复了</span>
+<span class="ps">$</span> <span class="cmd">Get-Content src\main.cs</span>
+class Main { /* patched */ }        <span class="cmt">← 补丁内容已生效</span></pre>
+  </div>
+  <p><code class="ic">svn patch</code> 的返回值很直观：
+  <code class="ic">U</code> 表示更新成功，<code class="ic">A</code> 表示新增了文件，<code class="ic">D</code> 表示删除了文件，
+  <code class="ic">C</code> 表示补丁上下文对不上、需要人工处理，
+  <code class="ic">G</code> 表示自动合并成功。</p>
+</div>
+
+<!-- ==========================================================================
+     第 9 节：撤销与回退
+     ========================================================================== -->
+<h3 class="sec" id="s9"><span class="no">9</span>撤销与回退：五种「后悔」场景</h3>
+
+<p class="lead">
+  「我改错了」「我想回到上个版本」「这个提交整个不要了」——
+  这是 SVN 里最容易混淆的一组操作，因为<strong>撤销本地改动</strong>和<strong>撤销已提交的改动</strong>完全是两回事。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 9-1　回退的五种场景与对应命令</span><span class="fs">Rollback Matrix</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 470" width="980" height="470" role="img" aria-label="SVN 回退场景与命令对应图">
+  <!-- 时间轴 -->
+  <line x1="80" y1="60" x2="920" y2="60" stroke="#3d444d" stroke-width="2"/>
+  <text class="hd" x="80" y="40">时间轴（左旧右新）</text>
+
+  <circle cx="180" cy="60" r="12" fill="#0d1117" stroke="#8b949e" stroke-width="2"/>
+  <text class="tm" x="180" y="65" text-anchor="middle">8</text>
+  <circle cx="360" cy="60" r="12" fill="#0d1117" stroke="#e3b341" stroke-width="2"/>
+  <text class="tm" x="360" y="65" text-anchor="middle">9</text>
+  <circle cx="540" cy="60" r="12" fill="#0d1117" stroke="#ff7b72" stroke-width="2"/>
+  <text class="tm" x="540" y="65" text-anchor="middle">10</text>
+  <circle cx="720" cy="60" r="12" fill="#0d1117" stroke="#58a6ff" stroke-width="2"/>
+  <text class="tm" x="720" y="65" text-anchor="middle">11</text>
+  <circle cx="880" cy="60" r="12" fill="#0d1117" stroke="#d2a8ff" stroke-width="2"/>
+  <text class="tm" x="880" y="65" text-anchor="middle">12</text>
+
+  <text class="tm2" x="540" y="88" text-anchor="middle" fill="#ff7b72">犯错的提交</text>
+  <text class="tm2" x="720" y="88" text-anchor="middle" fill="#58a6ff">工作副本当前</text>
+
+  <!-- 场景 1 -->
+  <rect x="24" y="112" width="460" height="98" rx="10" fill="rgba(210,168,255,.07)" stroke="#d2a8ff" stroke-width="1.4"/>
+  <text class="hd" x="44" y="136" fill="#d2a8ff">场景 1：还没提交，想丢弃本地修改</text>
+  <text class="tm" x="44" y="160" fill="#7ee787">svn revert README.md</text>
+  <text class="tm" x="44" y="180" fill="#7ee787">svn revert -R .            ← 递归撤销整个目录</text>
+  <text class="ts" x="44" y="200">注意：这是不可逆操作，revert 掉的改动找不回来（除非 diff 存过）</text>
+
+  <!-- 场景 2 -->
+  <rect x="496" y="112" width="460" height="98" rx="10" fill="rgba(88,166,255,.07)" stroke="#58a6ff" stroke-width="1.4"/>
+  <text class="hd" x="516" y="136" fill="#58a6ff">场景 2：还没提交，想丢弃「add」动作</text>
+  <text class="tm" x="516" y="160" fill="#7ee787">svn revert newfile.txt</text>
+  <text class="tm" x="516" y="180" fill="#7ee787">svn revert -R newdir/</text>
+  <text class="ts" x="516" y="200">revert 会让 A 状态的文件变回 ?，文件本身仍在磁盘上</text>
+
+  <!-- 场景 3 -->
+  <rect x="24" y="224" width="460" height="112" rx="10" fill="rgba(255,166,87,.07)" stroke="#ffa657" stroke-width="1.4"/>
+  <text class="hd" x="44" y="248" fill="#ffa657">场景 3：已提交，想「反向提交」一次以抵消</text>
+  <text class="ts" x="44" y="270">假设 r10 是个错误提交，要撤销它的全部影响：</text>
+  <text class="tm" x="44" y="292" fill="#7ee787">svn merge -c -10 .          ← 反向合并 r10</text>
+  <text class="tm" x="44" y="312" fill="#7ee787">svn commit -m "回退 r10"</text>
+  <text class="ts" x="44" y="332">安全：历史保留完整，r10 和回退记录都在</text>
+
+  <!-- 场景 4 -->
+  <rect x="496" y="224" width="460" height="112" rx="10" fill="rgba(255,123,114,.07)" stroke="#ff7b72" stroke-width="1.4"/>
+  <text class="hd" x="516" y="248" fill="#ff7b72">场景 4：已提交，想把它整个从历史里抹掉</text>
+  <text class="ts" x="516" y="270">必须用管理员工具，且会改变后续所有版本号：</text>
+  <text class="tm" x="516" y="292" fill="#ff7b72">svnadmin dump → 过滤 → load 到新库</text>
+  <text class="ts" x="516" y="312">极端手段，会破坏所有同事的工作副本，</text>
+  <text class="ts" x="516" y="332">只有误提交了密码/大文件时才考虑（第 21 节）</text>
+
+  <!-- 场景 5 -->
+  <rect x="24" y="350" width="932" height="106" rx="10" fill="rgba(126,231,135,.07)" stroke="#7ee787" stroke-width="1.4"/>
+  <text class="hd" x="44" y="374" fill="#7ee787">场景 5：只想「回到过去看一眼」，不想真的改东西</text>
+  <text class="tm" x="44" y="398" fill="#7ee787">svn update -r 8 .              ← 工作副本整体回到 r8（这是「历史检出」，可随时回来）</text>
+  <text class="tm" x="44" y="418" fill="#7ee787">svn update                      ← 玩完了，update 回最新</text>
+  <text class="tm" x="532" y="398" fill="#7ee787">svn cat -r 8 README.md          ← 只看内容，不落盘</text>
+  <text class="tm" x="532" y="418" fill="#7ee787">svn export -r 8 URL out/        ← 导出 r8 的干净副本</text>
+  <text class="ts" x="44" y="444">核心区别：<tspan fill="#e6edf3">update -r</tspan> 是「把工作副本的时间指针往回拨」，不是丢弃数据；随时可以 update 回来。</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>决策口诀：</b>没提交 → <code class="ic">revert</code>；
+    已提交想抵消 → <code class="ic">merge -c -N</code> + <code class="ic">commit</code>；
+    只想看看过去 → <code class="ic">update -r</code> / <code class="ic">cat -r</code>；
+    要从历史抹掉 → <code class="ic">svnadmin dump/load</code>（极危险）。
+    <strong>SVN 里「撤销已提交」永远是「再提交一次反向改动」，而不是删除历史</strong>——这是集中式系统的安全基石。
+  </div>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：revert 撤销本地修改</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 改了文件，status 显示 M</span>
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="hl">M</span>       README.md
+
+<span class="cmt"># 后悔了，撤销</span>
+<span class="ps">$</span> <span class="cmd">svn revert README.md</span>
+<span class="ok">Reverted 'README.md'</span>
+
+<span class="span cmt"># 验证：干净了</span>
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="dim">&lt;空输出 = 已恢复&gt;</span>
+
+<span class="cmt"># 递归撤销整个工作副本的所有本地改动（慎用！）</span>
+<span class="ps">$</span> <span class="cmd">svn revert -R .</span>
+Reverted '.'                    <span class="cmt">← 会逐层列出被撤销的路径</span>
+
+<span class="cmt"># 撤销「添加」动作：A 变回 ?</span>
+<span class="ps">$</span> <span class="cmd">svn revert newfile.txt</span>
+Reverted 'newfile.txt'
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="no">?</span>       newfile.txt            <span class="cmt">← 回到未跟踪状态，文件还在</span></pre>
+  </div>
+</div>
+
+<div class="box warn">
+  <span class="bt">revert 是不可逆的</span>
+  <p><code class="ic">svn revert</code> 会把文件内容<strong>恢复成 pristine 副本</strong>（最近一次 update 拿到的那份），
+  你所有未提交的修改会<em>永久丢失</em>，无法通过 SVN 找回。</p>
+  <p>养成习惯：<strong>revert 之前先 <code class="ic">svn diff --file backup.patch</code> 存一份</strong>，
+  至少给自己留条后路。IDE 的本地历史（如 VS Code 的 Timeline、JetBrains 的 Local History）也能救急。</p>
+</div>
+
+<h4 class="sub">撤销已提交的改动：反向合并</h4>
+
+<p>
+  对于已经提交上去的错误改动，标准做法是<strong>「再提交一次反向补丁」</strong>。
+  <code class="ic">svn merge -c -10</code> 里那个<strong>负号</strong>就是关键——它表示「反向应用」。
+</p>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">撤销已提交改动的标准流程</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 前提：你的工作副本是干净的，且在正确的分支/目录上</span>
+cd wc
+svn update --non-interactive
+
+<span class="c"># 第 1 步：先看看 r10 到底改了什么（确认没找错对象）</span>
+svn log -v -c 10
+svn diff -c 10
+
+<span class="c"># 第 2 步：反向合并 r10（注意那个负号！）</span>
+svn merge -c -10 .
+<span class="c"># 执行后工作副本里，r10 的改动被「倒回去」了，但还没提交</span>
+
+<span class="c"># 第 3 步：确认结果符合预期</span>
+svn status
+svn diff
+
+<span class="c"># 第 4 步：提交这次回退</span>
+svn commit -m <span class="s">"回退 r10：该版本引入了错误的登录逻辑"</span>
+<span class="c"># 得到一个新版本号（比如 r13），历史完整保留</span>
+
+<span class="c"># ---- 撤销多个版本 ----</span>
+svn merge -c -10,-11,-12 .              <span class="c"># 撤销三个不连续的版本</span>
+svn merge -r 12:9 .                     <span class="c"># 撤销 r10~r12（反向区间）</span>
+
+<span class="c"># ---- 只想撤销某次提交里的一部分文件 ----</span>
+svn merge -c -10 src/login.cs           <span class="c"># 只回退这个文件的改动</span>
+
+<span class="c"># ---- 撤销还没提交的 merge 结果（反悔了）----</span>
+svn revert -R .
+svn cleanup                              <span class="c"># 清掉 mergeinfo 的中间状态</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：反向合并的输出</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn merge -c -10 .</span>
+<span class="hl">--- Reverse-merging r10 into '.':</span>
+<span class="hl">U</span>    docs.md
+<span class="cmt">          ↑ U = 文件被更新（改动已倒回）</span>
+<span class="cmt">          注意提示里明确写了 "Reverse-merging"（反向合并）</span>
+
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="hl">M</span>       docs.md                 <span class="cmt">← 现在它是一个普通的待提交修改</span>
+
+<span class="ps">$</span> <span class="cmd">svn commit -m "回退 r10"</span>
+Sending        docs.md
+Transmitting file data .done
+Committing transaction...
+<span class="ok">Committed revision 13.</span>          <span class="cmt">← 新的版本号，历史没被破坏</span></pre>
+  </div>
+</div>
+
+<h4 class="sub">只想看历史版本，不想改动</h4>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">查看历史版本的四种方式</span><span class="acts"><button data-copy">复制</button></span></div>
+<pre class="code"><span class="c"># 方式一：看单个文件的历史内容（不落盘，最轻量）</span>
+svn cat -r 8 README.md
+svn cat -r 8 file:///repo/trunk/README.md
+
+<span class="c"># 方式二：导出某个版本的干净副本（无 .svn 目录）</span>
+svn export -r 8 file:///repo/trunk ./release-8/
+svn export file:///repo/tags/v1.0 ./v1.0/
+
+<span class="c"># 方式三：把整个工作副本拨回某个版本（可随时回来）</span>
+svn update -r 8
+<span class="c"># 此时 svn info 会显示 Revision: 8，但这是「混合版本」状态</span>
+svn update                    <span class="c"># 回到最新</span>
+
+<span class="c"># 方式四：取回一个已删除的文件</span>
+svn cat -r 5 file:///repo/trunk/deleted-file.txt &gt; recovered.txt
+<span class="c"># 或先记下路径再复制回来</span>
+svn copy -r 5 file:///repo/trunk/deleted-file.txt ./recovered.txt
+svn commit -m <span class="s">"恢复被删除的 deleted-file.txt"</span>
+
+<span class="c"># 方式五：把某个文件回退到历史版本（但其他文件不动）</span>
+svn merge -c -8 README.md     <span class="c"># 只回退这个文件在 r8 的改动</span>
+<span class="c"># 或直接取出旧内容覆盖</span>
+svn cat -r 8 README.md &gt; README.md
+svn commit -m <span class="s">"README 回退到 r8 内容"</span></pre>
+</div>
+
+<div class="box tip">
+  <span class="bt">快捷键：-c 与 -r 的区别</span>
+  <ul>
+    <li><code class="ic">-c N</code>　= <code class="ic">-r N-1:N</code>　——<strong>只</strong>看第 N 次提交引入的变化</li>
+    <li><code class="ic">-c -N</code>　= 反向应用第 N 次提交（撤销）</li>
+    <li><code class="ic">-r A:B</code>　—— 从 A 到 B 之间的<strong>全部</strong>变化（多个提交的累积）</li>
+  </ul>
+  <p>所以「撤销单次提交」要用 <code class="ic">-c -N</code>，用 <code class="ic">-r</code> 容易一下子撤多了。</p>
+</div>
+
+<!-- ==========================================================================
+     第四阶段 · 第 10 节：冲突处理
+     ========================================================================== -->
+<h3 class="sec" id="s10"><span class="no">10</span>冲突：产生、解剖与解决</h3>
+
+<p class="lead">
+  冲突不是错误，是 SVN <strong>拒绝替你做决定</strong>的诚实表现。
+  它在说：「这两份改动都改到了同一行，我判断不了该留谁，你来定。」
+</p>
+
+<h4 class="sub" id="s10-2">冲突是怎么产生的：三方合并</h4>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 10-1　三方合并：SVN 如何判断能否自动合并</span><span class="fs">3-Way Merge</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 460" width="980" height="460" role="img" aria-label="SVN 三方合并原理图">
+  <!-- 三个来源 -->
+  <rect class="c-gray" x="40" y="50" width="240" height="112" rx="10"/>
+  <text class="hd" x="60" y="76" fill="#8b949e">① BASE（共同祖先）</text>
+  <text class="ts" x="60" y="98">你和同事共同的起点</text>
+  <text class="tm" x="60" y="122" fill="#8b949e">= 你上次 update 的版本</text>
+  <text class="tm2" x="60" y="144">.svn/pristine 里那份</text>
+
+  <rect class="c-green" x="370" y="50" width="240" height="112" rx="10"/>
+  <text class="hd" x="390" y="76" fill="#7ee787">② MINE（你的改动）</text>
+  <text class="ts" x="390" y="98">你磁盘上的文件</text>
+  <text class="tm" x="390" y="122" fill="#7ee787">README.md.mine</text>
+  <text class="tm2" x="390" y="144">你要提交的内容</text>
+
+  <rect class="c-blue" x="700" y="50" width="240" height="112" rx="10"/>
+  <text class="hd" x="720" y="76" fill="#58a6ff">③ THEIRS（服务器的改动）</text>
+  <text class="ts" x="720" y="98">同事已经提交上去的内容</text>
+  <text class="tm" x="720" y="122" fill="#58a6ff">README.md.r3</text>
+  <text class="tm2" x="720" y="144">最新版本 r3 的内容</text>
+
+  <!-- 汇合箭头 -->
+  <path class="arwg" d="M280,106 L366,106"/>
+  <path class="arwb" d="M700,106 L614,106"/>
+  <path class="arwp" d="M160,162 L420,196"/>
+  <path class="arwp" d="M260,162 L440,196"/>
+  <path class="arwp" d="M720,162 L560,196"/>
+
+  <!-- 合并引擎 -->
+  <rect class="n-pur" x="340" y="196" width="300" height="80" rx="11"/>
+  <text class="hd" x="490" y="222" text-anchor="middle" fill="#d2a8ff">三方合并引擎</text>
+  <text class="ts" x="490" y="244" text-anchor="middle">逐块比较：谁改了什么？</text>
+  <text class="ts" x="490" y="264" text-anchor="middle">改动是否落在同一块上？</text>
+
+  <!-- 两个结果 -->
+  <path class="arwg" d="M420,276 L280,320"/>
+  <path class="arwr" d="M560,276 L700,320"/>
+
+  <rect class="n-green" x="60" y="320" width="330" height="118" rx="11"/>
+  <text class="hd" x="80" y="346" fill="#7ee787">结果 A：改动不重叠 → 自动合并（G）</text>
+  <text class="ts" x="80" y="370">你改了第 1 行，同事改了第 50 行</text>
+  <text class="ts" x="80" y="392">SVN 直接把两份改动拼在一起</text>
+  <text class="tm" x="80" y="416" fill="#7ee787">update 输出 G　无需人工介入</text>
+
+  <rect class="n-red" x="590" y="320" width="350" height="118" rx="11"/>
+  <text class="hd" x="610" y="346" fill="#ff7b72">结果 B：改动重叠 → 冲突（C）</text>
+  <text class="ts" x="610" y="370">你和同事都改了第 1 行</text>
+  <text class="ts" x="610" y="392">SVN 无法判断该保留哪个</text>
+  <text class="tm" x="610" y="416" fill="#ff7b72">update 输出 C　必须人工解决</text>
+
+  <!-- 注意 -->
+  <rect x="40" y="182" width="272" height="112" rx="10" fill="rgba(255,166,87,.07)" stroke="#ffa657" stroke-width="1.3"/>
+  <text class="hd" x="60" y="206" fill="#ffa657">为什么要记录 BASE</text>
+  <text class="ts" x="60" y="230">没有 BASE，SVN 只知道「两份内容</text>
+  <text class="ts" x="60" y="250">不同」，但不知道<tspan fill="#e6edf3">谁改了什么</tspan>，</text>
+  <text class="ts" x="60" y="270">也就无法做自动合并。</text>
+  <text class="ts" x="60" y="290" fill="#7ee787">这就是 .svn/pristine 存在的意义。</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>关键洞察：</b>冲突<strong>只在双方改到同一区域时</strong>才发生。
+    这就是为什么「频繁 update」能有效降低冲突——把 BASE 不断往前推，
+    你和同事的改动窗口就越小，重叠概率越低。
+  </div>
+</div>
+
+<h4 class="sub">亲手制造一次冲突（实测）</h4>
+
+<p>要理解冲突，最好的办法是亲手造一个。下面这段操作在两个工作副本之间模拟「你和同事同时改一个文件」。</p>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">bash</span><span class="fn">复现冲突的最小步骤</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 准备：两个工作副本，模拟你和同事</span>
+svn checkout file:///repo/trunk wc      <span class="c"># 你的</span>
+svn checkout file:///repo/trunk wc2     <span class="c"># 同事的</span>
+
+<span class="c"># 同事先改并提交</span>
+cd wc2
+echo <span class="s">"版本A：来自同事的修改"</span> &gt; README.md
+svn commit -m <span class="s">"同事修改 README"</span>            <span class="c"># → r3</span>
+
+<span class="c"># 你在旧版本上改了同一个文件（但还没更新）</span>
+cd ../wc
+echo <span class="s">"版本B：我本地的修改"</span> &gt; README.md
+
+<span class="c"># 现在 update，冲突就出现了</span>
+svn update
+<span class="c"># C    README.md</span>
+<span class="c"># Merge conflict discovered in file 'README.md'.</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测输出：冲突爆发的那一刻</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="ps">$</span> <span class="cmd">svn update</span>
+Updating '.':
+<span class="no">C</span>    README.md
+Updated to revision 3.
+
+<span class="no">svn: Merge conflict discovered in file 'README.md'.</span>
+<span class="cmt">↑ 注意：update 的退出码是 0，但确实产生了冲突</span>
+<span class="cmt">  在交互式终端下，这里会弹出菜单让你选 postpon/mine/theirs 等</span>
+
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="no">C</span>       README.md                 <span class="cmt">← C = Conflicted</span>
+<span class="no">?</span>       README.md.mine            <span class="cmt">← 冲突辅助文件开始出现</span>
+<span class="no">?</span>       README.md.r2
+<span class="no">?</span>       README.md.r3
+<span class="hl">Summary of conflicts:</span>
+  <span class="no">Text conflicts: 1</span>
+<span class="cmt">  ↑ 冲突汇总，一眼知道有几个文件要处理</span></pre>
+  </div>
+</div>
+
+<h4 class="sub">冲突文件解剖：四个文件从哪来</h4>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 10-2　一个冲突文件裂变成四个</span><span class="fs">Conflict Files</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 430" width="980" height="430" role="img" aria-label="SVN 冲突产生的辅助文件解剖图">
+  <!-- 原始文件 -->
+  <rect class="c-gray" x="380" y="34" width="220" height="52" rx="10"/>
+  <text class="tm" x="490" y="58" text-anchor="middle">README.md</text>
+  <text class="tm2" x="490" y="76" text-anchor="middle">（现在带有冲突标记）</text>
+
+  <!-- 分裂箭头 -->
+  <path class="bd2" d="M490,86 L490,110"/>
+  <path class="bd2" d="M150,110 L830,110"/>
+  <path class="bd2" d="M150,110 L150,140"/>
+  <path class="bd2" d="M377,110 L377,140"/>
+  <path class="bd2" d="M603,110 L603,140"/>
+  <path class="bd2" d="M830,110 L830,140"/>
+
+  <!-- 四个文件 -->
+  <rect class="c-pur" x="40" y="140" width="220" height="106" rx="10"/>
+  <text class="tm" x="60" y="164" fill="#d2a8ff">README.md.mine</text>
+  <text class="ts" x="60" y="186">你本地修改后的内容</text>
+  <text class="ts" x="60" y="206">= MINE</text>
+  <text class="ts" x="60" y="228" fill="#d2a8ff">想「全用我的」就复制它</text>
+
+  <rect class="c-red" x="267" y="140" width="220" height="106" rx="10"/>
+  <text class="tm" x="287" y="164" fill="#ff7b72">README.md.r2</text>
+  <text class="ts" x="287" y="186">BASE 版本（共同祖先）</text>
+  <text class="ts" x="287" y="206">= 冲突前你手上的版本</text>
+  <text class="ts" x="287" y="228" fill="#ff7b72">你 update 前的那个 r2</text>
+
+  <rect class="c-green" x="493" y="140" width="220" height="106" rx="10"/>
+  <text class="tm" x="513" y="164" fill="#7ee787">README.md.r3</text>
+  <text class="ts" x="513" y="186">服务器最新版本的内容</text>
+  <text class="ts" x="513" y="206">= THEIRS</text>
+  <text class="ts" x="513" y="228" fill="#7ee787">想「全用服务器的」就复制它</text>
+
+  <rect class="c-gray" x="720" y="140" width="220" height="106" rx="10"/>
+  <text class="tm" x="740" y="164">README.md</text>
+  <text class="ts" x="740" y="186">合并后的文件，内嵌冲突标记</text>
+  <text class="ts" x="740" y="206">= 你要编辑的目标</text>
+  <text class="ts" x="740" y="228" fill="#8b949e">解决后提交的就是它</text>
+
+  <!-- 冲突标记解剖 -->
+  <rect x="40" y="266" width="900" height="148" rx="11" fill="#0b0f14" stroke="#30363d" stroke-width="1.4"/>
+  <text class="hd" x="62" y="292" fill="#e6edf3">README.md 里长这样：</text>
+
+  <text class="tm" x="62" y="318" fill="#d2a8ff">&lt;&lt;&lt;&lt;&lt;&lt;&lt; .mine</text>
+  <text class="tm" x="62" y="338" fill="#e6edf3">版本B：我本地的修改</text>
+
+  <text class="tm" x="62" y="360" fill="#ff7b72">||||||| .r2</text>
+  <text class="tm" x="62" y="380" fill="#8b949e"># 我的项目</text>
+
+  <text class="tm" x="62" y="402" fill="#7ee787">=======</text>
+  <text class="tm" x="360" y="318" fill="#7ee787">.r3 &gt;&gt;&gt;&gt;&gt;&gt;&gt;</text>
+  <text class="tm" x="360" y="338" fill="#e6edf3">版本A：来自同事的修改</text>
+
+  <!-- 标注 -->
+  <path class="arwp" d="M196,318 L250,318" stroke="#d2a8ff" stroke-width="1.3"/>
+  <text class="ts" x="256" y="322" fill="#d2a8ff">起始标记 MINE 段开始</text>
+
+  <path class="arwr" d="M196,360 L250,360" stroke="#ff7b72" stroke-width="1.3"/>
+  <text class="ts" x="256" y="364" fill="#ff7b72">BASE 段（三方合并信息，1.7+ 才有）</text>
+
+  <path class="arwg" d="M196,402 L250,402" stroke="#7ee787" stroke-width="1.3"/>
+  <text class="ts" x="256" y="406" fill="#7ee787">分隔线：以上是我的，以下是服务器的</text>
+
+  <text class="ts" x="360" y="364" fill="#7ee787">结束标记 THEIRS 段到此处为止</text>
+  <text class="ts" x="360" y="406" fill="#7ee787">你要做的：删掉所有 7 个标记字符，留下想要的内容</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>冲突标记的记忆法：</b><code class="ic">&lt;&lt;&lt;&lt;&lt;&lt;&lt; .mine</code> 到 <code class="ic">|||||||</code> 之间是<strong>我的</strong>；
+    <code class="ic">=======</code> 到 <code class="ic">&gt;&gt;&gt;&gt;&gt;&gt;&gt; .r3</code> 之间是<strong>服务器的</strong>。
+    中间 <code class="ic">||||||| .r2</code> 段是原始版本，仅供你参考对比，解决时一并删掉。
+  </div>
+</div>
+
+<h4 class="sub" id="s10-3">四种解决姿势</h4>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 10-3　冲突解决决策树</span><span class="fs">Decision Tree</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 440" width="980" height="440" role="img" aria-label="SVN 冲突解决决策树">
+  <!-- 起点 -->
+  <rect class="c-red" x="380" y="24" width="220" height="48" rx="10"/>
+  <text class="hd" x="490" y="54" text-anchor="middle" fill="#ff7b72">status 显示 C 冲突文件</text>
+
+  <path class="bd2" d="M490,72 L490,96"/>
+  <text class="ts" x="500" y="92">先判断：这两份改动能否共存？</text>
+
+  <!-- 四个分支 -->
+  <path class="bd2" d="M490,96 L135,130"/>
+  <path class="bd2" d="M490,96 L380,130"/>
+  <path class="bd2" d="M490,96 L600,130"/>
+  <path class="bd2" d="M490,96 L845,130"/>
+
+  <rect class="n-green" x="40" y="130" width="192" height="54" rx="9"/>
+  <text class="tx" x="136" y="153" text-anchor="middle">两者可以共存</text>
+  <text class="ts" x="136" y="173" text-anchor="middle">（改的是不同逻辑）</text>
+
+  <rect class="n-blue" x="284" y="130" width="192" height="54" rx="9"/>
+  <text class="tx" x="380" y="153" text-anchor="middle">我的对，他的是错的</text>
+  <text class="ts" x="380" y="173" text-anchor="middle">（或反之）</text>
+
+  <rect class="n-pur" x="504" y="130" width="192" height="54" rx="9"/>
+  <text class="tx" x="600" y="153" text-anchor="middle">两个都不对</text>
+  <text class="ts" x="600" y="173" text-anchor="middle">（要重新设计）</text>
+
+  <rect class="n-orange" x="748" y="130" width="192" height="54" rx="9"/>
+  <text class="tx" x="844" y="153" text-anchor="middle">整个改动都不想要</text>
+  <text class="ts" x="844" y="173" text-anchor="middle">（决定放弃）</text>
+
+  <!-- 箭头到命令 -->
+  <path class="arwg" d="M136,184 L136,220"/>
+  <path class="arwb" d="M380,184 L380,220"/>
+  <path class="arwp" d="M600,184 L600,220"/>
+  <path class="arwo" d="M844,184 L844,220"/>
+
+  <!-- 四种方案 -->
+  <rect class="c-green" x="40" y="220" width="192" height="150" rx="10"/>
+  <text class="hd" x="56" y="244" fill="#7ee787">方案 1：手工编辑</text>
+  <text class="ts" x="56" y="266">打开文件，删掉所有</text>
+  <text class="ts" x="56" y="284">冲突标记，把两边</text>
+  <text class="ts" x="56" y="302">内容都保留下来</text>
+  <text class="tm" x="56" y="328" fill="#7ee787">svn resolve \</text>
+  <text class="tm" x="56" y="346" fill="#7ee787">  --accept working</text>
+  <text class="tm" x="56" y="364" fill="#7ee787">  README.md</text>
+
+  <rect class="c-blue" x="284" y="220" width="192" height="150" rx="10"/>
+  <text class="hd" x="300" y="244" fill="#58a6ff">方案 2：全用一边</text>
+  <text class="ts" x="300" y="266">用 --accept 一步到位，</text>
+  <text class="ts" x="300" y="284">无需手工编辑</text>
+  <text class="tm" x="300" y="310" fill="#58a6ff">--accept mine-full</text>
+  <text class="ts" x="300" y="330">丢弃服务器改动</text>
+  <text class="tm" x="300" y="352" fill="#58a6ff">--accept theirs-full</text>
+  <text class="ts" x="300" y="372">丢弃我的改动</text>
+
+  <rect class="c-pur" x="504" y="220" width="192" height="150" rx="10"/>
+  <text class="hd" x="520" y="244" fill="#d2a8ff">方案 3：推翻重做</text>
+  <text class="ts" x="520" y="266">先把工作副本恢复</text>
+  <text class="ts" x="520" y="284">到干净状态，再基于</text>
+  <text class="ts" x="520" y="302">最新版本重新实现</text>
+  <text class="tm" x="520" y="330" fill="#d2a8ff">svn revert -R .</text>
+  <text class="tm" x="520" y="350" fill="#d2a8ff">svn cleanup</text>
+  <text class="tm" x="520" y="372" fill="#d2a8ff">svn update</text>
+
+  <rect class="c-orange" x="748" y="220" width="192" height="150" rx="10"/>
+  <text class="hd" x="764" y="244" fill="#ffa657">方案 4：回到原始版本</text>
+  <text class="ts" x="764" y="266">双方改动统统丢掉，</text>
+  <text class="ts" x="764" y="284">文件回到 BASE 状态</text>
+  <text class="tm" x="764" y="312" fill="#ffa657">svn resolve \</text>
+  <text class="tm" x="764" y="330" fill="#ffa657">  --accept base \</text>
+  <text class="tm" x="764" y="348" fill="#ffa657">  README.md</text>
+  <text class="ts" x="764" y="368" fill="#ff7b72">两侧改动全丢，慎用</text>
+
+  <!-- 收尾 -->
+  <rect x="40" y="390" width="900" height="40" rx="9" fill="rgba(126,231,135,.07)" stroke="#7ee787" stroke-width="1.3"/>
+  <text class="ts" x="60" y="415">无论选哪种方案，最后一步都是：<tspan class="mono" fill="#7ee787">svn commit -m "解决冲突"</tspan>　—— 不提交，冲突状态永远在。</text>
+</svg>
+  </div>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：手工解决冲突的完整流程</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 第 1 步：看清冲突长什么样</span>
+<span class="ps">$</span> <span class="cmd">Get-Content README.md</span>
+<span class="hl">&lt;&lt;&lt;&lt;&lt;&lt;&lt; .mine</span>
+﻿版本B：我本地的修改
+<span class="hl">||||||| .r2</span>
+﻿# 我的项目
+<span class="hl">=======</span>
+﻿版本A：来自同事的修改
+<span class="hl">&gt;&gt;&gt;&gt;&gt;&gt;&gt; .r3</span>
+
+<span class="cmt"># 第 2 步：编辑文件，删掉所有标记，留下最终内容</span>
+<span class="ps">$</span> <span class="cmd">Set-Content README.md "版本B+C：合并后的最终内容"</span>
+
+<span class="cmt"># 第 3 步：告诉 SVN「我解决了」</span>
+<span class="ps">$</span> <span class="cmd">svn resolve --accept working README.md</span>
+<span class="ok">Merge conflicts in 'README.md' marked as resolved.</span>
+
+<span class="cmt"># 第 4 步：验证状态从 C 变成了 M</span>
+<span class="ps">$</span> <span class="cmd">svn status</span>
+<span class="hl">M</span>       README.md
+<span class="cmt">        ↑ 冲突标记消失，现在它是普通修改了</span>
+
+<span class="cmt"># 第 5 步：提交</span>
+<span class="ps">$</span> <span class="cmd">svn commit -m "解决 README 冲突并合并双方修改"</span>
+Sending        README.md
+Transmitting file data .done
+Committing transaction...
+<span class="ok">Committed revision 4.</span>
+
+<span class="cmt"># 第 6 步：确认辅助文件也被清理了</span>
+<span class="ps">$</span> <span class="cmd">Get-ChildItem README.md*</span>
+README.md                        <span class="cmt">← .mine / .r2 / .r3 已自动删除</span></pre>
+  </div>
+</div>
+
+<h4 class="sub">--accept 的六个取值</h4>
+
+<div class="tw">
+<table>
+<thead>
+  <tr><th>取值</th><th>含义</th><th>什么时候用</th></tr>
+</thead>
+<tbody>
+  <tr>
+    <td><code class="ic g">working</code></td>
+    <td>接受当前工作副本里的内容（默认）</td>
+    <td><strong>最常用</strong>。你手工编辑完冲突标记后选它</td>
+  </tr>
+  <tr>
+    <td><code class="ic b">mine-full</code></td>
+    <td>丢弃服务器改动，<strong>整个文件</strong>用我的</td>
+    <td>确定自己的版本是对的，同事改的完全不需要</td>
+  </tr>
+  <tr>
+    <td><code class="ic b">theirs-full</code></td>
+    <td>丢弃我的改动，<strong>整个文件</strong>用服务器的</td>
+    <td>自己改错了，想完全跟随服务器版本</td>
+  </tr>
+  <tr>
+    <td><code class="ic p">mine-conflict</code></td>
+    <td>只在<strong>冲突块</strong>用我的，非冲突区保留合并结果</td>
+    <td>大部分改动挺好，只有冲突那几行以我为准</td>
+  </tr>
+  <tr>
+    <td><code class="ic p">theirs-conflict</code></td>
+    <td>只在<strong>冲突块</strong>用服务器的</td>
+    <td>只有冲突那几行以服务器为准，其余保留我的</td>
+  </tr>
+  <tr>
+    <td><code class="ic r">base</code></td>
+    <td>回到原始版本，<strong>双方改动全部丢弃</strong></td>
+    <td>两边都改乱了，想从头再来</td>
+  </tr>
+</tbody>
+</table>
+</div>
+
+<div class="box tip">
+  <span class="bt">批量解决：-R 递归</span>
+  <div class="codewrap">
+    <div class="codehead"><span class="lang">bash</span><span class="fn">一次解决多个冲突</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 递归解决当前目录下所有冲突</span>
+svn resolve --accept working -R .
+
+<span class="c"># 先看看有哪些冲突文件（解决前必做）</span>
+svn status | grep <span class="s">'^C'</span>
+svn status | findstr <span class="s">"^C"</span>          <span class="c"># Windows</span>
+
+<span class="c"># 批量把冲突都当「用我的」处理（危险，确认清楚再用）</span>
+svn resolve --accept mine-full -R .
+
+<span class="c"># 如果搞砸了想重来：先 cleanup 再 update 还会重新产生冲突</span>
+svn revert -R .
+svn cleanup
+svn update</pre>
+  </div>
+</div>
+
+<div class="box err">
+  <span class="bt">解决冲突时最常见的三个错误</span>
+  <ol>
+    <li><strong>忘了删掉冲突标记</strong> —— 提交后发现文件里还留着 <code class="ic">&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code>，代码直接编译不过。
+      提交前务必搜索一遍：<code class="ic">grep -rn "^&lt;&lt;&lt;&lt;&lt;&lt;&lt;" .</code></li>
+    <li><strong>解决了文件但忘了 <code class="ic">svn resolve</code></strong> —— status 永远显示 C，提交会被拒绝：
+      <code class="ic">svn: E155015: Aborting commit: 'README.md' remains in conflict</code></li>
+    <li><strong>用 <code class="ic">svn resolve</code> 但没实际编辑文件</strong> ——
+      <code class="ic">--accept working</code> 只是「声明已解决」，它<strong>不会自动帮你删标记</strong>。
+      必须先真的编辑好，再声明。</li>
+  </ol>
+</div>
+
+<div class="box ok">
+  <span class="bt">冲突处理的黄金流程（背下来）</span>
+  <div class="steps">
+    <div class="stitle"><span class="badge">CONFLICT</span>五步走</div>
+    <div class="step"><div class="num"></div><div class="body"><span class="st">看清分歧</span><span class="sc"><code class="ic">svn status</code> 找出所有 C 文件；<code class="ic">svn diff</code> 看冲突块内容</span></div></div>
+    <div class="step"><div class="num"></div><div class="body"><span class="st">逐个编辑</span><span class="sc">打开文件，删掉 <code class="ic">&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> / <code class="ic">|||||||</code> / <code class="ic">=======</code> / <code class="ic">&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code> 全部标记，留下正确内容</span></div></div>
+    <div class="step"><div class="num"></div><div class="body"><span class="st">声明解决</span><span class="sc"><code class="ic">svn resolve --accept working 文件名</code>（或 <code class="ic">-R .</code> 批量）</span></div></div>
+    <div class="step"><div class="num"></div><div class="body"><span class="st">复查一遍</span><span class="sc"><code class="ic">svn status</code> 应该只剩 M；再 <code class="ic">grep -rn "^&lt;&lt;&lt;&lt;&lt;&lt;&lt;" .</code> 确认没漏标记</span></div></div>
+    <div class="step"><div class="num"></div><div class="body"><span class="st">提交</span><span class="sc"><code class="ic">svn commit -m "解决 XXX 冲突（与 某人 的改动合并）"</code> —— 日志里写清跟谁冲突、怎么解决的</span></div></div>
+  </div>
+</div>

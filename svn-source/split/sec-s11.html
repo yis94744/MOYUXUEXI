@@ -1,0 +1,103 @@
+<h3 class="sec" id="s11"><span class="no">11</span>分支的本质：一次廉价的复制</h3>
+
+<p class="lead">
+  如果你只从 Git 过来，SVN 的分支概念会让你困惑三分钟，然后突然豁然开朗。
+  核心只有一句话：<strong>SVN 里的分支就是一个普通目录，复制它只花 0 字节。</strong>
+</p>
+
+<h4 class="sub">「复制」在 SVN 里意味着什么</h4>
+
+<p>
+  传统理解里，复制一个 5GB 的目录要占 5GB 空间、花几分钟。
+  但在 SVN 里，<code class="ic">svn copy</code> 创建分支是<em>瞬间完成</em>的，仓库几乎不增长。为什么？
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 11-1　廉价复制：分支为什么不占空间</span><span class="fs">Cheap Copy</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 470" width="980" height="470" role="img" aria-label="SVN 廉价复制原理图">
+  <!-- 上：复制前 -->
+  <text class="hd" x="30" y="30" fill="#8b949e">svn copy 之前</text>
+
+  <rect class="c-blue" x="30" y="46" width="180" height="54" rx="9"/>
+  <text class="tm" x="120" y="70" text-anchor="middle">/trunk/</text>
+  <text class="tm2" x="120" y="90" text-anchor="middle">指向 r8 的节点树</text>
+
+  <!-- 树结构 -->
+  <rect class="c-gray" x="30" y="120" width="180" height="34" rx="7"/>
+  <text class="tm2" x="120" y="142" text-anchor="middle">src/</text>
+  <rect class="c-gray" x="30" y="160" width="180" height="34" rx="7"/>
+  <text class="tm2" x="120" y="182" text-anchor="middle">docs/</text>
+  <rect class="c-gray" x="30" y="200" width="180" height="34" rx="7"/>
+  <text class="tm2" x="120" y="222" text-anchor="middle">README.md</text>
+
+  <path class="bd2" d="M120,100 L120,120"/>
+  <path class="bd2" d="M120,154 L120,160"/>
+  <path class="bd2" d="M120,194 L120,200"/>
+
+  <!-- 实际数据 -->
+  <rect class="n-green" x="270" y="120" width="240" height="114" rx="10"/>
+  <text class="hd" x="290" y="146" fill="#7ee787">实际的数据块（只存一份）</text>
+  <text class="tm2" x="290" y="170">db/revs/8/...</text>
+  <text class="tm2" x="290" y="192">src/main.cs 的内容</text>
+  <text class="tm2" x="290" y="214">docs/guide.md 的内容</text>
+
+  <path class="bd2" d="M210,150 L270,160"/>
+  <text class="ts" x="214" y="144">节点指向数据</text>
+
+  <!-- 命令行 -->
+  <rect x="560" y="46" width="392" height="76" rx="10" fill="rgba(210,168,255,.07)" stroke="#d2a8ff" stroke-width="1.3"/>
+  <text class="tm" x="580" y="76" fill="#d2a8ff">svn copy ^/trunk ^/branches/feature -m "建分支"</text>
+  <text class="ts" x="580" y="102">执行时间：毫秒级。仓库增长：几百字节元数据。</text>
+
+  <!-- 下：复制后 -->
+  <text class="hd" x="30" y="278" fill="#7ee787">svn copy 之后（r9）</text>
+
+  <rect class="c-blue" x="30" y="296" width="180" height="54" rx="9"/>
+  <text class="tm" x="120" y="320" text-anchor="middle">/trunk/</text>
+  <text class="tm2" x="120" y="340" text-anchor="middle">仍指向 r8 节点树</text>
+
+  <rect class="c-pur" x="270" y="296" width="180" height="54" rx="9"/>
+  <text class="tm" x="360" y="320" text-anchor="middle">/branches/feature/</text>
+  <text class="tm2" x="360" y="340" text-anchor="middle">也指向 r8 节点树</text>
+
+  <path class="arwp" d="M210,323 L270,323"/>
+  <text class="ts" x="240" y="315" text-anchor="middle" fill="#d2a8ff">copy</text>
+
+  <!-- 共享数据 -->
+  <rect class="n-green" x="520" y="296" width="432" height="118" rx="10"/>
+  <text class="hd" x="540" y="322" fill="#7ee787">共享同一份数据，没有复制任何内容</text>
+  <text class="ts" x="540" y="346">两个目录的节点树里，每个文件条目都指向同一个内容校验和。</text>
+  <text class="ts" x="540" y="368">SVN 的存储层是按「内容寻址」的：相同内容的文件永远只存一份。</text>
+  <text class="ts" x="540" y="390" fill="#7ee787">所以：分支 100 个 = 数据仍然只有 1 份。</text>
+  <text class="ts" x="540" y="408">只有当你修改了分支里的文件，那一份新内容才会被写入。</text>
+
+  <path class="bd2" d="M360,350 L520,340"/>
+
+  <!-- 与 Git 对比 -->
+  <rect x="30" y="378" width="466" height="74" rx="10" fill="rgba(88,166,255,.07)" stroke="#58a6ff" stroke-width="1.3"/>
+  <text class="hd" x="50" y="402" fill="#58a6ff">这和 Git 的思路其实一样</text>
+  <text class="ts" x="50" y="424">Git 用「提交对象 + 指向它的引用」实现廉价分支；</text>
+  <text class="ts" x="50" y="444">SVN 用「目录节点树 + 共享内容寻址」实现廉价复制。</text>
+
+  <text class="ts" x="520" y="440" fill="#ffa657">区别在于：Git 分支切换在本地瞬间完成，SVN 切换要联网。</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>一句话总结：</b>SVN 的分支就是<strong>仓库里多了一个目录</strong>，内容是原目录的「快捷方式式引用」。
+    这解释了两个常见疑问：① 为什么建分支要联网，因为要在服务器上提交一次；
+    ② 为什么分支多了仓库也不膨胀，因为没改的文件共享同一份数据。
+  </div>
+</div>
+
+<div class="box key">
+  <span class="bt">分支和标签，在 SVN 里技术上完全一样</span>
+  <p>这是一个必须点破的事实：<strong>SVN 的 tag 不是特殊对象，它就是一个用 <code class="ic">svn copy</code> 复制出来的目录。</strong>
+  和 branch 唯一的区别是——<em>约定上</em>你认为它是「发布快照」而不该再改。</p>
+  <p>SVN 不会阻止你往 <code class="ic">/tags/v1.0/</code> 里提交代码，它照样接受。
+  想真正实现「标签只读」，得靠 <strong>authz 权限控制</strong>（第 19 节会给完整配置）。</p>
+</div>
+
+<!-- ==========================================================================
+     第 12 节：创建与切换分支
+     ========================================================================== -->

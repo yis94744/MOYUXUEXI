@@ -1,0 +1,243 @@
+<h3 class="sec" id="s19"><span class="no">19</span>认证与权限：authz 精细控制</h3>
+
+<p class="lead">
+  <code class="ic">authz</code> 是 SVN 相对 Git 的<strong>杀手级优势</strong>：
+  它能精确到「某个目录，某个组，只能读不能写」。这一节把语法和坑一次讲透。
+</p>
+
+<div class="fig">
+  <div class="fh"><span class="ic">◈</span><span class="ft">图 19-1　authz 权限模型：从路径到权限的映射</span><span class="fs">Authorization</span></div>
+  <div class="fb">
+<svg viewBox="0 0 980 480" width="980" height="480" role="img" aria-label="SVN authz 权限模型图">
+  <!-- 左：用户与组 -->
+  <text class="hd" x="30" y="28" fill="#58a6ff">第一步：定义组（[groups]）</text>
+  <rect x="24" y="44" width="300" height="150" rx="11" fill="rgba(88,166,255,.06)" stroke="#58a6ff" stroke-width="1.4"/>
+
+  <rect class="c-blue" x="44" y="64" width="120" height="52" rx="8"/>
+  <text class="tm" x="104" y="86" text-anchor="middle">alice</text>
+  <text class="tm2" x="104" y="104" text-anchor="middle">admins + devs</text>
+
+  <rect class="c-blue" x="44" y="126" width="120" height="52" rx="8"/>
+  <text class="tm" x="104" y="148" text-anchor="middle">bob</text>
+  <text class="tm2" x="104" y="166" text-anchor="middle">devs</text>
+
+  <rect class="c-orange" x="184" y="94" width="120" height="52" rx="8"/>
+  <text class="tm" x="244" y="116" text-anchor="middle">carol</text>
+  <text class="tm2" x="244" y="134" text-anchor="middle">outsource</text>
+
+  <!-- 中间：规则 -->
+  <text class="hd" x="350" y="28" fill="#d2a8ff">第二步：按路径配规则（[/path]）</text>
+  <rect x="344" y="44" width="300" height="150" rx="11" fill="rgba(210,168,255,.06)" stroke="#d2a8ff" stroke-width="1.4"/>
+
+  <text class="tm" x="364" y="70" fill="#d2a8ff">[/]</text>
+  <text class="tm2" x="380" y="90">* =                    ← 默认无权限</text>
+  <text class="tm2" x="380" y="110">@admins = rw</text>
+
+  <text class="tm" x="364" y="138" fill="#7ee787">[/trunk]</text>
+  <text class="tm2" x="380" y="158">@devs = rw             ← 开发可读写</text>
+  <text class="tm2" x="380" y="178">* = r                  ← 其他人只读</text>
+
+  <!-- 右侧：结果 -->
+  <text class="hd" x="670" y="28" fill="#7ee787">第三步：生效结果</text>
+  <rect x="664" y="44" width="292" height="150" rx="11" fill="rgba(126,231,135,.06)" stroke="#7ee787" stroke-width="1.4"/>
+
+  <text class="tm2" x="684" y="70">/trunk</text>
+  <text class="tm2" x="810" y="70" fill="#7ee787">alice: rw  bob: rw</text>
+
+  <text class="tm2" x="684" y="94">/branches</text>
+  <text class="tm2" x="810" y="94" fill="#7ee787">alice: rw  bob: rw</text>
+
+  <text class="tm2" x="684" y="118">/tags</text>
+  <text class="tm2" x="810" y="118" fill="#ffa657">bob: 只读</text>
+
+  <text class="tm2" x="684" y="142">仓库根 /</text>
+  <text class="tm2" x="810" y="142" fill="#ff7b72">carol: 拒绝访问</text>
+
+  <text class="tm2" x="684" y="170" fill="#8b949e">（未在 authz 中出现的用户 = 无权限）</text>
+
+  <!-- 继承模型 -->
+  <text class="hd" x="30" y="228" fill="#e3b341">权限的继承规则（理解这个才不会配错）</text>
+  <rect x="24" y="244" width="460" height="220" rx="11" fill="rgba(227,179,65,.06)" stroke="#e3b341" stroke-width="1.4"/>
+
+  <text class="ts" x="44" y="270">SVN 从仓库根开始，逐级向下匹配路径，</text>
+  <text class="ts" x="44" y="290"><tspan fill="#e6edf3" font-weight="700">每一级都可能有自己的规则</tspan>。规则来源：</text>
+
+  <text class="tm2" x="44" y="320" fill="#7ee787">① 最具体（最长路径）的匹配 → 优先</text>
+  <text class="tm2" x="44" y="346" fill="#58a6ff">② 具体路径里，用户名 &gt; 组名 &gt; * 通配</text>
+  <text class="tm2" x="44" y="372" fill="#d2a8ff">③ 都没有 → 向上找父目录的规则</text>
+  <text class="tm2" x="44" y="398" fill="#ff7b72">④ 一直找到 / 都没有 → 拒绝</text>
+
+  <text class="ts" x="44" y="428" fill="#ffa657">★ 关键：[ / ] 段里的规则会影响所有子路径，</text>
+  <text class="ts" x="44" y="448" fill="#ffa657">　 除非子路径有自己的、更具体的规则覆盖它。</text>
+
+  <!-- 权限值 -->
+  <rect x="504" y="244" width="452" height="220" rx="11" fill="rgba(88,166,255,.06)" stroke="#58a6ff" stroke-width="1.4"/>
+  <text class="hd" x="524" y="270" fill="#58a6ff">权限值的五种写法</text>
+
+  <line x1="524" y1="284" x2="936" y2="284" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="308" fill="#8b949e">空（什么都不写）</text>
+  <text class="ts" x="700" y="308">无任何权限，连看都不能看</text>
+
+  <line x1="524" y1="320" x2="936" y2="320" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="344" fill="#58a6ff">r</text>
+  <text class="ts" x="700" y="344">只读：可 checkout、update、log</text>
+
+  <line x1="524" y1="356" x2="936" y2="356" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="380" fill="#7ee787">rw</text>
+  <text class="ts" x="700" y="380">读写：可 commit、建分支、改属性</text>
+
+  <line x1="524" y1="392" x2="936" y2="392" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="416" fill="#d2a8ff">=</text>
+  <text class="ts" x="700" y="416">显式清空权限（用于覆盖父级给的权限）</text>
+
+  <line x1="524" y1="428" x2="936" y2="428" stroke="#30363d" stroke-width="1"/>
+
+  <text class="tm" x="524" y="452" fill="#ffa657">~ 或留空</text>
+  <text class="ts" x="700" y="452">1.8+ 支持 @组 = 特殊语法，此处不建议依赖</text>
+</svg>
+  </div>
+  <div class="cap">
+    <b>核心心法：</b>authz 是<strong>白名单模型</strong>——没有明确授权的就是拒绝。
+    所以第一行永远写 <code class="ic">[/]</code> + <code class="ic">* =</code>（全部拒绝），
+    再逐条放开需要的路径和组。这样最安全，也最容易排查。
+  </div>
+</div>
+
+<div class="codewrap">
+  <div class="codehead"><span class="lang">ini</span><span class="fn">conf/authz　完整企业级配置示例</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c">#############################################################
+# authz —— SVN 权限控制文件
+# 格式：[路径] 后面跟 "用户/组 = 权限"
+# 路径以 / 开头，相对于仓库根（注意：不是相对于仓库目录）
+#############################################################</span>
+
+<span class="c"># ============ 用户组定义 ============</span>
+[groups]
+admins    = alice, bob          <span class="c"># 管理员：能改标签、能改权限</span>
+devs      = alice, bob, carol   <span class="c"># 开发：能读写主干和分支</span>
+qa        = dave, erin          <span class="c"># 测试：只读代码，能写测试报告</span>
+outsource = frank               <span class="c"># 外包：只能看一个目录</span>
+
+<span class="c"># ============ 仓库根：默认拒绝一切 ============</span>
+[/]
+* =                        <span class="c"># 所有用户，无权限</span>
+@admins = rw               <span class="c"># 管理员全权</span>
+
+<span class="c"># ============ 主干：开发可读写，全员可读 ============</span>
+[/trunk]
+@devs = rw
+@qa   = r
+@admins = rw
+* = r                      <span class="c"># 其他登录用户只读（比上面 [/] 更具体，覆盖它）</span>
+
+<span class="c"># 主干下的机密子目录：只有 admins 能看</span>
+[/trunk/secret]
+@admins = rw
+* =                        <span class="c"># 其他人依然被 [/] 的 * = 挡住</span>
+
+<span class="c"># 外包只读这一个目录</span>
+[/trunk/art/external]
+@outsource = r
+@devs = rw
+* = r
+
+<span class="c"># ============ 分支：开发可读写 ============</span>
+[/branches]
+@devs = rw
+@qa   = r
+@admins = rw
+
+<span class="c"># ============ 标签：只读！只有 admins 能打标签 ============</span>
+[/tags]
+* = r                      <span class="c"># 所有人只读 —— 这就是「标签不可变」的实现</span>
+@admins = rw               <span class="c"># 只有管理员能创建/删除标签</span>
+
+<span class="c"># ============ 特殊场景：允许所有人提交日志修正 ============</span>
+<span class="c"># （revprop 修改的权限控制，需要配合 pre-revprop-change 钩子）</span>
+[revprop]
+<span class="c"># 这里不写具体路径规则，revprop 权限在钩子里控制</span></pre>
+</div>
+
+<div class="box termbox">
+  <span class="bt">实测：权限矩阵验证</span>
+  <div class="term">
+    <div class="th"><span class="dotr"></span><span class="doty"></span><span class="dotg"></span><span style="margin-left:6px">PowerShell</span></div>
+<pre><span class="cmt"># 配置：alice 在 admins+devs 组，bob 只在 devs 组
+# authz: [/trunk] @devs = rw   [/tags] @admins = rw, * = r</span>
+
+<span class="cmt"># ---- bob 读 /trunk：允许 ----</span>
+<span class="ps">$</span> <span class="cmd">svn list --username bob --password bob123 --no-auth-cache svn://127.0.0.1/repo/trunk</span>
+<span class="ok">art.psd</span>
+<span class="ok">docs.md</span>
+<span class="ok">src/</span>
+
+<span class="cmt"># ---- bob 写 /trunk：允许 ----</span>
+<span class="ps">$</span> <span class="cmd">svn mkdir --username bob --password bob123 svn://127.0.0.1/repo/trunk/bob-test -m "bob 建目录"</span>
+Committing transaction...
+<span class="ok">Committed revision 13.</span>
+
+<span class="cmt"># ---- bob 写 /tags：被拒绝（他只读）----</span>
+<span class="ps">$</span> <span class="cmd">svn mkdir --username bob --password bob123 svn://127.0.0.1/repo/tags/v2.0 -m "bob 打标签"</span>
+<span class="no">svn: E220004: Access denied</span>
+<span class="cmt">↑ 这就是「标签只读」的实际效果</span>
+
+<span class="cmt"># ---- alice 写 /tags：允许（她在 admins 组）----</span>
+<span class="ps">$</span> <span class="cmd">svn mkdir --username alice --password alice123 svn://127.0.0.1/repo/tags/v2.0 -m "alice 打标签"</span>
+Committing transaction...
+<span class="ok">Committed revision 15.</span>
+
+<span class="cmt"># ---- bob 访问仓库根：被拒绝（[/] 里 * = 无权限）----</span>
+<span class="ps">$</span> <span class="cmd">svn list --username bob --password bob123 svn://127.0.0.1/repo</span>
+<span class="no">svn: E170001: Authorization failed</span>
+
+<span class="cmt"># ---- 未认证访问：被拒绝（anon-access = none）----</span>
+<span class="ps">$</span> <span class="cmd">svn list --non-interactive svn://127.0.0.1/repo/trunk</span>
+<span class="no">svn: E170001: Can't get password</span></pre>
+  </div>
+</div>
+
+<div class="box err">
+  <span class="bt">authz 的五个高频坑</span>
+  <ol>
+    <li><strong>路径写错基准</strong> —— authz 里的路径是<strong>相对仓库根</strong>的，
+      写 <code class="ic">[/repo/trunk]</code> 是错的，应该是 <code class="ic">[/trunk]</code>。</li>
+    <li><strong>忘记 <code class="ic">authz-db</code> 配置</strong> ——
+      <code class="ic">svnserve.conf</code> 里不写 <code class="ic">authz-db = authz</code>，
+      整个权限文件<strong>根本不会被读取</strong>，所有登录用户都是全权。</li>
+    <li><strong>以为没写 = 没权限，但有父级规则兜着</strong> ——
+      <code class="ic">[/trunk/secret]</code> 里不写规则，不代表无人可访问；
+      它会继承 <code class="ic">[/]</code> 或 <code class="ic">[/trunk]</code> 的规则。要真正锁死必须显式写 <code class="ic">* =</code>。</li>
+    <li><strong>组名前的 @ 忘了写</strong> —— <code class="ic">devs = rw</code> 会被理解为「用户 devs」而不是「组 devs」，
+      正确写法是 <code class="ic">@devs = rw</code>。</li>
+    <li><strong>权限改完不生效</strong> —— svnserve 每次请求都会重读 authz，通常立即生效。
+      如果没生效，检查是不是改错了仓库的 conf 目录（多仓库时容易改串）。</li>
+  </ol>
+</div>
+
+<div class="box tip">
+  <span class="bt">调试权限问题的利器：svnauthz-validate</span>
+  <div class="codewrap">
+    <div class="codehead"><span class="lang">bash</span><span class="fn">校验 authz 语法</span><span class="acts"><button data-copy>复制</button></span></div>
+<pre class="code"><span class="c"># 检查语法错误（拼错、格式不对会明确报错）</span>
+svnauthz-validate /var/svn/repo/conf/authz
+
+<span class="c"># 1.9+ 还能直接查询某个用户对某路径的权限</span>
+svnauthz access --username bob --path /tags /var/svn/repo/conf/authz
+<span class="c"># 输出：r   （只读）</span>
+
+svnauthz access --username alice --path /tags /var/svn/repo/conf/authz
+<span class="c"># 输出：rw  （读写）</span>
+
+svnauthz access --username carol --path /trunk /var/svn/repo/conf/authz
+<span class="c"># 输出：（空） = 无权限</span></pre>
+  </div>
+  <p>改完权限先跑一遍这个，能省掉大量「为什么还是拒绝」的排查时间。</p>
+</div>
+
+<!-- ==========================================================================
+     第 20 节：钩子脚本
+     ========================================================================== -->
