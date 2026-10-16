@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>22 任务与成就系统 — 游戏算法与系统设计｜从数据结构到完整系统，覆盖游戏开发全部核心算法</title>
+<meta name="description" content="条件表达式、事件驱动进度、任务链、前置依赖、存档兼容">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">游戏算法与系统设计
+        <span>从数据结构到完整系统，覆盖游戏开发全部核心算法</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>22 · 任务与成就系统</h1>
+
+<p class="lead">任务和成就<strong>看起来只是"记录进度"</strong>，但设计不好会<em>让每个操作都要遍历所有任务</em>。这一页讲<em>高效的进度追踪架构</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="../lua/13-framework-design.html#event" data-brief="快照遍历 + 队列化派发，防止回调中修改列表"><span class="prereq__title">事件系统</span><span class="prereq__page">13-framework-design</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="tracking">一、任务系统的三种进度追踪</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方式</th><th>做法</th><th>性能</th></tr></thead>
+  <tbody>
+    <tr><td><strong>轮询（最差）</strong></td><td>每帧遍历所有任务查条件</td><td><span class="mk mk--no">O(任务数 × 每帧)</span></td></tr>
+    <tr><td><strong>定时检查</strong></td><td>每秒遍历一次</td><td><span class="mk mk--warn">O(任务数 × 每秒)</span></td></tr>
+    <tr><td><strong>事件驱动（推荐）</strong></td><td>事件触发时更新相关任务</td><td><span class="mk mk--yes">O(受影响的任务)</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">为什么轮询是灾难</span>
+  <strong>假设有 200 个任务，每个条件要检查背包、等级、击杀数……</strong><br>
+  <strong>轮询的做法</strong>：每帧把 200 个任务全检查一遍<br>
+  · 每帧 200 次条件判断<br>
+  · 每次判断可能涉及遍历背包（<em>又是 O(n)</em>）<br>
+  · <strong>每帧可能上万次操作</strong><br><br>
+  <strong>事件驱动的做法</strong>：<br>
+  · 玩家击杀怪物 → 发 <code>MonsterKilled</code> 事件<br>
+  · <em>只通知"监听击杀事件"的任务</em>（可能只有 3 个）<br>
+  · 3 次更新，而不是 200 次检查<br><br>
+  <strong>关键设计</strong>：<em>建立"事件类型 → 监听该事件的任务列表"的索引</em>。<br>
+  这样事件触发时，<strong>O(1) 找到需要更新的任务</strong>。<br><br>
+  <em>这是"用空间换时间"在任务系统上的应用（对比页 14 的索引）。</em>
+</div>
+
+<h2 id="condition-types">二、四类任务条件与实现</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>类型</th><th>例子</th><th>实现</th></tr></thead>
+  <tbody>
+    <tr><td><strong>计数类</strong></td><td>击杀 10 只怪</td><td><em>累加计数</em></td></tr>
+    <tr><td><strong>状态类</strong></td><td>等级达到 30</td><td><strong>读当前状态</strong></td></tr>
+    <tr><td><strong>拥有类</strong></td><td>拥有某道具</td><td>查背包（<em>用索引</em>）</td></tr>
+    <tr><td><strong>事件类</strong></td><td>通关某副本</td><td>监听一次性事件</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">计数类的设计要点</span>
+  <strong>计数类最常见的坑</strong>：<em>进度不能只在"当前会话"里累加</em>。<br><br>
+  <strong>问题场景</strong>：<br>
+  · 任务要求"累计击杀 100 只怪"<br>
+  · 玩家杀了 60 只，退出游戏<br>
+  · 重新进入 → <em>进度清零？</em><br><br>
+  <strong>正确做法</strong>：<em>进度要持久化</em>。<br>
+  · 每次进度变化时<strong>保存到存档</strong><br>
+  · 或者：<em>不保存进度，而是保存"累计击杀总数"，任务进度 = 总数 - 接任务时的总数</em><br><br>
+  <strong>第二种更好</strong>：<br>
+  · 加新任务不需要额外的存储<br>
+  · 玩家能看到"历史累计"<br>
+  · <em>但要注意"接任务前的击杀不算"这个规则要不要遵守</em>
+</div>
+
+<h2 id="achievement">三、成就系统的特殊之处</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">成就与任务的三点不同</span>
+  <strong>① 成就通常是不可放弃的</strong><br>
+  任务可以放弃，成就<em>一旦触发就永久记录</em>。<br><br>
+  <strong>② 成就要"追溯"</strong><br>
+  如果新增一个"击杀 1000 只怪"的成就，<em>已经杀了 2000 只的玩家应该立刻解锁</em>。<br>
+  <strong>实现</strong>：成就检查不能只看"新事件"，还要看<em>历史累计数据</em>。<br><br>
+  <strong>③ 成就数量可能很多</strong><br>
+  几百个成就是常见的。<br>
+  <strong>优化</strong>：<em>按事件类型建索引</em>（同上）；<em>不活跃的成就先不检查</em>。<br><br>
+  <strong>常见事故</strong>：<em>上线后发现某个成就永远无法解锁</em>——因为条件写错了或者依赖的数据没记录。<br>
+  <strong>防护</strong>：<em>做成就自检工具，模拟各种数据看能否解锁</em>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="22">
+  <div class="task"><input type="checkbox" id="t-22-1"><label for="t-22-1"><strong>实现事件驱动</strong>：建立"事件类型 → 任务列表"的索引，验证只更新相关任务。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-2"><label for="t-22-2"><strong>对比轮询</strong>：实现轮询版和事件版，测 200 个任务时的性能差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-3"><label for="t-22-3"><strong>做四类条件</strong>：分别实现计数、状态、拥有、事件四类条件。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-4"><label for="t-22-4"><strong>处理持久化</strong>：让计数类进度能跨会话累加，验证退出重进后进度不丢。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-5"><label for="t-22-5"><strong>做成就追溯</strong>：新增一个成就，验证老玩家能立刻解锁。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-6"><label for="t-22-6"><strong>回答面试题</strong>：① 任务进度为什么要用事件驱动？② 计数类进度怎么持久化？③ 成就为什么要"追溯"？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道轮询是灾难，要用事件驱动</strong>；<br>
+    ② <strong>能建立"事件类型 → 任务列表"的索引</strong>；<br>
+    ③ 能实现四类任务条件；<br>
+    ④ <strong>知道计数类进度要持久化，以及两种做法</strong>；<br>
+    ⑤ 知道成就要支持"追溯"（老玩家能立刻解锁）。<br>
+    <br>
+    <em>第 ① 和 第 ④ 条最实用——前者是性能，后者是正确性（进度丢失是严重事故）。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="21-reddot.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">21 红点系统 ★★★</div>
+  </a>
+  <a class="next" href="23-buff-skill.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">23 Buff 与技能系统</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,260 @@
+<h1>15 · 输入与音频</h1>
+
+<p class="lead">前四页讲了 Unity 的<strong>核心机制、物理、动画、UI</strong>。这一页讲<em>玩家如何与游戏交互</em>——输入是玩家的"手"，音频是游戏的"情绪"。两者都不是难点，但都有<em>容易被忽略的细节</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（14）讲 UI。UI 的按钮点击本质上就是输入系统的一部分——这一页把输入讲透。<br>
+  <strong>关键衔接</strong>：页 11 讲的生命周期决定了<em>输入该放在哪个回调里</em>（必须放 Update，不能放 FixedUpdate）。<br>
+  <strong>下一页</strong>（16）资源管理与热更新。到那时你会发现——<em>UI 图集、音效资源都属于"资源"</em>，两页要配合。<br>
+  <strong>难度提示</strong>：这一页<em>内容简单但坑多</em>，尤其是输入系统的版本选择。
+</div>
+
+<h2 id="two-systems">一、两套输入系统</h2>
+
+<p>Unity 有<strong>两套并存的输入系统</strong>，这不是"新旧替代"的关系，而是"简单版与功能版"的关系。<em>选错了会在项目中后期付出代价。</em></p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  输入系统：旧系统与 Input System 对比
+// ============================================================
+// 【重要】Unity 有两套输入系统，可以共存但不能混用同一个按键
+//
+//   旧系统：Input.GetAxis / GetKey     —— 简单，但难以重映射
+//   新系统：InputAction / InputSystem  —— 功能强，包体积更大
+//
+// 本文件演示旧系统（新系统需要安装 package，且用不同的 API）
+
+public class LegacyInput : MonoBehaviour
+{
+    [SerializeField] private float _moveSpeed = 5f;
+    [SerializeField] private float _rotateSpeed = 180f;
+
+    private void Update()
+    {
+        // ---------- 三种按键检测方式 ----------
+
+        // 方式 1：GetKey —— 按住时一直为 true
+        bool holding = Input.GetKey(KeyCode.W);
+
+        // 方式 2：GetKeyDown —— 只在按下的那一帧为 true
+        bool pressedThisFrame = Input.GetKeyDown(KeyCode.Space);
+
+        // 方式 3：GetKeyUp —— 只在松开的那一帧为 true
+        bool releasedThisFrame = Input.GetKeyUp(KeyCode.Space);
+
+        // ---------- 轴输入：自带平滑 ----------
+        // GetAxis 会做插值（有惯性），GetAxisRaw 直接返回 -1/0/1
+        float h = Input.GetAxis("Horizontal");      // 平滑，适合移动
+        float vRaw = Input.GetAxisRaw("Vertical");  // 立即，适合菜单
+
+        // ---------- 鼠标 ----------
+        float mouseX = Input.GetAxis("Mouse X");
+        float mouseY = Input.GetAxis("Mouse Y");
+
+        // 注意：鼠标位置是屏幕坐标（左下角为原点）
+        Vector3 mousePos = Input.mousePosition;
+        bool leftClick = Input.GetMouseButton(0);      // 0=左 1=右 2=中
+        bool leftDown = Input.GetMouseButtonDown(0);
+
+        // ---------- 移动与旋转 ----------
+        Vector3 dir = new Vector3(h, 0f, vRaw);
+        if (dir.sqrMagnitude &gt; 1f) dir.Normalize();
+        transform.position += dir * (_moveSpeed * Time.deltaTime);
+
+        transform.Rotate(Vector3.up, mouseX * _rotateSpeed * Time.deltaTime);
+
+        Debug.Log(holding + " " + pressedThisFrame + " " + releasedThisFrame);
+        Debug.Log(mouseY + " " + mousePos + " " + leftClick + " " + leftDown);
+
+        // ---------- 触屏（旧系统方式）----------
+        HandleTouch();
+    }
+
+    private void HandleTouch()
+    {
+        if (Input.touchCount == 0) return;
+
+        // 遍历所有触点（支持多点触控）
+        for (int i = 0; i &lt; Input.touchCount; i++)
+        {
+            Touch t = Input.GetTouch(i);
+
+            switch (t.phase)
+            {
+                case TouchPhase.Began:
+                    Debug.Log("手指按下 " + t.position);
+                    break;
+                case TouchPhase.Moved:
+                    Debug.Log("移动了 " + t.deltaPosition);
+                    break;
+                case TouchPhase.Ended:
+                    Debug.Log("抬起");
+                    break;
+            }
+        }
+    }
+
+    // ---------- 陀螺仪与加速度计 ----------
+    private void HandleSensors()
+    {
+        // 需要设备支持
+        Vector3 accel = Input.acceleration;
+        Vector3 gyro = Input.gyro.rotationRate;
+
+        // 注意：陀螺仪需要先启用
+        Input.gyro.enabled = true;
+
+        Debug.Log(accel + " " + gyro);
+    }
+}
+
+// ============================================================
+//  输入重映射：旧系统的痛点
+// ============================================================
+// 旧系统的按键和轴是【在 Project Settings 里配置的】，
+// 运行时虽然可以通过 InputManager 修改，但非常麻烦。
+//
+// 新系统（Input System）的 InputActionAsset 原生支持：
+//   · 运行时重映射（Rebinding）
+//   · 多设备并存（键鼠 + 手柄）
+//   · 动作与按键解耦
+//
+// 【选型建议】
+//   · 简单项目 / 原型        -&gt; 旧系统够用
+//   · 需要重映射 / 多手柄 / 主机平台 -&gt; 新系统
+//   · 已有项目              -&gt; 不要为了"先进"而重写输入层
+
+// ============================================================
+//  条件编译：同时支持两套系统
+// ============================================================
+#if ENABLE_INPUT_SYSTEM
+// 使用新系统
+// using UnityEngine.InputSystem;
+#endif
+
+public class InputAdapter : MonoBehaviour
+{
+    // 通过宏定义做适配层，业务代码不关心底层用哪套
+    public Vector2 GetMoveInput()
+    {
+#if ENABLE_INPUT_SYSTEM &amp;&amp; !ENABLE_LEGACY_INPUT_MANAGER
+        // 新版：需要 InputAction 引用
+        return Vector2.zero;
+#else
+        return new Vector2(
+            Input.GetAxisRaw("Horizontal"),
+            Input.GetAxisRaw("Vertical"));
+#endif
+    }
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th></th><th>旧系统（Input）</th><th>新系统（Input System）</th></tr></thead>
+  <tbody>
+    <tr><td><strong>API</strong></td><td><code>Input.GetAxis</code> / <code>GetKey</code></td><td><code>InputAction</code> / 回调</td></tr>
+    <tr><td><strong>上手</strong></td><td><span class="mk mk--yes">极简单</span></td><td><span class="mk mk--warn">需要学习</span></td></tr>
+    <tr><td><strong>重映射</strong></td><td><span class="mk mk--no">很难</span></td><td><span class="mk mk--yes">原生支持</span></td></tr>
+    <tr><td><strong>多设备</strong></td><td>手动处理</td><td><strong>自动切换</strong></td></tr>
+    <tr><td><strong>包体积</strong></td><td>内置，无额外开销</td><td>会增加包体积</td></tr>
+    <tr><td><strong>移动端</strong></td><td>够用</td><td>更强（触屏手势）</td></tr>
+    <tr><td><strong>适用</strong></td><td>简单项目、原型</td><td><strong>需要重映射/多手柄/主机</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="legacy-detail">二、旧系统的关键细节</h2>
+
+<p>下面这些细节<strong>看起来简单但经常被搞错</strong>。</p>
+<div class="callout callout--danger">
+  <span class="callout__title">GetAxis 与 GetAxisRaw 的区别</span>
+  <code>GetAxis</code> <strong>带平滑插值</strong>——输入 1 时返回值会逐渐从 0 涨到 1。<em>这适合角色移动（手感更顺滑）。</em><br>
+  <code>GetAxisRaw</code> <strong>立即返回 -1/0/1</strong>。<em>这适合菜单导航、需要精确响应的场景。</em><br><br>
+  <strong>常见错误</strong>：用 <code>GetAxis</code> 做 UI 导航，导致按键响应"慢半拍"。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">输入必须放在 Update</span>
+  这是页 11 讲过的内容，但在输入上尤其重要：<br>
+  <code>FixedUpdate</code> 一帧可能执行 <strong>0 次或多次</strong>，而 <code>Input.GetKeyDown</code> <em>只在按下的那一帧为 true</em>。<br>
+  把它放在 FixedUpdate 里会导致——<strong>有时能检测到按键，有时丢失</strong>。<br><br>
+  <em>这类 bug 极难复现，因为取决于帧率与物理步长的巧合。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">鼠标位置的坐标系</span>
+  <code>Input.mousePosition</code> 返回的是<strong>屏幕坐标，左下角为原点</strong>（不是左上角）。<br>
+  而且它是 <code>Vector3</code>，<em>z 值始终是 0</em>——不要用它直接当世界坐标用（见页 26 讲的 <code>ScreenToWorldPoint</code> 陷阱）。
+</div>
+
+<h2 id="audio">三、音频系统</h2>
+
+<p>Unity 的音频<strong>上手极简单</strong>——挂一个 <code>AudioSource</code>、拖一个 clip 就能响。但<em>要做好听感，需要理解几个参数</em>。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>属性</th><th>范围</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>volume</code></td><td>0 ~ 1</td><td>线性音量</td></tr>
+    <tr><td><code>pitch</code></td><td>0.1 ~ 3</td><td><strong>1 是原速</strong>；0.95~1.05 用于制造变化</td></tr>
+    <tr><td><code>loop</code></td><td>bool</td><td>循环播放</td></tr>
+    <tr><td><code>playOnAwake</code></td><td>bool</td><td>BGM 常用；<strong>音效要关掉</strong></td></tr>
+    <tr><td><code>spatialBlend</code></td><td>0 ~ 1</td><td><strong>0 = 2D，1 = 3D</strong>；中间值是混合</td></tr>
+    <tr><td><code>rolloffMode</code></td><td>枚举</td><td>3D 衰减曲线，<strong>Linear 最可控</strong></td></tr>
+    <tr><td><code>minDistance</code></td><td>米</td><td>此距离内保持最大音量，常用 1~3</td></tr>
+    <tr><td><code>maxDistance</code></td><td>米</td><td>超出后不再衰减，常用 20~40</td></tr>
+    <tr><td><code>priority</code></td><td>0 ~ 256</td><td><strong>0 是最高优先级</strong>（很多人搞反）</td></tr>
+    <tr><td><code>dopplerLevel</code></td><td>0 ~ 5</td><td><strong>设为 0 关闭多普勒效应</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">两个反直觉的设计</span>
+  <strong>① priority 数字越小优先级越高。</strong>0 是最高，256 是最低。<em>BGM 应设成较低优先级（如 128），重要音效设 0。</em><br><br>
+  <strong>② dopplerLevel 默认是 1，会产生多普勒效应。</strong>高速移动的物体（子弹、飞车）会因此出现<em>怪异的音调变化</em>。绝大多数游戏应该<strong>直接设为 0</strong>。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">三个经验值</span>
+  <strong>随机音调范围</strong>：<code>0.95 ~ 1.05</code>。<em>再大就会明显跑调，再小听不出区别。</em><br>
+  <strong>3D 音效距离</strong>：<code>minDistance</code> 设 1~3 米，<code>maxDistance</code> 设 20~40 米。<br>
+  <strong>音量转 dB</strong>：<code>20 * log10(线性值)</code>。线性 0.5 约等于 -6dB。<em>人类听感是对数的，所以音量滑条通常要转成 dB 才符合直觉。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="15">
+  <div class="task"><input type="checkbox" id="t-15-1"><label for="t-15-1"><strong>对比两套系统</strong>：分别用旧系统和新系统实现"按下跳跃"，感受 API 复杂度的差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-2"><label for="t-15-2"><strong>验证 GetAxis 平滑</strong>：打印 <code>GetAxis</code> 与 <code>GetAxisRaw</code> 的返回值，观察前者是渐变的、后者是跳变的。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-3"><label for="t-15-3"><strong>复现 FixedUpdate 丢输入</strong>：把 <code>GetKeyDown</code> 放进 <code>FixedUpdate</code>，快速连按空格，观察丢失情况。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-4"><label for="t-15-4"><strong>加随机音调</strong>：找项目里的重复音效（脚步、射击），加上 0.95~1.05 的随机 pitch。<em>感受听感的提升。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-15-5"><label for="t-15-5"><strong>修掉多普勒效应</strong>：给高速移动物体的音效把 <code>dopplerLevel</code> 设为 0，对比听感。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-6"><label for="t-15-6"><strong>做一个音量滑条</strong>：实现线性滑条转 dB 的映射，对比"直接赋值"与"转 dB"的听感差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-7"><label for="t-15-7"><strong>回答面试题</strong>：① GetAxis 和 GetAxisRaw 的区别？② 输入为什么必须放 Update？③ priority 数字大小与优先级的关系？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出旧系统与新系统的四条差异，并知道什么项目该用哪个；<br>
+    ② <strong>能解释 GetAxis 与 GetAxisRaw 的区别及各自适用场景</strong>；<br>
+    ③ 知道输入必须放 Update 的原因（页 11 的生命周期知识）；<br>
+    ④ 能说出 AudioSource 的至少 6 个关键参数；<br>
+    ⑤ <strong>知道 priority 数字越小越优先</strong>，以及 dopplerLevel 通常该设为 0。<br>
+    <br>
+    <em>第 ④ 和第 ⑤ 条是面试中常被问到的细节——它们看起来小，但能立刻区分"用过 Unity"和"理解 Unity"。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="14-unity-ui.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">14 UI 系统</div>
+  </a>
+  <a class="next" href="16-unity-assets.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">16 资源管理与热更新</div>
+  </a>
+</nav>

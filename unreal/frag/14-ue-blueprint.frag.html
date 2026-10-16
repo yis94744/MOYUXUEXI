@@ -1,0 +1,94 @@
+<h1>14 · 蓝图与 C++ 协作 ★★</h1>
+
+<p class="lead">这是<strong>Unreal 项目最重要的一页</strong>——它决定你的项目<em>开发效率高不高、能不能让策划参与</em>。<strong>划错这条线，项目会很难维护</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="boundary">一、C++ 与蓝图的职责边界 ★★★</h2>
+
+<p><strong>没有绝对正确的划分</strong>，但有一条被大量项目验证过的原则：</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>内容</th><th>放 C++</th><th>放蓝图</th></tr></thead>
+  <tbody>
+    <tr><td><strong>性能关键逻辑</strong></td><td><span class="mk mk--yes">✓</span></td><td><span class="mk mk--no">✗</span></td></tr>
+    <tr><td><strong>复杂算法</strong></td><td><span class="mk mk--yes">✓</span></td><td><span class="mk mk--no">✗</span></td></tr>
+    <tr><td><strong>数据结构定义</strong></td><td><span class="mk mk--yes">✓</span></td><td><em>可继承使用</em></td></tr>
+    <tr><td><strong>易变配置</strong></td><td><span class="mk mk--no">✗</span></td><td><span class="mk mk--yes">✓</span></td></tr>
+    <tr><td><strong>具体数值</strong></td><td><span class="mk mk--no">✗</span></td><td><span class="mk mk--yes">✓</span></td></tr>
+    <tr><td><strong>美术资源组合</strong></td><td><span class="mk mk--no">✗</span></td><td><span class="mk mk--yes">✓</span></td></tr>
+    <tr><td><strong>一次性逻辑</strong></td><td><span class="mk mk--no">✗</span></td><td><span class="mk mk--yes">✓</span></td></tr>
+    <tr><td><strong>策划能理解的流程</strong></td><td><span class="mk mk--no">✗</span></td><td><span class="mk mk--yes">✓</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">一条实用的判断标准</span>
+  <strong>问自己："这个东西多久变一次？"</strong><br><br>· <strong>很少变</strong>（<em>框架、算法、数据结构</em>）→ <strong>C++</strong><br>· <strong>经常变</strong>（<em>数值、配置、流程</em>）→ <strong>蓝图</strong><br><br><strong>为什么这样分</strong>：<br>· <em>C++ 改一次要编译几分钟</em>（页 09）<br>· <em>蓝图改一次立刻生效</em><br>· <strong>蓝图还能热更新</strong>（<em>打包后也能改</em>）<br><br><strong>经典模式</strong>：<br><code>C++ 定义基类（框架）</code><br><code>&nbsp;&nbsp;↓</code><br><code>蓝图继承并填数值</code><br><br><em>例如：<code>AWeapon</code>（C++）→ <code>BP_Rifle</code>、<code>BP_Shotgun</code>（蓝图）</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">蓝图的性能代价</span>
+  <strong>蓝图比 C++ 慢多少</strong>：<em>粗略估计 10~40 倍</em>（<em>取决于节点的复杂度</em>）。<br><br><strong>为什么</strong>：<br>· <em>蓝图是解释执行的</em>（<em>逐节点求值</em>）<br>· <em>每个节点都有虚函数调用开销</em><br>· <em>参数传递要装箱解箱</em><br><br><strong>什么时候要换 C++</strong>：<br>· <em>Tick 里执行的逻辑</em><br>· <em>大量实例同时执行</em>（<em>比如 100 个敌人每帧跑蓝图</em>）<br>· <em>数学密集的计算</em><br><br><strong>实践建议</strong>：<em>先用蓝图做原型</em>，<strong>确认逻辑稳定后再考虑要不要移到 C++</strong>。<br><em>过早优化会浪费时间——很多蓝图逻辑根本不在热路径上。</em>
+</div>
+
+<h2 id="expose">二、怎么把 C++ 暴露给蓝图</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>说明符</th><th>作用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>BlueprintReadWrite</strong></td><td>蓝图可读写变量</td></tr>
+    <tr><td><strong>BlueprintReadOnly</strong></td><td>蓝图只读变量</td></tr>
+    <tr><td><strong>BlueprintCallable</strong></td><td><strong>蓝图可调用函数</strong></td></tr>
+    <tr><td><strong>BlueprintImplementableEvent</strong></td><td><strong>C++ 声明，蓝图实现</strong></td></tr>
+    <tr><td><strong>BlueprintNativeEvent</strong></td><td><em>C++ 有默认实现，蓝图可覆盖</em></td></tr>
+    <tr><td><strong>BlueprintPure</strong></td><td><em>无副作用的函数（不加执行引脚）</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">两个最有用的事件类型</span>
+  <strong>① BlueprintImplementableEvent</strong>——<em>C++ 声明，蓝图实现</em><br><code>UFUNCTION(BlueprintImplementableEvent)</code><br><code>void OnWeaponFired();</code><br><em>C++ 里没有实现，调用时执行蓝图的版本</em>。<br><strong>用途</strong>：<em>把"表现层"交给美术/策划</em>（<em>特效、音效、动画</em>）。<br><br><strong>② BlueprintNativeEvent</strong>——<em>C++ 有默认，蓝图可覆盖</em><br><code>UFUNCTION(BlueprintNativeEvent)</code><br><code>void OnDamaged(float Amount);</code><br><code>// 实现要加 _Implementation 后缀</code><br><code>void AMyActor::OnDamaged_Implementation(float Amount) { /* 默认逻辑 */ }</code><br><strong>用途</strong>：<em>默认行为 + 允许定制</em>。<br><br><strong>注意</strong>：<em>NativeEvent 的实现函数必须加 <code>_Implementation</code> 后缀</em>——<strong>忘了会链接错误。</strong>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="14">
+  <div class="task"><input type="checkbox" id="t-14-1"><label for="t-14-1"><strong>做一次划分</strong>：拿你项目的一个系统，按"多久变一次"的原则分 C++ 和蓝图。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-2"><label for="t-14-2"><strong>暴露变量</strong>：用 <code>BlueprintReadWrite</code> 暴露一个变量，在蓝图里修改。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-3"><label for="t-14-3"><strong>暴露函数</strong>：用 <code>BlueprintCallable</code> 暴露一个函数，在蓝图里调用。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-4"><label for="t-14-4"><strong>用 ImplementableEvent</strong>：C++ 声明一个事件，在蓝图里实现，验证调用。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-5"><label for="t-14-5"><strong>用 NativeEvent</strong>：实现一个带默认行为的 NativeEvent，<em>注意 _Implementation 后缀</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-6"><label for="t-14-6"><strong>测性能</strong>：用蓝图和 C++ 分别实现同一个 Tick 逻辑，对比性能。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-7"><label for="t-14-7"><strong>回答面试题</strong>：① C++ 和蓝图怎么划分？② 蓝图比 C++ 慢多少？③ NativeEvent 的实现函数为什么要加后缀？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能用"多久变一次"原则划分 C++ 和蓝图</strong>；<br>
+    ② <strong>知道蓝图比 C++ 慢 10~40 倍，以及什么时候该换</strong>；<br>
+    ③ 能说出六个暴露说明符；<br>
+    ④ <strong>知道 ImplementableEvent 和 NativeEvent 的区别</strong>；<br>
+    ⑤ 知道 NativeEvent 的实现要加 <code>_Implementation</code> 后缀。<br>
+    <br>
+    <em>第 ① 和 第 ② 条最重要——**这条边界决定了项目的开发效率**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="13-ue-framework.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">13 Gameplay Framework ★★★</div>
+  </a>
+  <a class="next" href="15-ue-gas.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">15 GAS 技能系统 ★★</div>
+  </a>
+</nav>

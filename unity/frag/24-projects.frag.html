@@ -1,0 +1,118 @@
+<h1>24 · 实战项目集</h1>
+
+<p class="lead">这是<strong>把前面 23 页全部串起来的一页</strong>。你不需要做十个项目——<em>但必须做完其中两到三个，而且要"做完"</em>。没做完的项目在面试里等于没有。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>前面 23 页</strong>是知识。这一页是<em>把知识变成作品</em>。
+  <strong>关键衔接</strong>：每个项目都标注了它用到哪些页的知识——<em>做项目的过程就是复习</em>。
+  <strong>下一页</strong>（25）面试与作品集。<em>项目做完之后，要会讲。</em>
+  <strong>最重要的提醒</strong>：<strong>完成比完美重要</strong>。一个做完的小游戏，价值远高于三个没做完的"大作"。
+</div>
+
+<h2 id="projects">一、十个项目（按难度递增）</h2>
+
+<p>下面十个项目<strong>难度递增</strong>。它们不是让你全做——而是<em>给你一个可以按需选择的清单</em>。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>#</th><th>项目</th><th>核心考点</th><th>相关页</th><th>建议时长</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><strong>打砖块 / 贪吃蛇</strong></td><td>基础生命周期、输入、碰撞</td><td>03, 11, 12</td><td>3 天</td></tr>
+    <tr><td>2</td><td><strong>2D 平台跳跃</strong></td><td>CharacterController、状态机、动画</td><td>12, 13</td><td>1 周</td></tr>
+    <tr><td>3</td><td><strong>卡牌对战（单机）</strong></td><td>数据驱动设计、ScriptableObject</td><td>11, 20</td><td>1.5 周</td></tr>
+    <tr><td>4</td><td><strong>塔防游戏</strong></td><td>寻路、对象池、UI 框架</td><td>11, 14, 算法站 21</td><td>2 周</td></tr>
+    <tr><td>5</td><td><strong>Roguelike 地牢</strong></td><td>程序化生成、背包、掉落</td><td>算法站 24</td><td>2.5 周</td></tr>
+    <tr><td>6</td><td><strong>动作游戏（含连招）</strong></td><td>Animator 状态机、帧同步、手感调优</td><td>13, 22</td><td>3 周</td></tr>
+    <tr><td>7</td><td><strong>FPS 射击</strong></td><td>射线检测、AI 行为树、性能优化</td><td>12, 算法站 17</td><td>3 周</td></tr>
+    <tr><td>8</td><td><strong>模拟经营</strong></td><td>大量实体管理、性能优化、存档</td><td>21, 算法站 26</td><td>4 周</td></tr>
+    <tr><td>9</td><td><strong>联机对战（小规模）</strong></td><td>状态同步、网络延迟处理</td><td>22</td><td>4 周</td></tr>
+    <tr><td>10</td><td><strong>完整热更手游 Demo</strong></td><td>Lua 热更、资源管理、发布流程</td><td>Lua 站全部</td><td>6 周</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三个必须避免的坑</span>
+  <strong>① 只做演示、不做系统</strong><br>
+  很多人的项目只有"能跑"，没有存档、没有设置、没有暂停。<em>这些才是体现工程能力的地方。</em><br><br>
+  <strong>② 中途换项目</strong><br>
+  "这个不好玩，我换个想法"——<em>这是最常见的失败原因</em>。<br>
+  <strong>完成一个粗糙的，胜过开始十个完美的。</strong><br><br>
+  <strong>③ 不写文档</strong><br>
+  做完就忘了当时怎么设计的。<em>面试时讲不出"为什么这样设计"。</em><br>
+  <strong>建议</strong>：每个项目维护一份 README，记录技术选型与取舍。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">怎么让项目"值得写进简历"</span>
+  <strong>不是"我做了个塔防"，而是：</strong><br>
+  · "实现了 A* + 流场混合寻路，200 个单位同时寻路保持 60 帧"<br>
+  · "用对象池 + 分帧加载把 GC 从每帧 2KB 降到 0"<br>
+  · "设计了数据驱动的技能系统，策划可配置 200+ 技能无需改代码"<br><br>
+  <strong>区别在于：量化 + 技术决策 + 你解决的具体问题。</strong><br>
+  <em>面试官不关心你做了什么游戏，只关心你在其中解决了什么技术问题。</em>
+</div>
+
+<h2 id="skeleton">二、每个项目都应该有的"骨架"</h2>
+
+<p>不管做什么游戏，<strong>这七个系统都应该有</strong>。它们不是"加分项"，而是<em>基本功的体现</em>。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>系统</th><th>最低要求</th><th>相关页</th></tr></thead>
+  <tbody>
+    <tr><td><strong>游戏流程</strong></td><td>主菜单 → 游戏 → 结算 → 重开</td><td>20</td></tr>
+    <tr><td><strong>存档</strong></td><td>至少能保存进度与设置</td><td>16</td></tr>
+    <tr><td><strong>设置界面</strong></td><td>音量、分辨率、按键</td><td>14, 15</td></tr>
+    <tr><td><strong>暂停</strong></td><td>正确的 timeScale 处理</td><td>20</td></tr>
+    <tr><td><strong>音效管理</strong></td><td>BGM + 音效池，音量可调</td><td>15</td></tr>
+    <tr><td><strong>UI 架构</strong></td><td>界面栈、返回逻辑正确</td><td>14, 20</td></tr>
+    <tr><td><strong>性能预算</strong></td><td>目标机型上稳定 60 帧</td><td>21</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">为什么这些"无聊"的系统很重要</span>
+  <strong>因为面试官会问</strong>：<br>
+  · "你的存档怎么处理版本兼容？"<br>
+  · "暂停时 timeScale 改了，你的协程会出问题吗？"<br>
+  · "UI 打开三层后返回键怎么处理？"<br><br>
+  <em>这些问题答不好，会立刻暴露"只做过 demo，没做过完整项目"。</em><br><br>
+  <strong>而且这些系统本身不难</strong>——每个大概半天到一天。相比之下，它们的<em>面试收益远高于再做一个炫酷特效</em>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="24">
+  <div class="task"><input type="checkbox" id="t-24-1"><label for="t-24-1"><strong>选定两个项目</strong>：从清单里选一个"能做完的"和一个"有挑战的"。<em>写下来，不要中途换。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-24-2"><label for="t-24-2"><strong>给第一个项目定范围</strong>：明确"什么不做"——<em>范围控制是能做完的关键</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-3"><label for="t-24-3"><strong>做完整骨架</strong>：先把七个基础系统搭起来，再加玩法。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-4"><label for="t-24-4"><strong>写 README</strong>：记录技术选型、遇到的问题、怎么解决的。<em>面试时直接用。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-24-5"><label for="t-24-5"><strong>量化你的优化</strong>：记录优化前后的帧率、GC、内存数字。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-6"><label for="t-24-6"><strong>让别人玩一次</strong>：观察他们在哪里卡住、哪里困惑。<em>这是最有效的测试。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-24-7"><label for="t-24-7"><strong>做完它</strong>：不换项目，直到能从头玩到尾。</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 至少有<strong>一个能从头玩到尾</strong>的完整项目；<br>
+    ② 项目包含七个基础系统（存档、设置、暂停等）；<br>
+    ③ <strong>有一份记录技术选型与优化数据的 README</strong>；<br>
+    ④ 能说出项目中最难的技术问题及解决过程；<br>
+    ⑤ 项目在目标机型上稳定运行。<br>
+    <br>
+    <em>这五条做到，你就有了面试的硬通货。做不到第 ① 条，其他都是空谈。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="23-ai.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">23 AI 辅助开发与 AI NPC</div>
+  </a>
+  <a class="next" href="25-interview.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">25 面试、作品集与资源</div>
+  </a>
+</nav>

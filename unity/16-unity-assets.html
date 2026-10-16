@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>16 资源管理与热更新 — C# + Unity 路线｜从零基础到独立完成商业级项目</title>
+<meta name="description" content="Resources 陷阱、AssetBundle 依赖管理、Addressables 深入、四种热更方案对比">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C# + Unity 路线
+        <span>从零基础到独立完成商业级项目</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>16 · 资源管理与热更新</h1>
+
+<p class="lead">这是<strong>Unity 工程能力的分水岭</strong>。会不会做玩法是一回事，能不能<em>管好几百 MB 的资源、让包体可控、让线上能热更</em>是另一回事。这一页讲三代资源方案的演进与取舍。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（15）讲了输入与音频——音效资源本身就是"资源"。<br>
+  <strong>关键衔接</strong>：页 11 讲的<em>预制体与对象池</em>在这一页会延伸到"资源怎么加载"；页 07 讲的 <em>GC 与内存</em>在这里变成"资源怎么卸载"。<br>
+  <strong>下一页</strong>（17）渲染与画面优化。<em>图集、纹理压缩、LOD 都属于"资源"与"渲染"的交叉地带。</em><br>
+  <strong>难度提示</strong>：这一页的<strong>概念不难但工程复杂度高</strong>——热更新是上线项目最容易出事故的地方。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="11-unity-core.html#prefab" data-brief="Instantiate/Destroy 的真实成本，对象池的适用场景"><span class="prereq__title">预制体</span><span class="prereq__page">11-unity-core</span></a>
+          <a class="prereq__item" href="11-unity-core.html#so" data-brief="数据与代码分离：配置表、事件通道、全局数据容器"><span class="prereq__title">ScriptableObject</span><span class="prereq__page">11-unity-core</span></a>
+          <a class="prereq__item" href="06-cs-modern.html#reflection" data-brief="运行时检查类型；慢 100~1000 倍，IL2CPP 下泛型反射有限制"><span class="prereq__title">反射</span><span class="prereq__page">06-cs-modern</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="evolution">一、三代资源方案的演进</h2>
+
+<p>资源管理方案经历了三代。<strong>每一代都解决了上一代的问题，也带来了新的复杂度。</strong></p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using System.Collections.Generic;
+
+// ============================================================
+//  资源管理：从 Resources 到 Addressables 的三代演进
+// ============================================================
+//  第一代 Resources.Load      —— 简单，但全量打包，不可热更
+//  第二代 AssetBundle         —— 灵活，但依赖管理要自己做
+//  第三代 Addressables        —— 自动依赖、可远程、引用计数
+//
+// 本文件演示三种方案的写法与取舍。
+
+public class ResourcesDemo : MonoBehaviour
+{
+    // ============================================================
+    //  第一代：Resources（不推荐）
+    // ============================================================
+    private void LoadFromResources()
+    {
+        // 【致命问题】Resources 目录下所有资源都会被【无条件】打进包里，
+        // 无论有没有用到。这意味着：
+        //   · 包体增大（哪怕是废弃资源也会被打包）
+        //   · 启动变慢（启动时要建立索引）
+        //   · 【无法热更新】（在包里，改不了）
+        GameObject prefab = Resources.Load&lt;GameObject&gt;("Prefabs/Enemy");
+        if (prefab != null)
+        {
+            Instantiate(prefab);
+        }
+
+        // 卸载：只能统一卸载，无法精确控制
+        // Resources.UnloadUnusedAssets();   // 触发 GC，有性能开销
+
+        // 【官方立场】Unity 明确不推荐使用 Resources 目录做资源管理
+    }
+}
+
+// ============================================================
+//  第二代：AssetBundle
+// ============================================================
+public class BundleDemo : MonoBehaviour
+{
+    private AssetBundle _bundle;
+
+    private void LoadBundle()
+    {
+        // 加载 AB 包（本地用 LoadFromFile，远程用 UnityWebRequest）
+        string path = System.IO.Path.Combine(Application.streamingAssetsPath, "enemy");
+        _bundle = AssetBundle.LoadFromFile(path);
+
+        if (_bundle == null)
+        {
+            Debug.LogError("Bundle 加载失败");
+            return;
+        }
+
+        // 从包里加载具体资源
+        GameObject prefab = _bundle.LoadAsset&lt;GameObject&gt;("Enemy");
+        if (prefab != null) Instantiate(prefab);
+
+        // 【关键】卸载策略（这是最容易搞错的地方）
+        //   Unload(false)：只卸载包的结构，已加载的资源【保留】
+        //   Unload(true)：连已加载的资源一起卸载（会导致场景物体变白）
+        // _bundle.Unload(false);
+    }
+
+    // ---------- AB 包的三大痛点 ----------
+    // 1. 【依赖管理】A 包依赖 B 包，必须自己维护依赖表并先加载 B
+    // 2. 【重复资源】同一个贴图被多个包引用，会被打进多个包（包体膨胀）
+    // 3. 【引用计数】资源被谁引用了、什么时候能卸载，全要自己管
+}
+
+// ============================================================
+//  第三代：Addressables（推荐）
+// ============================================================
+public class AddressableDemo : MonoBehaviour
+{
+    // 用 async / await 的方式（需要 UniTask 或 Unity 2021+ 的 AsyncOperationHandle）
+    private async void LoadAsync()
+    {
+        // 按地址加载，不需要知道它在哪个包里
+        var handle = UnityEngine.AddressableAssets.Addressables
+            .LoadAssetAsync&lt;GameObject&gt;("Assets/Prefabs/Enemy.prefab");
+
+        await handle.Task;
+
+        if (handle.Status == UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationStatus.Succeeded)
+        {
+            Instantiate(handle.Result);
+        }
+
+        // 【重要】引用计数：加载一次，就要释放一次
+        UnityEngine.AddressableAssets.Addressables.Release(handle);
+    }
+
+    // ---------- Addressables 解决的三个问题 ----------
+    // 1. 自动依赖管理：声明了依赖，系统自动先加载
+    // 2. 自动去重：同一个资源不会重复打包
+    // 3. 引用计数：Load 加一，Release 减一，减到零才卸载
+
+    // ---------- 但仍然要注意 ----------
+    // · 必须严格配对 Load / Release，漏了会内存泄漏
+    // · 首次加载有延迟（要读 catalog），需要预加载
+    // · 远程加载要处理失败重试
+}
+
+// ============================================================
+//  资源管理选型表
+// ============================================================
+//  方案            上手难度   热更   依赖管理   包体影响
+//  ----------------------------------------------------------
+//  Resources       极低      不支持  无        全量打包（差）
+//  AssetBundle     高        支持    手动（难） 可控（好）
+//  Addressables    中        支持    自动（好） 可控（好）
+//
+//  【结论】新项目一律用 Addressables。
+//          小项目 / 原型可以用 Resources，但不要等到项目大了再迁移——
+//          迁移成本远高于一开始就用对。
+
+// ============================================================
+//  资源加载的性能要点
+// ============================================================
+public class AssetPerf : MonoBehaviour
+{
+    // 1. 【异步加载】大资源必须异步，否则卡帧
+    private void LoadAsyncPattern()
+    {
+        // 用协程或 async 加载，配合加载界面
+        // StartCoroutine(LoadRoutine());
+    }
+
+    // 2. 【预加载】在加载界面把常用资源先加载好
+    // 3. 【对象池】频繁创建销毁的对象用池（见页 11）
+    // 4. 【及时释放】场景切换时释放不再用的资源
+    // 5. 【图集】UI 小图合并成大图，减少 Draw Call 与加载次数
+    // 6. 【压缩格式】纹理用 ASTC（移动端）/ DXT（PC），不要用无压缩
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方案</th><th>上手难度</th><th>热更</th><th>依赖管理</th><th>包体影响</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Resources</strong></td><td>极低</td><td><span class="mk mk--no">不支持</span></td><td>无</td><td><span class="mk mk--no">全量打包（差）</span></td></tr>
+    <tr><td><strong>AssetBundle</strong></td><td>高</td><td><span class="mk mk--yes">支持</span></td><td><span class="mk mk--no">手动（难）</span></td><td><span class="mk mk--yes">可控（好）</span></td></tr>
+    <tr><td><strong>Addressables</strong></td><td>中</td><td><span class="mk mk--yes">支持</span></td><td><span class="mk mk--yes">自动（好）</span></td><td><span class="mk mk--yes">可控（好）</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="resources-problem">二、Resources 为什么被官方弃用</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">Resources 的三个致命问题</span>
+  <strong>① 全量打包</strong>：<code>Resources</code> 目录下<em>所有</em>资源都会被无条件打进包里，无论有没有用到。<br>
+  · 废弃资源也会被打包 → <strong>包体膨胀</strong><br>
+  · 启动时要建立索引 → <strong>启动变慢</strong><br><br>
+  <strong>② 无法热更新</strong>：资源在包里，改了必须重新发版。<em>这对需要频繁更新的手游是致命的。</em><br><br>
+  <strong>③ 内存无法精确控制</strong>：只能 <code>UnloadUnusedAssets</code> 统一卸载，<em>而它本身会触发 GC，有性能开销</em>。<br><br>
+  <strong>Unity 官方明确不推荐使用 Resources 目录做资源管理。</strong>
+</div>
+
+<h2 id="bundle-pain">三、AssetBundle 的三大痛点</h2>
+
+<p>AssetBundle 解决了热更新，但<strong>把复杂度全部转嫁给了开发者</strong>。</p>
+<div class="callout callout--warn">
+  <span class="callout__title">痛点一：依赖管理</span>
+  A 包依赖 B 包，你必须<em>自己维护依赖表</em>，并保证加载 A 之前先加载 B。<br>
+  漏了就会看到——<strong>贴图变白、材质丢失、模型变成紫色方块</strong>。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">痛点二：重复资源</span>
+  同一个贴图被多个包引用时，会被<em>打进多个包</em>。<br>
+  这会导致<strong>包体膨胀</strong>，而且同一个资源在内存里有<em>多份副本</em>。<br><br>
+  <em>解决方法是做"依赖包"提取公共资源——但那个配置表非常难维护。</em>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">痛点三：引用计数</span>
+  资源被谁引用了、什么时候能卸载，<strong>全部要自己管</strong>。<br>
+  卸载早了 → <em>场景物体变白</em>；卸载晚了 → <em>内存爆掉</em>。<br><br>
+  <code>Unload(false)</code> 与 <code>Unload(true)</code> 的区别是<em>经典面试题</em>。
+</div>
+
+<h2 id="addressables-value">四、Addressables 解决什么</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">Addressables 的三个优势</span>
+  <strong>① 自动依赖管理</strong>：声明了依赖，系统自动先加载。<em>不用再手写依赖表。</em><br>
+  <strong>② 自动去重</strong>：同一个资源不会重复打包。<br>
+  <strong>③ 引用计数</strong>：<code>Load</code> 加一，<code>Release</code> 减一，减到零才卸载。<em>卸载时机自动管理。</em><br><br>
+  <strong>但仍要注意</strong>：<br>
+  · 必须严格配对 <code>Load</code> / <code>Release</code>，<em>漏了会内存泄漏</em><br>
+  · 首次加载有延迟（要读 catalog），<strong>需要预加载</strong><br>
+  · 远程加载要处理失败重试
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">迁移成本提示</span>
+  <strong>小项目 / 原型</strong>可以用 Resources，但不要等到项目大了再迁移——<em>迁移成本远高于一开始就用对</em>。<br>
+  <strong>新项目</strong>一律用 Addressables。<br>
+  <strong>已有项目</strong>：如果包体还能接受，<em>不要为了"先进"而重写资源层</em>。
+</div>
+
+<h2 id="hotupdate">五、热更新的完整流程</h2>
+
+<p>热更新是<strong>上线手游的标配能力</strong>。它的流程是：</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>步骤</th><th>做什么</th><th>关键点</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1. 资源版本</strong></td><td>服务器维护资源版本号与清单</td><td>客户端启动时比对</td></tr>
+    <tr><td><strong>2. 差异下载</strong></td><td>只下载变化的资源包</td><td><strong>增量更新，不是全量</strong></td></tr>
+    <tr><td><strong>3. 校验</strong></td><td>MD5 / 大小校验</td><td><em>防止下载损坏</em></td></tr>
+    <tr><td><strong>4. 落盘</strong></td><td>写入持久化目录</td><td><code>persistentDataPath</code></td></tr>
+    <tr><td><strong>5. 切换</strong></td><td>下次启动使用新资源</td><td><strong>支持回滚</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">热更新最容易出事故的三个点</span>
+  <strong>① 下载中断</strong>：玩家在弱网下载到一半退出。<em>必须支持断点续传，且保证半包不会被使用。</em><br><br>
+  <strong>② 版本不一致</strong>：玩家 A 更新了、玩家 B 没更新，两人联机会出问题。<em>需要做版本校验与强制更新。</em><br><br>
+  <strong>③ 无法回滚</strong>：新版本有严重 bug 时，<em>必须能快速回退到上一版本</em>。<br>
+  <strong>业界标准做法</strong>：保留上一版本的完整资源，出问题时切换回去。<br><br>
+  <em>这一条是"能不能上线的分界线"——没有回滚方案的热更，等于把线上项目放在没有刹车的车上。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="16">
+  <div class="task"><input type="checkbox" id="t-16-1"><label for="t-16-1"><strong>检查项目里的 Resources 使用</strong>：搜索所有 <code>Resources.Load</code>，统计有多少是被真正使用的。<em>很多项目里超过一半是废弃的。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-16-2"><label for="t-16-2"><strong>做一次 AB 包实验</strong>：手动打两个有依赖关系的包，故意先加载依赖方，观察贴图变白的问题。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-3"><label for="t-16-3"><strong>读 Unload 的源码文档</strong>：确认 <code>Unload(false)</code> 与 <code>Unload(true)</code> 的区别，并写一个例子验证。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-4"><label for="t-16-4"><strong>接入 Addressables</strong>：把项目里的一个 Resources 加载改成 Addressables，用 Profiler 对比内存占用。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-5"><label for="t-16-5"><strong>设计一个热更清单格式</strong>：用 JSON 描述"版本号 + 文件路径 + MD5 + 大小"，写一个解析器。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-6"><label for="t-16-6"><strong>做版本比对逻辑</strong>：实现"本地版本 vs 服务器版本"的差异计算，输出需要下载的文件列表。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-7"><label for="t-16-7"><strong>回答面试题</strong>：① Resources 为什么被弃用？② AB 包的依赖问题怎么解决？③ 热更新怎么做回滚？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能对比三代资源方案的优劣，并说出各自适用场景；<br>
+    ② <strong>能说出 Resources 的三个致命问题</strong>；<br>
+    ③ 知道 AssetBundle 的三大痛点（依赖、重复、引用计数）；<br>
+    ④ 能解释 Addressables 的引用计数机制，以及漏 Release 的后果；<br>
+    ⑤ <strong>能画出热更新的完整流程，并说出三个最容易出事故的点</strong>。<br>
+    <br>
+    <em>第 ⑤ 条是这一页最有价值的内容——它决定了你能不能让项目"安全地上线"。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="15-unity-input.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">15 输入与音频</div>
+  </a>
+  <a class="next" href="17-unity-render.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">17 渲染与画面优化</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

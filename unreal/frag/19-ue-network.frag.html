@@ -1,0 +1,91 @@
+<h1>19 · 网络与多人游戏 ★★★</h1>
+
+<p class="lead">这是<strong>Unreal 最有价值也最复杂的部分</strong>。UE 的网络框架<em>开箱即用</em>——但<strong>理解不到位会写出各种诡异 bug</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="model">一、UE 的网络模型</h2>
+
+<p>UE 采用<strong>服务器权威（Server Authoritative）</strong>模型。<em>理解这个模型是理解一切的前提。</em></p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>角色</th><th>含义</th><th>权限</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Server</strong></td><td><strong>权威</strong></td><td><em>决定一切</em></td></tr>
+    <tr><td><strong>Client</strong></td><td><em>请求与显示</em></td><td><strong>没有权威</strong></td></tr>
+    <tr><td><strong>AutonomousProxy</strong></td><td><strong>本地控制的角色</strong></td><td><em>有输入权</em></td></tr>
+    <tr><td><strong>SimulatedProxy</strong></td><td><em>其他角色</em></td><td><strong>只能插值显示</strong></td></tr>
+    <tr><td><strong>Listen Server</strong></td><td><em>既是服务器又是玩家</em></td><td><strong>开发期常用</strong></td></tr>
+    <tr><td><strong>Dedicated Server</strong></td><td><em>专用服务器</em></td><td><em>正式上线用</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">最重要的一条：客户端不能改权威状态 ★★★</span>
+  <strong>这是网络游戏的第一原则。</strong><br><br><strong>错误做法</strong>：<em>客户端直接扣血</em><br><code>// 在客户端执行</code><br><code>Health -= Damage;</code><br><em>作弊者可以随意改这个值。</em><br><br><strong>正确做法</strong>：<em>客户端请求 → 服务器验证 → 服务器执行 → 复制回客户端</em><br><code>// 客户端</code><br><code>ServerTakeDamage(Damage);   // RPC 请求</code><br><code>// 服务器</code><br><code>void ServerTakeDamage_Implementation(float Damage) {</code><br><code>&nbsp;&nbsp;Health -= Damage;   // 服务器才是权威</code><br><code>}</code><br><br><strong>怎么判断该放哪</strong>：<em>问"如果玩家能随意改这个值，会怎样？"</em><br>· <em>会破坏游戏平衡 → 服务器</em><br>· <em>只影响本地显示 → 客户端</em><br><br><strong>这和 Lua 站页 21 讲的"客户端不可信"是同一个原则。</strong>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">三种 RPC 及其适用场景</span>
+  <div class="table-wrap"><table><thead><tr><th>RPC</th><th>方向</th><th>用途</th></tr></thead><tbody><tr><td><code>Server</code></td><td>客户端 → 服务器</td><td><strong>请求操作</strong></td></tr><tr><td><code>Client</code></td><td>服务器 → 特定客户端</td><td><em>通知特定玩家</em></td></tr><tr><td><code>NetMulticast</code></td><td>服务器 → 所有客户端</td><td><strong>广播效果</strong></td></tr></tbody></table></div><br><strong>典型用法</strong>：<br>· <em>开枪</em> → <code>ServerFire()</code>（<em>请求</em>）<br>· <em>播放枪声</em> → <code>MulticastPlaySound()</code>（<em>所有人听到</em>）<br>· <em>提示"你被击中了"</em> → <code>ClientShowHitMarker()</code>（<em>只给本人</em>）<br><br><strong>关键规则</strong>：<br>· <em>RPC 只能从"有权限"的一端调用</em><br>· <em>实现函数必须加 <code>_Implementation</code> 后缀</em><br>· <strong>RPC 不能返回值</strong>（<em>异步的</em>）
+</div>
+
+<h2 id="replication">二、属性复制与预测</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>机制</th><th>作用</th><th>复杂度</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Replicated 属性</strong></td><td><em>服务器 → 客户端同步</em></td><td>低</td></tr>
+    <tr><td><strong>RepNotify</strong></td><td><strong>值变化时回调</strong></td><td>低</td></tr>
+    <tr><td><strong>RPC</strong></td><td><em>单次调用</em></td><td>中</td></tr>
+    <tr><td><strong>客户端预测</strong></td><td><strong>本地立即响应</strong></td><td><span class="mk mk--no">高</span></td></tr>
+    <tr><td><strong>服务器回滚</strong></td><td><em>修正预测错误</em></td><td>高</td></tr>
+    <tr><td><strong>插值</strong></td><td><em>平滑其他玩家</em></td><td>低</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">为什么需要"客户端预测"</span>
+  <strong>问题</strong>：<em>玩家按下移动键，要等服务器确认才动</em>——<strong>延迟 100ms 就是明显的手感问题</strong>。<br><br><strong>预测的做法</strong>：<br>① 客户端<strong>立即</strong>执行移动<br>② 同时把输入发给服务器<br>③ 服务器计算并返回权威位置<br>④ <em>如果客户端预测错了，服务器纠正</em><br><br><strong>效果</strong>：<em>本地操作零延迟感</em>。<br><br><strong>代价</strong>：<br>· <em>需要"回滚重放"的复杂度</em><br>· <em>可能出现"回拉"</em>（<em>预测错误时位置突然跳</em>）<br><br><strong>UE 提供的帮助</strong>：<br>· <code>ACharacter</code> <em>内置了移动预测</em><br>· GAS <em>内置了技能的预测</em><br><em>这就是为什么要用 UE 的框架而不是自己写。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="19">
+  <div class="task"><input type="checkbox" id="t-19-1"><label for="t-19-1"><strong>开 Listen Server</strong>：在编辑器里测试多人（Play → Number of Players = 2）。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-2"><label for="t-19-2"><strong>测属性复制</strong>：用 <code>UPROPERTY(Replicated)</code> 同步一个变量，观察两个窗口的值。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-3"><label for="t-19-3"><strong>用 RepNotify</strong>：加 <code>OnRep_</code> 回调，观察值变化时触发。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-4"><label for="t-19-4"><strong>做一次 RPC</strong>：实现 <code>Server</code> 和 <code>Multicast</code>，观察执行端。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-5"><label for="t-19-5"><strong>复现"客户端改状态"</strong>：故意在客户端改血量，观察它会被服务器覆盖。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-6"><label for="t-19-6"><strong>回答面试题</strong>：① 客户端能不能改权威状态？② 三种 RPC 的区别？③ 为什么需要客户端预测？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道 UE 是服务器权威模型</strong>；<br>
+    ② <strong>知道"客户端不能改权威状态"这条第一原则</strong>；<br>
+    ③ 能说出三种 RPC 及适用场景；<br>
+    ④ 知道 RPC 实现要加 <code>_Implementation</code> 后缀；<br>
+    ⑤ <strong>理解客户端预测的必要性与代价</strong>。<br>
+    <br>
+    <em>第 ② 条是本页最重要的——**它也是所有网络游戏的第一原则**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="18-ue-niagara.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">18 Niagara 与物理</div>
+  </a>
+  <a class="next" href="20-ue-ui.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">20 UI 与音频</div>
+  </a>
+</nav>

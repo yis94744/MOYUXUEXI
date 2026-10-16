@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>04 table 与元表 ★ — Lua 热更新路线｜从零基础到独立搭建可上线的热更框架</title>
+<meta name="description" content="table 的本质、数组与字典、元表元方法、面向对象实现">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">Lua 热更新路线
+        <span>从零基础到独立搭建可上线的热更框架</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>04 · table 与元表 ★★★</h1>
+
+<p class="lead">这一页是<strong>整个 Lua 语言最重要的内容</strong>。Lua 没有数组、字典、类、模块——<strong>所有这些都用 table 实现</strong>。而元表（metatable）让 table 能重载运算符、定义缺失行为、实现继承。<em>不懂元表，你就看不懂任何 Lua 框架的源码。</em></p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（03）讲的是语法基础。这一页讲 Lua 的<em>核心数据结构</em>——它是后面所有内容的基石。<br>
+  <strong>为什么这一页标三个星</strong>：接下来你会遇到的<em>面向对象（06）、框架设计（13-17）、xLua 的类型映射（10）</em>，全部建立在元表之上。<br>
+  <strong>下一页</strong>（05）函数与闭包——Lua 的另一个"魔法"来源。<br>
+  <strong>验证方式</strong>：本页所有代码在 <em>Lua 5.4.7</em> 解释器里实际运行过，输出结果是真实的。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="04-lua-table.html#table-basic" data-brief="# 对含 nil 的表不可靠，用 select 计数"><span class="prereq__title">Lua table</span><span class="prereq__page">04-lua-table</span></a>
+          <a class="prereq__item" href="04-lua-table.html#metatable" data-brief="__index 两种形式、__newindex、运算符重载"><span class="prereq__title">元表</span><span class="prereq__page">04-lua-table</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="table-basic">一、table 基础 ★</h2>
+
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  table：Lua 唯一的数据结构
+-- ============================================================
+--  Lua 没有数组、字典、类、模块的概念，
+--  所有这些都是用 table 实现的。理解 table 就理解了 Lua 的一半。
+
+print("=== 1. 两种初始化方式 ===")
+-- 数组式（隐式索引 1,2,3...）
+local arr = { "a", "b", "c" }
+print("数组:", arr[1], arr[2], arr[3])
+
+-- 字典式（显式键）
+local dict = { name = "张三", age = 25, ["key with space"] = "支持带空格的键" }
+print("字典:", dict.name, dict["age"], dict["key with space"])
+
+-- 混合式
+local mixed = { "first", "second", name = "混合", [10] = "十" }
+print("混合:", mixed[1], mixed[2], mixed.name, mixed[10])
+
+print()
+print("=== 2. 索引从 1 开始，不是 0 ===")
+-- 【高频错误点】这是 Lua 与几乎所有其他语言最大的差异
+local t = { "a", "b", "c" }
+print("t[0] =", t[0])          -- nil（不存在！）
+print("t[1] =", t[1])          -- "a"
+print("#t   =", #t)            -- 3
+
+print()
+print("=== 3. 长度运算符 # 的真相 ===")
+local seq = { 1, 2, 3, 4, 5 }
+print("连续数组 #:", #seq)               -- 5
+
+-- 【重要】# 只对「序列」可靠。有空洞的表长度是未定义的
+local hole = { 1, 2, nil, 4 }
+print("有空洞的表 #:", #hole)           -- 结果不确定（可能是 4，也可能是 2）
+print("空洞表用 select 数:", select("#", table.unpack(hole, 1, 4)))
+
+-- 安全做法：自己数
+local function countSafe(tbl)
+  local n = 0
+  for _ in pairs(tbl) do n = n + 1 end
+  return n
+end
+print("安全计数:", countSafe(hole))
+
+print()
+print("=== 4. 表的增删改查 ===")
+local list = {}
+
+-- 尾部添加
+table.insert(list, "A")
+table.insert(list, "B")
+print("insert 后:", #list, list[1], list[2])
+
+-- 指定位置插入（后续元素后移）
+table.insert(list, 1, "ZERO")
+print("头插后:", #list, list[1], list[2], list[3])
+
+-- 删除并返回
+local removed = table.remove(list)
+print("remove 返回:", removed, "剩余:", #list)
+
+-- 指定位置删除
+local removedFirst = table.remove(list, 1)
+print("头删返回:", removedFirst, "剩余:", #list)
+
+-- 清空：三种方式
+list = {}                          -- 最快，推荐
+-- for i = #list, 1, -1 do table.remove(list) end
+-- list[1] = nil                      -- 错误！不会真正清空
+
+print()
+print("=== 5. 遍历：pairs 与 ipairs 的区别 ===")
+local data = { 10, 20, 30, name = "test", [100] = "hundred" }
+
+print("-- ipairs（只遍历连续整数键，遇到第一个 nil 停止）")
+for i, v in ipairs(data) do
+  print("   i=" .. i .. " v=" .. tostring(v))
+end
+
+print("-- pairs（遍历所有键，顺序不确定）")
+for k, v in pairs(data) do
+  print("   k=" .. tostring(k) .. " v=" .. tostring(v))
+end
+
+print()
+print("=== 6. 表是引用类型 ===")
+local a = { 1, 2, 3 }
+local b = a               -- 不是复制！b 和 a 指向同一个表
+b[1] = 999
+print("修改 b 影响 a:", a[1])            -- 999
+
+local c = a               -- 浅拷贝的正确写法
+local copy = {}
+for k, v in pairs(c) do copy[k] = v end
+copy[1] = 111
+print("浅拷贝互不影响:", a[1], copy[1])   -- 999  111
+
+print()
+print("=== 7. table 库常用函数 ===")
+local nums = { 5, 2, 8, 1, 9, 3 }
+
+-- 排序（默认升序）
+table.sort(nums)
+print("排序后:", table.concat(nums, ", "))
+
+-- 自定义排序（降序）
+table.sort(nums, function(x, y) return x &gt; y end)
+print("降序:", table.concat(nums, ", "))
+
+-- 拼接
+print("拼接:", table.concat(nums, "-"))
+
+-- 解包（5.2+ 用 table.unpack）
+print("unpack:", table.unpack({ "a", "b", "c" }))
+
+-- 打包（5.2+）
+local packed = table.pack(1, 2, 3, nil, 5)
+print("pack 后 n =", packed.n)
+
+print()
+print("=== 8. 性能：预分配大小 ===")
+-- Lua 的 table 会自动扩容，但扩容有成本。
+-- 已知大小时用 table.new（LuaJIT 扩展）或在循环外创建。
+local bigTable = {}
+local start = os.clock()
+for i = 1, 500000 do
+  bigTable[i] = i
+end
+print(string.format("插入 50 万次耗时: %.3f 秒", os.clock() - start))
+print("验证:", bigTable[500000])
+
+-- 【最佳实践】复用表而不是反复创建
+-- 差的写法：每次调用都建新表
+-- 好的写法：传一个「输出表」进来，或使用对象池</code></pre>
+
+<div class="callout callout--danger">
+  <span class="callout__title">反直觉之三：索引从 1 开始</span>
+  Lua 的数组索引<strong>从 1 开始</strong>，不是 0。这意味着：<br>
+  <code>local t = {"a","b","c"}</code> —— <code>t[1]</code> 是 <code>"a"</code>，<code>t[0]</code> 是 <code>nil</code>。<br><br>
+  <strong>为什么容易出错</strong>：<br>
+  • 从 C# / C / Java 转过来的人会习惯性写 <code>for i = 0, #t - 1</code>，<em>结果少遍历一个还报错</em>；<br>
+  • 与外部系统交互（C# 数组、网络协议）时，<strong>索引偏移是最常见的 bug 来源</strong>。<br><br>
+  <strong>正确写法</strong>：<code>for i = 1, #t do</code> 或 <code>for i, v in ipairs(t) do</code>。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">长度运算符 # 的真相（重要）</span>
+  <code>#t</code> <strong>只对"序列"可靠</strong>——也就是从 1 开始、连续、没有空洞的表。<br><br>
+  <strong>含 nil 的表，<code>#t</code> 的结果是"未定义的"</strong>——不同 Lua 版本、不同内部实现可能给出不同结果。<br>
+  在 Lua 5.4 实测中：<code>{1,2,nil,4}</code> 的 <code>#t</code> 返回 <strong>4</strong>，<code>{1,2,3,nil}</code> 返回 <strong>3</strong>——<em>看起来"对"，但这是实现细节，不是语言保证</em>。<br><br>
+  <strong>要准确计数，必须用 <code>select("#", ...)</code> 或自己遍历 <code>pairs</code>。</strong><br>
+  <em>这一条在代码 review 时经常被忽略，但在处理网络数据、可变参数时会导致真实 bug。</em>
+</div>
+
+<h2 id="metatable">二、元表：Lua 的全部魔法 ★★★</h2>
+
+<p>元表让一个普通 table 可以<strong>"重载"运算符、定义缺失行为、实现继承</strong>。Lua 的面向对象就是用元表实现的。</p>
+
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  元表（metatable）：Lua 最强大的机制 ★★★
+-- ============================================================
+--  元表让一个普通的 table 能够"重载"运算符、定义缺失行为、
+--  实现面向对象。Lua 的 OOP 就是用元表实现的。
+--  理解元表 = 理解 Lua 的全部魔法。
+
+print("=== 1. setmetatable / getmetatable ===")
+local t = {}
+local mt = {}
+setmetatable(t, mt)
+print("getmetatable(t) == mt :", getmetatable(t) == mt)
+
+-- 保护元表：加了 __metatable 字段后就取不到了
+setmetatable(t, { __metatable = "locked" })
+print("被保护的元表:", getmetatable(t))          -- "locked"
+
+print()
+print("=== 2. __index：访问不存在的键时触发 ===")
+-- 这是【最重要的元方法】，OOP 继承就靠它
+
+-- 形式一：__index 是表 —— 去那个表里找
+local base = { greeting = "hello" }
+local derived = setmetatable({}, { __index = base })
+print("derived.greeting =", derived.greeting)     -- "hello"（从 base 查到的）
+print("rawget 绕过 __index:", rawget(derived, "greeting"))  -- nil
+
+-- 形式二：__index 是函数 —— 自定义查找逻辑
+local dynamic = setmetatable({}, {
+  __index = function(tbl, key)
+    return "动态生成:" .. tostring(key)
+  end
+})
+print(dynamic.anything)              -- "动态生成:anything"
+print(dynamic.foo)                   -- "动态生成:foo"
+
+-- 缓存优化：查到后写回表，下次就不走 __index 了
+local cached = setmetatable({}, {
+  __index = function(tbl, key)
+    local v = "计算出的" .. tostring(key)
+    rawset(tbl, key, v)              -- 写回，后续直接命中
+    return v
+  end
+})
+print("首次（走 __index 计算）:", cached.expensive)
+print("rawget 直接取（能看到已写回）:", rawget(cached, "expensive"))
+print("二次访问（命中缓存，不走 __index）:", cached.expensive)
+
+print()
+print("=== 3. __newindex：写入新键时触发 ===")
+local log = {}
+local readonly = setmetatable({}, {
+  __newindex = function(tbl, key, value)
+    log[#log + 1] = string.format("尝试写入 %s = %s", tostring(key), tostring(value))
+    rawset(tbl, key, value)          -- 想真正写入必须用 rawset
+  end
+})
+readonly.name = "测试"
+readonly.value = 123
+print("写入日志:")
+for _, line in ipairs(log) do print("  " .. line) end
+
+-- 只读表（禁止写入）
+local locked = setmetatable({ fixed = 1 }, {
+  __newindex = function()
+    error("该表是只读的", 2)          -- 层级 2 让报错指向调用方
+  end
+})
+print("读取只读表:", locked.fixed)
+local ok, err = pcall(function() locked.newKey = 1 end)
+print("写入只读表:", ok, err)
+
+print()
+print("=== 4. 运算符重载 ===")
+local Vector = {}
+Vector.__index = Vector
+
+function Vector.new(x, y)
+  return setmetatable({ x = x, y = y }, Vector)
+end
+
+-- 算术运算符
+Vector.__add = function(a, b) return Vector.new(a.x + b.x, a.y + b.y) end
+Vector.__sub = function(a, b) return Vector.new(a.x - b.x, a.y - b.y) end
+Vector.__mul = function(a, b)
+  if type(b) == "number" then return Vector.new(a.x * b, a.y * b) end
+  return a.x * b.x + a.y * b.y            -- 点积
+end
+Vector.__unm = function(a) return Vector.new(-a.x, -a.y) end   -- 一元负号
+
+-- 比较运算符
+Vector.__eq = function(a, b) return a.x == b.x and a.y == b.y end
+Vector.__lt = function(a, b) return (a.x * a.x + a.y * a.y) &lt; (b.x * b.x + b.y * b.y) end
+Vector.__le = function(a, b) return not (b &lt; a) end
+
+-- 长度与字符串
+Vector.__len = function(a) return 2 end
+Vector.__tostring = function(a)
+  return string.format("Vec(%g, %g)", a.x, a.y)
+end
+
+local v1 = Vector.new(1, 2)
+local v2 = Vector.new(3, 4)
+
+print("加法 v1+v2 =", tostring(v1 + v2))
+print("减法 v2-v1 =", tostring(v2 - v1))
+print("数乘 v1*3  =", tostring(v1 * 3))
+print("点积 v1*v2 =", v1 * v2)
+print("取负 -v1   =", tostring(-v1))
+print("相等 v1==v1:", v1 == Vector.new(1, 2))
+print("小于 v1&lt;v2 :", v1 &lt; v2)
+print("#v1        =", #v1)
+
+print()
+print("=== 5. __call：让表可以像函数一样调用 ===")
+local callable = setmetatable({ name = "调用器" }, {
+  __call = function(self, arg)
+    return self.name .. " 收到: " .. tostring(arg)
+  end
+})
+print(callable("参数"))
+print(callable("另一个参数"))
+
+print()
+print("=== 6. __concat 与 .. 运算 ===")
+local concatDemo = setmetatable({ v = "值" }, {
+  __concat = function(a, b)
+    local sa = type(a) == "table" and a.v or tostring(a)
+    local sb = type(b) == "table" and b.v or tostring(b)
+    return sa .. "|" .. sb
+  end
+})
+print("表 .. 字符串:", concatDemo .. "尾部")
+print("字符串 .. 表:", "头部" .. concatDemo)
+
+print()
+print("=== 7. __gc 与 __mode（弱表）===")
+-- __mode 实现弱表：键或值不被强引用时自动回收
+local weakValues = setmetatable({}, { __mode = "v" })
+weakValues.a = {}
+weakValues.b = {}
+collectgarbage("collect")
+print("弱值表在 GC 后:", weakValues.a, weakValues.b)   -- 可能为 nil（被回收）
+
+local strong = {}
+local weakKeys = setmetatable({}, { __mode = "k" })
+weakKeys[strong] = "值"
+collectgarbage("collect")
+print("强引用还在，弱键表条目保留:", weakKeys[strong] ~= nil)
+
+print()
+print("=== 8. 元方法完整清单 ===")
+local methods = {
+  "【算术】__add __sub __mul __div __mod __pow __unm __idiv",
+  "【位运算】__band __bor __bxor __bnot __shl __shr",
+  "【比较】__eq __lt __le",
+  "【其它运算】__concat __len __call",
+  "【访问】__index __newindex",
+  "【GC】__gc __close __mode",
+  "【调试】__tostring __name __metatable __pairs",
+}
+for _, m in ipairs(methods) do print("  " .. m) end
+
+print()
+print("=== 9. 性能提醒：__index 有成本 ===")
+-- 每次访问缺失的键都会触发函数调用。
+-- 热路径上频繁访问不存在的字段会明显变慢。
+local N = 200000
+
+local plain = { x = 1 }
+local withMeta = setmetatable({ x = 1 }, { __index = function() return nil end })
+
+local t1 = os.clock()
+for i = 1, N do local _ = plain.x end
+local plainTime = os.clock() - t1
+
+local t2 = os.clock()
+for i = 1, N do local _ = withMeta.x end      -- 存在，不走 __index
+local metaTime = os.clock() - t2
+
+print(string.format("访问已有字段: 普通 %.4f / 元表 %.4f", plainTime, metaTime))
+
+local t3 = os.clock()
+for i = 1, N do local _ = withMeta.missing end  -- 不存在，走 __index 函数
+local missTime = os.clock() - t3
+
+print(string.format("访问缺失字段（触发 __index）: %.4f 秒", missTime))
+print(string.format("触发元方法比直接命中慢约 %.1f 倍", missTime / plainTime))</code></pre>
+
+<div class="callout callout--tip">
+  <span class="callout__title">__index 的两种形式（必须理解）</span>
+  <strong>形式一：<code>__index</code> 是表</strong>——去那个表里查找。<br>
+  这是<em>继承</em>的实现方式：<code>setmetatable(child, { __index = parent })</code>，子表里没有的键会去父表找。<br><br>
+  <strong>形式二：<code>__index</code> 是函数</strong>——调用函数，用返回值作为结果。<br>
+  这是<em>动态生成</em>的实现方式：可以按需计算、延迟加载、返回默认值。<br><br>
+  <strong>性能提醒</strong>：函数形式的 <code>__index</code> 每次访问缺失键都会<strong>触发一次函数调用</strong>。<br>
+  实测数据：触发元方法比直接命中字段<strong>慢约 3 倍</strong>。<br>
+  <em>热路径上避免频繁访问"不存在的字段"——或者用 <code>rawset</code> 缓存查到的值。</em>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">rawget / rawset：绕过元表</span>
+  <code>rawget(t, k)</code> 和 <code>rawset(t, k, v)</code> <strong>完全绕过元表</strong>，直接操作表本身。<br><br>
+  <strong>用途一：检查字段是否真的存在</strong><br>
+  <code>t.foo</code> 可能来自 <code>__index</code>，而 <code>rawget(t, "foo")</code> 只查表本身。<br><br>
+  <strong>用途二：在 <code>__newindex</code> 里真正写入</strong><br>
+  这是<strong>最容易踩的坑</strong>：如果在 <code>__newindex</code> 函数里写 <code>tbl[key] = value</code>，会<em>再次触发 <code>__newindex</code>，导致无限递归</em>。<strong>必须用 <code>rawset</code>。</strong>
+</div>
+
+<h2 id="summary">三、元方法完整清单</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>分类</th><th>元方法</th><th>触发时机</th></tr></thead>
+  <tbody>
+    <tr><td rowspan="8"><strong>算术</strong></td><td><code>__add</code></td><td><code>a + b</code></td></tr>
+    <tr><td><code>__sub</code> / <code>__mul</code> / <code>__div</code></td><td><code>- * /</code></td></tr>
+    <tr><td><code>__mod</code> / <code>__pow</code> / <code>__idiv</code></td><td><code>% ^ //</code></td></tr>
+    <tr><td><code>__unm</code></td><td>一元负号 <code>-a</code></td></tr>
+    <tr><td colspan="2"><em>（位运算：<code>__band</code> <code>__bor</code> <code>__bxor</code> <code>__bnot</code> <code>__shl</code> <code>__shr</code>）</em></td></tr>
+    <tr><td rowspan="3"><strong>比较</strong></td><td><code>__eq</code></td><td><code>a == b</code>（<em>两边都是 table 时才触发</em>）</td></tr>
+    <tr><td><code>__lt</code></td><td><code>a &lt; b</code></td></tr>
+    <tr><td><code>__le</code></td><td><code>a &lt;= b</code>（Lua 会自动用 <code>not (b &lt; a)</code> 推导）</td></tr>
+    <tr><td rowspan="3"><strong>其它运算</strong></td><td><code>__concat</code></td><td><code>a .. b</code></td></tr>
+    <tr><td><code>__len</code></td><td><code>#a</code></td></tr>
+    <tr><td><code>__call</code></td><td><code>a(...)</code> 像函数一样调用</td></tr>
+    <tr><td rowspan="2"><strong>访问</strong></td><td><code>__index</code></td><td>读取不存在的键</td></tr>
+    <tr><td><code>__newindex</code></td><td>写入不存在的键</td></tr>
+    <tr><td rowspan="2"><strong>GC</strong></td><td><code>__mode</code></td><td>弱表（"k" 弱键 / "v" 弱值 / "kv" 都弱）</td></tr>
+    <tr><td><code>__gc</code></td><td>对象被回收前（需 <code>setmetatable</code> 时对象已有此字段）</td></tr>
+    <tr><td rowspan="3"><strong>调试</strong></td><td><code>__tostring</code></td><td><code>tostring(a)</code> / <code>print(a)</code></td></tr>
+    <tr><td><code>__name</code></td><td>错误信息里显示的类型名</td></tr>
+    <tr><td><code>__metatable</code></td><td>保护元表，<code>getmetatable</code> 返回它的值</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="tasks">四、本章动手任务</h2>
+
+<div class="tasks" data-page="04">
+  <div class="task"><input type="checkbox" id="t-04-1"><label for="t-04-1"><strong>验证 # 不可靠</strong>：构造 <code>{1, 2, nil, 4}</code> 和 <code>{1, 2, 3, nil}</code>，打印 <code>#t</code> 与 <code>select("#", ...)</code>，观察差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-2"><label for="t-04-2"><strong>实现一个 Vector 类</strong>：用元表实现 <code>+ - * == &lt;</code> 和 <code>tostring</code>，让 <code>print(v1 + v2)</code> 输出可读结果。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-3"><label for="t-04-3"><strong>制造无限递归</strong>：在 <code>__newindex</code> 里用 <code>tbl[k] = v</code> 而不是 <code>rawset</code>，观察栈溢出。<em>这是必须亲身踩一次的坑。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-04-4"><label for="t-04-4"><strong>实现只读表</strong>：用 <code>__newindex</code> 抛错，并用 <code>pcall</code> 验证写入被阻止。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-5"><label for="t-04-5"><strong>实现默认值表</strong>：用 <code>__index</code> 函数让访问任何不存在的键都返回 0，然后<em>加上缓存优化</em>对比两次访问的耗时。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-6"><label for="t-04-6"><strong>弱表实验</strong>：用 <code>__mode = "v"</code> 建一个弱值表，存入对象后调用 <code>collectgarbage()</code>，观察值是否被回收。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-7"><label for="t-04-7"><strong>回答面试题</strong>：① <code>__index</code> 的两种形式？② 为什么 <code>__newindex</code> 里必须用 <code>rawset</code>？③ <code>#t</code> 什么时候不可靠？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能写出一个用元表实现的 class，包含 <code>new</code>、实例方法、继承；<br>
+    ② 能说出 <code>__index</code> 表形式与函数形式的区别，以及各自的性能特征；<br>
+    ③ <strong>能解释为什么 <code>__newindex</code> 里必须用 <code>rawset</code></strong>；<br>
+    ④ 知道 <code>#t</code> 对含 nil 的表不可靠，并能给出正确替代方案；<br>
+    ⑤ 能默写至少 10 个元方法及其触发时机。<br><br>
+    <em>这一页是整站最重要的内容之一。如果第 ① 和第 ③ 条你还做不到，不要往下走——后面的框架设计会完全看不懂。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="03-lua-basic.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">03 基础语法与类型</div>
+  </a>
+  <a class="next" href="05-lua-function.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">05 函数与闭包</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

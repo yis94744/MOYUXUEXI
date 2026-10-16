@@ -1,0 +1,144 @@
+<h1>13 · 框架总体设计 ★★★</h1>
+
+<p class="lead">从这一页开始进入<strong>框架设计</strong>——这是 Lua 站<strong>最有价值的部分</strong>。语法一周能学完，但<em>能设计好一套热更框架的人，在团队里是稀缺的</em>。这一页搭出<strong>可运行的框架骨架</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>前面 12 页</strong>讲的是语言与热更原理。从这一页开始讲<strong>怎么把它们组织成一个可维护的项目</strong>。<br>
+  <strong>关键衔接</strong>：页 06 的 <em>class 实现</em>、页 07 的<em>协程与错误处理</em>在这一页被组合成模块系统。<br>
+  <strong>后四页</strong>（14-17）会分别展开这一页提到的各个模块——<em>核心模块、OOP 框架、UI 框架、热更管理</em>。<br>
+  <strong>验证方式</strong>：本页的框架骨架在 <em>Lua 5.4.7</em> 完整运行过，包括模块注册、事件派发、生命周期。<strong>你可以直接抄这个结构。</strong>
+</div>
+
+<h2 id="layers">一、五层架构</h2>
+
+<p>成熟的热更框架通常分为<strong>五层</strong>。<em>分层的目的是控制依赖方向。</em></p>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>13/framework</code></div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>层</th><th>内容</th><th>谁维护</th></tr></thead>
+  <tbody>
+    <tr><td><strong>业务层</strong></td><td>玩法逻辑、UI 界面、活动</td><td>策划 + 业务程序</td></tr>
+    <tr><td><strong>框架层</strong></td><td>模块管理、事件、资源、网络</td><td><strong>框架开发者</strong></td></tr>
+    <tr><td><strong>适配层</strong></td><td>xLua 封装、Unity API 桥接</td><td>隔离引擎差异</td></tr>
+    <tr><td><strong>引擎层</strong></td><td>Unity / C#</td><td>引擎团队</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">唯一的原则：依赖只能从上往下</span>
+  <strong>业务层可以调框架层，但框架层绝对不能引用业务层的任何东西。</strong><br><br>
+  违反这条原则的后果：<br>
+  · 框架代码里出现 <code>require("UI.BagPanel")</code> → <em>框架无法复用到其他项目</em><br>
+  · 框架层直接调业务逻辑 → <em>模块之间缠绕，改一处崩三处</em><br><br>
+  <strong>检验方法</strong>：把框架层单独复制到另一个项目，<em>如果编译不过，说明依赖方向错了</em>。
+</div>
+
+<h2 id="module">二、模块管理器的设计要点</h2>
+
+<p>模块管理器是<strong>框架的地基</strong>。它的设计决定了后面所有模块怎么协作。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>设计点</th><th>方案</th><th>理由</th></tr></thead>
+  <tbody>
+    <tr><td><strong>注册方式</strong></td><td><code>register(name, module)</code></td><td>名字索引，简单直观</td></tr>
+    <tr><td><strong>重复注册</strong></td><td><code>assert</code> 报错</td><td><em>早暴露问题，别静默覆盖</em></td></tr>
+    <tr><td><strong>初始化顺序</strong></td><td>按注册顺序</td><td>可控、可预测</td></tr>
+    <tr><td><strong>销毁顺序</strong></td><td><strong>逆序销毁</strong></td><td>后注册的可能依赖先注册的</td></tr>
+    <tr><td><strong>懒加载</strong></td><td>首次访问时初始化</td><td><em>加快启动速度</em></td></tr>
+    <tr><td><strong>错误处理</strong></td><td>顶层 xpcall 兜底</td><td>防止一个错误崩溃整个游戏</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">为什么销毁要逆序</span>
+  假设 <code>UI</code> 模块依赖 <code>Resource</code> 模块（<em>UI 要加载图集</em>）。<br>
+  如果按注册顺序销毁——<em>先销毁 Resource，UI 还在用，就崩了</em>。<br><br>
+  <strong>逆序销毁</strong>保证：后注册的（依赖别人的）<strong>先被销毁</strong>。<br><br>
+  <em>这是栈（LIFO）的自然特性——和构造函数/析构函数的配对不同，这是"先建的活到最后"。</em>
+</div>
+
+<h2 id="event">三、事件系统的两个关键设计</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">设计一：快照遍历（防止回调中修改列表）</span>
+  <strong>问题场景</strong>：A 订阅了事件 X，在<em>处理事件 X 的回调里取消了 B 的订阅</em>。<br>
+  如果直接遍历原列表，会导致<em>索引错位、跳过元素或崩溃</em>。<br><br>
+  <strong>解决方案</strong>：派发前<strong>复制一份快照</strong>再遍历。<br>
+  <em>代价是每次派发多一次表复制</em>——但这个代价是值得的，因为<strong>回调里修改订阅是最常见的用法</strong>。<br><br>
+  <strong>优化</strong>：如果事件频繁且订阅者少，可以用<em>复用缓冲区</em>避免每次分配。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">设计二：队列化派发（防止递归派发）</span>
+  <strong>问题场景</strong>：回调 A 在响应事件 X 时<em>又派发了事件 X</em> → 无限递归。<br><br>
+  <strong>解决方案</strong>：派发时先<strong>入队</strong>，统一处理。<br>
+  <code>emit(X)</code> → 入队 → 循环取出派发<br>
+  如果派发中又有 <code>emit</code>，<em>只是入队，由外层循环处理</em>。<br><br>
+  <strong>好处</strong>：<br>
+  · 不会无限递归<br>
+  · 派发顺序可预测（FIFO）<br>
+  · 可以在回调里安全地订阅/取消订阅
+</div>
+
+<h2 id="scope">四、框架骨架 vs 完整框架</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">本页是骨架，不是完整框架</span>
+  <strong>本页演示的是"结构"</strong>——模块管理、事件、生命周期。<br>
+  一个真实的框架还需要：<br>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>模块</th><th>作用</th><th>对应页</th></tr></thead>
+    <tbody>
+      <tr><td><strong>资源管理</strong></td><td>加载、卸载、缓存</td><td>14</td></tr>
+      <tr><td><strong>UI 框架</strong></td><td>界面栈、绑定、红点</td><td>16</td></tr>
+      <tr><td><strong>网络层</strong></td><td>协议、重连、心跳</td><td>14</td></tr>
+      <tr><td><strong>配置表</strong></td><td>加载、索引、热重载</td><td>14</td></tr>
+      <tr><td><strong>热更新</strong></td><td>版本比对、下载、校验</td><td>17</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <em>但所有这些都建立在<strong>模块管理 + 事件系统</strong>这两个地基上。</em><br>
+  <strong>理解了这个结构，再看真实框架（xLua、ToLua、自研框架）的源码就不会迷路。</strong>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="13">
+  <div class="task"><input type="checkbox" id="t-13-1"><label for="t-13-1"><strong>跑通本页示例</strong>：把框架骨架复制到你的环境，运行一遍看输出。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-2"><label for="t-13-2"><strong>加一个模块</strong>：给框架加一个"存档模块"，实现 <code>onInit</code> / <code>onDestroy</code>。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-3"><label for="t-13-3"><strong>验证逆序销毁</strong>：让 UIModule 依赖 ResourceModule，观察逆序销毁是否避免了崩溃。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-4"><label for="t-13-4"><strong>测试快照遍历</strong>：在回调里取消自己的订阅，验证不会出错。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-5"><label for="t-13-5"><strong>加错误兜底</strong>：给事件派发加 <code>xpcall</code>，让一个回调出错不影响其他回调。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-6"><label for="t-13-6"><strong>画依赖图</strong>：画出你设计的框架的模块依赖关系，检查是否符合"从上往下"的原则。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-7"><label for="t-13-7"><strong>回答面试题</strong>：① 框架为什么要分层？② 模块为什么逆序销毁？③ 事件派发为什么要用快照？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能画出五层架构图并说清每层的职责</strong>；<br>
+    ② 能实现模块管理器（注册、初始化、逆序销毁）；<br>
+    ③ <strong>能解释事件系统为什么需要"快照遍历"和"队列化派发"</strong>；<br>
+    ④ 知道框架层不能引用业务层的原因，以及检验方法；<br>
+    ⑤ 有一次"从零搭框架骨架"的实践。<br>
+    <br>
+    <em>第 ③ 条是这一页最有价值的内容——它是"写过框架"和"用过框架"的分界线。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="12-tolua.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">12 ToLua 与其它方案</div>
+  </a>
+  <a class="next" href="14-framework-modules.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">14 核心模块实现</div>
+  </a>
+</nav>

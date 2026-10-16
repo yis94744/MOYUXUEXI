@@ -1,0 +1,147 @@
+<h1>21 · 性能优化实战</h1>
+
+<p class="lead">这一页把前面散落的性能知识<strong>串成一条完整的排查流程</strong>。你将学到：<em>拿到一个卡顿的游戏，如何从零定位到具体那一行代码</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（20）讲架构。架构决定了<em>性能问题的天花板</em>——如果架构就是每帧创建对象，那再怎么优化都是治标。<br>
+  <strong>关键衔接</strong>：页 07 的<em>GC 十大来源</em>、页 14 的 <em>Canvas 重建</em>、页 17 的<em>渲染优先级</em>在这一页汇合成一个流程。<br>
+  <strong>下一页</strong>（22）网络、工程化与发布。<em>性能问题解决后，就要考虑"怎么发出去"。</em><br>
+  <strong>重要性</strong>：这是<strong>面试中区分度最高的一页</strong>——"有性能优化经验者优先"是所有中高级 JD 的标配。
+</div>
+
+<h2 id="workflow">一、完整排查流程</h2>
+
+<p>性能优化有<strong>固定的五步流程</strong>。跳过任何一步都会导致白忙。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>步骤</th><th>做什么</th><th>工具</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1. 确认现象</strong></td><td>卡顿？发热？内存涨？<em>具体是什么</em></td><td>真机测试</td></tr>
+    <tr><td><strong>2. 定位类型</strong></td><td>CPU / GPU / 内存 / IO</td><td>Profiler 各模块</td></tr>
+    <tr><td><strong>3. 缩小范围</strong></td><td>哪个系统？哪个函数？</td><td>Profiler 调用树</td></tr>
+    <tr><td><strong>4. 修改验证</strong></td><td>只改一处，改完立即测</td><td>Profiler 对比</td></tr>
+    <tr><td><strong>5. 回归测试</strong></td><td>确认没引入新问题</td><td>全流程跑一遍</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">最容易犯的三个错误</span>
+  <strong>① 凭感觉优化</strong>：改了十处，结果改的都是非瓶颈。<em>一次只改一处，才能知道哪处有效。</em><br><br>
+  <strong>② 在编辑器里测性能</strong>：编辑器有额外开销，且很多问题只有真机才暴露。<em>必须连真机 Profile。</em><br><br>
+  <strong>③ 优化后不复测</strong>：改完就提交，结果引入了新 bug 或性能反而下降。<em>每次改动都要测。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">分段计时：最快定位瓶颈的方法</span>
+  如果 Profiler 调用树太复杂看不清，最有效的办法是<strong>手动分段计时</strong>：<br>
+  <code>var sw = Stopwatch.StartNew();</code><br>
+  <code>// 你的代码</code><br>
+  <code>Debug.Log(sw.ElapsedMilliseconds);</code><br><br>
+  <em>把系统按模块分段打点，一眼就能看出哪个模块最耗时。</em>这比看 Profiler 的花哨图表更快。
+</div>
+
+<h2 id="four-types">二、四类瓶颈的定位方法</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>类型</th><th>症状</th><th>定位工具</th><th>常见原因</th></tr></thead>
+  <tbody>
+    <tr><td><strong>CPU 逻辑</strong></td><td>帧率低但 GPU 空闲</td><td>Profiler CPU</td><td>每帧查找、LINQ、闭包</td></tr>
+    <tr><td><strong>GC 卡顿</strong></td><td>规律性卡顿（每隔几秒）</td><td>Profiler GC Alloc</td><td><em>页 07 的十大来源</em></td></tr>
+    <tr><td><strong>GPU 渲染</strong></td><td>CPU 空闲但帧率低</td><td>Profiler GPU / Frame Debugger</td><td>Draw Call、Overdraw</td></tr>
+    <tr><td><strong>内存</strong></td><td>长时间运行后崩溃</td><td>Memory Profiler</td><td>资源泄漏、未卸载</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">GC 卡顿的识别特征</span>
+  <strong>规律性卡顿</strong>是 GC 的典型症状——<em>每隔几秒卡一下</em>，而不是持续低帧。<br>
+  原因：每帧产生固定量的垃圾，累积到阈值后 GC 触发一次全停顿。<br><br>
+  <strong>验证方法</strong>：Profiler 里看 <code>GC.Collect</code> 的调用时间点，是否与卡顿时刻吻合。<br><br>
+  <strong>解决</strong>：回到页 07 的十大来源清单，逐个消除。<em>目标是把 Update 相关的分配降到 0 B。</em>
+</div>
+
+<h2 id="mobile">三、移动端的特殊考量</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">移动端与 PC 的三个关键差异</span>
+  <strong>① 发热降频</strong>：手机跑几分钟后会降频，<em>帧率从 60 掉到 30</em>。<br>
+  → 要测"连续运行 10 分钟后的帧率"，而不是刚启动的。<br><br>
+  <strong>② 内存更紧张</strong>：中低端机可用内存可能只有 1~2 GB。<br>
+  → 资源加载要更保守，卸载要更积极。<br><br>
+  <strong>③ GPU 带宽受限</strong>：移动 GPU 的显存带宽远低于 PC。<br>
+  → <em>Overdraw 的代价比 PC 上大得多</em>，半透明要格外克制。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">真机调试的三种方式</span>
+  <strong>① USB 连接 + Profiler Attach</strong>：最常用，能看到完整的 Profiler 数据。<br>
+  <strong>② Development Build + Autoconnect</strong>：打包时勾选 Development Build。<br>
+  <strong>③ 设备日志</strong>：用 <code>adb logcat</code>（Android）抓日志，分析崩溃。<br><br>
+  <em>注意：Development Build 本身有性能开销，测出的数字比正式包略差。测绝对性能要用正式包 + 代码内计时。</em>
+</div>
+
+<h2 id="priority">四、优化收益的优先级</h2>
+
+<p>同样是花一小时，<strong>收益可能差 10 倍</strong>。按这个顺序做：</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>优先级</th><th>手段</th><th>典型收益</th><th>工作量</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1</strong></td><td>消除 Update 里的 GC 分配</td><td><strong>消除规律性卡顿</strong></td><td>小</td></tr>
+    <tr><td><strong>2</strong></td><td>缓存每帧查找的组件/相机</td><td>显著降 CPU</td><td>小</td></tr>
+    <tr><td><strong>3</strong></td><td>拆分 Canvas、关 Raycast Target</td><td>显著降 UI 开销</td><td>小</td></tr>
+    <tr><td><strong>4</strong></td><td>合批、降 Draw Call</td><td>显著降渲染开销</td><td>中</td></tr>
+    <tr><td><strong>5</strong></td><td>关阴影、降后处理</td><td>显著降 GPU</td><td>小</td></tr>
+    <tr><td><strong>6</strong></td><td>对象池</td><td>减少 GC 峰值</td><td>中</td></tr>
+    <tr><td><strong>7</strong></td><td>降分辨率 / 画质分级</td><td>兜底方案</td><td>小</td></tr>
+    <tr><td><strong>8</strong></td><td>Job System / DOTS</td><td>数量级提升</td><td><strong>大</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">为什么把 DOTS 放最后</span>
+  <strong>因为它的迁移成本最高</strong>——需要重写整个模块，还要团队熟悉数据导向设计。<br>
+  而前面七项<em>往往能把性能提升 2~5 倍</em>，且改动量小得多。<br><br>
+  <strong>只有当这些都做完还不够时，才考虑 DOTS。</strong>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="21">
+  <div class="task"><input type="checkbox" id="t-21-1"><label for="t-21-1"><strong>做一次完整排查</strong>：找一个帧率不达标的功能，按五步流程走一遍，<em>记录每一步的发现</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-2"><label for="t-21-2"><strong>用 Stopwatch 分段计时</strong>：给一个复杂系统的每个模块加计时打点，找出最耗时的那个。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-3"><label for="t-21-3"><strong>识别 GC 卡顿</strong>：用 Profiler 找出 GC 触发的时刻，与卡顿时刻做对照。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-4"><label for="t-21-4"><strong>连真机 Profile</strong>：用 USB 连接手机，Attach Profiler，对比编辑器与真机的差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-5"><label for="t-21-5"><strong>测发热降频</strong>：连续运行 10 分钟，记录帧率变化曲线。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-6"><label for="t-21-6"><strong>写优化报告</strong>：把一次优化的完整过程写成报告（问题、定位、修改、验证）。<em>这是面试的硬通货。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-21-7"><label for="t-21-7"><strong>回答面试题</strong>：① 怎么定位 GC 卡顿？② 移动端和 PC 性能优化有什么不同？③ 优化的优先级顺序？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能复述性能排查的五步流程</strong>；<br>
+    ② 能区分四类瓶颈并知道各自用什么工具定位；<br>
+    ③ <strong>能识别 GC 卡顿的特征（规律性卡顿）</strong>；<br>
+    ④ 知道移动端与 PC 的三个关键差异；<br>
+    ⑤ 有一次完整的"从定位到验证"的优化经历，并能说清数字。<br>
+    <br>
+    <em>第 ⑤ 条是这一页的核心目标——面试官问"有性能优化经验吗"，你需要的不是一个"知道"，而是一个"做过"。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="20-patterns.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">20 架构与设计模式</div>
+  </a>
+  <a class="next" href="22-network-eng.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">22 网络、工程化与发布</div>
+  </a>
+</nav>

@@ -1,0 +1,154 @@
+<h1>26 · 性能优化模式库 ★★</h1>
+
+<p class="lead">这一页不是"算法"，而是<strong>工程手段</strong>。它们比算法更常用——因为<em>90% 的性能问题不是算法复杂度不对，而是"用错了方式"</em>。这 12 个模式覆盖了游戏开发中绝大部分的性能优化场景。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>前面 25 页</strong>讲的是具体算法与系统。这一页抽象出<em>跨领域的优化模式</em>——它们是<strong>可复用的思维工具</strong>。<br>
+  <strong>关键衔接</strong>：这里会反复用到前面学过的结构（<em>堆、哈希、空间划分</em>），但视角从"怎么实现"变成"<strong>什么场景该用</strong>"。<br>
+  <strong>验证方式</strong>：本页<strong>每个模式都有实测数据</strong>——而且其中有<em>三个模式的实测结果推翻了常见说法</em>。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">先看一个重要说明：本页有"反直觉"的实测结论</span>
+  很多人相信"对象池一定更快""查表一定比计算快""位运算一定比布尔变量快"。<br>
+  <strong>但本页的实测数据表明：在 Lua 5.4 下，这三个说法都站不住脚。</strong><br><br>
+  这正是这一页最有价值的地方——<em>它会告诉你哪些"优化常识"其实需要验证</em>。<br>
+  <strong>记住那条最重要的原则：先测，再优化。</strong>
+</div>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>26/perf-patterns</code></div>
+
+<h2 id="counter">一、三个被实测推翻的"常识" ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">反例一：对象池并没有更快</span>
+  <strong>实测结果</strong>：200000 次创建 vs 200000 次池复用——<em>对象池反而略慢（0.93x）</em>。<br><br>
+  <strong>为什么</strong>：测试里的"对象"是一个只有 5 个字段的小表，<em>创建它的成本本身就极低</em>。而对象池的 <code>get</code>/<code>release</code> 有函数调用和表操作开销，两者大致相抵。<br><br>
+  <strong>那为什么还要用对象池？</strong>真正的原因不是"建对象慢"，而是：<br>
+  ① <strong>GC 压力</strong>——200000 个短命对象会让 GC 频繁触发，而 <em>GC 停顿体现在帧率抖动上，微基准测不出来</em>；<br>
+  ② <strong>初始化成本</strong>——如果对象初始化要读配置、算属性、加载资源，复用就明显划算；<br>
+  ③ <strong>内存碎片</strong>——长期运行下频繁分配会让堆碎片化。<br><br>
+  <strong>正确的判断方式</strong>：不要凭微基准决定，<em>用 Profiler 看 GC Alloc 和帧率曲线</em>。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">反例二：三角函数查表反而更慢</span>
+  <strong>实测结果</strong>：直接算 <code>math.sin</code> 100 万次用 0.054 秒；查表用 0.061 秒——<em>查表慢了</em>。<br><br>
+  <strong>为什么</strong>：现代 CPU 的 <code>sin</code> 已经被优化得很好（甚至用 SIMD 指令），而查表需要：<em>取模运算 → 浮点转整数 → 表查找 → 边界检查</em>，这些加起来超过了一次硬件 sin 计算。<br><br>
+  <strong>那什么时候查表有价值？</strong><br>
+  ① 计算<strong>非常复杂</strong>时（不是 sin 这种单指令操作）——<em>复杂伤害公式、多层嵌套属性计算</em>；<br>
+  ② 需要<strong>确定性结果</strong>时（跨平台浮点一致性，用于帧同步）；<br>
+  ③ 在<strong>没有硬件浮点单元</strong>的设备上（老式功能机）。<br><br>
+  <strong>教训</strong>："空间换时间"是个诱人的说法，<em>但现代 CPU 的算力经常比你的内存访问更快</em>。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">反例三：位运算在 Lua 里没有速度优势</span>
+  <strong>实测结果</strong>：布尔字段 0.053 秒，位掩码 0.065 秒——<em>位运算更慢（0.82x）</em>。<br><br>
+  <strong>为什么</strong>：Lua 5.4 的位运算通过内部函数实现，而表字段访问是<em>高度优化的哈希查找</em>，两者性能接近。<br><br>
+  <strong>但位运算仍有不可替代的价值</strong>（这些优势都不是速度）：<br>
+  ① <strong>省内存</strong>——一个 int 存 32 个布尔标志；<br>
+  ② <strong>省带宽</strong>——网络同步时一个整数比 32 个 bool 紧凑得多；<br>
+  ③ <strong>原子性</strong>——一个整数可以一次性比较/传递，不担心部分更新；<br>
+  ④ <strong>C# 里确实更快</strong>——在 Unity 的 C# 中，位运算是原生 CPU 指令，<em>比 bool[] 或 Dictionary 明显更快</em>。<br><br>
+  <strong>结论</strong>：在 Lua 里用位运算是为了<em>省内存和带宽</em>，不是为了速度。在 C# 里它两者兼得。
+</div>
+
+<h2 id="valid">二、经得起验证的模式（实测确实有效）</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>模式</th><th>实测效果</th><th>为什么有效</th></tr></thead>
+  <tbody>
+    <tr><td><strong>缓存（Memoization）</strong></td><td><span class="mk mk--yes">快 76 倍</span></td><td>把 O(n) 计算变成 O(1) 查表</td></tr>
+    <tr><td><strong>字符串用 table.concat</strong></td><td><span class="mk mk--yes">快 16.5 倍</span></td><td>避免每次拼接都重新分配整串</td></tr>
+    <tr><td><strong>平方距离代替开方</strong></td><td><span class="mk mk--yes">快 3.9 倍</span></td><td>省掉 sqrt 运算</td></tr>
+    <tr><td><strong>局部变量缓存</strong></td><td><span class="mk mk--yes">快 3.1 倍</span></td><td>寄存器访问 vs 多级表查找</td></tr>
+    <tr><td><strong>哈希表代替线性查找</strong></td><td><span class="mk mk--yes">快数百倍</span></td><td>O(1) vs O(n)</td></tr>
+    <tr><td><strong>批处理</strong></td><td>固定开销减少 N 倍</td><td>摊薄每次操作的固定成本</td></tr>
+    <tr><td><strong>分帧</strong></td><td>避免单帧卡顿</td><td>把工作摊到多帧</td></tr>
+    <tr><td><strong>惰性计算</strong></td><td>不用的就不算</td><td>消除无谓计算</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">注意"缓存"的适用条件</span>
+  实测中缓存快了 76 倍——但这是因为<strong>只有 100 个不同的 key 被查询了 10000 次</strong>（命中率 99%）。<br><br>
+  <strong>如果 key 每次都不同</strong>（比如用对象实例做 key），那么：<br>
+  • 缓存永远不命中<br>
+  • 却要为每次查询付出<em>写入缓存的开销</em><br>
+  • 而且缓存会<strong>无限增长直到内存爆掉</strong><br><br>
+  <strong>所以缓存必须考虑</strong>：命中率、内存上限、淘汰策略（见下一页 LRU）。
+</div>
+
+<h2 id="choose">三、怎么选择用哪个模式</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>症状</th><th>首选模式</th><th>次选</th></tr></thead>
+  <tbody>
+    <tr><td>每帧都在创建对象</td><td><strong>对象池</strong></td><td>避免分配</td></tr>
+    <tr><td>同样的计算重复做</td><td><strong>缓存</strong></td><td>空间换时间</td></tr>
+    <tr><td>单帧耗时超过预算</td><td><strong>分帧</strong></td><td>降精度</td></tr>
+    <tr><td>大量小对象逐个处理</td><td><strong>批处理</strong></td><td>选对容器</td></tr>
+    <tr><td>热循环里访问嵌套数据</td><td><strong>局部变量缓存</strong></td><td>减少间接层</td></tr>
+    <tr><td>查找慢</td><td><strong>换容器</strong>（哈希/堆/Trie）</td><td>空间划分</td></tr>
+    <tr><td>碰撞/AI 范围查询慢</td><td><strong>空间划分</strong></td><td>缓存结果</td></tr>
+    <tr><td>字符串操作多</td><td><strong>table.concat</strong></td><td>避免分配</td></tr>
+    <tr><td>GC 频繁触发</td><td><strong>避免分配</strong></td><td>对象池</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="method">四、优化的正确流程 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">这是全页最重要的内容</span>
+  <strong>优化必须遵循的顺序</strong>：<br>
+  <strong>① 测量</strong>——用 Profiler 找出真正的瓶颈（<em>不要猜</em>）<br>
+  <strong>② 分析</strong>——确认它占了多少时间（<em>优化只占 1% 的东西没有意义</em>）<br>
+  <strong>③ 优化</strong>——只改瓶颈部分<br>
+  <strong>④ 复测</strong>——验证真的变快了，且没有引入 bug<br><br>
+  <strong>常见的错误</strong>：<br>
+  • 优化了 1% 的代码，却增加了 200 行复杂度<br>
+  • 凭"感觉"优化，结果改错了地方（<em>本页的三个反例就是例证</em>）<br>
+  • 为了性能牺牲可读性，但性能没提升——<strong>因为本来就不是瓶颈</strong><br><br>
+  <strong>80/20 法则</strong>：<em>20% 的代码占 80% 的耗时</em>。找到那 20%，比盲目优化全部代码有效得多。
+</div>
+
+<h2 id="tasks">五、本章动手任务</h2>
+
+<div class="tasks" data-page="26">
+  <div class="task"><input type="checkbox" id="t-26-1"><label for="t-26-1"><strong>复现三个反例</strong>：亲自跑一遍对象池、查表、位运算的对比。<em>用自己的机器验证，而不是相信本页的数字。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-26-2"><label for="t-26-2"><strong>实现对象池并测 GC</strong>：在 Unity 里实现一个子弹池，用 Profiler 对比"用池"与"不用池"的 <code>GC Alloc</code> 和帧率曲线。</label></div>
+  <div class="task"><input type="checkbox" id="t-26-3"><label for="t-26-3"><strong>给缓存加淘汰策略</strong>：实现一个带最大容量的缓存（超过上限就淘汰最旧的），防止内存无限增长。</label></div>
+  <div class="task"><input type="checkbox" id="t-26-4"><label for="t-26-4"><strong>做分帧调度器</strong>：实现一个"每帧最多处理 N 个任务"的调度器，加进度回调。<em>这是加载界面的基础。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-26-5"><label for="t-26-5"><strong>优化你自己的代码</strong>：找一段你写的慢代码，<em>先用 Profiler 测量</em>，再选一个模式优化，最后复测。<strong>记录优化前后的数字。</strong></label></div>
+  <div class="task"><input type="checkbox" id="t-26-6"><label for="t-26-6"><strong>写优化报告</strong>：把上面的过程写成一份简短报告（瓶颈是什么、占多少、怎么改、改后多少）。<em>这是面试时的加分材料。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-26-7"><label for="t-26-7"><strong>回答面试题</strong>：① 对象池解决什么问题？② 缓存什么时候不该用？③ 优化的正确流程是什么？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出至少 8 个性能优化模式，以及各自适用场景；<br>
+    ② <strong>能解释为什么"对象池一定更快""查表一定更快"是错的</strong>；<br>
+    ③ 知道缓存必须考虑淘汰策略，否则会内存爆掉；<br>
+    ④ <strong>能复述"测量 → 分析 → 优化 → 复测"的完整流程</strong>；<br>
+    ⑤ 有一次真实的优化经历，并能说清优化前后的数字。<br><br>
+    <em>第 ② 和第 ④ 条是这一页最有价值的内容——它们让你避免"凭直觉做优化"这个最常见的错误。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="25-time-scheduler.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">25 定时器与事件调度</div>
+  </a>
+  <a class="next" href="27-cache-lru.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">27 缓存策略与 LRU</div>
+  </a>
+</nav>

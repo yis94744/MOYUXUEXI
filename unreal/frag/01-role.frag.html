@@ -1,0 +1,107 @@
+<h1>01 · 岗位与行业现实</h1>
+
+<p class="lead">Unreal 岗位<strong>比 Unity 少，但薪资普遍更高</strong>。这一页讲清楚<em>行业真实的分工、门槛、以及值不值得转</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="positions">一、Unreal 岗位的三种类型</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>岗位</th><th>做什么</th><th>C++ 要求</th><th>数量</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Gameplay 程序</strong></td><td>玩法、技能、战斗</td><td><span class="mk mk--warn">中（蓝图+C++）</span></td><td><strong>最多</strong></td></tr>
+    <tr><td><strong>引擎程序</strong></td><td>改造引擎、优化、工具链</td><td><span class="mk mk--no">高（深入源码）</span></td><td>少</td></tr>
+    <tr><td><strong>工具程序</strong></td><td>编辑器扩展、DCC 管线</td><td>中高</td><td>少</td></tr>
+    <tr><td><strong>图形程序</strong></td><td>渲染、Shader、材质</td><td><strong>极高</strong></td><td>很少</td></tr>
+    <tr><td><strong>技术美术（TA）</strong></td><td>材质、特效、管线</td><td><em>看情况</em></td><td>中等</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">Unreal 岗位的三个现实</span>
+  <strong>① 岗位数量比 Unity 少很多</strong><br>
+  · Unity 手游项目遍地都是<br>
+  · Unreal 主要是<em>PC/主机 3A 项目</em>——国内数量有限<br>
+  · <em>但竞争也相对小（因为会的人少）</em><br><br>
+  <strong>② 薪资普遍更高</strong><br>
+  · 起步薪资通常高于 Unity<br>
+  · 但<em>要求也更高</em>——C++ 是硬门槛<br>
+<br>
+  <strong>③ 大多数岗位是 "Gameplay + 蓝图"</strong><br>
+  · 纯引擎程序岗位<em>非常少</em>（需要多年经验）<br>
+  · <strong>Gameplay 程序才是主流</strong>——<em>需要的是"C++ 写逻辑 + 蓝图做配置"的协作能力</em><br><br>
+  <em>这个现实很重要——它决定了你该把精力放在哪。</em>
+</div>
+
+<h2 id="difference">二、Unreal 与 Unity 的技术差异</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>维度</th><th>Unity</th><th>Unreal</th></tr></thead>
+  <tbody>
+    <tr><td><strong>语言</strong></td><td>C#</td><td><strong>C++</strong></td></tr>
+    <tr><td><strong>热更新</strong></td><td>Lua / HybridCLR</td><td><em>蓝图可变，C++ 要发版</em></td></tr>
+    <tr><td><strong>脚本化</strong></td><td>代码为主</td><td><strong>蓝图（可视化脚本）</strong></td></tr>
+    <tr><td><strong>渲染</strong></td><td>需要自己调</td><td><strong>默认画质高</strong></td></tr>
+    <tr><td><strong>内存</strong></td><td>GC（手动控制少）</td><td><strong>UObject 有 GC，但更可控</strong></td></tr>
+    <tr><td><strong>源码</strong></td><td>闭源（部分开放）</td><td><strong>完整源码开放</strong></td></tr>
+    <tr><td><strong>编译</strong></td><td>快（秒级）</td><td><strong>慢（分钟级）</strong></td></tr>
+    <tr><td><strong>上手</strong></td><td><em>容易</em></td><td><strong>陡峭</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">两个最需要适应的点</span>
+  <strong>① 编译慢</strong><br>
+  Unity 改一行代码<em>几秒就能运行</em>。<br>
+  Unreal 改 C++ 头文件<strong>可能要几分钟到十几分钟</strong>（<em>因为要重新编译依赖它的所有文件</em>）。<br>
+  <em>这直接改变了工作方式</em>：<br>
+  · 你会更倾向于<strong>把易变的逻辑放在蓝图</strong><br>
+  · 会用<strong>头文件前向声明</strong>减少依赖<br>
+  · <em>会珍惜每一次编译</em><br><br>
+  <strong>② 蓝图是"必需品"不是"可选项"</strong><br>
+  纯 C++ 做 UE 项目<em>效率很低</em>。<br>
+  <strong>主流做法</strong>：<br>
+  · C++ 写<strong>基类和框架</strong>（性能关键、逻辑复杂）<br>
+  · 蓝图做<strong>具体配置和组合</strong>（策划和美术能参与）<br>
+  <em>页 14 会详细讲这个边界怎么划。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="01">
+  <div class="task"><input type="checkbox" id="t-01-1"><label for="t-01-1"><strong>看招聘网站</strong>：搜索"Unreal"和"UE5"，统计岗位数量和薪资范围。</label></div>
+  <div class="task"><input type="checkbox" id="t-01-2"><label for="t-01-2"><strong>对比你的现状</strong>：现在的技能能匹配哪些岗位？<em>差距在哪？</em></label></div>
+  <div class="task"><input type="checkbox" id="t-01-3"><label for="t-01-3"><strong>确定目标岗位</strong>：Gameplay / 引擎 / 工具？<em>这决定后面的学习重点。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-01-4"><label for="t-01-4"><strong>回答开放题</strong>：① 你为什么想学 Unreal？② 你现在的背景是什么？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道 Unreal 岗位的三种类型及数量分布</strong>；<br>
+    ② 理解 Unreal 岗位比 Unity 少但要求高；<br>
+    ③ <strong>知道"Gameplay + 蓝图"才是主流岗位</strong>；<br>
+    ④ 能说出 Unreal 与 Unity 的六个技术差异；<br>
+    ⑤ 知道编译慢会如何改变工作方式。<br>
+    <br>
+    <em>这一页的标准很低——**只要能回答"为什么学"就够了**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="index.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">路线总览</div>
+  </a>
+  <a class="next" href="02-setup.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">02 环境搭建与第一个项目</div>
+  </a>
+</nav>

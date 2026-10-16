@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11 图形学与渲染管线 — C++ + Unreal 路线｜从零基础到 3A 级项目开发</title>
+<meta name="description" content="渲染管线、坐标空间、光照模型、PBR、延迟渲染、Shader 编写与 HLSL">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C++ + Unreal 路线
+        <span>从零基础到 3A 级项目开发</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>11 · 图形学与渲染管线 ★★</h1>
+
+<p class="lead">这一页讲<strong>画面是怎么从数据变成像素的</strong>。理解管线，才能理解<em>为什么某些操作很贵、为什么某些效果做不到</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="../unity/09-math.html#vector" data-brief="位置/方向/速度都是向量；sqrMagnitude 比 Distance 快"><span class="prereq__title">向量运算</span><span class="prereq__page">09-math</span></a>
+          <a class="prereq__item" href="../unity/09-math.html#vector" data-brief="位置/方向/速度都是向量；sqrMagnitude 比 Distance 快"><span class="prereq__title">向量运算</span><span class="prereq__page">09-math</span></a>
+          <a class="prereq__item" href="../unity/10-graphics.html#pipeline" data-brief="应用/几何/像素/后处理四阶段，性能瓶颈各在哪里"><span class="prereq__title">渲染管线</span><span class="prereq__page">10-graphics</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="pipeline">一、渲染管线的六个阶段</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>阶段</th><th>做什么</th><th>瓶颈常见于</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1. 顶点处理</strong></td><td>顶点着色器：坐标变换</td><td><em>顶点数太多</em></td></tr>
+    <tr><td><strong>2. 图元装配</strong></td><td>把顶点连成三角形</td><td><em>一般不是瓶颈</em></td></tr>
+    <tr><td><strong>3. 光栅化</strong></td><td>三角形 → 像素</td><td><strong>像素太多会慢</strong></td></tr>
+    <tr><td><strong>4. 片元处理</strong></td><td>片元着色器：算颜色</td><td><strong>最常见的瓶颈</strong></td></tr>
+    <tr><td><strong>5. 测试混合</strong></td><td>深度测试、透明度混合</td><td><em>Overdraw 相关</em></td></tr>
+    <tr><td><strong>6. 输出</strong></td><td>写入帧缓冲</td><td>带宽受限</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">两个最需要理解的瓶颈点</span>
+  <strong>① 顶点数量（Vertex Bound）</strong><br>· 顶点着色器对<em>每个顶点</em>执行一次<br>· <strong>复杂模型、大量实例化对象</strong>时是瓶颈<br>· <em>优化：LOD、剔除、简化模型</em><br><br><strong>② 像素填充（Fill Rate / Pixel Bound）</strong><br>· 片元着色器对<em>每个像素</em>执行一次<br>· <strong>全屏后处理、半透明、粒子</strong>时是瓶颈<br>· <em>优化：降低分辨率、减少 Overdraw、简化 Shader</em><br><br><strong>怎么判断瓶颈在哪</strong>：<br>· <em>降低分辨率后变快</em> → <strong>像素瓶颈</strong><br>· <em>减少模型面数后变快</em> → <strong>顶点瓶颈</strong><br><br><em>这个判断方法比看 Profiler 更快。</em>
+</div>
+
+<h2 id="spaces">二、坐标空间的转换链 ★★</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>空间</th><th>含义</th><th>转换</th></tr></thead>
+  <tbody>
+    <tr><td><strong>模型空间</strong></td><td>模型自身的坐标系</td><td>模型矩阵 →</td></tr>
+    <tr><td><strong>世界空间</strong></td><td>整个场景的坐标系</td><td>视图矩阵 →</td></tr>
+    <tr><td><strong>观察空间</strong></td><td>以相机为原点</td><td><em>投影矩阵 →</em></td></tr>
+    <tr><td><strong>裁剪空间</strong></td><td><strong>准备做裁剪</strong></td><td>透视除法 →</td></tr>
+    <tr><td><strong>NDC</strong></td><td>标准化设备坐标（-1~1）</td><td>视口变换 →</td></tr>
+    <tr><td><strong>屏幕空间</strong></td><td>像素坐标</td><td><em>最终输出</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">为什么需要这么多空间</span>
+  <strong>每个空间解决一个问题</strong>：<br>· <strong>模型空间</strong>——<em>模型可以复用（同一棵树用在多个位置）</em><br>· <strong>世界空间</strong>——<em>处理物体间的关系（碰撞、光照）</em><br>· <strong>观察空间</strong>——<em>简化"相对相机"的计算</em><br>· <strong>裁剪空间</strong>——<strong>高效剔除屏幕外的物体</strong><br>· <strong>NDC</strong>——<em>与分辨率无关的标准化坐标</em><br>· <strong>屏幕空间</strong>——<em>最终要写进具体的像素</em><br><br><strong>实战中的常见问题</strong>：<br>· <em>"为什么我的物体不在预期位置？"</em> → 可能搞混了空间<br>· <em>"为什么缩放后位置偏了？"</em> → 变换顺序错了<br><br><strong>Unreal 的帮助函数</strong>：<br><code>GetActorLocation()</code>——<em>世界空间</em><br><code>GetActorTransform()</code>——<em>包含旋转缩放</em><br><code>UKismetMathLibrary::InverseTransformLocation()</code>——<em>空间转换</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="11">
+  <div class="task"><input type="checkbox" id="t-11-1"><label for="t-11-1"><strong>判断瓶颈类型</strong>：在 UE 里降低分辨率看帧率变化，判断是不是像素瓶颈。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-2"><label for="t-11-2"><strong>跑一次 RenderDoc</strong>：抓一帧，看完整的渲染管线调用。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-3"><label for="t-11-3"><strong>数 Draw Call</strong>：用 <code>stat RHI</code> 命令看 Draw Call 数量。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-4"><label for="t-11-4"><strong>验证坐标空间</strong>：打印同一个物体的"世界坐标"和"相对相机坐标"。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-5"><label for="t-11-5"><strong>做一次 Overdraw 测试</strong>：叠 10 层半透明，观察帧率下降。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-6"><label for="t-11-6"><strong>回答面试题</strong>：① 渲染管线的六个阶段？② 怎么判断像素瓶颈？③ 为什么需要这么多坐标空间？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出渲染管线的六个阶段</strong>；<br>
+    ② <strong>知道"顶点瓶颈"和"像素瓶颈"的区别及判断方法</strong>；<br>
+    ③ 能说出坐标空间的转换链；<br>
+    ④ 知道每个坐标空间解决什么问题；<br>
+    ⑤ 有一次"用 RenderDoc / stat 命令"分析渲染的经历。<br>
+    <br>
+    <em>第 ② 条最实用——**"降分辨率测试"能在几秒内判断瓶颈类型**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="10-math.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">10 游戏数学基础 ★</div>
+  </a>
+  <a class="next" href="12-ue-cpp.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">12 Unreal C++ 与宏系统 ★★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<h1>24 · 背包、掉落与权重随机</h1>
+
+<p class="lead">这一页讲<strong>两个每个游戏都有的系统</strong>：背包和掉落。它们看起来简单，但<em>有几个容易写错的地方</em>——尤其是<strong>权重随机</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="inventory">一、背包的三种实现</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>实现</th><th>结构</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>数组（格子）</strong></td><td>固定格子数，每格放一个道具</td><td><strong>大多数游戏</strong></td></tr>
+    <tr><td><strong>哈希（无限）</strong></td><td>itemId → 数量</td><td><em>材料类游戏</em></td></tr>
+    <tr><td><strong>混合</strong></td><td>装备用格子，材料用哈希</td><td><span class="mk mk--yes">最优</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">背包最常见的两个 bug</span>
+  <strong>① 道具数量为 0 但格子还在</strong><br>
+  删除道具时<em>只把数量减到 0，没清空格子</em>。<br>
+  后果：<em>格子显示为"空的"，但仍然占用位置</em>——玩家看到背包满了但看不到东西。<br>
+  <strong>解决</strong>：<em>数量归零时立即清空格子（设为 nil）</em>。<br><br>
+  <strong>② 遍历背包时删除道具</strong><br>
+  <code>for i = 1, #bag do</code><br>
+  <code>&nbsp;&nbsp;if bag[i].count == 0 then table.remove(bag, i) end</code><br>
+  <code>end</code><br>
+  <em>删除元素后，后面的元素前移，但 i 继续递增</em>——<strong>会跳过元素</strong>。<br>
+  <strong>解决</strong>：<em>倒序遍历</em>，或<em>先收集再统一删除</em>。<br><br>
+  <strong>这两个 bug 我在 C# 站和 <code>页 04</code> 都提过——它们是"遍历中修改集合"这个通病的具体表现。</strong>
+</div>
+
+<h2 id="weighted-random">二、权重随机：三种实现的实测 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">错误做法：随机数除以总权重</span>
+  <strong>看起来对的写法</strong>：<br>
+  <code>local total = 0</code><br>
+  <code>for _, item in ipairs(drops) do total = total + item.weight end</code><br>
+  <code>local r = math.random() * total</code><br>
+  <code>for _, item in ipairs(drops) do</code><br>
+  <code>&nbsp;&nbsp;r = r - item.weight</code><br>
+  <code>&nbsp;&nbsp;if r &lt;= 0 then return item end</code><br>
+  <code>end</code><br>
+  <em>这个写法是<strong>对的</strong>——但每次掉落都要遍历计算总权重。</em><br><br>
+  <strong>真正的错误做法</strong>：<br>
+  <code>if math.random() &lt; 0.1 then -- 10% 概率</code><br>
+  <code>-- 但"10%"是按什么算的？</em><br>
+  <em>如果所有道具的概率加起来不等于 1，就会出现"永远掉不出某道具"或"某道具概率被悄悄放大"。</em><br>
+  <strong>正确思路</strong>：<em>权重是相对值，不是绝对概率</em>。<br>
+  权重 10 / 100 / 200 → 实际概率 = 10/310、100/310、200/310。<br>
+  <strong>总权重会变</strong>（比如某个道具不可掉落时），概率自动重分配。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">优化：前缀和 + 二分查找</span>
+  <strong>问题</strong>：上面的写法每次掉落都是 O(n)——<em>遍历计算总权重</em>。<br>
+  如果每次击杀要掉落 5 次，1000 个怪就是 5000 次 O(n) 遍历。<br><br>
+  <strong>优化做法</strong>：<br>
+  ① <strong>预计算前缀和</strong>：<code>cum[1]=10, cum[2]=110, cum[3]=310</code><br>
+  ② 随机 <code>r = math.random(1, total)</code><br>
+  ③ <strong>二分查找</strong> <code>r</code> 落在哪个区间<br>
+  <em>复杂度从 O(n) 降到 O(log n)</em><br><br>
+  <strong>更好的做法</strong>：<em>如果权重不变，前缀和算一次就好</em>。<br>
+  每次掉落只需 O(log n) 的二分。<br><br>
+  <strong>适用场景</strong>：<em>掉落表很大（几百项）且频繁调用时</em>。<br>
+  小掉落表（十几项）直接用遍历就够——<em>不要过度优化</em>。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">随机的可复现性问题</span>
+  <strong>问题</strong>：如果需要"同样的种子产生同样的掉落"（<em>录像回放、战斗重算、帧同步</em>）——<br>
+  <code>math.random</code> 是<strong>全局状态</strong>，无法保证复现。<br><br>
+  <strong>解决</strong>：<em>用独立的随机数生成器</em>：<br>
+  <code>local rng = { seed = 12345 }</code><br>
+  <code>function rng:next()</code><br>
+  <code>&nbsp;&nbsp;self.seed = (self.seed * 1103515245 + 12345) % 2147483648</code><br>
+  <code>&nbsp;&nbsp;return self.seed</code><br>
+  <code>end</code><br>
+  <em>每个系统用自己的 rng 实例，互不干扰。</em><br><br>
+  <strong>帧同步游戏必须这样做</strong>——否则不同客户端的随机结果不一致，<em>直接导致战斗结果分歧</em>。<br>
+  <strong>详见 Lua 站页 12（帧同步的确定性）。</strong>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="24">
+  <div class="task"><input type="checkbox" id="t-24-1"><label for="t-24-1"><strong>实现背包</strong>：支持添加/删除/查询，处理"数量归零"和"遍历中删除"。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-2"><label for="t-24-2"><strong>实现权重随机</strong>：用遍历法，验证概率分布符合权重。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-3"><label for="t-24-3"><strong>验证概率</strong>：跑 10 万次，统计每个道具的实际掉落率，对比理论权重。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-4"><label for="t-24-4"><strong>优化为二分</strong>：加前缀和 + 二分查找，测大掉落表的性能差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-5"><label for="t-24-5"><strong>做独立随机</strong>：实现一个可复现的 rng 实例，验证同种子同结果。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-6"><label for="t-24-6"><strong>回答面试题</strong>：① 权重随机的正确实现？② 前缀和+二分为什么更快？③ 什么情况需要可复现的随机？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能实现背包的三种结构；<br>
+    ② <strong>知道背包的两个常见 bug（数量归零、遍历中删除）</strong>；<br>
+    ③ <strong>知道"权重是相对值不是绝对概率"</strong>；<br>
+    ④ <strong>会用前缀和 + 二分优化掉落（O(n) → O(log n)）</strong>；<br>
+    ⑤ 知道什么时候需要可复现的随机（帧同步、录像）。<br>
+    <br>
+    <em>第 ③ 和 第 ④ 条最有价值——前者是概念纠偏，后者是实用优化。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="23-buff-skill.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">23 Buff 与技能系统</div>
+  </a>
+  <a class="next" href="25-time-scheduler.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">25 定时器与事件调度</div>
+  </a>
+</nav>

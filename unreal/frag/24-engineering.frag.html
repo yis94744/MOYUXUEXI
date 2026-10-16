@@ -1,0 +1,89 @@
+<h1>24 · 工程化与发布</h1>
+
+<p class="lead">这一页讲<strong>让项目能协作、能打包、能上线</strong>的那些事。<em>UE 的工程化比 Unity 复杂，但流程更成熟</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="vcs">一、版本控制：UE 的特殊要求</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>文件</th><th>处理</th><th>原因</th></tr></thead>
+  <tbody>
+    <tr><td><strong>.uasset / .umap</strong></td><td><strong>二进制，必须用 LFS</strong></td><td><em>无法合并</em></td></tr>
+    <tr><td><strong>Source/</strong></td><td><em>普通文本，正常 Git</em></td><td>可以合并</td></tr>
+    <tr><td><strong>Content/</strong></td><td><strong>大文件，必须 LFS</strong></td><td><em>体积大</em></td></tr>
+    <tr><td><strong>Binaries/</strong></td><td><em>忽略</em></td><td>编译产物</td></tr>
+    <tr><td><strong>Intermediate/</strong></td><td><em>忽略</em></td><td>临时文件</td></tr>
+    <tr><td><strong>Saved/</strong></td><td><em>忽略</em></td><td>日志与配置</td></tr>
+    <tr><td><strong>DerivedDataCache/</strong></td><td><em>忽略</em></td><td><strong>体积巨大</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">UE 项目最容易犯的版本控制错误</span>
+  <strong>① 没配 Git LFS</strong><br><em>几 GB 的资源直接进 Git</em> → <strong>仓库爆炸，clone 几小时</strong><br><br><strong>② 提交了 Intermediate/Saved</strong><br><em>这些是本地文件，不该共享</em> → <em>冲突、体积膨胀</em><br><br><strong>③ 没配 .gitattributes</strong><br><em>.uasset 被当文本处理</em> → <strong>损坏文件</strong><br><br><strong>正确的 .gitignore 要忽略</strong>：<br><code>Binaries/</code>、<code>Intermediate/</code>、<code>Saved/</code>、<code>DerivedDataCache/</code>、<code>.vs/</code><br><br><strong>.gitattributes 要设置</strong>：<br><code>*.uasset filter=lfs diff=lfs merge=lfs -text</code><br><code>*.umap filter=lfs diff=lfs merge=lfs -text</code><br><br><strong>合作开发提醒</strong>：<em>UE 的 .uasset 无法合并</em>——<strong>两个人同时改一个蓝图，后提交的会覆盖先提交的</strong>。<br><em>要建立"谁改谁负责"的协作规范。</em>
+</div>
+
+<h2 id="build">二、打包与发布</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>配置</th><th>用途</th><th>优化</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Debug</strong></td><td><em>调试</em></td><td>无优化</td></tr>
+    <tr><td><strong>Development</strong></td><td><strong>开发测试</strong></td><td><em>部分优化 + 可调试</em></td></tr>
+    <tr><td><strong>Test</strong></td><td><em>性能测试</em></td><td>接近 Shipping</td></tr>
+    <tr><td><strong>Shipping</strong></td><td><strong>正式发布</strong></td><td><span class="mk mk--yes">完全优化</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">命令行打包：CI 的基础</span>
+  <strong>打包命令</strong>：<br><code>UnrealBuildTool.exe -project="MyGame.uproject" -target=MyGame -platform=Win64 -configuration=Shipping -archive</code><br><br><strong>或者用 BuildCookRun</strong>（<em>更常用</em>）：<br><code>RunUAT.bat BuildCookRun -project="MyGame.uproject" -noP4 -platform=Win64 -clientconfig=Shipping -cook -build -stage -pak -archive -archivedirectory="Output"</code><br><br><strong>关键阶段</strong>：<br>· <strong>Build</strong>——<em>编译 C++</em><br>· <strong>Cook</strong>——<em>把资源转成平台格式</em>（<em>最耗时</em>）<br>· <strong>Stage</strong>——<em>收集文件</em><br>· <strong>Package</strong>——<em>打包成可执行文件</em><br>· <strong>Archive</strong>——<em>输出到目录</em><br><br><em>这套流程可以完全脚本化，适合 CI 集成。</em>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">Cook 阶段是最容易出问题的</span>
+  <strong>Cook 会做什么</strong>：<em>把编辑器格式的资源转成运行时格式</em>。<br><br><strong>常见问题</strong>：<br>① <strong>Cook 时间极长</strong>——<em>大项目可能几小时</em><br>② <em>资源引用丢失</em>——<em>只在运行时加载的资源没被 Cook</em><br>③ <strong>平台特定的问题</strong>——<em>某些材质在某平台不支持</em><br><br><strong>应对</strong>：<br>· <em>用 Cook 缓存</em>（<em>只重新 Cook 变化的</em>）<br>· <strong>动态加载的资源要加到 "Additional Asset Directories to Cook"</strong><br>· <em>每个平台都要单独测</em><br><br><strong>提前规划</strong>：<em>Cook 时间是"项目越大越痛"的问题</em>——<strong>早点建立 CI，别等到发版前才发现要几小时。</strong>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="24">
+  <div class="task"><input type="checkbox" id="t-24-1"><label for="t-24-1"><strong>配置 .gitignore 和 .gitattributes</strong>：给 UE 项目设置正确的版本控制。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-2"><label for="t-24-2"><strong>测 LFS</strong>：提交一个 .uasset，验证走的是 LFS。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-3"><label for="t-24-3"><strong>命令行打包</strong>：用 BuildCookRun 打包一次，观察各个阶段。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-4"><label for="t-24-4"><strong>测 Cook 时间</strong>：记录首次 Cook 和增量 Cook 的时间差。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-5"><label for="t-24-5"><strong>写 CI 脚本</strong>：把打包流程写成脚本，能一键执行。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-6"><label for="t-24-6"><strong>回答面试题</strong>：① UE 项目版本控制要注意什么？② 四种打包配置的区别？③ Cook 阶段为什么容易出问题？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道 .uasset 必须用 LFS，且无法合并</strong>；<br>
+    ② 知道要忽略哪些目录；<br>
+    ③ <strong>能说出四种打包配置的区别</strong>；<br>
+    ④ <strong>知道 BuildCookRun 的五个阶段</strong>；<br>
+    ⑤ 知道 Cook 阶段的三个常见问题。<br>
+    <br>
+    <em>第 ① 条最重要——**版本控制配错了，后期迁移成本极高**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="23-perf.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">23 性能优化实战 ★★★</div>
+  </a>
+  <a class="next" href="25-ai.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">25 AI 辅助开发与 AI NPC</div>
+  </a>
+</nav>

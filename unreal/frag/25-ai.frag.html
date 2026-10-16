@@ -1,0 +1,88 @@
+<h1>25 · AI 辅助开发与 AI NPC</h1>
+
+<p class="lead">这一页讲<strong>两件都叫"AI"的事</strong>：<em>用 AI 辅助你写 UE 代码</em>，以及在 UE 里<em>做 AI NPC</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="assist">一、AI 辅助 UE 开发的真实效果 ★★</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>任务</th><th>效果</th><th>原因</th></tr></thead>
+  <tbody>
+    <tr><td><strong>基础 C++ 语法</strong></td><td><span class="mk mk--yes">好</span></td><td><em>标准知识</em></td></tr>
+    <tr><td><strong>标准库用法</strong></td><td><span class="mk mk--yes">好</span></td><td><em>资料丰富</em></td></tr>
+    <tr><td><strong>UE 宏的写法</strong></td><td><span class="mk mk--warn">中</span></td><td><strong>容易漏细节</strong></td></tr>
+    <tr><td><strong>UE 类层次</strong></td><td><span class="mk mk--warn">中</span></td><td><em>可能记错继承关系</em></td></tr>
+    <tr><td><strong>GAS / 网络代码</strong></td><td><span class="mk mk--no">差</span></td><td><strong>上下文太复杂</strong></td></tr>
+    <tr><td><strong>构建配置</strong></td><td><span class="mk mk--no">差</span></td><td><em>版本差异大</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">AI 写 UE 代码的三个高频错误</span>
+  <strong>① 版本不匹配</strong><br><em>UE4 的写法用在 UE5 上</em>——比如：<br>· <code>GetWorld()-&gt;GetTimeSeconds()</code> 的替代<br>· <em>某些 API 改名或废弃</em><br><br><strong>② 漏掉必要的东西</strong><br><em>UE 的代码有很多"必须写"的部分</em>：<br>· <em>忘了 <code>GENERATED_BODY()</code></em><br>· <em>忘了 <code>_Implementation</code> 后缀</em>（<em>页 14</em>）<br>· <strong>忘了 UPROPERTY 导致 GC 回收</strong>（<em>页 12</em>）<br><br><strong>③ .Build.cs 依赖没加</strong><br><em>AI 给了代码，但没说要在 .Build.cs 加模块</em>→ <strong>链接错误</strong>（<em>页 09</em>）<br><br><strong>防护</strong>：<em>AI 给的 UE 代码，重点检查这三项</em>——<strong>比逐行读代码快得多。</strong>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">AI 在 UE 上最有价值的用法</span>
+  <strong>不是"让它写代码"，而是</strong>：<br><br><strong>① 解释不熟悉的代码</strong><br><em>把一段引擎源码丢给它，让它解释</em>——<strong>比读文档快</strong>。<br><br><strong>② 找 API</strong><br><em>"UE 里怎么做 X？"</em>——<em>它会给出函数名，你再自己去验证</em>。<br><br><strong>③ 写样板代码</strong><br><em>USTRUCT 的定义、Subsystem 的框架、接口的声明</em>——<strong>这些模板化的东西它写得不错</strong>。<br><br><strong>④ 分析错误信息</strong><br><em>把编译错误贴给它</em>——<strong>模板错误的解读特别有用</strong>（<em>页 06</em>）。<br><br><em>关键是定位准确：AI 是"加速器"，不是"决策者"。</em>
+</div>
+
+<h2 id="npc">二、在 UE 里做 AI NPC</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>层次</th><th>技术</th><th>难度</th></tr></thead>
+  <tbody>
+    <tr><td><strong>行为 AI</strong></td><td><em>行为树 + EQS</em></td><td>低（<em>UE 内置</em>）</td></tr>
+    <tr><td><strong>对话 AI</strong></td><td><strong>接 LLM</strong></td><td>中</td></tr>
+    <tr><td><strong>语音 AI</strong></td><td><em>语音识别 + TTS</em></td><td>中高</td></tr>
+    <tr><td><strong>完整 NPC</strong></td><td><strong>感知 + LLM + 行为</strong></td><td><span class="mk mk--no">高</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">UE 里接 LLM 的架构</span>
+  <strong>四步循环</strong>（<em>和 Lua 站页 23 讲的一样</em>）：<br>① <em>收集上下文</em>（<em>玩家位置、对话历史</em>）<br>② <strong>调用 LLM</strong>（<em>用 HTTP 请求</em>）<br>③ <em>过滤输出</em>（<em>安全审核、格式校验</em>）<br>④ <strong>执行行为</strong>（<em>映射到行为树能执行的动作</em>）<br><br><strong>UE 的实现要点</strong>：<br>· <strong>HTTP 要在非游戏线程</strong>（<em>否则卡帧</em>）<br>· <em>用 Subsystem 管理 LLM 连接</em>（<em>页 22</em>）<br>· <strong>输出必须走白名单</strong>（<em>绝不能让 LLM 直接产生行为指令</em>）<br><br><strong>关键限制</strong>：<em>LLM 响应要 1~3 秒</em>——<strong>玩家等不了</strong>。<br><em>要用异步 + 打字机效果掩盖延迟。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="25">
+  <div class="task"><input type="checkbox" id="t-25-1"><label for="t-25-1"><strong>测试 AI 的 UE 代码</strong>：让 AI 写一段 UE 代码，重点检查那三个高频错误。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-2"><label for="t-25-2"><strong>用 AI 解释源码</strong>：找一段引擎源码，让 AI 解释它的作用。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-3"><label for="t-25-3"><strong>用 AI 读错误</strong>：故意制造一个模板错误，让 AI 帮你读错误信息。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-4"><label for="t-25-4"><strong>设计 LLM NPC 架构</strong>：写出四步循环的具体实现方案。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-5"><label for="t-25-5"><strong>做安全过滤</strong>：实现一个白名单，把 LLM 输出映射到行为树节点。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-6"><label for="t-25-6"><strong>回答面试题</strong>：① AI 写 UE 代码的高频错误？② AI 在 UE 上最有价值的用法？③ LLM NPC 的关键限制？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道 AI 在 UE 上效果有限的三个原因</strong>；<br>
+    ② <strong>知道 AI 写 UE 代码的三个高频错误及检查方法</strong>；<br>
+    ③ 知道 AI 最有价值的四种用法；<br>
+    ④ 能说出 LLM NPC 的四个层次；<br>
+    ⑤ 知道 UE 里接 LLM 的架构要点及关键限制。<br>
+    <br>
+    <em>第 ② 条最实用——**它把"验证 AI 输出"变成了一个三分钟的检查清单**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="24-engineering.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">24 工程化与发布</div>
+  </a>
+  <a class="next" href="26-projects.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">26 实战项目集</div>
+  </a>
+</nav>

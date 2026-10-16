@@ -1,0 +1,114 @@
+<h1>15 · 动态规划与贪心</h1>
+
+<p class="lead">动态规划在游戏里的应用<strong>比你想的少</strong>，但<em>有几个场景非它不可</em>。这一页讲<strong>什么时候真的需要 DP</strong>，以及<em>那些其实用贪心就够的场景</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="do-you-need">一、先问：真的需要 DP 吗</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">游戏里 DP 的真实使用频率</span>
+  <strong>说实话：游戏开发中，DP 用得不多。</strong><br><br>
+  <strong>为什么</strong>：<br>
+  · DP 通常处理"大规模最优解"问题<br>
+  · 而游戏里这类问题往往<em>数据量小</em>，或<em>有更好的启发式解法</em><br>
+  · 玩家也不要求"数学最优"——<em>"够好"就够了</em><br><br>
+  <strong>真正会用 DP 的场景</strong>：<br>
+  · <strong>背包问题</strong>（<em>体力有限，装哪些道具收益最大</em>）<br>
+  · <strong>最长公共子序列</strong>（<em>文本 diff、版本对比</em>）<br>
+  · <strong>编辑距离</strong>（<em>模糊匹配、拼写纠错</em>）<br>
+  · <strong>路径计数</strong>（<em>地图上有多少条路可走</em>）<br>
+  · 部分<strong>关卡难度评估</strong><br><br>
+  <strong>用贪心就够的场景</strong>：<br>
+  · 任务奖励选择（<em>按性价比排序取前几个</em>）<br>
+  · 技能加点推荐（<em>按收益排序</em>）<br>
+  · 资源分配（<em>按优先级分配</em>）<br><br>
+  <em>结论：先想清楚"这个问题真的需要最优解吗"，再决定用不用 DP。</em>
+</div>
+
+<h2 id="real-cases">二、游戏里真实用到 DP 的三个场景</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>场景</th><th>问题</th><th>复杂度</th></tr></thead>
+  <tbody>
+    <tr><td><strong>背包（0-1）</strong></td><td>体力有限，选哪些道具收益最大</td><td>O(n × W)</td></tr>
+    <tr><td><strong>编辑距离</strong></td><td>两个字符串的相似度</td><td>O(n × m)</td></tr>
+    <tr><td><strong>最长公共子序列</strong></td><td>文本 diff、版本对比</td><td>O(n × m)</td></tr>
+    <tr><td><strong>路径计数</strong></td><td>网格上有多少条路径</td><td>O(n × m)</td></tr>
+    <tr><td><strong>硬币找零</strong></td><td>最少用几个面额凑出金额</td><td>O(n × amount)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">背包问题：DP 的经典应用</span>
+  <strong>游戏场景</strong>：背包容量 100，有 20 个道具，每个有重量和价值，<em>怎么装收益最大</em>？<br><br>
+  <strong>为什么贪心不行</strong>：<em>按"价值/重量比"排序取，可能不是最优</em>。<br>
+  反例：容量 10，道具 A(重10,价值10)、B(重6,价值7)、C(重4,价值5)<br>
+  · 贪心（比值）：先取 A，得 10<br>
+  · 最优：取 B+C = 12<br><br>
+  <strong>DP 的做法</strong>：<br>
+  <code>dp[i][w] = max(dp[i-1][w], dp[i-1][w-物品i重量] + 物品i价值)</code><br>
+  <em>含义：前 i 个物品、容量 w 时的最大价值</em><br><br>
+  <strong>复杂度</strong>：O(n × W)。<em>W 是容量——如果容量是 10000 就有点慢了。</em><br>
+  <strong>实战提示</strong>：<em>游戏里背包通常不追求数学最优，而是按玩家选择的顺序装</em>——所以真正的 0-1 背包用得也不多。
+</div>
+
+<h2 id="greedy">三、贪心：游戏里更常用的思路</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">贪心的适用条件</span>
+  <strong>贪心能用的两个前提</strong>：<br>
+  ① <strong>贪心选择性质</strong>——局部最优能推出全局最优<br>
+  ② <strong>无后效性</strong>——当前选择不影响未来选项<br><br>
+  <strong>游戏里的常见贪心</strong>：<br>
+  · <strong>任务排序</strong>——<em>按奖励/时间比排序，优先做划算的</em><br>
+  · <strong>资源采集</strong>——<em>先采最近/最富的</em><br>
+  · <strong>AI 目标选择</strong>——<em>选威胁度最高的打</em><br>
+  · <strong>技能释放顺序</strong>——<em>按 DPS 排序</em><br>
+  · <strong>消除类游戏提示</strong>——<em>找当前最优的一步</em><br><br>
+  <strong>为什么游戏偏爱贪心</strong>：<br>
+  ① <strong>快</strong>——通常 O(n log n)（排序）或 O(n)<br>
+  ② <strong>可解释</strong>——<em>"因为性价比最高"玩家能理解</em><br>
+  ③ <strong>够好</strong>——<em>玩家感知不到"非最优"</em><br><br>
+  <em>除非玩家能算出"你应该给我更好的方案"，否则贪心就够了。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="15">
+  <div class="task"><input type="checkbox" id="t-15-1"><label for="t-15-1"><strong>判断需不需要 DP</strong>：列出你项目里的三个"优化问题"，判断各该用什么方法。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-2"><label for="t-15-2"><strong>实现背包 DP</strong>：用 0-1 背包解决"体力有限选道具"，验证比贪心更优。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-3"><label for="t-15-3"><strong>对比贪心与 DP</strong>：构造一个贪心失败、DP 成功的例子。<em>理解为什么贪心不总能最优。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-15-4"><label for="t-15-4"><strong>实现编辑距离</strong>：计算两个字符串的相似度，用于模糊匹配。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-5"><label for="t-15-5"><strong>找项目里的贪心</strong>：找出你项目里"按某规则排序取前几个"的逻辑。<em>它们都是贪心。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-15-6"><label for="t-15-6"><strong>回答面试题</strong>：① 游戏里 DP 用得多的场景是什么？② 什么时候贪心就够？③ 背包为什么贪心会失败？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道游戏里 DP 用得不多，只有几个特定场景</strong>；<br>
+    ② 能说出 DP 的三个真实游戏场景（背包、编辑距离、路径计数）；<br>
+    ③ <strong>能举出"贪心失败"的反例</strong>；<br>
+    ④ 能说出贪心的两个适用前提；<br>
+    ⑤ 知道游戏为什么偏爱贪心（快、可解释、够好）。<br>
+    <br>
+    <em>第 ① 和 第 ⑤ 条是这一页最有价值的内容——它们帮你**把精力放在真正需要的地方**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="14-search.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">14 查找与字符串算法</div>
+  </a>
+  <a class="next" href="16-state-machine.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">16 状态机 ★★★</div>
+  </a>
+</nav>

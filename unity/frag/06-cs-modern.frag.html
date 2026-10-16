@@ -1,0 +1,727 @@
+
+      <h1>06 · 泛型、反射与现代特性</h1>
+      <p class="lead">前五页你学的是"怎么写代码"。从这一页开始，你学的是<strong>怎么写"能被别人复用的代码"</strong>。泛型让你写一次就能适配所有类型；反射让你能在运行时"看见"自己的代码结构；特性让你能给代码贴标签；异常让你能优雅地处理意外。</p>
+
+      <div class="callout callout--note">
+        <span class="callout__title">这一页在路线中的位置</span>
+        <strong>上一页</strong>（05）你学会了用委托和事件解耦模块。但那些代码往往是<em>为某一个具体类型写死的</em>。<br>
+        <strong>这一页</strong>解决"复用"问题：泛型让容器/管理器不用为每种类型重写一遍；反射和特性让"注册系统"这类重复工作变成自动的。<br>
+        <strong>下一页</strong>（07）会把这些知识用在性能上——<em>泛型不装箱、反射有代价、特性有运行时开销</em>，这些都是 GC 分配的来源。<br>
+        <strong>换句话说</strong>：这一页教你"强大的工具"，下一页教你"这些工具的账单"。
+      </div>
+
+      <h2 id="generic">一、泛型：写一次，适配所有类型</h2>
+      <p>假设你要写一个对象池。不用泛型的话，你有两个选择：</p>
+
+      <ul>
+        <li><strong>方案 A</strong>：为每种类型写一个池子——<code>BulletPool</code>、<code>EnemyPool</code>、<code>EffectPool</code>…代码重复到让人崩溃。</li>
+        <li><strong>方案 B</strong>：用一个 <code>Stack&lt;object&gt;</code>——但每次取出都要强制转换，而且<em>值类型会装箱</em>（还记得页 03 讲的装箱吗）。</li>
+      </ul>
+      <p>泛型是第三个选项：<strong>写一次代码，编译时为每种类型生成专用版本</strong>，既没有重复，也没有装箱。</p>
+
+      <h3 id="generic-class">泛型类与泛型方法</h3>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using System;
+using System.Collections.Generic;
+
+// ============================================================
+//  泛型类：把类型变成参数
+// ============================================================
+public class ObjectPool&lt;T&gt; where T : class
+{
+    private readonly Stack&lt;T&gt; _pool = new Stack&lt;T&gt;();
+    private readonly Func&lt;T&gt; _factory;
+    private readonly Action&lt;T&gt; _onGet;
+    private readonly Action&lt;T&gt; _onRelease;
+
+    public ObjectPool(Func&lt;T&gt; factory, Action&lt;T&gt; onGet = null,
+                      Action&lt;T&gt; onRelease = null, int prewarm = 0)
+    {
+        _factory = factory ?? throw new ArgumentNullException(nameof(factory));
+        _onGet = onGet;
+        _onRelease = onRelease;
+
+        for (int i = 0; i &lt; prewarm; i++) _pool.Push(_factory());
+    }
+
+    public T Get()
+    {
+        T item = _pool.Count &gt; 0 ? _pool.Pop() : _factory();
+        _onGet?.Invoke(item);
+        return item;
+    }
+
+    public void Release(T item)
+    {
+        _onRelease?.Invoke(item);
+        _pool.Push(item);
+    }
+
+    public int Count { get { return _pool.Count; } }
+}
+
+// ============================================================
+//  泛型方法 + 扩展方法
+// ============================================================
+public static class GameObjectExtensions
+{
+    public static T GetOrAddComponent&lt;T&gt;(this GameObject go) where T : Component
+    {
+        if (go.TryGetComponent(out T c)) return c;
+        return go.AddComponent&lt;T&gt;();
+    }
+}
+
+// ============================================================
+//  泛型约束的完整写法
+// ============================================================
+public class ConstraintDemo
+{
+    // struct 约束：只能是值类型
+    public static T Max&lt;T&gt;(T a, T b) where T : struct, IComparable&lt;T&gt;
+    {
+        return a.CompareTo(b) &gt; 0 ? a : b;
+    }
+
+    // class + new() 约束
+    public static T Create&lt;T&gt;() where T : class, new()
+    {
+        return new T();
+    }
+
+    // 多个接口约束
+    public static void Process&lt;T&gt;(T item) where T : IDisposable, IComparable&lt;T&gt;
+    {
+        item.Dispose();
+    }
+}
+
+// ============================================================
+//  泛型单例基类（Unity 中最常用的泛型模式）
+// ============================================================
+public abstract class MonoSingleton&lt;T&gt; : MonoBehaviour where T : MonoSingleton&lt;T&gt;
+{
+    private static T _instance;
+
+    public static T Instance
+    {
+        get
+        {
+            if (_instance != null) return _instance;
+
+            _instance = FindObjectOfType&lt;T&gt;();
+            if (_instance == null)
+            {
+                var go = new GameObject(typeof(T).Name);
+                _instance = go.AddComponent&lt;T&gt;();
+            }
+            return _instance;
+        }
+    }
+
+    protected virtual void Awake()
+    {
+        if (_instance != null &amp;&amp; _instance != this)
+        {
+            Destroy(gameObject);     // 场景里出现重复实例时销毁后来的
+            return;
+        }
+        _instance = (T)this;
+        DontDestroyOnLoad(gameObject);
+    }
+
+    protected virtual void OnDestroy()
+    {
+        if (_instance == this) _instance = null;   // 必须清理，否则留下"假 null"
+    }
+}
+
+public class AudioManager : MonoSingleton&lt;AudioManager&gt;
+{
+    public void PlayBgm(string name) { }
+}</code></pre>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">注意 <code>where T : class</code> 这个约束</span>
+        上面的对象池加了 <code>where T : class</code>，意思是"T 必须是引用类型"。<br>
+        为什么？因为池子里用 <code>Stack&lt;T&gt;</code> 存储，如果 T 是值类型，取出时会有<em>语义问题</em>——值类型是拷贝语义，池化它对性能帮助很小，反而增加复杂度。<br>
+        <strong>约束不只是"限制"，更是一种"文档"</strong>：它明确告诉使用者"这个类为引用类型设计"。
+      </div>
+
+      <h3 id="constraint">泛型约束全表</h3>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>约束</th><th>含义</th><th>典型用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>where T : struct</code></td><td>必须是值类型（不含 Nullable）</td><td>数学运算、比较</td></tr>
+          <tr><td><code>where T : class</code></td><td>必须是引用类型</td><td>对象池、缓存</td></tr>
+          <tr><td><code>where T : notnull</code></td><td>不可为空（C# 8）</td><td>字典键</td></tr>
+          <tr><td><code>where T : unmanaged</code></td><td>非托管类型（C# 7.3）</td><td>可用于指针、Burst</td></tr>
+          <tr><td><code>where T : new()</code></td><td>必须有公开无参构造</td><td><strong>必须放在约束列表最后</strong></td></tr>
+          <tr><td><code>where T : BaseClass</code></td><td>必须是某类或其派生</td><td>组件查找</td></tr>
+          <tr><td><code>where T : IInterface</code></td><td>必须实现接口</td><td>可写多个</td></tr>
+          <tr><td><code>where T : U</code></td><td>与另一类型参数的关系</td><td>裸类型约束</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <h3 id="singleton">实战：泛型单例基类</h3>
+      <p>这是 Unity 中最经典的泛型应用。<strong>每个 Manager 都要写一遍单例逻辑太蠢了</strong>，用泛型基类一次解决。</p>
+      <p>上面的 <code>MonoSingleton&lt;T&gt;</code> 代码就是完整实现。几个关键点：</p>
+
+      <ul>
+        <li><code>where T : MonoSingleton&lt;T&gt;</code> —— 这个"自引用约束"是<em>CRTP 模式</em>，让基类能知道具体子类型。</li>
+        <li><code>_instance = (T)this;</code> —— 因为约束保证了 T 是自己的派生类，转换必然成功。</li>
+        <li><code>OnDestroy</code> 里必须置空 —— 否则场景切换后留下"假 null"（页 11 会详细讲）。</li>
+        <li><code>DontDestroyOnLoad</code> 是否该加 —— <strong>取决于你的需求</strong>。全站管理器需要，场景内管理器不需要。</li>
+      </ul>
+
+      <div class="callout callout--warn">
+        <span class="callout__title">Unity 的 API 版本提醒</span>
+        <code>FindObjectOfType&lt;T&gt;()</code> 从 <strong>Unity 2023.1</strong> 起被标记为过时。<br>
+        新 API 是 <code>FindFirstObjectByType&lt;T&gt;()</code>（返回第一个）和 <code>FindAnyObjectByType&lt;T&gt;()</code>（更快，任意一个）。<br>
+        2020–2022 用 <code>FindObjectOfType</code> 即可；写新项目建议用新 API 并加版本宏。
+      </div>
+
+      <h2 id="reflection">二、反射：让代码"看见"自己</h2>
+      <p>反射是<strong>在运行时检查和操作类型的能力</strong>。听起来很抽象，但你在 Unity 里其实一直在享受它的好处：</p>
+
+      <ul>
+        <li>Inspector 能显示你的字段 —— 那是反射在读字段元数据。</li>
+        <li>你在类上加 <code>[SerializeField]</code> 就生效 —— 那是反射在读特性。</li>
+        <li>Unity 能找到所有标了 <code>[MenuItem]</code> 的方法并放进菜单 —— 那也是反射。</li>
+      </ul>
+      <p><strong>但你自己用反射时，要清楚它的代价。</strong></p>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using System;
+using System.Reflection;
+
+public class ReflectTarget
+{
+    public int PublicField = 1;
+    private int _privateField = 2;
+    public int PublicProperty { get; set; }
+    public static string StaticField = "s";
+
+    public void PublicMethod(int x) { Debug.Log("called " + x); }
+    private void PrivateMethod() { Debug.Log("private"); }
+}
+
+public class ReflectionDemo : MonoBehaviour
+{
+    private void Start()
+    {
+        Type t = typeof(ReflectTarget);
+
+        // ============ 基本信息 ============
+        Debug.Log(t.FullName);                 // 完整类型名
+        Debug.Log(t.Name);                     // 简单名
+        Debug.Log(t.IsClass);
+        Debug.Log(t.BaseType?.Name);
+        Debug.Log(t.Assembly.GetName().Name);
+
+        // ============ 字段 ============
+        const BindingFlags Flags = BindingFlags.Public
+                                 | BindingFlags.NonPublic
+                                 | BindingFlags.Instance;
+
+        foreach (FieldInfo f in t.GetFields(Flags))
+        {
+            Debug.Log(f.Name + " : " + f.FieldType.Name);
+        }
+
+        // ============ 创建实例 + 调用方法 ============
+        object instance = Activator.CreateInstance(t);
+
+        MethodInfo method = t.GetMethod("PublicMethod");
+        method.Invoke(instance, new object[] { 5 });
+
+        MethodInfo priv = t.GetMethod("PrivateMethod",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        priv.Invoke(instance, null);
+
+        // ============ 读写私有字段 ============
+        FieldInfo privField = t.GetField("_privateField", Flags);
+        Debug.Log(privField.GetValue(instance));     // 2
+        privField.SetValue(instance, 99);
+
+        // ============ 静态成员 ============
+        FieldInfo sf = t.GetField("StaticField");
+        Debug.Log(sf.GetValue(null));                // 静态字段传 null
+    }
+}</code></pre>
+
+      <h3 id="reflect-unity">Unity 中的两个典型用途</h3>
+      <p><strong>用途一：用特性标记 + 反射批量注册系统。</strong>想象你有 20 个游戏系统（战斗、背包、任务…），每次新增一个都要手动去改一个注册列表 —— 这是典型的重复劳动。<strong>用特性标记 + 反射扫描就能全自动。</strong></p>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using System;
+using System.Reflection;
+
+// ============================================================
+//  反射的性能代价与三种优化方案
+// ============================================================
+public class FastReflection
+{
+    // 反射 Invoke 比直接调用慢 100~1000 倍，且产生 GC（装箱 + object[] 分配）
+
+    // ---------- 方案一：缓存 MemberInfo ----------
+    private static readonly MethodInfo CachedMethod =
+        typeof(ReflectTarget).GetMethod("PublicMethod");
+
+    // ---------- 方案二：缓存委托（推荐，接近直接调用的性能）----------
+    private static Action&lt;ReflectTarget, int&gt; _fastAction;
+
+    static FastReflection()
+    {
+        MethodInfo m = typeof(ReflectTarget).GetMethod("PublicMethod");
+        _fastAction = (Action&lt;ReflectTarget, int&gt;)Delegate.CreateDelegate(
+            typeof(Action&lt;ReflectTarget, int&gt;), m);
+    }
+
+    public static void CallFast(ReflectTarget t)
+    {
+        _fastAction(t, 5);
+    }
+
+    // ---------- 方案三：表达式树（可支持更复杂的场景）----------
+    // ---------- 方案四：IL Emit（最强但最复杂，IL2CPP 下受限）----------
+}
+
+// ============================================================
+//  实战：用特性标记 + 反射批量注册系统
+// ============================================================
+[AttributeUsage(AttributeTargets.Class)]
+public class GameSystemAttribute : Attribute
+{
+    public int Order { get; }
+    public GameSystemAttribute(int order = 0) { Order = order; }
+}
+
+[GameSystem(10)]
+public class CombatSystem { }
+
+[GameSystem(20)]
+public class SaveSystem { }
+
+public static class SystemRegistry
+{
+    public static System.Collections.Generic.List&lt;Type&gt; DiscoverAll()
+    {
+        var result = new System.Collections.Generic.List&lt;Type&gt;();
+        Assembly asm = typeof(SystemRegistry).Assembly;
+
+        foreach (Type t in asm.GetTypes())
+        {
+            if (!t.IsClass || t.IsAbstract) continue;
+
+            var attr = t.GetCustomAttribute&lt;GameSystemAttribute&gt;();
+            if (attr != null) result.Add(t);
+        }
+
+        result.Sort((a, b) =&gt;
+            a.GetCustomAttribute&lt;GameSystemAttribute&gt;().Order
+                .CompareTo(b.GetCustomAttribute&lt;GameSystemAttribute&gt;().Order));
+
+        return result;
+    }
+}</code></pre>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">IL2CPP 的重要限制</span>
+        IL2CPP 是 AOT（提前编译）。泛型实例<strong>只在编译期被引用过</strong>的情况下才会生成代码。<br>
+        如果某个泛型组合只在反射里用到，AOT 阶段可能不生成 → 运行时抛 <code>ExecutionEngineException</code>。<br>
+        <strong>三个解决办法</strong>：<br>① 在代码里显式实例化一次（写个用不到的 dummy 调用）；<br>② 加 <code>[UnityEngine.Scripting.Preserve]</code> 特性；<br>③ 在 <code>link.xml</code> 中保留类型/程序集（页 22 详解）。
+      </div>
+
+      <h2 id="attribute">三、特性：给代码贴标签</h2>
+      <p>特性（Attribute）是<strong>元数据</strong>——它不改变代码行为，只是"贴个标签"，等别人（框架或你自己的代码）来读这个标签。</p>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>Unity 常用特性</th><th>作用</th><th>备注</th></tr></thead>
+        <tbody>
+          <tr><td><code>[SerializeField]</code></td><td>私有字段暴露到 Inspector</td><td>最常用</td></tr>
+          <tr><td><code>[SerializeReference]</code></td><td>真正的多态序列化</td><td>Unity 2019.3+</td></tr>
+          <tr><td><code>[FormerlySerializedAs("old")]</code></td><td>字段改名后保留已存数据</td><td><strong>强烈推荐</strong></td></tr>
+          <tr><td><code>[HideInInspector]</code></td><td>public 字段不在 Inspector 显示</td><td>但仍序列化</td></tr>
+          <tr><td><code>[Range(min,max)]</code></td><td>数值滑块</td><td>仅 float/int</td></tr>
+          <tr><td><code>[Min(v)]</code></td><td>最小值硬限制</td><td>Unity 2019.1+</td></tr>
+          <tr><td><code>[Tooltip("...")]</code></td><td>鼠标悬停提示</td><td></td></tr>
+          <tr><td><code>[Header("...")]</code></td><td>Inspector 分组标题</td><td></td></tr>
+          <tr><td><code>[RequireComponent(typeof(T))]</code></td><td>自动添加依赖组件</td><td>类特性</td></tr>
+          <tr><td><code>[DisallowMultipleComponent]</code></td><td>禁止同物体挂多个</td><td>类特性</td></tr>
+          <tr><td><code>[ExecuteAlways]</code></td><td>编辑模式也执行生命周期</td><td>Unity 2018.1+</td></tr>
+          <tr><td><code>[CreateAssetMenu]</code></td><td>右键创建 ScriptableObject</td><td>类特性</td></tr>
+          <tr><td><code>[ContextMenu("名称")]</code></td><td>组件右上角菜单</td><td>方法特性</td></tr>
+          <tr><td><code>[UnityEngine.Scripting.Preserve]</code></td><td>防止 IL2CPP 剥离</td><td>见上面 IL2CPP 部分</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--tip">
+        <span class="callout__title"><code>[FormerlySerializedAs]</code> 是被严重低估的特性</span>
+        场景：你把字段 <code>_speed</code> 改名成 <code>_moveSpeed</code>。<br>
+        <strong>所有已经保存了数据的预制体和场景里，这个字段的值会丢失</strong>——因为 Unity 是按字段名匹配数据的。<br>
+        加上 <code>[FormerlySerializedAs("_speed")]</code> 后，Unity 会<em>先尝试读新名字，读不到再读旧名字</em>，数据就保住了。<br>
+        <strong>规则</strong>：任何会影响序列化的字段改名，都要加这个特性。<em>上线后改名不带它，等于把策划配的数据全清空。</em>
+      </div>
+
+      <h2 id="exception">四、异常处理</h2>
+      <p>异常是"出了意料之外的事"时的标准处理方式。但在 Unity 里，<strong>滥用异常比不用异常更糟</strong>——因为异常不仅慢，还可能中断一帧的执行。</p>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using System;
+
+public class ExceptionDemo : MonoBehaviour
+{
+    private void Start()
+    {
+        try
+        {
+            GameObject go = GameObject.Find("NotExist");
+            go.SetActive(false);                    // NullReferenceException
+        }
+        catch (NullReferenceException e)
+        {
+            Debug.LogError("空引用：" + e.Message);
+        }
+        catch (Exception e) when (e.Message.Contains("timeout"))   // 异常筛选器（C# 6+）
+        {
+            Debug.LogError("超时：" + e.Message);
+        }
+        catch (Exception e)
+        {
+            Debug.LogException(e);                  // 保留堆栈
+            throw;                                  // 重新抛出（保留原始堆栈）
+        }
+        finally
+        {
+            // 无论是否异常都会执行，用于释放资源
+        }
+    }
+}
+
+// ============================================================
+//  自定义异常
+// ============================================================
+public class ConfigLoadException : Exception
+{
+    public string FilePath { get; }
+
+    public ConfigLoadException(string path, string message) : base(message)
+    {
+        FilePath = path;
+    }
+
+    public ConfigLoadException(string path, string message, Exception inner)
+        : base(message, inner)
+    {
+        FilePath = path;
+    }
+}
+
+// ============================================================
+//  正确的实践：用 TryXxx 表达"预期内的失败"
+// ============================================================
+public class ConfigLoader
+{
+    public class Config { public int Level; }
+
+    public bool TryLoadConfig(string path, out Config cfg)
+    {
+        cfg = null;
+        if (!System.IO.File.Exists(path)) return false;
+
+        try
+        {
+            cfg = JsonUtility.FromJson&lt;Config&gt;(System.IO.File.ReadAllText(path));
+            return cfg != null;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("配置加载失败：" + path + "，" + e.Message);
+            return false;
+        }
+    }
+}
+
+// ============================================================
+//  全局异常捕获
+// ============================================================
+public class GlobalExceptionCatcher : MonoBehaviour
+{
+    private void OnEnable()
+    {
+        Application.logMessageReceived += OnLog;
+    }
+
+    private void OnDisable()
+    {
+        Application.logMessageReceived -= OnLog;
+    }
+
+    private void OnLog(string condition, string stackTrace, LogType type)
+    {
+        if (type == LogType.Exception || type == LogType.Error)
+        {
+            // 上报到日志系统 / 崩溃收集
+            // 注意：Application.logMessageReceived 必须在主线程调用 Unity API
+        }
+    }
+}</code></pre>
+
+      <h3 id="exception-types">常用异常类型速查</h3>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>异常</th><th>触发场景</th></tr></thead>
+        <tbody>
+          <tr><td><code>NullReferenceException</code></td><td>访问 null 的成员</td></tr>
+          <tr><td><code>IndexOutOfRangeException</code></td><td>数组/List 下标越界</td></tr>
+          <tr><td><code>ArgumentException</code></td><td>参数非法（如 Dictionary.Add 重复键）</td></tr>
+          <tr><td><code>InvalidOperationException</code></td><td>状态不允许该操作（遍历中改集合）</td></tr>
+          <tr><td><code>KeyNotFoundException</code></td><td>Dictionary 索引器取不存在的键</td></tr>
+          <tr><td><code>FormatException</code></td><td><code>int.Parse</code> 格式错误</td></tr>
+          <tr><td><code>MissingReferenceException</code></td><td><strong>Unity 特有</strong>：访问已销毁的对象</td></tr>
+          <tr><td><code>MissingComponentException</code></td><td><strong>Unity 特有</strong>：GetComponent 失败后访问返回对象</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--warn">
+        <span class="callout__title">Unity 中异常处理的四条实践建议</span>
+        <strong>① 用 <code>TryXxx</code> 模式表达"预期内的失败"</strong>，不要用异常。<br>比如"文件不存在"是预期内的，返回 <code>false</code> 就好；"文件存在但格式损坏"才是异常。<br>
+        <strong>② 不要用异常做流程控制。</strong>异常涉及堆栈展开，性能很差。<em>靠异常实现的逻辑只能算 bug。</em><br>
+        <strong>③ 不要 <code>catch (Exception)</code> 后什么都不做。</strong>吞掉异常是 bug 的温床——<em>出问题时你连线索都没有</em>。<br>
+        <strong>④ 在 Job System / Burst 中<em>不能使用异常</em>。</strong>Burst 编译的代码里任何 <code>try/catch</code> 都会编译失败（页 18 详讲）。
+      </div>
+
+      <h2 id="modern">五、现代 C# 特性与 Unity 支持矩阵</h2>
+      <p>C# 一直在演进，但<strong>Unity 的 C# 版本是被锁定的</strong>——它由 Unity 内置的编译器决定，你无法自由升级。这导致一个尴尬局面：<em>网上很多 C# 教程教的语法，在 Unity 里根本用不了</em>。</p>
+
+      <h3 id="matrix">Unity 的 C# 版本对照表（务必对照项目版本）</h3>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>Unity 版本</th><th>内置 C# 版本</th><th>.NET API 兼容级别</th><th>关键新增</th></tr></thead>
+        <tbody>
+          <tr><td>2017.x</td><td>C# 6</td><td>.NET 3.5 / 4.x 可选</td><td>字符串插值、表达式体、nameof</td></tr>
+          <tr><td>2018.3</td><td>C# 7.3</td><td>.NET 4.x Equivalent</td><td>out var、元组、模式匹配、局部函数</td></tr>
+          <tr><td>2019.4 LTS</td><td>C# 7.3</td><td>.NET Standard 2.0 / 4.x</td><td>同上</td></tr>
+          <tr><td>2020.2</td><td>C# 8.0</td><td>.NET Standard 2.1 / 4.x</td><td>switch 表达式、??=、using 声明</td></tr>
+          <tr><td>2021.2+</td><td>C# 9.0</td><td>.NET Standard 2.1</td><td>record、init、目标类型 new</td></tr>
+          <tr><td>Unity 6（6000.x）</td><td>C# 9.0</td><td>.NET Standard 2.1</td><td>仍是 C# 9</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">三个必须记住的版本限制</span>
+        <strong>① C# 8 的默认接口实现（DIM）在 Unity 中不可用。</strong>Mono 运行时没实现它，<em>语法能编译但运行时出错</em>。<br>
+        <strong>② C# 10/11 的新特性 Unity 完全不支持。</strong>包括文件作用域命名空间、<code>record struct</code>、原始字符串 <code>"""..."""</code>、<code>required</code> 成员。<br>
+        <strong>③ 不要在 Unity 项目里用 <code>-langversion:latest</code>。</strong>把语言版本调到 11 并不会让新语法可用，反而可能编译失败。<br>
+        <em>写代码前先确认「这个语法我的 Unity 版本支持吗」，能省下大量试错时间。</em>
+      </div>
+
+      <h3 id="modern-demo">逐个特性速览（都是 Unity 可用的）</h3>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using System;
+using System.Collections.Generic;
+
+// ============================================================
+//  C# 6：字符串插值、表达式体、nameof、?.、when
+// ============================================================
+public class ModernFeatures : MonoBehaviour
+{
+    [SerializeField] private float _speed = 5f;
+    private int _level = 7;
+    private float _hp = 0.5f;
+
+    // C# 6：表达式体属性
+    public float Hp { get =&gt; _hp; set =&gt; _hp = value; }
+
+    private void Start()
+    {
+        // C# 6：字符串插值
+        string s1 = "Level " + _level.ToString("D3");
+        string s2 = $"Level {_level:D3}";
+
+        // C# 6：nameof（重构安全，改字段名不会漏改字符串）
+        Debug.Log(nameof(_speed));            // "_speed"
+
+        // C# 6：空条件运算符
+        Transform t = null;
+        Vector3? pos = t?.position;
+
+        Debug.Log(s1 + s2 + pos);
+    }
+
+    // C# 7：out 变量内联声明
+    private void TryParseDemo()
+    {
+        if (int.TryParse("123", out int value))   // 内联声明，不需要提前定义
+        {
+            Debug.Log(value);
+        }
+    }
+
+    // C# 7：元组返回多个值
+    private (bool success, int value) TryGet()
+    {
+        return (true, 42);
+    }
+
+    // C# 7：模式匹配
+    private string Describe(object obj)
+    {
+        switch (obj)
+        {
+            case int i when i &gt; 100: return "big int";
+            case int i: return "int " + i;
+            case string s: return "string " + s;
+            case null: return "null";
+            default: return "unknown";
+        }
+    }
+
+    // C# 7：局部函数
+    private void LocalFunctionDemo()
+    {
+        Debug.Log(Sum(10));
+
+        int Sum(int n)
+        {
+            int total = 0;
+            for (int i = 1; i &lt;= n; i++) total += i;
+            return total;
+        }
+    }
+
+    // C# 8：switch 表达式
+    private string GetTier(int score) =&gt; score switch
+    {
+        &gt;= 90 =&gt; "A",
+        &gt;= 80 =&gt; "B",
+        &gt;= 60 =&gt; "C",
+        _ =&gt; "F"
+    };
+
+    // C# 8：using 声明（不需要大括号块）
+    private void UsingDeclaration()
+    {
+        // using var writer = new System.IO.StreamWriter("path");
+        // 方法结束时自动释放
+    }
+
+    // C# 9：目标类型 new
+    private void TargetTypedNew()
+    {
+        List&lt;int&gt; a = new();                  // 不需要重复写 List&lt;int&gt;
+        Dictionary&lt;string, List&lt;int&gt;&gt; b = new();
+        Debug.Log(a.Count + b.Count);
+    }
+
+    // C# 9：init 访问器（只能在初始化时赋值）
+    public class WeaponData
+    {
+        public string Id { get; init; } = "";
+        public float Damage { get; init; }
+    }
+
+    private void InitDemo()
+    {
+        var w = new WeaponData { Id = "sword", Damage = 10f };
+        // w.Damage = 20f;   // 编译错误：init 属性只能在初始化时赋值
+        Debug.Log(w.Id + w.Damage);
+    }
+
+    // C# 9：static lambda（编译期保证不捕获，零分配）
+    private void StaticLambda()
+    {
+        var list = new List&lt;int&gt; { 3, 1, 2 };
+        list.Sort(static (x, y) =&gt; x.CompareTo(y));
+    }
+}
+
+// ============================================================
+//  C# 9：record（Unity 2021.2+）
+// ============================================================
+public record PlayerProfile(string Name, int Level);
+
+public class RecordDemo : MonoBehaviour
+{
+    private void Start()
+    {
+        var p1 = new PlayerProfile("Hero", 5);
+        var p2 = new PlayerProfile("Hero", 5);
+
+        Debug.Log(p1 == p2);          // True —— record 是值相等
+        Debug.Log(p1.ToString());     // PlayerProfile { Name = Hero, Level = 5 }
+
+        // with 表达式：基于现有实例创建修改后的副本
+        var p3 = p1 with { Level = 6 };
+        Debug.Log(p3);
+
+        // 解构
+        var (name, level) = p1;
+        Debug.Log(name + " " + level);
+    }
+}</code></pre>
+
+      <div class="callout callout--warn">
+        <span class="callout__title">关于 <code>record</code> 在 Unity 中的一个限制</span>
+        <code>record</code> <strong>不能被 Unity 序列化</strong>——它不是 <code>[System.Serializable]</code>，编译器生成的字段是只读 init 属性。<br>
+        所以 <code>record</code> 适合做<em>纯逻辑层的不可变数据</em>、编辑器工具、DTO，但<strong>不要用在需要 Inspector 显示的地方</strong>。<br>
+        好消息是：<code>record</code> 在 IL2CPP 下完全可用（Unity 2021.2+）。
+      </div>
+
+      <h2 id="tasks">六、本章动手任务</h2>
+
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="t-06-1">
+          <label for="t-06-1"><strong>写一个泛型对象池</strong>：不用 Unity 内置的 <code>ObjectPool</code>，自己实现一个带预热的池子，并用它管理子弹。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-06-2">
+          <label for="t-06-2"><strong>用泛型单例重构</strong>：把之前写的某个 Manager 改成继承 <code>MonoSingleton&lt;T&gt;</code>，对比代码量。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-06-3">
+          <label for="t-06-3"><strong>反射实验</strong>：写一段代码，用反射打印出某一个 MonoBehaviour 的所有字段名和类型。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-06-4">
+          <label for="t-06-4"><strong>特性实战</strong>：定义一个 <code>[GameSystem]</code> 特性，用反射扫描程序集，自动找出所有标记过的类并排序。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-06-5">
+          <label for="t-06-5"><strong>版本验证</strong>：在你的 Unity 版本里测试 <code>record</code>、目标类型 <code>new</code>、<code>init</code>，看哪些能用哪些报错。<em>记录下你的版本的边界</em>。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-06-6">
+          <label for="t-06-6"><strong>回答面试题</strong>：① 泛型约束有哪些？② 反射慢在哪里，怎么优化？③ Unity 支持哪个 C# 版本，哪些特性不能用？</label>
+        </li>
+      </ul>
+
+      <div class="milestone">
+        <p class="mb0">
+          <strong>本章过关标准</strong>：<br>① 能写出一个泛型类并解释 <code>where</code> 约束的作用；<br>② 能说清 <code>MonoSingleton&lt;T&gt;</code> 里自引用约束的含义；<br>③ 知道反射的三种优化手段，并说清各自适用场景；<br>④ 能列举至少 8 个 Unity 内置特性的用途；<br>⑤ <strong>能准确说出你所用的 Unity 版本对应哪个 C# 版本</strong>。<br><br><em>第 ⑤ 条看起来简单，但它在面试和实际开发中都会直接决定你的方案选择。</em>
+        </p>
+      </div>
+
+      <nav class="page-nav">
+        <a href="05-cs-adv.html">
+          <div class="dir">← C# 语言线</div>
+          <div class="title">05 委托、事件与 LINQ</div>
+        </a>
+        <a class="next" href="07-cs-memory.html">
+          <div class="dir">C# 语言线 →</div>
+          <div class="title">07 内存、GC 与零分配</div>
+        </a>
+      </nav>

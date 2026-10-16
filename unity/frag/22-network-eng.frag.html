@@ -1,0 +1,135 @@
+<h1>22 · 网络、工程化与发布</h1>
+
+<p class="lead">这一页讲<strong>三件"项目能不能顺利交付"的事</strong>：网络同步方案怎么选、工程化怎么落地、包怎么发出去。<em>它们不是技术难点，但每一件都可能卡住项目。</em></p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（21）讲性能优化。这一页讲<em>把项目"送到玩家手上"</em>。
+  <strong>关键衔接</strong>：页 16 的<em>热更新</em>是发布环节的一部分；页 20 的<em>依赖方向</em>决定了工程化能走多远。
+  <strong>下一页</strong>（23）AI 辅助开发与 AI NPC。<em>这是新时代的能力。</em>
+  <strong>提醒</strong>：这一页的内容<em>很多人工作几年都用不上</em>（比如不做多人的项目），但<strong>面试时会问</strong>。
+</div>
+
+<h2 id="sync">一、网络同步：两种根本方案</h2>
+
+<p>所有网络游戏都建立在这<strong>两种方案</strong>之上。选错了会在项目中期推倒重来。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th></th><th>帧同步（Lockstep）</th><th>状态同步（State Sync）</th></tr></thead>
+  <tbody>
+    <tr><td><strong>同步内容</strong></td><td><strong>操作指令</strong></td><td><strong>状态数据</strong></td></tr>
+    <tr><td><strong>数据量</strong></td><td><span class="mk mk--yes">极小</span>（几个字节）</td><td><span class="mk mk--no">较大</span>（位置、属性）</td></tr>
+    <tr><td><strong>服务器压力</strong></td><td>低（只转发）</td><td>高（要跑逻辑）</td></tr>
+    <tr><td><strong>网络波动</strong></td><td><span class="mk mk--no">敏感</span>（要等齐）</td><td><span class="mk mk--yes">容忍</span>（可插值）</td></tr>
+    <tr><td><strong>反外挂</strong></td><td><span class="mk mk--no">难</span>（客户端有完整逻辑）</td><td><span class="mk mk--yes">好</span>（服务器权威）</td></tr>
+    <tr><td><strong>确定性</strong></td><td><strong>必须保证</strong>（浮点/随机）</td><td>不需要</td></tr>
+    <tr><td><strong>适用</strong></td><td>RTS、MOBA、格斗、卡牌</td><td><strong>MMO、FPS、大部分手游</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">帧同步的"确定性"是个大坑</span>
+  <strong>帧同步要求所有客户端在相同输入下产生完全相同的结果。</strong><br>
+  但浮点运算在不同 CPU / 不同编译器下<em>结果可能不同</em>！<br><br>
+  <strong>解决方案</strong>：<br>
+  · 全部用<strong>定点数</strong>代替浮点<br>
+  · 随机数用<strong>自定义的确定性算法</strong>（不能用 <code>Random</code>）<br>
+  · 遍历顺序要<strong>固定</strong>（不能依赖 <code>Dictionary</code> 的顺序）<br><br>
+  <em>这就是为什么帧同步游戏的代码"看起来很怪"——那些约束都是为了让结果可复现。</em>
+</div>
+
+<h2 id="engineering">二、工程化：让项目能长期维护</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方面</th><th>做法</th><th>解决的问题</th></tr></thead>
+  <tbody>
+    <tr><td><strong>版本控制</strong></td><td>Git + LFS + Unity 设置</td><td>大文件、场景合并冲突</td></tr>
+    <tr><td><strong>程序集拆分</strong></td><td>asmdef</td><td><em>改一行代码编译 30 秒</em></td></tr>
+    <tr><td><strong>代码规范</strong></td><td>EditorConfig + 命名约定</td><td>风格混乱、review 成本高</td></tr>
+    <tr><td><strong>自动化测试</strong></td><td>Unity Test Framework</td><td>重构时不知道有没有改坏</td></tr>
+    <tr><td><strong>CI/CD</strong></td><td>Jenkins / GitHub Actions</td><td>每天手动打包</td></tr>
+    <tr><td><strong>日志系统</strong></td><td>分级日志 + 上报</td><td><em>线上出问题看不到线索</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">asmdef 是被低估的优化</span>
+  <strong>问题</strong>：所有代码在一个程序集里时，改<em>任何一行</em>都要重新编译整个程序集。<br>
+  项目大了之后，一次编译可能<strong>30 秒到 2 分钟</strong>。<br><br>
+  <strong>解决</strong>：用 <code>.asmdef</code> 拆成多个程序集：<br>
+  · 只编译<em>被修改的那个程序集</em><br>
+  · 强制依赖方向（跨程序集引用要显式声明）<br>
+  · 编辑器代码自动排除出包体<br><br>
+  <em>这是投入产出比极高的一项改造——半天工作量，省下的是每天几十次编译的时间。</em>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">Unity 项目的 Git 配置</span>
+  <strong>必须做的三件事</strong>：<br>
+  ① <code>.gitattributes</code>：设置 <code>*.unity</code> 用 <code>force text</code> 序列化（否则无法合并）<br>
+  ② <code>.gitignore</code>：忽略 <code>Library/</code> <code>Temp/</code> <code>Obj/</code> <code>Build/</code><br>
+  ③ <strong>Git LFS</strong>：大文件（贴图、模型、音频）走 LFS<br><br>
+  <strong>场景合并</strong>：用 <code>UnityYAMLMerge</code> 配置到 Git，否则两个人改同一个场景必然冲突。
+</div>
+
+<h2 id="release">三、发布流程</h2>
+
+<p>从"能跑"到"上线"，中间还有<strong>一条完整的流水线</strong>。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>环节</th><th>内容</th><th>常见问题</th></tr></thead>
+  <tbody>
+    <tr><td><strong>打包</strong></td><td>设置包名、图标、签名、AOT 配置</td><td><em>签名不对导致无法安装</em></td></tr>
+    <tr><td><strong>加固</strong></td><td>代码混淆、防调试、防重打包</td><td>过不了渠道检测</td></tr>
+    <tr><td><strong>渠道</strong></td><td>各应用商店的 SDK 接入</td><td>每个渠道都要单独测</td></tr>
+    <tr><td><strong>隐私合规</strong></td><td>隐私政策、权限申请</td><td><strong>不合规会被下架</strong></td></tr>
+    <tr><td><strong>灰度</strong></td><td>先小范围发布，观察数据</td><td>没有回滚机制</td></tr>
+    <tr><td><strong>监控</strong></td><td>崩溃收集、性能数据上报</td><td><em>线上问题靠玩家反馈</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三个会导致无法上线的细节</span>
+  <strong>① 隐私合规</strong>：现在国内 Android 与 iOS 都要求<em>首次启动前展示隐私政策</em>，且不能在用户同意前收集数据。<strong>不合规直接下架。</strong><br><br>
+  <strong>② IL2CPP 的 AOT 泛型</strong>：反射用到的泛型组合在 IL2CPP 下可能不存在，<em>运行时报错</em>（见页 06）。<br><br>
+  <strong>③ 签名与密钥丢失</strong>：Android 签名密钥丢了就<em>无法更新已上架的包</em>。<strong>必须妥善备份。</strong>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="22">
+  <div class="task"><input type="checkbox" id="t-22-1"><label for="t-22-1"><strong>配置 .gitattributes 与 LFS</strong>：给你的项目设置好 Unity 的版本控制配置。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-2"><label for="t-22-2"><strong>拆分程序集</strong>：给项目建立 3~5 个 asmdef，测量编译时间的改善。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-3"><label for="t-22-3"><strong>写一个 CI 脚本</strong>：用命令行参数启动 Unity 打包，输出 APK。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-4"><label for="t-22-4"><strong>实现分级日志</strong>：写一个日志系统，支持按等级过滤、关键日志上报。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-5"><label for="t-22-5"><strong>画一次发布流程图</strong>：从代码提交到上架商店，列出所有环节与依赖。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-6"><label for="t-22-6"><strong>回答面试题</strong>：① 帧同步和状态同步的区别？② asmdef 有什么用？③ IL2CPP 下反射有什么限制？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能对比帧同步与状态同步，并说出各自适用类型</strong>；<br>
+    ② 知道帧同步的"确定性"难点及三种解决方案；<br>
+    ③ 能列举工程化的六个方面；<br>
+    ④ <strong>知道 asmdef 能显著减少编译时间</strong>，并说出它的三个好处；<br>
+    ⑤ 能画出完整的发布流程，并说出三个常见坑。<br>
+    <br>
+    <em>第 ① 和第 ④ 条是最常被问到的两个——它们既考知识面，也考工程实践经验。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="21-perf.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">21 性能优化实战</div>
+  </a>
+  <a class="next" href="23-ai.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">23 AI 辅助开发与 AI NPC</div>
+  </a>
+</nav>

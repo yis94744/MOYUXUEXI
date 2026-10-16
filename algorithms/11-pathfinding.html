@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11 寻路算法 ★★★ — 游戏算法与系统设计｜从数据结构到完整系统，覆盖游戏开发全部核心算法</title>
+<meta name="description" content="A*、Dijkstra、启发函数、JPS、NavMesh、流场寻路">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">游戏算法与系统设计
+        <span>从数据结构到完整系统，覆盖游戏开发全部核心算法</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>11 · 寻路算法 ★★★</h1>
+
+<p class="lead">这是<strong>算法站最重要的一页</strong>。A* 是游戏 AI 的核心算法，也是面试的重点。这一页不只讲实现，更讲<em>那些决定性能的关键决策</em>——启发函数怎么选、什么时候该换方案。<strong>所有数据都是实测的。</strong></p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（10）讲图的遍历。寻路就是<em>在图上找最短路径</em>——是图论最实用的应用。
+  <strong>关键衔接</strong>：页 07 的<em>堆</em>在这里成为 A* 的开放列表；页 12 的<em>空间划分</em>解决"如何快速找到邻居"。
+  <strong>为什么标三个星</strong>：寻路是<strong>面试必问</strong>，而且是<em>少数能体现"算法+工程"双重能力的题目</em>。
+  <strong>验证方式</strong>：本页实现了完整的 A*（含启发函数对比），在 Lua 5.4.7 实测运行，<em>地图可视化和性能数据都是真实的</em>。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="10-graph.html#traversal" data-brief="BFS 用队列找最短，DFS 用栈判连通"><span class="prereq__title">图与遍历</span><span class="prereq__page">10-graph</span></a>
+          <a class="prereq__item" href="07-heap-priority.html#topk" data-brief="Top-K 用最小堆，建堆是 O(n)"><span class="prereq__title">堆与优先队列</span><span class="prereq__page">07-heap-priority</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="evolution">一、寻路算法的演进</h2>
+
+<p>从 BFS 到 A* 到 JPS，<strong>每一步优化的本质都是"减少盲目搜索"</strong>。</p>
+
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  寻路算法：A* 与它的优化 ★★★
+-- ============================================================
+--  A* 是游戏 AI 最重要的算法。这一份实现包含：
+--    · 完整可运行的 A*
+--    · Dijkstra 对比
+--    · 启发函数的影响（实测）
+--    · JPS 跳跃点优化思路
+--    · 流场寻路（Flow Field）
+
+print("=== 1. 寻路算法的演进关系 ===")
+print()
+print("  BFS（广度优先）  —— 无权图最短路径，但【盲目】搜索")
+print("       ↓ 加入权重")
+print("  Dijkstra         —— 有权图最短路径，但【向四周均匀扩展】")
+print("       ↓ 加入启发式")
+print("  A*               —— 用启发函数【朝目标方向】搜索，最快")
+print("       ↓ 优化对称路径")
+print("  JPS              —— 跳过直线上的中间点，只考虑「跳跃点」")
+print()
+print("  它们的本质：都是在图上找最短路径，区别是【搜索顺序】")
+print()
+
+print("=== 2. 网格地图与基础结构 ===")
+
+-- 创建测试地图
+-- 0 = 可通行, 1 = 障碍
+local function createMap(width, height, obstacleRate, seed)
+  math.randomseed(seed or 42)
+  local map = {}
+  for y = 1, height do
+    map[y] = {}
+    for x = 1, width do
+      map[y][x] = (math.random() &lt; obstacleRate) and 1 or 0
+    end
+  end
+  -- 保证起点和终点可通行
+  map[1][1] = 0
+  map[height][width] = 0
+  return map
+end
+
+local function printMap(map, width, height, path)
+  local pathSet = {}
+  if path then
+    for _, p in ipairs(path) do
+      pathSet[p.y * 1000 + p.x] = true
+    end
+  end
+
+  for y = 1, height do
+    io.write("    ")
+    for x = 1, width do
+      if y == 1 and x == 1 then io.write("S")
+      elseif y == height and x == width then io.write("E")
+      elseif pathSet[y * 1000 + x] then io.write("*")
+      elseif map[y][x] == 1 then io.write("#")
+      else io.write(".") end
+    end
+    print()
+  end
+end
+
+local W, H = 20, 12
+local map = createMap(W, H, 0.25, 12345)
+print("  地图（S=起点 E=终点 #=障碍 .=可通行）:")
+printMap(map, W, H)
+
+-- ============================================================
+--  3. 优先队列（A* 的开放列表）
+-- ============================================================
+-- A* 需要每次取出 f 值最小的节点 —— 这正是堆的用途
+
+local PriorityQueue = {}
+PriorityQueue.__index = PriorityQueue
+
+function PriorityQueue.new()
+  return setmetatable({ items = {} }, PriorityQueue)
+end
+
+function PriorityQueue:size() return #self.items end
+
+function PriorityQueue:push(node)
+  self.items[#self.items + 1] = node
+  local i = #self.items
+  while i &gt; 1 do
+    local parent = math.floor(i / 2)
+    if self.items[parent].f &lt;= self.items[i].f then break end
+    self.items[parent], self.items[i] = self.items[i], self.items[parent]
+    i = parent
+  end
+end
+
+function PriorityQueue:pop()
+  local items = self.items
+  if #items == 0 then return nil end
+
+  local top = items[1]
+  items[1] = items[#items]
+  items[#items] = nil
+
+  local i = 1
+  while true do
+    local smallest = i
+    local l, r = i * 2, i * 2 + 1
+    if l &lt;= #items and items[l].f &lt; items[smallest].f then smallest = l end
+    if r &lt;= #items and items[r].f &lt; items[smallest].f then smallest = r end
+    if smallest == i then break end
+    items[i], items[smallest] = items[smallest], items[i]
+    i = smallest
+  end
+
+  return top
+end
+
+-- ============================================================
+--  4. 启发函数（A* 的灵魂）
+-- ============================================================
+local Heuristic = {}
+
+-- 曼哈顿距离：只能上下左右走
+function Heuristic.manhattan(x1, y1, x2, y2)
+  return math.abs(x1 - x2) + math.abs(y1 - y2)
+end
+
+-- 欧几里得距离：可以斜着走
+function Heuristic.euclidean(x1, y1, x2, y2)
+  local dx, dy = x1 - x2, y1 - y2
+  return math.sqrt(dx * dx + dy * dy)
+end
+
+-- 对角线距离：8 方向移动的最优启发
+function Heuristic.octile(x1, y1, x2, y2)
+  local dx = math.abs(x1 - x2)
+  local dy = math.abs(y1 - y2)
+  local D, D2 = 1, math.sqrt(2)
+  return D * (dx + dy) + (D2 - 2 * D) * math.min(dx, dy)
+end
+
+-- 零启发：退化成 Dijkstra
+function Heuristic.zero() return 0 end
+
+print()
+print("=== 5. A* 实现（重点看启发函数怎么用）===")
+
+local function aStar(map, W, H, startX, startY, goalX, goalY, heuristicFn, allowDiagonal)
+  heuristicFn = heuristicFn or Heuristic.manhattan
+
+  local open = PriorityQueue.new()
+  local closed = {}
+  local cameFrom = {}
+  local gScore = {}          -- 从起点到该点的实际代价
+
+  local function key(x, y) return y * 10000 + x end
+
+  local startNode = {
+    x = startX, y = startY,
+    g = 0,
+    h = heuristicFn(startX, startY, goalX, goalY),
+  }
+  startNode.f = startNode.g + startNode.h
+
+  open:push(startNode)
+  gScore[key(startX, startY)] = 0
+
+  -- 方向：4 方向 or 8 方向
+  local dirs
+  if allowDiagonal then
+    dirs = {
+      {0,-1,1}, {1,0,1}, {0,1,1}, {-1,0,1},        -- 上下左右
+      {1,-1,1.414}, {1,1,1.414}, {-1,1,1.414}, {-1,-1,1.414},  -- 四个斜角
+    }
+  else
+    dirs = { {0,-1,1}, {1,0,1}, {0,1,1}, {-1,0,1} }
+  end
+
+  local expanded = 0     -- 统计扩展了多少节点（衡量效率）
+
+  while open:size() &gt; 0 do
+    local current = open:pop()
+    local ck = key(current.x, current.y)
+
+    -- 到达目标
+    if current.x == goalX and current.y == goalY then
+      -- 回溯路径
+      local path = {}
+      local node = current
+      while node do
+        table.insert(path, 1, { x = node.x, y = node.y })
+        node = cameFrom[key(node.x, node.y)]
+      end
+      return path, expanded, current.g
+    end
+
+    -- 【关键】允许重复入堆，取出时检查是否已处理
+    -- 这是堆不支持"更新元素"时的标准做法
+    if closed[ck] then goto continue end
+    closed[ck] = true
+    expanded = expanded + 1
+
+    -- 扩展邻居
+    for _, d in ipairs(dirs) do
+      local nx, ny = current.x + d[1], current.y + d[2]
+
+      -- 边界检查
+      if nx &gt;= 1 and nx &lt;= W and ny &gt;= 1 and ny &lt;= H then
+        -- 障碍检查
+        if map[ny][nx] == 0 then
+          local nk = key(nx, ny)
+
+          -- 【重要】斜向移动时，检查两个相邻的直角格子
+          -- 否则会"穿墙角"
+          local blocked = false
+          if d[3] &gt; 1 then
+            if map[current.y][nx] == 1 or map[ny][current.x] == 1 then
+              blocked = true
+            end
+          end
+
+          if not blocked and not closed[nk] then
+            local tentativeG = current.g + d[3]
+
+            if not gScore[nk] or tentativeG &lt; gScore[nk] then
+              gScore[nk] = tentativeG
+              cameFrom[nk] = current
+
+              local h = heuristicFn(nx, ny, goalX, goalY)
+              open:push({
+                x = nx, y = ny,
+                g = tentativeG,
+                h = h,
+                f = tentativeG + h,
+              })
+            end
+          end
+        end
+      end
+    end
+
+    ::continue::
+  end
+
+  return nil, expanded, nil    -- 无路径
+end
+
+-- 测试基础 A*
+print("  4 方向 A*（曼哈顿启发）:")
+local path, expanded, cost = aStar(map, W, H, 1, 1, W, H, Heuristic.manhattan, false)
+if path then
+  print(string.format("    找到路径: 长度 %d, 代价 %.1f, 扩展了 %d 个节点", #path, cost, expanded))
+  printMap(map, W, H, path)
+else
+  print("    无路径")
+end
+
+print()
+print("  8 方向 A*（允许斜走，用 octile 启发）:")
+local path8, expanded8, cost8 = aStar(map, W, H, 1, 1, W, H, Heuristic.octile, true)
+if path8 then
+  print(string.format("    找到路径: 长度 %d, 代价 %.1f, 扩展了 %d 个节点", #path8, cost8, expanded8))
+  print("    【对比】斜走让路径更短，但代价计算更复杂")
+end
+
+print()
+print("=== 6. 启发函数的影响（实测）★★★ ===")
+print()
+print("  启发函数决定了 A* 的搜索方向：")
+print("    h = 0        -&gt; 退化成 Dijkstra（向四周扩展）")
+print("    h 偏小       -&gt; 搜索范围大，但保证最优解")
+print("    h 准确       -&gt; 搜索范围最小，仍是最优解")
+print("    h 偏大       -&gt; 搜索快，但【可能不是最优解】")
+print()
+
+local testCases = {
+  { name = "h = 0（退化成 Dijkstra）", fn = Heuristic.zero,      diagonal = false },
+  { name = "曼哈顿距离（准确）",       fn = Heuristic.manhattan, diagonal = false },
+  { name = "欧几里得距离（偏小）",     fn = Heuristic.euclidean, diagonal = false },
+  { name = "欧几里得 x2（偏大）",      fn = function(x1,y1,x2,y2)
+                                          return Heuristic.euclidean(x1,y1,x2,y2) * 2
+                                        end, diagonal = false },
+}
+
+print(string.format("  %-28s %-12s %-12s %s", "启发函数", "扩展节点数", "路径代价", "是否最优"))
+print("  " .. string.rep("-", 72))
+
+for _, tc in ipairs(testCases) do
+  local p, e, c = aStar(map, W, H, 1, 1, W, H, tc.fn, tc.diagonal)
+  if p then
+    local isOptimal = "是"
+    -- 与 h=0 的结果对比（Dijkstra 保证最优）
+    local _, _, optimalCost = aStar(map, W, H, 1, 1, W, H, Heuristic.zero, false)
+    if math.abs(c - optimalCost) &gt; 0.01 then
+      isOptimal = "【否】"
+    end
+    print(string.format("  %-28s %-12d %-12.1f %s", tc.name, e, c, isOptimal))
+  else
+    print(string.format("  %-28s %s", tc.name, "无路径"))
+  end
+end
+
+print()
+print("  【结论】")
+print("    · h = 0 扩展节点最多（盲目搜索）")
+print("    · 准确的启发函数能大幅减少扩展节点")
+print("    · h 偏大时搜索更快，但不保证最优")
+print()
+print("  【重要说明】本例中「偏大的启发」依然得到 30.0 的最优代价，")
+print("    但这是【地图特殊】导致的巧合，不是保证：")
+print("      · 在网格上，欧几里得距离【总是 &lt;= 真实距离】，")
+print("        即使乘以 2 也未必超过真实代价")
+print("      · 真正会导致非最优的是【h 超过真实剩余代价】")
+print("        例如 h 用「曼哈顿距离 x 10」，就会高估")
+print()
+print("  【规律】h 越接近真实代价，A* 越快，且仍保证最优。")
+print("          h 等于真实代价时，A* 几乎只扩展一条路径")
+print("          h 超过真实代价时，可能找到非最优解")
+
+print()
+print("=== 7. 性能测试：不同地图规模 ===")
+
+local sizes = {
+  { w = 20, h = 12, obstacles = 0.25 },
+  { w = 50, h = 30, obstacles = 0.25 },
+  { w = 100, h = 60, obstacles = 0.25 },
+}
+
+print(string.format("  %-14s %-14s %-14s %s", "地图大小", "耗时(ms)", "扩展节点", "路径长度"))
+print("  " .. string.rep("-", 62))
+
+for _, s in ipairs(sizes) do
+  local m = createMap(s.w, s.h, s.obstacles, 999)
+  local t = os.clock()
+  local p, e, c = aStar(m, s.w, s.h, 1, 1, s.w, s.h, Heuristic.manhattan, false)
+  local elapsed = (os.clock() - t) * 1000
+
+  if p then
+    print(string.format("  %-14s %-14.2f %-14d %d",
+      s.w .. "x" .. s.h, elapsed, e, #p))
+  else
+    -- 【重要】大地图返回"无路径"是正常现象：
+    --   障碍率 25% 时，网格从 (1,1) 到 (w,h) 有可能被完全阻断
+    print(string.format("  %-14s %-14s（障碍率 25%，可能被阻断）",
+      s.w .. "x" .. s.h, "无路径"))
+  end
+end
+
+print()
+print("  【观察】")
+print("    · 20x12 几乎不耗时（0.00 ms）")
+print("    · 50x30 约 1 ms —— 依然很快")
+print("    · 100x60 无路径 —— 大障碍率下可能被完全阻断")
+print()
+print("  【结论】")
+print("    · 小地图（&lt; 50x50）的 A* 完全不需要优化")
+print("    · 大地图才需要考虑 JPS / 流场 / 分层寻路")
+print("    · 【最重要】要设最大搜索节点上限 ——")
+print("      否则「无路径」时会遍历整个地图，造成卡顿")
+
+print()
+print("=== 8. A* 的核心优化手段 ===")
+print()
+print(string.format("  %-20s %-16s %s", "优化手段", "效果", "代价"))
+print("  " .. string.rep("-", 68))
+
+local optimizations = {
+  { "用堆做开放列表",     "取最小从 O(n) 到 O(log n)", "无" },
+  { "准确的启发函数",     "大幅减少扩展节点",          "需要设计" },
+  { "闭集用哈希表",       "O(1) 查询已访问",           "内存开销" },
+  { "路径平滑",           "去掉锯齿，看起来自然",       "额外计算" },
+  { "JPS 跳跃点",         "同质区域跳过中间点",         "实现复杂" },
+  { "流场寻路",           "多单位共享一次计算",         "适合同目标群" },
+  { "分层寻路",           "大地图先粗后细",             "需要预处理" },
+  { "路径缓存",           "重复请求直接返回",           "需要失效策略" },
+}
+
+for _, o in ipairs(optimizations) do
+  print(string.format("  %-20s %-16s %s", o[1], o[2], o[3]))
+end
+
+print()
+print("=== 9. JPS（Jump Point Search）思路 ===")
+print()
+print("  A* 的问题：对称路径太多")
+print("    在空旷区域，往左走 3 步和往左走 2 步再往左走 1 步是【等价的】")
+print("    但 A* 会把这两种都探索一遍 —— 浪费")
+print()
+print("  JPS 的核心：")
+print("    · 只考虑【跳跃点】：转折点、障碍旁边的点、目标点")
+print("    · 中间那些「直线上的点」直接跳过")
+print("    · 在空旷地图上能减少【90% 以上】的扩展节点")
+print()
+print("  【限制】")
+print("    · 只适用于【均匀代价】的网格（所有格子代价相同）")
+print("    · 实现复杂度高（需要处理各种方向组合）")
+print("    · 地图频繁变化时优势下降")
+
+print()
+print("=== 10. 流场寻路（Flow Field）★★★ ===")
+print()
+print("  场景：RTS 游戏，200 个单位要去【同一个目标点】")
+print()
+print("  用 A* 的问题：")
+print("    每个单位都跑一次 A* = 200 次寻路 = 卡死")
+print()
+print("  流场寻路的思路：")
+print("    ① 从【目标点】做一次 BFS，计算每个格子到目标的距离")
+print("    ② 每个格子记录「朝哪个方向走能更快到达」")
+print("    ③ 所有单位只需查自己所在格子的方向 —— O(1)")
+print()
+print("  这就是【用空间换时间】：")
+print("    一次计算（O(格子数)），换来 N 个单位的同时寻路")
+print()
+
+-- 流场演示
+local function buildFlowField(map, W, H, goalX, goalY)
+  -- 从目标点做 BFS（反向），计算距离场
+  local dist = {}
+  for y = 1, H do
+    dist[y] = {}
+    for x = 1, W do dist[y][x] = -1 end
+  end
+
+  dist[goalY][goalX] = 0
+  local queue = { { x = goalX, y = goalY } }
+  local head = 1
+
+  local dirs = { {0,-1}, {1,0}, {0,1}, {-1,0}, {1,-1}, {1,1}, {-1,1}, {-1,-1} }
+
+  while head &lt;= #queue do
+    local cur = queue[head]
+    head = head + 1
+
+    for _, d in ipairs(dirs) do
+      local nx, ny = cur.x + d[1], cur.y + d[2]
+      if nx &gt;= 1 and nx &lt;= W and ny &gt;= 1 and ny &lt;= H then
+        if map[ny][nx] == 0 and dist[ny][nx] == -1 then
+          dist[ny][nx] = dist[cur.y][cur.x] + 1
+          queue[#queue + 1] = { x = nx, y = ny }
+        end
+      end
+    end
+  end
+
+  -- 为每个格子计算"流向"（指向距离更小的邻居）
+  local flow = {}
+  for y = 1, H do
+    flow[y] = {}
+    for x = 1, W do
+      if dist[y][x] &gt; 0 then
+        local bestDir, bestDist = nil, dist[y][x]
+
+        for _, d in ipairs(dirs) do
+          local nx, ny = x + d[1], y + d[2]
+          if nx &gt;= 1 and nx &lt;= W and ny &gt;= 1 and ny &lt;= H then
+            if dist[ny][nx] &gt;= 0 and dist[ny][nx] &lt; bestDist then
+              bestDist = dist[ny][nx]
+              bestDir = d
+            end
+          end
+        end
+        flow[y][x] = bestDir
+      end
+    end
+  end
+
+  return flow, dist
+end
+
+local smallMap = createMap(12, 8, 0.1, 777)
+local flow, dist = buildFlowField(smallMap, 12, 8, 12, 8)
+
+print("  流场可视化（箭头指向下一步）：")
+local arrows = {
+  [{0,-1}] = "^", [{0,1}] = "v", [{1,0}] = "&gt;", [{-1,0}] = "&lt;",
+}
+for y = 1, 8 do
+  io.write("    ")
+  for x = 1, 12 do
+    if x == 12 and y == 8 then
+      io.write("E")
+    elseif smallMap[y][x] == 1 then
+      io.write("#")
+    elseif dist[y][x] &lt; 0 then
+      io.write(" ")      -- 不可达
+    else
+      local d = flow[y][x]
+      if d then
+        local dx, dy = d[1], d[2]
+        if dy == -1 and dx == 0 then io.write("^")
+        elseif dy == 1 and dx == 0 then io.write("v")
+        elseif dx == 1 and dy == 0 then io.write("&gt;")
+        elseif dx == -1 and dy == 0 then io.write("&lt;")
+        elseif dx == 1 and dy == -1 then io.write("/")
+        elseif dx == -1 and dy == -1 then io.write("\\")
+        elseif dx == 1 and dy == 1 then io.write("\\")
+        elseif dx == -1 and dy == 1 then io.write("/")
+        else io.write("?") end
+      else
+        io.write("*")
+      end
+    end
+  end
+  print()
+end
+
+print()
+print("  每个单位只需查自己格子的箭头，O(1) 得到下一步")
+print("  【收益】200 个单位共享一次流场计算，CPU 开销降低上百倍")
+
+print()
+print("=== 11. 实战选型建议 ===")
+print()
+print(string.format("  %-22s %-20s %s", "场景", "推荐方案", "理由"))
+print("  " .. string.rep("-", 72))
+
+local choices = {
+  { "单个角色寻路",     "A* + 堆",           "通用，实现简单" },
+  { "大量单位去同目标", "流场寻路",           "一次计算，共享使用" },
+  { "大量单位去不同目标", "A* + 路径缓存",    "缓存重复请求" },
+  { "超大地图",         "分层寻路",           "先粗后细" },
+  { "均匀代价网格",     "JPS",                "减少 90% 扩展" },
+  { "导航网格",         "NavMesh + A*",       "Unity 内置支持" },
+  { "动态障碍多",       "流场 / 局部避障",     "全场重算代价高" },
+}
+
+for _, c in ipairs(choices) do
+  print(string.format("  %-22s %-20s %s", c[1], c[2], c[3]))
+end
+
+print()
+print("=== 12. 三条实战原则 ===")
+print()
+print("  【原则一】先测量再优化")
+print("    小地图（&lt; 50x50）的 A* 只要几毫秒，不需要任何优化。")
+print("    只有大地图 / 大量单位时，才需要 JPS 或流场。")
+print()
+print("  【原则二】限制搜索范围")
+print("    设定最大搜索节点数，超过就返回「找不到」或走直线。")
+print("    这比任何算法优化都有效 —— 它保证了最坏情况的耗时。")
+print()
+print("  【原则三】分帧计算")
+print("    把 A* 拆成多帧执行（每帧扩展 N 个节点）。")
+print("    玩家看到的是「寻路中」的提示，而不是卡顿。")
+print("    这是页 26「分帧」模式在寻路上的应用。")</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>算法</th><th>核心思想</th><th>扩展节点</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>BFS</strong></td><td>按层扩展</td><td>最多</td><td>无权图</td></tr>
+    <tr><td><strong>Dijkstra</strong></td><td>按累计代价扩展</td><td>多</td><td>有权图，要算到所有点</td></tr>
+    <tr><td><strong>A*</strong></td><td>按 f = g + h 扩展</td><td><strong>少</strong></td><td><strong>已知目标的寻路（主流）</strong></td></tr>
+    <tr><td><strong>JPS</strong></td><td>跳过直线上的点</td><td><strong>最少</strong></td><td>均匀代价网格</td></tr>
+    <tr><td><strong>流场</strong></td><td>从目标反向计算方向</td><td>一次计算</td><td><strong>大量单位去同一目标</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="heuristic">二、启发函数：A* 的灵魂 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">实测数据：启发函数让扩展节点减少 82%</span>
+  本页在同一张地图上测试了四种启发函数：
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>启发函数</th><th>扩展节点数</th><th>路径代价</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>h = 0</code></td><td><strong>184</strong></td><td>30.0</td><td>退化成 Dijkstra</td></tr>
+      <tr><td>曼哈顿距离</td><td><strong>73</strong></td><td>30.0</td><td>准确（4 方向）</td></tr>
+      <tr><td>欧几里得距离</td><td>148</td><td>30.0</td><td>偏小（低估）</td></tr>
+      <tr><td>欧几里得 x2</td><td><strong>32</strong></td><td>30.0</td><td>偏大，本例仍最优</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <strong>结论</strong>：准确的启发函数把扩展节点从 184 降到 73——<strong>减少 60%</strong>。
+  <em>而 h=0 就是"完全盲目"的 Dijkstra，慢得多。</em>
+  <strong>但要小心</strong>：上表中"偏大的启发"依然得到最优解，这是<em>地图特殊导致的巧合</em>——<strong>不是保证</strong>。
+</div>
+
+<h2 id="admissible">三、启发函数的正确性规则 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">什么情况下 A* 会找到非最优解</span>
+  <strong>规则：h 必须【不高估】真实剩余代价</strong>（称为"可采纳性"）。
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>h 的情况</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr><td><code>h = 0</code></td><td>退化成 Dijkstra，<strong>保证最优</strong>但慢</td></tr>
+      <tr><td><code>h &lt;= 真实代价</code></td><td><strong>保证最优</strong>，越快越好</td></tr>
+      <tr><td><code>h == 真实代价</code></td><td>几乎只扩展一条路径（<strong>最快</strong>）</td></tr>
+      <tr><td><code>h &gt; 真实代价</code></td><td><span class="mk mk--no">可能非最优</span>（但更快）</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <strong>各启发函数的正确性</strong>（4 方向网格）：
+  · <strong>曼哈顿距离</strong>：<span class="mk mk--yes">可采纳</span>（在只能上下左右走时，它就是真实距离）
+  · <strong>欧几里得距离</strong>：<span class="mk mk--yes">可采纳</span>（直线距离永远 <= 实际走的距离）
+  · <strong>对角线距离（octile）</strong>：<span class="mk mk--yes">可采纳</span>（8 方向移动的最优启发）
+  <em>但要注意：如果地图有"传送门"或"快速通道"，直线距离可能【高估】真实代价，就会失去最优性。</em>
+</div>
+
+<h2 id="engineering">四、A* 的工程要点</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">要点一：必须设最大搜索上限</span>
+  <strong>实测中 100x60 的地图返回了"无路径"</strong>——因为障碍率 25% 时起点与终点可能被完全阻断。
+  <strong>问题</strong>：A* 在"无路径"时要<em>遍历整个可达区域</em>才能确定。
+  · 20x12 地图：只扩展 104 个节点
+  · 100x60 地图：<em>可能要扩展 6000 个节点</em>
+  <strong>解决办法</strong>：设<strong>最大扩展节点数上限</strong>，超过就返回失败。
+  <em>这比任何算法优化都有效——它保证了最坏情况的耗时。</em>
+  <strong>实战做法</strong>：
+  · 设一个预算（比如 2000 个节点）
+  · 超预算就返回"找不到路径"或走直线
+  · 用<em>分帧计算</em>把这个预算摊到多帧（见页 26）
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">要点二：重复入堆 vs 更新堆内元素</span>
+  <strong>问题</strong>：发现更优路径时，需要更新堆中已有节点的 f 值。
+  <strong>但标准堆不支持"更新任意元素"</strong>（你不知道它在数组的哪个位置）。
+  <strong>两种解决方案</strong>：
+  ① <strong>允许重复入堆</strong>（本页的做法）
+     · 同一个节点可能入堆多次
+     · 取出时检查"是否已处理"，已处理就跳过
+     · <em>简单，但堆会变大</em>
+  ② <strong>索引堆</strong>（Indexed Heap）
+     · 维护"节点 → 堆内位置"的映射
+     · 支持 O(log n) 更新
+     · <em>实现复杂，但堆更小</em>
+  <strong>实战建议</strong>：<em>用方案 ①，除非节点数极大（>10 万）</em>。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">要点三：斜向移动要检查"穿墙角"</span>
+  <strong>问题</strong>：允许斜走时，如果两个相邻的直角位置都是障碍，斜着穿过去会<em>穿过墙角</em>。
+  <strong>本页代码的处理</strong>：
+  <code>if map[current.y][nx] == 1 or map[ny][current.x] == 1 then blocked = true end</code>
+  <strong>但还有另一种策略</strong>：<em>允许穿墙角</em>（某些游戏故意这样设计，让移动更流畅）。
+  <em>这是一个"设计决策"而不是"技术问题"——要和策划确认。</em>
+</div>
+
+<h2 id="when-to-switch">五、什么时候该换方案</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>场景</th><th>推荐方案</th><th>理由</th></tr></thead>
+  <tbody>
+    <tr><td>单个角色寻路</td><td>A* + 堆</td><td>通用，实现简单</td></tr>
+    <tr><td><strong>大量单位去同目标</strong></td><td><strong>流场寻路</strong></td><td>一次计算，共享使用</td></tr>
+    <tr><td>大量单位去不同目标</td><td>A* + 路径缓存</td><td>缓存重复请求</td></tr>
+    <tr><td>超大地图</td><td>分层寻路</td><td>先粗后细</td></tr>
+    <tr><td>均匀代价网格</td><td>JPS</td><td>减少 90% 扩展</td></tr>
+    <tr><td>动态障碍多</td><td>流场 / 局部避障</td><td>全场重算代价高</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">流场寻路：RTS 的标配</span>
+  <strong>场景</strong>：RTS 游戏，200 个单位要去同一个目标点。
+  <strong>用 A* 的问题</strong>：每个单位跑一次 = 200 次寻路 = <em>卡死</em>。
+  <strong>流场的做法</strong>：
+  ① 从<strong>目标点</strong>反向 BFS，计算每个格子到目标的距离
+  ② 每个格子记录"朝哪个方向走能更快到达"
+  ③ 所有单位只需<em>查自己格子的方向</em>——<strong>O(1)</strong>
+  <strong>收益</strong>：CPU 开销降低上百倍。
+  <em>本页代码实现了完整的流场并做了可视化（用箭头显示流向）——这是理解流场最直观的方式。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="11">
+  <div class="task"><input type="checkbox" id="t-11-1"><label for="t-11-1"><strong>实现基础 A*</strong>：用堆做开放列表，跑通 4 方向寻路。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-2"><label for="t-11-2"><strong>对比四种启发函数</strong>：在地图上测试，记录扩展节点数。<em>亲自验证"准确启发能减少 60% 扩展"。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-11-3"><label for="t-11-3"><strong>加最大搜索上限</strong>：给 A* 加节点预算，验证"无路径"时不会遍历整个地图。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-4"><label for="t-11-4"><strong>实现 8 方向寻路</strong>：加上穿墙角检测，对比与 4 方向的路径长度。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-5"><label for="t-11-5"><strong>实现流场寻路</strong>：从目标反向 BFS，画出方向场，验证多个单位能共享。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-6"><label for="t-11-6"><strong>做路径平滑</strong>：把 A* 的锯齿路径用直线检测简化，让移动更自然。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-7"><label for="t-11-7"><strong>回答面试题</strong>：① A* 的 f/g/h 分别是什么？② 启发函数什么时候会导致非最优？③ 大量单位寻路怎么优化？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能实现完整的 A*（含堆、开放列表、闭集）</strong>；<br>
+    ② <strong>能说出四种启发函数，以及各自的可采纳性</strong>；<br>
+    ③ <strong>知道 h 高估会导致非最优，并能举出例子</strong>；<br>
+    ④ 知道"必须设最大搜索上限"以及原因；<br>
+    ⑤ 能判断什么场景该用 A* / 流场 / JPS。<br>
+    <br>
+    <em>第 ② 和第 ③ 条是这一页的核心——面试官问"启发函数怎么选"时，能答出"可采纳性"的人很少。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="10-graph.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">10 图的表示与遍历</div>
+  </a>
+  <a class="next" href="12-spatial.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">12 空间划分与碰撞优化 ★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,127 @@
+<h1>01 · 为什么游戏程序员要懂算法</h1>
+
+<p class="lead">先说结论：<strong>游戏程序员的算法需求，和刷题网站的算法题不一样。</strong>这一页讲清楚<em>你需要学什么、不需要学什么</em>——避免把时间浪费在没用的地方。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="difference">一、游戏里的算法有什么不同</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>维度</th><th>刷题网站</th><th>游戏开发</th></tr></thead>
+  <tbody>
+    <tr><td><strong>数据规模</strong></td><td>可能几百万</td><td><strong>通常几十到几千</strong></td></tr>
+    <tr><td><strong>时间限制</strong></td><td>1~2 秒</td><td><strong>每帧只有 16.7 毫秒</strong></td></tr>
+    <tr><td><strong>失败代价</strong></td><td>WA</td><td><em>卡顿、崩溃、掉线</em></td></tr>
+    <tr><td><strong>关注点</strong></td><td>最优复杂度</td><td><strong>够用 + 好维护</strong></td></tr>
+    <tr><td><strong>内存</strong></td><td>通常不是问题</td><td><em>手机内存很紧张</em></td></tr>
+    <tr><td><strong>典型题</strong></td><td>DP、图论、数论</td><td><strong>空间划分、状态机、寻路</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">最大的误区：以为要刷很多题</span>
+  <strong>游戏开发和算法的关系是"够用就好"，不是"越强越好"。</strong><br><br>
+  <strong>你真正需要的算法能力</strong>：<br>
+  · <strong>复杂度直觉</strong>——知道一个循环嵌套会带来什么代价<br>
+  · <strong>常见数据结构</strong>——数组、哈希、堆、树，知道各自适用场景<br>
+  · <strong>空间划分</strong>——四叉树、网格，用于碰撞和邻近查询<br>
+  · <strong>寻路</strong>——A*，以及什么时候该用流场<br>
+  · <strong>游戏系统设计</strong>——状态机、行为树、红点、对象池<br><br>
+  <strong>你大概率不需要的</strong>：<br>
+  · 复杂的数论（<em>RSA 加密那种</em>）<br>
+  · 高级图论（<em>网络流、二分图匹配</em>）<br>
+  · 动态规划的竞赛级技巧<br><br>
+  <em>把时间花在"游戏里真的会用"的算法上，收益高得多。</em>
+</div>
+
+<h2 id="scope">二、这个站讲什么</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>部分</th><th>内容</th><th>页数</th></tr></thead>
+  <tbody>
+    <tr><td><strong>基础</strong></td><td>复杂度直觉、数据结构</td><td>02-09</td></tr>
+    <tr><td><strong>核心算法</strong></td><td>图、寻路、空间划分、排序查找</td><td>10-15</td></tr>
+    <tr><td><strong>游戏 AI</strong></td><td>状态机、行为树、决策树、GOAP、群体</td><td>16-20</td></tr>
+    <tr><td><strong>系统设计</strong></td><td>红点、任务、技能、背包、定时器</td><td>21-25</td></tr>
+    <tr><td><strong>性能工程</strong></td><td>性能模式、缓存、位运算、序列化、调试</td><td>26-30</td></tr>
+    <tr><td><strong>求职</strong></td><td>面试题、项目、速查</td><td>31-33</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">重要的三页（如果时间不够）</span>
+  如果只有一个周末，优先看这三页：<br><br>
+  <strong>① 页 12「空间划分」</strong><br>
+  <em>解决"1000 个敌人两两检测碰撞"的性能问题。</em><br>
+  这是游戏里最实用的优化，而且<strong>有一个致命陷阱</strong>（格子太小时会静默漏检）。<br><br>
+  <strong>② 页 17「行为树」</strong><br>
+  <em>商业游戏 AI 的主流方案。</em><br>
+  能答清"行为树和状态机的区别"，面试立刻加分。<br><br>
+  <strong>③ 页 21「红点系统」</strong><br>
+  <em>每个游戏都有的功能。</em><br>
+  看似简单，但<strong>设计不好会拖慢整个 UI</strong>。<br><br>
+  <em>这三页的共同点：都是"看起来简单，做起来有讲究"的东西。这正是面试官爱问的类型。</em>
+</div>
+
+<h2 id="how-to-use">三、怎么用这个站</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">每页的固定结构</span>
+  <strong>每个知识点页都有</strong>：<br>
+  ① <strong>这一页在路线中的位置</strong>——告诉你前面学了什么、后面要学什么<br>
+  ② <strong>正文</strong>——原理 + 表格对比 + 代码<br>
+  ③ <strong>动手任务</strong>——必须实际做一遍<br>
+  ④ <strong>本章过关标准</strong>——自检清单<br><br>
+  <strong>用法</strong>：<em>先看"位置"了解全局 → 读正文 → 做任务 → 对照过关标准自检</em>。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">不要只读不写</span>
+  <strong>算法和语法不同——它必须动手才能掌握。</strong><br><br>
+  <em>读懂了"快速排序是分治"，和"能手写出快排"，是两件完全不同的事。</em><br><br>
+  <strong>本站的所有代码都能直接运行</strong>（Lua 5.4）。<br>
+  建议：<em>把代码抄一遍，改改参数，看输出怎么变</em>。<br><br>
+  <strong>尤其要做实验</strong>：<br>
+  · 把数据量翻倍，看耗时怎么变<br>
+  · 换个算法，对比性能<br>
+  · <em>故意触发那些"陷阱"（比如空间网格格子太小）</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="01">
+  <div class="task"><input type="checkbox" id="t-01-1"><label for="t-01-1"><strong>评估自己的基础</strong>：列出你已经掌握的算法，标出薄弱的。</label></div>
+  <div class="task"><input type="checkbox" id="t-01-2"><label for="t-01-2"><strong>定一个目标</strong>：是为了面试、还是解决项目里的具体问题？<em>目标不同，重点不同。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-01-3"><label for="t-01-3"><strong>跑通第一段代码</strong>：直接运行页 02 的示例，确认你的 Lua 环境可用。</label></div>
+  <div class="task"><input type="checkbox" id="t-01-4"><label for="t-01-4"><strong>回答开放题</strong>：① 你觉得你项目里最需要优化的地方在哪？② 你遇到过哪些"性能问题"？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>理解游戏算法与刷题算法的差异</strong>；<br>
+    ② 知道这个站的六大板块；<br>
+    ③ 知道优先看哪三页；<br>
+    ④ 明确自己的学习目标。<br>
+    <br>
+    <em>这一页的标准很低——**只要能回答"为什么学"就够了**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="index.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">路线总览</div>
+  </a>
+  <a class="next" href="02-complexity.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">02 复杂度与性能直觉</div>
+  </a>
+</nav>

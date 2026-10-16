@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>12 物理系统 — C# + Unity 路线｜从零基础到独立完成商业级项目</title>
+<meta name="description" content="Rigidbody 与力、碰撞体与触发器、碰撞矩阵、射线检测、物理材质、性能与替代方案">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C# + Unity 路线
+        <span>从零基础到独立完成商业级项目</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>12 · 物理系统</h1>
+
+<p class="lead">上一页（11）讲了生命周期，其中 <code>OnCollisionEnter</code> 这类<strong>物理回调</strong>就是这一页的主角。物理系统是游戏"手感"的来源，也是<em>性能问题的高发区</em>——用对了很爽，用错了很痛。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（11）的生命周期告诉你<em>物理回调什么时候触发</em>。这一页告诉你<strong>为什么会触发、什么时候不该触发</strong>。<br>
+  <strong>关键衔接</strong>：页 09 学的 <a class="kp-ref" href="09-math.html#vector" title="向量运算">向量运算</a>在这里大量使用——射线方向、力的大小、法线反弹都是向量。<br>
+  <strong>下一页</strong>（13）动画系统。动画状态机经常需要读取<em>物理速度</em>来驱动（比如 <code>Speed</code> 参数），两页会配合使用。<br>
+  <strong>难度提示</strong>：物理的概念不多，<em>但"什么时候该用哪种方案"需要经验</em>——这一页把取舍讲清楚。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="11-unity-core.html#lifecycle" data-brief="Awake/Start/Update/FixedUpdate/LateUpdate 的选择依据"><span class="prereq__title">生命周期与执行顺序</span><span class="prereq__page">11-unity-core</span></a>
+          <a class="prereq__item" href="11-unity-core.html#lifecycle" data-brief="世界与局部坐标转换、父子关系的性能影响"><span class="prereq__title">Transform 与坐标</span><span class="prereq__page">11-unity-core</span></a>
+          <a class="prereq__item" href="09-math.html#vector" data-brief="位置/方向/速度都是向量；sqrMagnitude 比 Distance 快"><span class="prereq__title">向量运算</span><span class="prereq__page">09-math</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="rigidbody">一、Rigidbody 与力的四种模式 ★</h2>
+
+<p>物理系统里最容易搞混的就是 <code>ForceMode</code>。<strong>很多人只知道默认的 <code>AddForce</code>，不知道还有三种模式</strong>，结果做出来的手感总是差一点。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  物理系统基础：Rigidbody 与力的三种施加方式
+// ============================================================
+public class PhysicsBasic : MonoBehaviour
+{
+    [SerializeField] private float _moveForce = 10f;
+    [SerializeField] private float _jumpForce = 5f;
+
+    private Rigidbody _rb;
+    private bool _grounded;
+
+    private void Awake()
+    {
+        _rb = GetComponent&lt;Rigidbody&gt;();
+
+        // 【必改项】消除视觉抖动
+        // FixedUpdate 的频率与渲染帧率不同步，
+        // 不做插值的话物体看起来会一顿一顿
+        _rb.interpolation = RigidbodyInterpolation.Interpolate;
+
+        // 高速物体防穿透
+        _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+    }
+
+    // ============================================================
+    //  物理操作必须在 FixedUpdate
+    // ============================================================
+    private void FixedUpdate()
+    {
+        // ---------- 方式 1：AddForce（施加力，有惯性和质量感）----------
+        float h = Input.GetAxis("Horizontal");
+        float v = Input.GetAxis("Vertical");
+
+        Vector3 force = new Vector3(h, 0f, v) * _moveForce;
+
+        // ForceMode 的四种模式（这是物理题的高频考点）
+        _rb.AddForce(force);                                  // 默认：持续力，受质量影响
+        _rb.AddForce(force, ForceMode.Force);                 // 同上，显式写法
+        // _rb.AddForce(force, ForceMode.Acceleration);       // 不受质量影响
+        // _rb.AddForce(force, ForceMode.Impulse);            // 瞬时冲量，受质量影响
+        // _rb.AddForce(force, ForceMode.VelocityChange);     // 瞬时速度变化，不受质量影响
+    }
+
+    // ============================================================
+    //  方式 2：直接设置 velocity（可控、即时响应）
+    // ============================================================
+    private void SetVelocityDemo()
+    {
+        // 水平速度直接设定，垂直速度保留（防止影响下落）
+        Vector3 vel = _rb.velocity;
+        vel.x = Input.GetAxis("Horizontal") * 5f;
+        vel.z = Input.GetAxis("Vertical") * 5f;
+        _rb.velocity = vel;
+    }
+
+    // ============================================================
+    //  方式 3：MovePosition（Kinematic 刚体的标准做法）
+    // ============================================================
+    private void MovePositionDemo()
+    {
+        // 【重要】isKinematic 开启后 velocity 不再驱动移动，必须用 MovePosition
+        if (_rb.isKinematic)
+        {
+            _rb.MovePosition(_rb.position + Vector3.forward * (Time.fixedDeltaTime * 3f));
+        }
+    }
+
+    // ---------- 跳跃：用 Impulse 模式 ----------
+    public void Jump()
+    {
+        if (!_grounded) return;
+
+        // Impulse 是瞬时冲量，适合跳跃、爆炸
+        _rb.AddForce(Vector3.up * _jumpForce, ForceMode.Impulse);
+        _grounded = false;
+    }
+
+    // ---------- 旋转：用 Torque 或 MoveRotation ----------
+    public void Spin(float degreesPerSecond)
+    {
+        // 角速度（弧度/秒）
+        _rb.angularVelocity = Vector3.up * (degreesPerSecond * Mathf.Deg2Rad);
+    }
+
+    public void ResetMotion()
+    {
+        // 停止所有运动
+        _rb.velocity = Vector3.zero;
+        _rb.angularVelocity = Vector3.zero;
+    }
+}
+
+// ============================================================
+//  ForceMode 四种模式的完整对比
+// ============================================================
+//                  受 mass 影响   持续时间
+//  Force              是          持续
+//  Acceleration       否          持续
+//  Impulse            是          瞬时
+//  VelocityChange     否          瞬时
+//
+//  选择依据：
+//    持续推力（火箭、风）        -&gt; Force
+//    想忽略质量做统一加速        -&gt; Acceleration
+//    跳跃、爆炸、击退            -&gt; Impulse
+//    想直接设定速度变化量        -&gt; VelocityChange
+//
+//  公式关系：
+//    Impulse = Force * fixedDeltaTime
+//    VelocityChange = Impulse / mass</code></pre>
+
+<div class="callout callout--tip">
+  <span class="callout__title">ForceMode 的四个模式，一次说清</span>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>模式</th><th>受 mass 影响</th><th>持续时间</th><th>典型用途</th></tr></thead>
+    <tbody>
+      <tr><td><code>Force</code></td><td>是</td><td>持续</td><td>火箭推力、风力、持续加速</td></tr>
+      <tr><td><code>Acceleration</code></td><td><strong>否</strong></td><td>持续</td><td>想让所有物体产生同样加速度</td></tr>
+      <tr><td><code>Impulse</code></td><td>是</td><td>瞬时</td><td><strong>跳跃、爆炸、击退</strong></td></tr>
+      <tr><td><code>VelocityChange</code></td><td><strong>否</strong></td><td>瞬时</td><td>直接设定速度变化量</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <strong>记忆方法</strong>：带 <code>Acceleration</code> 和 <code>VelocityChange</code> 的<em>不受质量影响</em>（因为它们描述的是"加速度"和"速度变化"，本质与质量无关）。<br>
+  <strong>公式关系</strong>：<code>Impulse = Force x fixedDeltaTime</code>，<code>VelocityChange = Impulse / mass</code>。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">velocity 与 AddForce 怎么选</span>
+  <strong>用 <code>velocity</code></strong>：需要<em>精确控制</em>和<em>即时响应</em>（角色移动、平台跳跃）。缺点是会覆盖物理计算，失去部分物理感。<br>
+  <strong>用 <code>AddForce</code></strong>：需要<em>物理感</em>和<em>惯性</em>（爆炸冲击、被击退、载具）。缺点是难以精确控制最终位置。<br>
+  <strong>不要混用</strong>：同时用两者会互相干扰，导致行为难以预测。<em>按模块统一选一种。</em>
+</div>
+
+<h2 id="raycast">二、射线检测 ★</h2>
+
+<p>射线检测是<strong>游戏里使用频率最高的物理功能</strong>——射击、点击拾取、AI 视线、地面检测、寻路障碍判断都靠它。也因此，它是<em>性能优化的重点区域</em>。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using System.Collections.Generic;
+
+// ============================================================
+//  射线检测：从基础到零分配
+// ============================================================
+public class RaycastDemo : MonoBehaviour
+{
+    [SerializeField] private float _maxDistance = 100f;
+    // 默认值 -1 等于「所有层」，实际项目在 Inspector 里指定具体层
+    [SerializeField] private LayerMask _groundMask = ~0;
+
+    // 预分配缓冲区，全程复用（零分配的关键）
+    private readonly RaycastHit[] _hits = new RaycastHit[16];
+    private readonly RaycastHit[] _sphereHits = new RaycastHit[8];
+
+    private void Update()
+    {
+        // ---------- 基础射线：返回最近的命中 ----------
+        // 这是最常用的形式，本身就是零分配的
+        Ray ray = new Ray(transform.position, transform.forward);
+
+        if (Physics.Raycast(ray, out RaycastHit hit, _maxDistance, _groundMask,
+                            QueryTriggerInteraction.Ignore))
+        {
+            Debug.Log("命中 " + hit.collider.name +
+                      " 距离 " + hit.distance +
+                      " 点 " + hit.point +
+                      " 法线 " + hit.normal);
+        }
+
+        // 等价写法：直接传起点和方向
+        if (Physics.Raycast(transform.position, Vector3.down, out RaycastHit ground, 10f))
+        {
+            Debug.Log(ground.point);
+        }
+
+        // ---------- 多次命中：用 NonAlloc ----------
+        int count = Physics.RaycastNonAlloc(
+            transform.position, Vector3.forward, _hits, _maxDistance, ~0,
+            QueryTriggerInteraction.Ignore);
+
+        if (count == _hits.Length)
+        {
+            // 【重要】缓冲区满了说明结果被截断
+            Debug.LogWarning("射线缓冲已满，结果可能不完整");
+        }
+
+        // NonAlloc 不保证排序，需要自己排
+        System.Array.Sort(_hits, 0, count,
+            Comparer&lt;RaycastHit&gt;.Create((a, b) =&gt; a.distance.CompareTo(b.distance)));
+
+        for (int i = 0; i &lt; count; i++)
+        {
+            Debug.Log(i + ": " + _hits[i].collider.name);
+        }
+    }
+
+    // ============================================================
+    //  其他检测方式
+    // ============================================================
+    private void OtherChecks()
+    {
+        // ---------- 球形投射：适合有体积的物体（子弹、角色）----------
+        // 参数：起点、半径、方向、结果、距离
+        if (Physics.SphereCast(transform.position, 0.5f, Vector3.forward,
+                               out RaycastHit sph, 50f))
+        {
+            Debug.Log("球形投射命中 " + sph.collider.name);
+        }
+
+        int sphCount = Physics.SphereCastNonAlloc(
+            transform.position, 0.5f, Vector3.forward, _sphereHits, 50f);
+
+        // ---------- 盒形投射：适合方形物体 ----------
+        // 参数：起点、半尺寸、方向、结果、旋转、距离
+        if (Physics.BoxCast(transform.position, new Vector3(0.5f, 0.5f, 0.5f),
+                            Vector3.forward, out RaycastHit box, Quaternion.identity, 50f))
+        {
+            Debug.Log("盒形投射命中 " + box.collider.name);
+        }
+
+        // ---------- 线段检测：判断两点之间是否有遮挡 ----------
+        if (Physics.Linecast(transform.position, Vector3.zero, out RaycastHit line,
+                             _groundMask))
+        {
+            Debug.Log("视线被挡住：" + line.collider.name);
+        }
+
+        // ---------- 范围检测：不发射射线，直接查某个区域 ----------
+        Collider[] overlaps = new Collider[32];
+        int overlapCount = Physics.OverlapSphereNonAlloc(transform.position, 5f, overlaps);
+
+        for (int i = 0; i &lt; overlapCount; i++)
+        {
+            Debug.Log("范围内：" + overlaps[i].name);
+        }
+
+        Debug.Log(sphCount);
+    }
+
+    // ============================================================
+    //  准星检测：从屏幕中心发射射线（FPS 常用）
+    // ============================================================
+    public bool CheckCrosshair(Camera cam, out RaycastHit hit)
+    {
+        // 从屏幕中心发射射线
+        Ray ray = cam.ScreenPointToRay(new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 0f));
+        return Physics.Raycast(ray, out hit, _maxDistance, ~0, QueryTriggerInteraction.Ignore);
+    }
+}
+
+// ============================================================
+//  射线调试：在 Scene 视图里画出来
+// ============================================================
+public class RaycastDebug : MonoBehaviour
+{
+    [SerializeField] private float _distance = 10f;
+
+    private void Update()
+    {
+        // 只在编辑器里编译，打包后自动移除
+        #if UNITY_EDITOR
+        Debug.DrawRay(transform.position, transform.forward * _distance,
+                      Color.green, 0f, false);
+        #endif
+
+        // 也可以用 Gizmos（需要在 OnDrawGizmos 里调用）
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(transform.position, 5f);
+        Gizmos.DrawLine(transform.position, transform.position + transform.forward * _distance);
+    }
+}</code></pre>
+
+<div class="callout callout--danger">
+  <span class="callout__title">射线检测的五个要点</span>
+  <strong>① <code>Raycast</code>（单个）本身就是零分配的</strong>，它返回最近的命中。只有需要<em>多个结果</em>时才用 All 或 NonAlloc。<br>
+  <strong>② <code>NonAlloc</code> 版本不排序。</strong>需要按距离排序必须自己调 <code>Array.Sort</code>。<br>
+  <strong>③ 层掩码能大幅提升性能。</strong>只检测需要的层，比检测所有层快得多——<em>物理引擎会先做层过滤，再算碰撞</em>。<br>
+  <strong>④ <code>QueryTriggerInteraction</code> 决定是否检测触发器。</strong>默认 <code>UseGlobal</code>（看项目设置）。射击检测通常用 <code>Ignore</code>，交互检测用 <code>Collide</code>。<br>
+  <strong>⑤ <code>SphereCast</code> 与 <code>Raycast</code> 的区别：</strong>球形投射有<em>体积</em>，起点处如果已经与其他碰撞体重叠会<strong>检测不到</strong>（这是最常见的坑）。<em>解决办法：把起点往后退一点，或用 <code>Physics.OverlapSphere</code> 补检起点。</em>
+</div>
+
+<h2 id="collision">三、碰撞与触发器的检测矩阵</h2>
+
+<p>这是<strong>新手最困惑的地方</strong>：明明两个物体都有碰撞体，为什么回调不触发？答案在下面这张矩阵里。</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>物体 A</th><th>物体 B</th><th>触发碰撞回调</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Rigidbody + Collider</td><td>Rigidbody + Collider</td><td><span class="mk mk--yes">会</span></td><td>正常物理碰撞</td></tr>
+    <tr><td>Rigidbody + Collider</td><td>静态 Collider</td><td><span class="mk mk--yes">会</span></td><td>动态撞静态，正常</td></tr>
+    <tr><td>静态 Collider</td><td>静态 Collider</td><td><span class="mk mk--no">不会</span></td><td><strong>两个静态物体之间不产生任何物理交互</strong></td></tr>
+    <tr><td>Rigidbody + Trigger</td><td>任意 Collider</td><td><span class="mk mk--yes">OnTrigger</span></td><td><code>isTrigger</code> 决定回调类型</td></tr>
+    <tr><td>Kinematic Rigidbody</td><td>静态 Collider</td><td><span class="mk mk--no">不会</span></td><td>Kinematic 不主动触发静态</td></tr>
+    <tr><td>Kinematic Rigidbody</td><td>带 Rigidbody 的物体</td><td><span class="mk mk--yes">会</span></td><td>Kinematic 能被动态物体撞到</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三个最容易踩的坑</span>
+  <strong>① 两个静态碰撞体不产生任何交互。</strong>想让物体"碰撞但不移动"，给它加 <code>Rigidbody</code> 并勾选 <code>isKinematic</code>，<em>而不是不加 Rigidbody</em>。<br>
+  <strong>② 触发器不产生物理效果。</strong><code>isTrigger = true</code> 的碰撞体是"幽灵"——它能被检测到，但不阻挡任何东西。<em>需要阻挡又要检测，得用两个碰撞体（一个 Trigger 一个普通）。</em><br>
+  <strong>③ 回调函数名拼错不会报错，只是静默不触发。</strong><code>OnCollisionEnter</code> 写成 <code>onCollisionEnter</code> 编译器<em>不会有任何提示</em>。<em>这是"物理回调不触发"最常见的原因——先用一个 <code>Debug.Log</code> 验证函数名是否正确。</em>
+</div>
+
+<h2 id="perf">四、物理性能优化 ★</h2>
+
+<p>物理是 CPU 大户。<strong>一个管理不当的物理场景，能让帧率从 60 掉到 20。</strong>下面按收益从高到低排列优化手段。</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>#</th><th>手段</th><th>做法</th><th>收益</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><strong>图层碰撞矩阵</strong></td><td>Project Settings → Physics → Layer Collision Matrix，取消不需要的勾选</td><td><span class="mk mk--yes">极高</span></td></tr>
+    <tr><td>2</td><td><strong>减少 Rigidbody 数量</strong></td><td>静止物体用 <code>isKinematic</code> 或直接移除刚体</td><td><span class="mk mk--yes">高</span></td></tr>
+    <tr><td>3</td><td><strong>简化碰撞体</strong></td><td>用 Box/Sphere/Capsule 代替 MeshCollider</td><td><span class="mk mk--yes">高</span></td></tr>
+    <tr><td>4</td><td><strong>降低 FixedUpdate 频率</strong></td><td>Project Settings → Time → Fixed Timestep（0.02 → 0.033）</td><td><span class="mk mk--warn">中</span></td></tr>
+    <tr><td>5</td><td><strong>关闭不必要的碰撞</strong></td><td>用 <code>Physics.IgnoreCollision</code> 或层屏蔽</td><td><span class="mk mk--warn">中</span></td></tr>
+    <tr><td>6</td><td><strong>减少射线检测次数</strong></td><td>合并检测、降低频率、用层掩码过滤</td><td><span class="mk mk--warn">中</span></td></tr>
+    <tr><td>7</td><td><strong>设置 sleepThreshold</strong></td><td>让静止物体进入睡眠状态</td><td>低</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">图层碰撞矩阵是最容易被忽略的优化</span>
+  默认情况下<strong>所有层都互相碰撞</strong>。但你的项目里通常有大量<em>不需要互相检测</em>的组合：<br>
+  • 子弹层 与 子弹层（子弹之间不需要碰撞）<br>
+  • UI 层 与 任何层（UI 不参与物理）<br>
+  • 装饰物层 与 特效层<br>
+  <strong>取消这些勾选，物理引擎的检测量能减少一半以上</strong>，而且<em>这是纯粹的配置工作，不需要写任何代码</em>。
+</div>
+
+<h2 id="tasks">五、本章动手任务</h2>
+
+<div class="tasks" data-page="12">
+  <div class="task"><input type="checkbox" id="t-12-1"><label for="t-12-1"><strong>对比四种 ForceMode</strong>：给同一个物体用四种模式施加同样大小的力，观察运动差异。<em>重点感受 mass 的影响。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-12-2"><label for="t-12-2"><strong>复现 SphereCast 起点问题</strong>：让球形投射的起点紧贴墙面，观察检测不到的情况；然后把起点退后 0.1 米再试。</label></div>
+  <div class="task"><input type="checkbox" id="t-12-3"><label for="t-12-3"><strong>验证碰撞矩阵</strong>：创建两个静态碰撞体让它们重叠，观察没有回调；给其中一个加 Kinematic Rigidbody 再看。</label></div>
+  <div class="task"><input type="checkbox" id="t-12-4"><label for="t-12-4"><strong>配置图层矩阵</strong>：给你的项目建立"子弹/敌人/玩家/环境"四个层，在碰撞矩阵里取消不需要的组合。</label></div>
+  <div class="task"><input type="checkbox" id="t-12-5"><label for="t-12-5"><strong>做准星检测</strong>：用 <code>ScreenPointToRay</code> 实现 FPS 准星检测，并在 UI 上显示命中的物体名。</label></div>
+  <div class="task"><input type="checkbox" id="t-12-6"><label for="t-12-6"><strong>优化一个物理场景</strong>：找或做一个物体很多的场景，用 Profiler 看 Physics 模块耗时，然后按表格里的手段逐项优化。</label></div>
+  <div class="task"><input type="checkbox" id="t-12-7"><label for="t-12-7"><strong>回答面试题</strong>：① ForceMode 四种模式的区别？② 为什么两个静态物体不碰撞？③ SphereCast 在什么情况下会漏检？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出 ForceMode 四种模式的区别，并知道跳跃该用哪种；<br>
+    ② 能解释 <code>velocity</code> 与 <code>AddForce</code> 的取舍；<br>
+    ③ 知道 <code>Raycast</code> / <code>RaycastAll</code> / <code>RaycastNonAlloc</code> 的区别与适用场景；<br>
+    ④ <strong>能说出碰撞检测矩阵中"两个静态物体不碰撞"的原因</strong>；<br>
+    ⑤ 知道至少五种物理优化手段，并能说出图层矩阵为什么收益最高。<br><br>
+    <em>第 ④ 条和第 ⑤ 条是最能体现"有没有实战经验"的两个点。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="11-unity-core.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">11 Unity 核心机制</div>
+  </a>
+  <a class="next" href="13-unity-anim.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">13 动画系统</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

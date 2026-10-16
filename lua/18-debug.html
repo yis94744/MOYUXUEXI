@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>18 调试与排错 — Lua 热更新路线｜从零基础到独立搭建可上线的热更框架</title>
+<meta name="description" content="断点调试、日志系统、内存泄漏定位、崩溃分析">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">Lua 热更新路线
+        <span>从零基础到独立搭建可上线的热更框架</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>18 · 调试与排错 ★★</h1>
+
+<p class="lead">Lua 的 bug 有个特点：<strong>错误信息往往指向错误的位置</strong>。这一页讲<em>怎么高效定位 Lua 问题</em>——包括那些"只在真机上出现"的疑难杂症。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="09-hotupdate-basics.html#require" data-brief="package.loaded 缓存，热更要清缓存"><span class="prereq__title">require 与模块</span><span class="prereq__page">09-hotupdate-basics</span></a>
+          <a class="prereq__item" href="07-lua-advanced.html#error" data-brief="error 的 level 参数、xpcall 抓堆栈"><span class="prereq__title">Lua 错误处理</span><span class="prereq__page">07-lua-advanced</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="characteristics">一、Lua 错误的三个特点</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>特点</th><th>表现</th><th>应对</th></tr></thead>
+  <tbody>
+    <tr><td><strong>错误位置可能不准</strong></td><td>报错行 ≠ 真正的错误行</td><td><em>往上看几行</em></td></tr>
+    <tr><td><strong>静默失败多</strong></td><td>访问 nil 字段只是返回 nil</td><td><strong>主动加断言</strong></td></tr>
+    <tr><td><strong>错误信息不完整</strong></td><td>只有一行，没有调用栈</td><td>用 <code>xpcall + traceback</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">Lua 最常见的错误：attempt to index a nil value</span>
+  <strong>这个错误占 Lua 报错的 80%</strong>。<br>
+  含义：<em>你访问了一个 nil 值的字段</em>。<br>
+  <code>local obj = nil</code><br>
+  <code>obj.field = 1  -- attempt to index a nil value (local obj)</code><br><br>
+  <strong>常见原因</strong>：<br>
+  · 对象已销毁但引用还在（<em>→ 假 null，见 C# 站页 11</em>）<br>
+  · 模块 require 失败（<em>→ 返回 nil</em>）<br>
+  · 配置表里没有这个 ID（<em>→ 查表返回 nil</em>）<br>
+  · 热更后引用失效<br><br>
+  <strong>排查方法</strong>：<em>把报错行拆开，逐个打印中间变量</em>。<br>
+  <strong>预防方法</strong>：<em>关键位置主动断言</em>：<code>assert(obj, "obj 不应该为空")</code>
+</div>
+
+<h2 id="tools">二、错误定位的四种手段</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>手段</th><th>用法</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>print 大法</strong></td><td>打印关键变量</td><td><em>最快，但污染输出</em></td></tr>
+    <tr><td><strong>assert 断言</strong></td><td>主动检查前置条件</td><td><strong>定位"谁传了 nil"</strong></td></tr>
+    <tr><td><strong>xpcall + traceback</strong></td><td>获取完整调用栈</td><td><strong>复杂逻辑</strong></td></tr>
+    <tr><td><strong>断点调试</strong></td><td>VS Code + 插件</td><td><span class="mk mk--yes">最强大</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">assert 是最好的调试工具</span>
+  <strong>assert 的价值不只是"检查"，而是"定位"</strong>。<br><br>
+  <strong>没有 assert 时</strong>：<br>
+  <code>-- 在很远的地方报错</code><br>
+  <code>attempt to index a nil value</code><br>
+  <em>你要往上追溯好几层才知道谁传了 nil</em>。<br><br>
+  <strong>有 assert 时</strong>：<br>
+  <code>function setTarget(obj)</code><br>
+  <code>&nbsp;&nbsp;assert(obj, "setTarget: obj 不能为 nil")</code><br>
+  <code>end</code><br>
+  <em>直接定位到"谁调用了 setTarget 并传了 nil"</em>。<br><br>
+  <strong>建议</strong>：<em>框架的公开接口都应该加参数校验</em>。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">xpcall + traceback 获取调用栈</span>
+  <strong>Lua 的默认错误信息没有调用栈</strong>——只有一行"哪里出错了"。<br>
+  <strong>获取完整堆栈</strong>：<br>
+  <code>local ok, err = xpcall(func, debug.traceback)</code><br>
+  <em>err 里会包含从调用点开始的完整调用链。</em><br><br>
+  <strong>实战用法</strong>：<em>框架的顶层（UI 按钮回调、网络回调、定时器回调）都应该用 xpcall 包一层</em>。<br>
+  这样任何回调出错都能拿到完整堆栈，而不是一行孤立的错误。<br><br>
+  <strong>更进一步</strong>：把堆栈上报到服务器，<em>线上问题也能看到调用链</em>。
+</div>
+
+<h2 id="hard-cases">三、四个疑难问题库 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">问题一：只在真机上出现，编辑器里正常</span>
+  <strong>常见原因</strong>：<br>
+  ① <strong>时序差异</strong>——真机帧率低，某些竞态才暴露<br>
+  ② <strong>代码裁剪</strong>——<code>xlua</code> 的生成代码没包含某个方法<br>
+  ③ <strong>热更版本不一致</strong>——真机用的是线上脚本<br>
+  ④ <strong>内存压力</strong>——真机内存少，GC 更频繁<br><br>
+  <strong>排查方法</strong>：<br>
+  · <em>先在真机上复现</em>（不要试图在编辑器里"造"出来）<br>
+  · 用 <code>adb logcat</code> 抓完整日志<br>
+  · 对比"编辑器用的脚本"与"真机用的脚本"是否一致<br><br>
+  <em>这类问题的价值很高——它往往暴露了真实的设计缺陷。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">问题二：内存只涨不降</span>
+  <strong>常见原因</strong>：<br>
+  ① <strong>事件订阅没取消</strong>——对象被事件系统持有（<em>→ 页 16 的经典问题</em>）<br>
+  ② <strong>缓存没上限</strong>——资源缓存无限增长<br>
+  ③ <strong>全局表累积</strong>——往全局表里塞数据，从不清理<br>
+  ④ <strong>闭包持有大对象</strong>——闭包捕获了不需要的东西<br><br>
+  <strong>排查方法</strong>：<br>
+  · <code>collectgarbage("count")</code> 打印内存，观察趋势<br>
+  · 用 <strong>弱表</strong>试探：把可疑的引用改成弱引用，看对象是否被回收<br>
+  · <em>二分法：注释掉一半逻辑，看内存是否还涨</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">问题三：热更后行为异常</span>
+  <strong>常见原因</strong>：<br>
+  ① <strong>旧引用指向旧模块</strong>（<em>→ 页 09 的核心问题</em>）<br>
+  ② <strong>状态残留</strong>（<em>→ 页 15、17</em>）<br>
+  ③ <strong>部分模块热更了，部分没有</strong>——依赖不一致<br><br>
+  <strong>排查方法</strong>：<br>
+  · 打印模块的<strong>版本号或哈希</strong>，确认全部更新了<br>
+  · <em>在模块顶部加一个标记</em>：<code>MODULE_VERSION = "2.1"</code><br>
+  · 对比"热更前后"的行为差异<br><br>
+  <strong>预防</strong>：<em>热更清单要包含所有相关模块</em>，不能只更一部分。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">问题四：随机崩溃，无法复现</span>
+  <strong>排查顺序</strong>：<br>
+  ① <strong>先拿到崩溃日志</strong>——没有日志就没法查<br>
+  ② <strong>看崩溃位置</strong>——是 Lua 层还是 C# 层<br>
+  ③ <strong>找共同的触发条件</strong>——都在做某个操作时崩？<br>
+  ④ <strong>加日志缩小范围</strong>——在可疑位置打点<br><br>
+  <strong>最常见的根因</strong>：<br>
+  · <strong>访问已销毁的对象</strong>（C# 对象被 Destroy 了，Lua 还持有引用）<br>
+  · <em>解决：持有时检查 <code>~= nil</code>，或者监听销毁事件自动清理引用</em><br><br>
+  <strong>工具</strong>：Unity 的 <code>Development Build</code> + <code>Log Stack Trace</code> 能给出 C# 侧的堆栈。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="18">
+  <div class="task"><input type="checkbox" id="t-18-1"><label for="t-18-1"><strong>复现 nil 错误</strong>：故意访问 nil 的字段，观察错误信息。<em>注意它只告诉你"哪一行"，不告诉你"为什么是 nil"。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-18-2"><label for="t-18-2"><strong>加断言定位</strong>：给一个函数加 <code>assert</code> 参数校验，对比加之前后的定位效率。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-3"><label for="t-18-3"><strong>用 xpcall 抓堆栈</strong>：写一个 <code>xpcall</code> + <code>debug.traceback</code> 的错误处理，看完整调用链。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-4"><label for="t-18-4"><strong>做错误上报</strong>：把 xpcall 抓到的堆栈格式化后"上报"（打印到日志），模拟线上排错。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-5"><label for="t-18-5"><strong>制造内存泄漏</strong>：故意不取消事件订阅，用 <code>collectgarbage("count")</code> 观察内存增长。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-6"><label for="t-18-6"><strong>用弱表排查</strong>：把可疑引用改成弱引用，验证对象能否被回收。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-7"><label for="t-18-7"><strong>回答面试题</strong>：① Lua 最常见的错误是什么？② 怎么获取调用栈？③ 内存只涨不降怎么排查？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道 Lua 错误的三个特点（位置不准、静默失败、无堆栈）</strong>；<br>
+    ② <strong>会用 assert 定位"谁传了 nil"</strong>；<br>
+    ③ <strong>会用 <code>xpcall + debug.traceback</code> 获取完整调用栈</strong>；<br>
+    ④ 能说出"只在真机出现"的四个常见原因；<br>
+    ⑤ 能按顺序排查"内存只涨不降"和"随机崩溃"。<br>
+    <br>
+    <em>第 ② 和 第 ③ 条最实用——它们能立刻提升你的调试效率。第 ④⑤ 条是实战经验的总结。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="17-framework-hot-patch.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">17 热更与版本管理 ★★★</div>
+  </a>
+  <a class="next" href="19-perf-practice.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">19 性能实战 ★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

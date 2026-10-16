@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>14 查找与字符串算法 — 游戏算法与系统设计｜从数据结构到完整系统，覆盖游戏开发全部核心算法</title>
+<meta name="description" content="二分查找、滑窗、KMP、字符串匹配、模糊搜索">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">游戏算法与系统设计
+        <span>从数据结构到完整系统，覆盖游戏开发全部核心算法</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>14 · 查找与字符串算法</h1>
+
+<p class="lead">查找是<strong>每个游戏都在做的事</strong>——按 ID 找配置、按名字找道具、按前缀搜技能。<em>这一页讲怎么让查找从"遍历"变成"O(1)"</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="05-hash.html#load" data-brief="负载因子、浮点不能做 key、索引优化"><span class="prereq__title">哈希表</span><span class="prereq__page">05-hash</span></a>
+          <a class="prereq__item" href="02-complexity.html#budget" data-brief="每帧 16.7ms，单系统 1~2ms 预算"><span class="prereq__title">复杂度直觉</span><span class="prereq__page">02-complexity</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="methods">一、四种查找方式的选择</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方式</th><th>复杂度</th><th>前提</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td>顺序遍历</td><td><span class="mk mk--no">O(n)</span></td><td>无</td><td><em>数据少、查一次</em></td></tr>
+    <tr><td>二分查找</td><td>O(log n)</td><td><strong>必须有序</strong></td><td>静态数据、范围查询</td></tr>
+    <tr><td>哈希查找</td><td><span class="mk mk--yes">O(1)</span></td><td>需要索引表</td><td><strong>精确查找（最常用）</strong></td></tr>
+    <tr><td>Trie</td><td>O(m)</td><td><strong>按前缀</strong></td><td>敏感词、自动补全</td></tr>
+    <tr><td>BST / 跳表</td><td>O(log n)</td><td>有序</td><td>范围查询 + 动态插入</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">二分查找的六个易错点</span>
+  <strong>二分查找看起来简单，但极容易写错</strong>（据说正确率只有 10%）：<br><br>
+  <strong>① 循环条件</strong>：<code>while lo &lt;= hi</code>（不是 <code>&lt;</code>）<br>
+  <strong>② 中点计算</strong>：<code>math.floor((lo + hi) / 2)</code>（<em>直接相加可能溢出</em>）<br>
+  <strong>③ 边界更新</strong>：<code>lo = mid + 1</code> / <code>hi = mid - 1</code>（<em>要 ±1，否则死循环</em>）<br>
+  <strong>④ 未找到</strong>：返回 nil 或 -1，<em>要明确约定</em><br>
+  <strong>⑤ 重复元素</strong>：<em>要明确返回第一个还是任意一个</em><br>
+  <strong>⑥ 有序前提</strong>：<em>数据必须是有序的</em>——这是最常见的使用错误<br><br>
+  <strong>验证方法</strong>：用边界值测（第一个、最后一个、不存在的值）。
+</div>
+
+<h2 id="index">二、索引：最划算的优化 ★★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">一个真实的优化案例</span>
+  <strong>场景</strong>：1000 条装备配置，需要按 ID 查询。<br><br>
+  <strong>优化前</strong>（每次遍历）：<br>
+  <code>for _, item in ipairs(configs) do</code><br>
+  <code>&nbsp;&nbsp;if item.id == target then return item end</code><br>
+  <code>end</code><br>
+  <em>10000 次查询实测 0.1590 秒</em><br><br>
+  <strong>优化后</strong>（建立索引）：<br>
+  <code>byId[item.id] = item</code>  -- 加载时建一次<br>
+  <code>return byId[target]</code>  -- 查询 O(1)<br>
+  <em>10000 次查询实测 0.0010 秒</em><br><br>
+  <strong>实测快 159 倍</strong>！<br><br>
+  <strong>关键点</strong>：<em>索引要在加载时<strong>建一次</strong>，而不是每次查询都建</em>。<br>
+  这是"用内存换时间"最典型的应用。
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">要建哪些索引</span>
+  <strong>看业务代码里怎么查</strong>：<br>
+  · <code>getById</code> → 建 <code>byId</code><br>
+  · <code>getByName</code> → 建 <code>byName</code><br>
+  · <code>getByType</code> → 建 <code>byType</code>（<em>值是数组</em>）<br>
+  · <code>getByQuality</code> → 建 <code>byQuality</code><br><br>
+  <strong>原则</strong>：<em>配置表通常很小（几千条），多建几个索引的内存开销可以忽略，但能避免大量遍历。</em><br><br>
+  <strong>注意</strong>：<em>索引是"只读"的</em>——配置加载后不再变化。<br>
+  如果配置会热重载，<strong>重建索引</strong>要和重新加载一起做。
+</div>
+
+<h2 id="string">三、字符串算法在游戏里的应用</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>算法</th><th>用途</th><th>复杂度</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Trie</strong></td><td>敏感词过滤、自动补全</td><td>O(m)，m 是词长</td></tr>
+    <tr><td><strong>AC 自动机</strong></td><td><strong>多关键词同时匹配</strong></td><td>O(n + 匹配数)</td></tr>
+    <tr><td>KMP</td><td>单模式串匹配</td><td>O(n + m)</td></tr>
+    <tr><td>Rabin-Karp</td><td><strong>哈希匹配、查重</strong></td><td>平均 O(n + m)</td></tr>
+    <tr><td>编辑距离</td><td>模糊匹配、拼写纠错</td><td>O(nm)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">敏感词过滤：为什么不能用 string.find 循环</span>
+  <strong>错误做法</strong>：<br>
+  <code>for _, word in ipairs(badWords) do</code><br>
+  <code>&nbsp;&nbsp;if text:find(word, 1, true) then return true end</code><br>
+  <code>end</code><br>
+  <em>1000 个敏感词，每条消息要扫 1000 次</em>——<strong>每条聊天消息耗时几毫秒</strong>。<br><br>
+  <strong>Trie 的做法</strong>：<br>
+  · 预先把所有敏感词建成 Trie<br>
+  · 遍历文本的每个字符，<em>沿着 Trie 走</em><br>
+  · 走到终止节点 = 命中<br>
+  <em>复杂度从 O(词数 × 文本长) 降到 O(文本长 × 最大词长)</em><br><br>
+  <strong>AC 自动机更进一步</strong>：<em>一次遍历同时匹配所有模式</em>——适合有几千个敏感词的场景。<br>
+  <strong>详见页 08。</strong>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="14">
+  <div class="task"><input type="checkbox" id="t-14-1"><label for="t-14-1"><strong>实现二分查找</strong>：用边界值测试（第一个、最后一个、不存在）。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-2"><label for="t-14-2"><strong>做索引优化</strong>：给一份配置建立 byId/byName 索引，实测遍历 vs 索引的差距。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-3"><label for="t-14-3"><strong>验证二分的前提</strong>：故意用无序数组做二分，观察错误结果。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-4"><label for="t-14-4"><strong>实现 Trie 过滤</strong>：用页 08 的 Trie 做敏感词过滤，对比 <code>string.find</code> 循环的速度。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-5"><label for="t-14-5"><strong>做多字段索引</strong>：给配置表建立多个索引，体会"用内存换时间"。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-6"><label for="t-14-6"><strong>回答面试题</strong>：① 二分查找有哪些易错点？② 索引为什么能快 100 倍？③ 敏感词过滤该用什么算法？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道二分查找的六个易错点</strong>；<br>
+    ② <strong>能实测出"索引比遍历快 100 倍以上"</strong>；<br>
+    ③ 知道要建哪些索引（看业务代码怎么查）；<br>
+    ④ 知道索引要在加载时建一次，不是每次查都建；<br>
+    ⑤ <strong>知道敏感词过滤要用 Trie，而不是 string.find 循环</strong>。<br>
+    <br>
+    <em>第 ② 和 第 ⑤ 条最实用——前者是通用优化手段，后者是具体场景的正确解法。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="13-sorting.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">13 排序与选择算法 ★★</div>
+  </a>
+  <a class="next" href="15-dynamic-programming.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">15 动态规划与贪心</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<h1>23 · 性能优化实战 ★★★</h1>
+
+<p class="lead">这一页把前面散落的性能知识<strong>串成一套完整的排查流程</strong>。<em>你会学到：拿到一个卡顿的 UE 项目，怎么从零定位到具体原因</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="workflow">一、五步排查流程</h2>
+
+<p>UE 的性能排查有<strong>固定的工具和流程</strong>。<em>不会用 Insights，就等于蒙眼优化。</em></p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>步骤</th><th>做什么</th><th>工具</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1. 确认现象</strong></td><td>卡顿？掉帧？加载慢？</td><td><em>Play in Editor vs 打包版</em></td></tr>
+    <tr><td><strong>2. 定位类型</strong></td><td><strong>CPU / GPU / 内存 / 加载</strong></td><td>Unreal Insights</td></tr>
+    <tr><td><strong>3. 缩小范围</strong></td><td>哪个系统？哪个函数？</td><td><code>stat</code> 命令</td></tr>
+    <tr><td><strong>4. 修改验证</strong></td><td>只改一处，立即测</td><td><em>对比数据</em></td></tr>
+    <tr><td><strong>5. 回归测试</strong></td><td>确认没引入新问题</td><td>全流程跑</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">最重要的提醒：PIE 数据不可信</span>
+  <strong>Unreal 的 Play in Editor（PIE）性能数据不能用于优化决策。</strong><br><br><strong>原因</strong>：<br>· <em>编辑器本身有开销</em><br>· <em>PIE 有额外的代理层</em><br>· <em>Debug 配置未开优化</em>（<em>慢几倍</em>）<br>· <strong>很多问题只在 Shipping 配置下暴露</strong><br><br><strong>正确做法</strong>：<br>① <strong>用 Development 配置打包测试</strong>（<em>不是 PIE</em>）<br>② <strong>最终用 Shipping 配置验证</strong><br>③ <em>对比 PIE 和打包版的差异，PIE 只用来"快速看有没有大问题"</em><br><br><strong>典型陷阱</strong>：<em>PIE 里跑 60 帧，打包后只有 30 帧</em>——<em>因为 PIE 可能跳过了某些检查，或者打包后启用了更严格的渲染路径。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">Unreal Insights：最重要的工具</span>
+  <strong>Insights 是 UE 的性能分析工具</strong>——类似 Unity 的 Profiler，但更强。<br><br><strong>能看什么</strong>：<br>· <strong>CPU 时间线</strong>——<em>每个线程在做什么</em><br>· <em>帧的详细分解</em><br>· <strong>GPU 时间</strong><br>· <em>内存分配</em><br>· <strong>加载时间</strong><br><br><strong>启动方式</strong>：<br>· <em>启动 Insights 应用</em><br>· <em>游戏里输入 <code>Trace.Start</code></em><br>· <em>或启动参数加 <code>-tracehost=localhost</code></em><br><br><strong>最实用的功能</strong>：<em>看"哪个函数占了最多帧时间"</em>——<strong>直接定位到具体的代码</strong>。
+</div>
+
+<h2 id="stat">二、常用 stat 命令速查</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>命令</th><th>看什么</th><th>什么时候用</th></tr></thead>
+  <tbody>
+    <tr><td><code>stat fps</code></td><td>帧率</td><td><em>基础</em></td></tr>
+    <tr><td><code>stat unit</code></td><td><strong>Frame/Game/Draw/GPU 分解</strong></td><td><span class="mk mk--yes">最常用</span></td></tr>
+    <tr><td><code>stat game</code></td><td><em>游戏逻辑耗时</em></td><td>CPU 瓶颈</td></tr>
+    <tr><td><code>stat gpu</code></td><td><strong>GPU 各阶段耗时</strong></td><td>GPU 瓶颈</td></tr>
+    <tr><td><code>stat rhi</code></td><td><em>Draw Call 数</em></td><td>渲染瓶颈</td></tr>
+    <tr><td><code>stat memory</code></td><td><em>内存占用</em></td><td>内存问题</td></tr>
+    <tr><td><code>stat particles</code></td><td><em>粒子数</em></td><td>特效瓶颈</td></tr>
+    <tr><td><code>stat physics</code></td><td><em>物理耗时</em></td><td>物理瓶颈</td></tr>
+    <tr><td><code>stat anim</code></td><td><em>动画耗时</em></td><td>动画瓶颈</td></tr>
+    <tr><td><code>stat uiwidgets</code></td><td><em>UI 耗时</em></td><td>UI 瓶颈</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">stat unit 怎么读 ★★</span>
+  <strong><code>stat unit</code> 显示四个数字</strong>：<br><span style="font-family:monospace">Frame&nbsp;&nbsp;&nbsp;16.7 ms<br>Game&nbsp;&nbsp;&nbsp;&nbsp;2.1 ms<br>Draw&nbsp;&nbsp;&nbsp;&nbsp;3.5 ms<br>GPU&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;14.2 ms</span><br><br><strong>怎么判断瓶颈</strong>：<br>· <em>Frame 是总时间，其他三个是各部分的耗时</em><br>· <strong>哪个数字接近 Frame，哪个就是瓶颈</strong><br>· <em>上面的例子：GPU 14.2 接近 Frame 16.7 → GPU 瓶颈</em><br><br><strong>如果 Game 是瓶颈</strong>：<em>看 <code>stat game</code> 进一步细分</em>。<br><strong>如果 GPU 是瓶颈</strong>：<em>看 <code>stat gpu</code> 找具体的渲染阶段。</em><br><br><em>这是最实用的性能排查方法——比开 Insights 更快。</em>
+</div>
+
+<h2 id="priority">三、优化优先级</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>优先级</th><th>优化项</th><th>典型收益</th><th>难度</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1</strong></td><td>关掉不必要的 Tick</td><td><span class="mk mk--yes">大</span></td><td>低</td></tr>
+    <tr><td><strong>2</strong></td><td>UI 加 Invalidation Box</td><td>大</td><td>低</td></tr>
+    <tr><td><strong>3</strong></td><td>减少 Draw Call（合批）</td><td>大</td><td>中</td></tr>
+    <tr><td><strong>4</strong></td><td><strong>降低特效/阴影质量</strong></td><td>大</td><td>低</td></tr>
+    <tr><td><strong>5</strong></td><td>Nanite/Lumen 按需开关</td><td>大</td><td>中</td></tr>
+    <tr><td><strong>6</strong></td><td>对象池</td><td>中</td><td>中</td></tr>
+    <tr><td><strong>7</strong></td><td>LOD / 剔除</td><td>中</td><td>中</td></tr>
+    <tr><td><strong>8</strong></td><td>C++ 替换蓝图热路径</td><td><em>看场景</em></td><td>中</td></tr>
+    <tr><td><strong>9</strong></td><td>并行化（ParallelFor）</td><td><em>看场景</em></td><td><span class="mk mk--no">高</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">为什么把"关 Tick"排第一</span>
+  <strong>因为收益大、成本低、风险小。</strong><br><br><strong>UE 项目的 Tick 灾难</strong>：<br>· <em>每个 Actor 默认可能开 Tick</em><br>· <em>1000 个 Actor 每帧 Tick = 明显开销</em><br>· <em>很多 Tick 完全可以关掉</em>（<em>静态物体、不需要每帧更新的）</em><br><br><strong>怎么优化</strong>：<br>① <code>PrimaryActorTick.bCanEverTick = false;</code>（<em>不需要就关</em>）<br>② <em>降低 Tick 频率</em>：<code>PrimaryActorTick.TickInterval = 0.1f;</code><br>③ <strong>用定时器代替 Tick</strong>（<em>只在需要时执行</em>）<br>④ <em>用事件驱动代替轮询</em><br><br><strong>检查方法</strong>：<code>stat game</code> <em>看 Game 时间</em> → 如果高，<em>用 Insights 看是哪些 Actor 在 Tick</em>。<br><br><em>这一条呼应了算法站页 26 的"惰性计算"模式。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="23">
+  <div class="task"><input type="checkbox" id="t-23-1"><label for="t-23-1"><strong>用 stat unit</strong>：跑游戏看四个数字，判断瓶颈在哪。</label></div>
+  <div class="task"><input type="checkbox" id="t-23-2"><label for="t-23-2"><strong>跑一次 Insights</strong>：抓一段 trace，找出最耗时的函数。</label></div>
+  <div class="task"><input type="checkbox" id="t-23-3"><label for="t-23-3"><strong>对比 PIE 和打包版</strong>：同一个场景分别测，记录差异。<em>感受 PIE 数据的不可信。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-23-4"><label for="t-23-4"><strong>关掉不必要的 Tick</strong>：找出项目里所有 Tick，关掉不需要的，测帧率提升。</label></div>
+  <div class="task"><input type="checkbox" id="t-23-5"><label for="t-23-5"><strong>做 UI 优化</strong>：给复杂 UI 加 Invalidation Box，对比帧率。</label></div>
+  <div class="task"><input type="checkbox" id="t-23-6"><label for="t-23-6"><strong>写优化报告</strong>：记录一次完整的优化过程（问题、定位、改动、复测数字）。</label></div>
+  <div class="task"><input type="checkbox" id="t-23-7"><label for="t-23-7"><strong>回答面试题</strong>：① 为什么 PIE 数据不可信？② 怎么用 stat unit 判断瓶颈？③ 优化优先级顺序？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能复述五步排查流程</strong>；<br>
+    ② <strong>知道 PIE 数据不可信，要用打包版测试</strong>；<br>
+    ③ <strong>会用 stat unit 判断瓶颈类型</strong>；<br>
+    ④ 能说出至少八条 stat 命令；<br>
+    ⑤ 有一次"用 Insights 定位到具体函数"的经历。<br>
+    <br>
+    <em>第 ② 和 第 ③ 条最实用——**它们能立刻提升你的排查效率**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="22-patterns.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">22 架构与设计模式 ★★</div>
+  </a>
+  <a class="next" href="24-engineering.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">24 工程化与发布</div>
+  </a>
+</nav>

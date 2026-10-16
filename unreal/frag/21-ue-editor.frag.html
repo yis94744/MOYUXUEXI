@@ -1,0 +1,88 @@
+<h1>21 · 编辑器扩展与插件</h1>
+
+<p class="lead">Unreal 的编辑器<strong>本身就是用 UE 做的</strong>——这意味着<em>你可以扩展它的一切</em>。这一页讲<em>怎么做工具提升团队效率</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="tools">一、四种编辑器扩展</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>形式</th><th>用途</th><th>难度</th></tr></thead>
+  <tbody>
+    <tr><td><strong>细节面板自定义</strong></td><td><em>让属性显示更友好</em></td><td>低</td></tr>
+    <tr><td><strong>Editor Utility Widget</strong></td><td><strong>快速做工具界面</strong></td><td><span class="mk mk--yes">低</span></td></tr>
+    <tr><td><strong>自定义 Asset 类型</strong></td><td><em>新的资源类型</em></td><td>中</td></tr>
+    <tr><td><strong>编辑器模块</strong></td><td><strong>完整的工具窗口</strong></td><td><span class="mk mk--no">高</span></td></tr>
+    <tr><td><strong>Commandlet</strong></td><td><em>命令行批处理</em></td><td>中</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">最推荐的入门方式：Editor Utility Widget</span>
+  <strong>为什么推荐它</strong>：<br>· <em>用蓝图就能做</em>（<em>不需要写 C++</em>）<br>· <em>所见即所得</em>（<em>拖控件就行</em>）<br>· <strong>能做大部分日常工具</strong><br><br><strong>能做什么</strong>：<br>· <em>批量修改资源</em>（<em>统一设置导入参数</em>）<br>· <em>检查资源规范</em>（<em>命名、大小、LOD</em>）<br>· <em>生成关卡内容</em><br>· <em>数据校验</em><br><br><strong>创建方式</strong>：<em>右键 → Editor Utilities → Editor Utility Widget</em><br><br><strong>优势</strong>：<em>做工具的门槛降低了一个数量级</em>——<strong>美术和策划都能自己做工具了。</strong>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">什么值得做成工具</span>
+  <strong>判断标准</strong>：<em>同一件事如果要做超过 10 次，就该考虑做工具。</em><br><br><strong>高价值工具</strong>：<br>· <em>资源规范检查</em>——<em>贴图大小、命名、LOD 设置</em><br>· <em>批量重命名 / 移动</em><br>· <em>性能预算检查</em>——<em>面数、材质数、光源数</em><br>· <em>关卡质检</em>——<em>有没有穿模、有没有缺失引用</em><br><br><strong>为什么这些值得做</strong>：<br>· <em>问题在提交前就被拦住</em><br>· <strong>不依赖人的记忆</strong><br>· <em>新人也能遵守规范</em><br><br><strong>这呼应了 Unity 站页 19 的原则：同一个错误犯过两次，就该写工具防止第三次。</strong>
+</div>
+
+<h2 id="plugin">二、插件系统</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>文件</th><th>作用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>.uplugin</strong></td><td><em>插件描述文件</em></td></tr>
+    <tr><td><strong>Source/</strong></td><td>C++ 代码</td></tr>
+    <tr><td><strong>Content/</strong></td><td><em>资源</em></td></tr>
+    <tr><td><strong>.Build.cs</strong></td><td><strong>模块依赖（页 09）</strong></td></tr>
+    <tr><td><strong>Resources/</strong></td><td><em>图标等</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">什么时候该做成插件</span>
+  <strong>值得做成插件</strong>：<br>· <em>要在多个项目复用</em><br>· <em>功能相对独立</em><br>· <em>需要独立的编译单元</em>（<em>加快编译</em>）<br><br><strong>不值得</strong>：<br>· <em>只在一个项目用一次</em><br>· <em>和项目逻辑强耦合</em><br><br><strong>额外的价值</strong>：<em>插件能作为"技术演示"</em>——<br><strong>面试时展示一个自己写的插件，比展示游戏项目更有说服力</strong>（<em>因为它体现的是"工程能力"而不是"用引擎的能力"</em>）。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="21">
+  <div class="task"><input type="checkbox" id="t-21-1"><label for="t-21-1"><strong>做一个 Editor Utility Widget</strong>：实现一个批量重命名资源的工具。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-2"><label for="t-21-2"><strong>做资源检查</strong>：写一个工具检查所有贴图的大小和格式是否符合规范。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-3"><label for="t-21-3"><strong>自定义细节面板</strong>：用 <code>UPropertyMetaData</code> 让某个属性的显示更友好。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-4"><label for="t-21-4"><strong>做 Commandlet</strong>：写一个命令行工具，在 CI 里检查资源规范。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-5"><label for="t-21-5"><strong>打包成插件</strong>：把上面的工具做成插件，试试在另一个项目里用。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-6"><label for="t-21-6"><strong>回答面试题</strong>：① 哪种编辑器扩展最容易上手？② 什么值得做成工具？③ 插件什么时候该用？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出五种编辑器扩展形式；<br>
+    ② <strong>知道 Editor Utility Widget 是最容易上手的</strong>；<br>
+    ③ <strong>能用"同一件事做超过 10 次就该做工具"判断价值</strong>；<br>
+    ④ 能说出插件的五个组成部分；<br>
+    ⑤ 有一次"做工具解决实际问题"的经历。<br>
+    <br>
+    <em>第 ③ 条最实用——**它帮你判断该把时间花在哪**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="20-ue-ui.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">20 UI 与音频</div>
+  </a>
+  <a class="next" href="22-patterns.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">22 架构与设计模式 ★★</div>
+  </a>
+</nav>

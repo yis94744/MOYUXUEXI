@@ -1,0 +1,113 @@
+<h1>20 · 工程化与协作</h1>
+
+<p class="lead">这一页讲<strong>让团队高效协作的那些事</strong>：代码规范、工具链、CI、以及<em>怎么让策划也能参与 Lua 开发</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="convention">一、Lua 代码规范</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方面</th><th>规范</th><th>为什么</th></tr></thead>
+  <tbody>
+    <tr><td><strong>命名</strong></td><td><code>local</code> 用小驼峰，类名大驼峰</td><td>和 C# 保持一致</td></tr>
+    <tr><td><strong>模块</strong></td><td>一个文件一个模块，返回 table</td><td><em>便于热更</em></td></tr>
+    <tr><td><strong>局部变量</strong></td><td>默认 <code>local</code></td><td><strong>避免全局污染</strong></td></tr>
+    <tr><td><strong>缩进</strong></td><td>统一 2 或 4 空格</td><td>代码 diff 清晰</td></tr>
+    <tr><td><strong>注释</strong></td><td>公开接口必须有注释</td><td>方便他人调用</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">最容易犯的规范错误：忘记 local</span>
+  <strong>Lua 的一个设计特性</strong>：<em>不加 <code>local</code> 就是全局变量</em>。<br><br>
+  <strong>后果</strong>：<br>
+  · 全局命名空间被污染<br>
+  · <em>模块之间意外互相影响</em><br>
+  · 热更时全局变量状态残留（<em>→ 页 15、17 的老问题</em>）<br>
+  · <strong>在沙箱环境下会直接报错</strong>（因为全局表被限制了）<br><br>
+  <strong>防护手段</strong>：<br>
+  ① <strong>用静态检查工具</strong>（如 luacheck）<br>
+  ② <strong>在模块顶部加保护</strong>：<code>local _ENV = ...</code>（谨慎使用）<br>
+  ③ <strong>代码 review 时重点看这个</strong><br><br>
+  <em>建议：在 CI 里跑 luacheck，把"未声明的全局变量"作为错误。</em>
+</div>
+
+<h2 id="with-designers">二、与策划协作</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">让策划能改配置，但改不了逻辑</span>
+  <strong>目标</strong>：策划能自主调整数值和流程，<em>但不会写出能崩溃游戏的代码</em>。<br><br>
+  <strong>做法</strong>：<br>
+  ① <strong>配置用数据格式</strong>（JSON / Excel / CSV），不用 Lua<br>
+  ② <strong>需要写逻辑的部分，用受限的 DSL</strong>：<br>
+  &nbsp;&nbsp;· 只暴露安全的白名单 API<br>
+  &nbsp;&nbsp;· <em>不能访问文件系统、网络、反射</em><br>
+  &nbsp;&nbsp;· 用沙箱执行（<em>→ 页 07 的 <code>_ENV</code></em>）<br>
+  ③ <strong>提供编辑器工具</strong>（Excel 校验、可视化编辑）<br><br>
+  <strong>收益</strong>：<em>策划改数值不用找程序，程序不用被打断</em>。这是团队效率的巨大提升。
+</div>
+
+<h2 id="ci">三、CI 与自动化</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>环节</th><th>工具</th><th>作用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>语法检查</strong></td><td><code>luac -p</code></td><td>提前发现语法错误</td></tr>
+    <tr><td><strong>静态分析</strong></td><td>luacheck</td><td><em>未声明全局、未使用变量</em></td></tr>
+    <tr><td><strong>单元测试</strong></td><td>busted</td><td>核心逻辑回归</td></tr>
+    <tr><td><strong>打包</strong></td><td>脚本 + 版本号</td><td>自动生成清单</td></tr>
+    <tr><td><strong>热更发布</strong></td><td>脚本 + 校验</td><td><strong>防止漏文件</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">最值得做的三个自动化</span>
+  <strong>按投入产出比排序</strong>：<br>
+  ① <strong>语法检查</strong>——<code>luac -p</code> 一行命令，<em>能拦住 60% 的低级错误</em><br>
+  ② <strong>静态检查</strong>——luacheck 找出全局变量泄漏，<em>能拦住 20%</em><br>
+  ③ <strong>热更清单自动生成</strong>——<em>防止"漏推文件"这类事故</em><br><br>
+  <strong>这三个加起来可能只要半天工作量</strong>，但能避免大量线上问题。<br>
+  <em>这回到 C# 站页 19 的原则：同一个错误犯过两次，就该写工具防止第三次。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="20">
+  <div class="task"><input type="checkbox" id="t-20-1"><label for="t-20-1"><strong>跑一次 luac -p</strong>：用 <code>luac -p 文件名</code> 检查语法，<em>故意写个语法错误看它能否发现</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-2"><label for="t-20-2"><strong>装 luacheck</strong>：对项目跑一遍，统计有多少"未声明全局变量"。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-3"><label for="t-20-3"><strong>写一个打包脚本</strong>：把所有 Lua 文件打包 + 生成清单 + 计算校验值。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-4"><label for="t-20-4"><strong>做一个沙箱</strong>：用 <code>_ENV</code> 限制脚本能访问的 API，验证 <code>os.execute</code> 不可用。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-5"><label for="t-20-5"><strong>建立 code review 清单</strong>：列出 Lua 代码必须检查的项（local、错误处理、订阅取消）。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-6"><label for="t-20-6"><strong>回答面试题</strong>：① Lua 最容易犯的规范错误？② 怎么让策划安全地改逻辑？③ 最值得做哪三个自动化？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出 Lua 代码规范的五个方面；<br>
+    ② <strong>知道"忘记 local"的危害及防护手段</strong>；<br>
+    ③ <strong>能用沙箱让策划安全地写逻辑</strong>；<br>
+    ④ 能说出 CI 的五个环节；<br>
+    ⑤ 知道最值得做的三个自动化及其投入产出比。<br>
+    <br>
+    <em>第 ② 和 第 ③ 条最实用——前者能避免一类难以排查的 bug，后者能大幅提升团队效率。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="19-perf-practice.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">19 性能实战 ★★</div>
+  </a>
+  <a class="next" href="21-security.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">21 安全与加密</div>
+  </a>
+</nav>

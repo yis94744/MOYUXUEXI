@@ -1,0 +1,199 @@
+<h1>17 · 行为树 Behavior Tree ★★★</h1>
+
+<p class="lead">行为树是<strong>目前游戏 AI 的事实标准</strong>。它比状态机好扩展、比 GOAP 好调试、策划能看懂。几乎所有商业游戏里的敌人 AI、NPC 行为、Boss 战斗，底层都是行为树。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（16）状态机是 AI 的基础。行为树是<em>状态机的进化版</em>——解决了状态机"状态多了连线爆炸"的问题。<br>
+  <strong>关键衔接</strong>：行为树用到<em>树结构（06）</em>的遍历思想、<em>黑板</em>类似弱引用表的概念。<br>
+  <strong>这一页和下一页的关系</strong>：18 讲决策树（一次性决策），19 讲 GOAP（规划型 AI）。<em>三者是互补的，不是替代关系</em>。<br>
+  <strong>验证方式</strong>：本页实现了一个<strong>完整可运行的行为树</strong>，包含组合节点、装饰器、黑板，并<em>真实模拟了一段 Boss 战斗</em>。
+</div>
+
+<h2 id="status">一、四种节点状态（基础中的基础）</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">为什么有 RUNNING</span>
+  <code>SUCCESS</code>（成功）和 <code>FAILURE</code>（失败）好理解，但 <code>RUNNING</code> 是行为树的<strong>精髓所在</strong>。<br><br>
+  它表示"<em>我这个节点还没做完，下一帧继续</em>"。<br>
+  这让 AI 能"记住"自己做到哪一步——比如<em>"走到目标点"这个动作需要 20 帧，用 RUNNING 就能跨帧保持状态</em>。<br><br>
+  <strong>没有 RUNNING 会怎样</strong>：每帧都要从头判断"我现在该做什么"，无法表达"我正在做但还没做完"。
+</div>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>17/behavior-tree</code></div>
+
+<h2 id="composite">二、组合节点：序列与选择</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>节点</th><th>逻辑</th><th>类比</th><th>短路规则</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Sequence 序列</strong></td><td>依次执行，全部成功才成功</td><td><code>AND</code> / 任务清单</td><td>任一失败<strong>立即返回失败</strong></td></tr>
+    <tr><td><strong>Selector 选择</strong></td><td>依次尝试，任一成功就成功</td><td><code>OR</code> / 备选方案</td><td>任一成功<strong>立即返回成功</strong></td></tr>
+    <tr><td><strong>Parallel 并行</strong></td><td>同时执行所有子节点</td><td>多线程</td><td>按策略配置决定</td></tr>
+    <tr><td><strong>Random 随机</strong></td><td>随机选一个执行</td><td>抽签</td><td>—</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">短路（Short-circuit）是性能关键</span>
+  <strong>Sequence 遇到 FAILURE 立即返回</strong>，不再执行后面的子节点。<br>
+  <strong>Selector 遇到 SUCCESS 立即返回</strong>，不再尝试后面的备选。<br><br>
+  <strong>这个特性直接影响性能</strong>：把<em>最容易失败的条件判断放在 Sequence 前面</em>，把<em>最高优先级的行为放在 Selector 前面</em>——<br>
+  这样每帧实际执行的节点数会大幅减少。<br><br>
+  <em>这是行为树性能优化的第一手段，比任何代码优化都有效。</em>
+</div>
+
+<h2 id="decorator">三、装饰器：修改子节点行为</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>装饰器</th><th>作用</th><th>实战用途</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Inverter 反转</strong></td><td>SUCCESS ↔ FAILURE</td><td>"不在范围内"这类反向条件</td></tr>
+    <tr><td><strong>Repeater 重复</strong></td><td>执行 N 次或无限</td><td>巡逻循环、持续攻击</td></tr>
+    <tr><td><strong>Cooldown 冷却</strong></td><td>一段时间内不执行</td><td><strong>技能释放节奏</strong>、Boss 大招</td></tr>
+    <tr><td><strong>Succeeder</strong></td><td>无论子节点结果都返回成功</td><td>"尝试一下，失败也无所谓"</td></tr>
+    <tr><td><strong>UntilFail 直到失败</strong></td><td>重复直到子节点失败</td><td>持续执行到条件不满足</td></tr>
+    <tr><td><strong>TimeLimit 限时</strong></td><td>超过时间就返回失败</td><td>技能前摇超时、卡住检测</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">冷却装饰器是最实用的一个</span>
+  <strong>没有它</strong>：Boss 每帧都会尝试放大招，需要自己写"技能是否就绪"的判断，而且要处理状态重置。<br>
+  <strong>有了它</strong>：包一层 <code>Cooldown(3.0)</code>，Boss 每 3 秒才能放一次。<em>逻辑清晰，不用改其他地方。</em><br><br>
+  <strong>注意</strong>：冷却装饰器需要访问"当前时间"。这通常通过<strong>黑板</strong>传递，而不是直接读全局时间——<em>这样便于做时间缩放、暂停、回放</em>。
+</div>
+
+<h2 id="blackboard">四、黑板（Blackboard）：AI 的共享内存</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">为什么需要黑板</span>
+  行为树的节点是<em>独立的对象</em>，它们需要共享数据：<br>
+  • "玩家在哪" —— 感知节点写入，追击节点读取<br>
+  • "当前血量" —— 状态同步写入，逃跑判断读取<br>
+  • "上次攻击时间" —— 冷却装饰器读写<br><br>
+  <strong>如果没有黑板</strong>：要么层层传参（每层都要转发），要么每个节点各自持有引用（耦合严重）。<br>
+  <strong>有了黑板</strong>：所有节点通过 <code>get</code>/<code>set</code> 访问同一份数据，<em>节点之间完全解耦</em>。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">黑板的设计要点</span>
+  <strong>① 类型安全</strong>：C# 实现时用泛型 <code>Get&lt;T&gt;(key)</code>，避免装箱（参见 C# 站的页 03）。<br>
+  <strong>② 键用哈希而非字符串</strong>：和 Animator 参数一样，<em>字符串键每次查找都要算哈希</em>。<br>
+  <strong>③ 支持默认值</strong>：<code>get(key, default)</code> 避免到处判空。<br>
+  <strong>④ 考虑"黑板作用域"</strong>：单个 AI 一份黑板（私有），还是全队共享一份（便于协同）？<em>实战中两者都有。</em><br>
+  <strong>⑤ 变化通知</strong>：某些数据变化时需要唤醒 AI（比如"发现玩家"），可以给黑板加事件机制。
+</div>
+
+<h2 id="perf">五、性能优化：六个关键手段</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">行为树的性能问题通常不在算法，而在使用方式</span>
+  行为树本身的 tick 逻辑很简单（<em>一次树遍历</em>），真正的性能问题来自：<br><br>
+  <strong>① 每帧重建树</strong> ✗<br>
+  在 <code>Update</code> 里 <code>new</code> 节点对象 → <strong>GC 灾难</strong>。<br>
+  <em>正确做法：初始化时构建一次，运行时只 tick。</em><br><br>
+  <strong>② 所有 AI 每帧都 tick</strong> ✗<br>
+  100 个 NPC 每个每帧 tick 一次，即使它们在做同样的事。<br>
+  <em>正确做法：分级更新（见下）。</em><br><br>
+  <strong>③ 节点里做重活</strong> ✗<br>
+  在条件节点里做射线检测、路径计算。<br>
+  <em>正确做法：结果缓存到黑板，多个节点复用。</em><br><br>
+  <strong>④ 树太深</strong> ✗<br>
+  深度 10 的树，最坏情况每帧要走 10 层。<br>
+  <em>正确做法：扁平化设计，用条件前置减少遍历。</em><br><br>
+  <strong>⑤ 条件节点顺序不对</strong> ✗<br>
+  把"距离判断"放在"是否死亡"前面，<em>导致每帧都算距离</em>。<br>
+  <em>正确做法：最廉价、最容易失败的判断放最前。</em><br><br>
+  <strong>⑥ 没有 RUNNING 复用</strong> ✗<br>
+  长动作每帧重头开始，而不是用 RUNNING 保持进度。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">分级更新（LOD）是收益最大的优化</span>
+  <strong>做法</strong>：按 AI 与玩家的距离，用不同的 tick 频率。<br>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>距离</th><th>更新频率</th><th>效果</th></tr></thead>
+    <tbody>
+      <tr><td>屏幕内 / 近处</td><td>每帧</td><td>表现完全正常</td></tr>
+      <tr><td>中距离</td><td>每 3~5 帧</td><td>玩家察觉不到</td></tr>
+      <tr><td>远处</td><td>每 10~20 帧</td><td>只见大致行为</td></tr>
+      <tr><td>不可见</td><td>每秒 1 次 / 停止</td><td><strong>省下绝大部分开销</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <strong>注意</strong>：降频会带来"行为不精确"——<em>比如远处的敌人可能晚 0.5 秒才反应</em>。<br>
+  所以<strong>战斗中的敌人不应该降频</strong>，只对"背景 NPC"用这个策略。
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">性能经验值</span>
+  单个 NPC 的行为树 tick，每帧开销通常在 <strong>1~10 微秒</strong>。<br>
+  100 个 NPC 每帧约 <strong>0.1~1 毫秒</strong>。<br><br>
+  <em>超过这个量级就说明有问题——通常是条件节点里做了重活，或者树的深度过大。</em><br>
+  用 Unity Profiler 的 <code>Deep Profile</code> 可以看到具体是哪个节点最耗时。
+</div>
+
+<h2 id="vs">六、行为树 vs 状态机 vs GOAP</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方案</th><th>优点</th><th>缺点</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>状态机</strong></td><td>简单、快、直观</td><td>状态多了连线爆炸</td><td>角色状态、UI、简单敌人</td></tr>
+    <tr><td><strong>行为树</strong></td><td>可读、可复用、模块化</td><td>复杂决策要写很深的树</td><td><strong>大多数游戏 AI（主流）</strong></td></tr>
+    <tr><td><strong>决策树</strong></td><td>易理解、可配置化</td><td>只做单次决策，无时序</td><td>选择行为、技能选择</td></tr>
+    <tr><td><strong>效用系统</strong></td><td>平滑、可量化、涌现性好</td><td>参数难调、难调试</td><td>策略游戏、资源分配</td></tr>
+    <tr><td><strong>GOAP</strong></td><td>灵活、能生成未预设的行为</td><td>难调试、性能不可控</td><td>模拟类、沉浸式 AI</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">实战中它们是组合使用的</span>
+  <strong>常见的组合方式</strong>：<br>
+  • <strong>行为树 + 决策树</strong>：行为树的某个节点做决策树判断，决定执行哪个分支<br>
+  • <strong>行为树 + 效用</strong>：用效用评分决定 Selector 的子节点优先级<br>
+  • <strong>状态机 + 行为树</strong>：大状态（<em>巡逻/战斗/逃跑</em>）用状态机，每个状态内部用行为树<br><br>
+  <em>不要试图用一个方案解决所有问题。</em>
+</div>
+
+<h2 id="tasks">七、本章动手任务</h2>
+
+<div class="tasks" data-page="17">
+  <div class="task"><input type="checkbox" id="t-17-1"><label for="t-17-1"><strong>手写一遍核心节点</strong>：不看示例，实现 Node、Sequence、Selector 三种节点，并验证短路行为。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-2"><label for="t-17-2"><strong>实现 RUNNING 语义</strong>：写一个"移动到目标点"的动作节点，需要多帧才完成，用 RUNNING 保持进度。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-3"><label for="t-17-3"><strong>实现三个装饰器</strong>：Inverter、Cooldown、Repeater，并测试它们的行为。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-4"><label for="t-17-4"><strong>组装一个完整的敌人 AI</strong>：包含巡逻、追击、攻击、逃跑四个行为，用黑板共享数据，<em>模拟 10 帧观察决策是否正确</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-5"><label for="t-17-5"><strong>做运行时可视化</strong>：实现一个打印函数，把当前 tick 的路径用缩进树形打印出来。<em>这是调试 AI 最有效的工具。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-17-6"><label for="t-17-6"><strong>测性能并优化</strong>：构造一棵深度 6 的树，测 100 个实例每帧的耗时；然后调整条件节点顺序，观察耗时下降。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-7"><label for="t-17-7"><strong>回答面试题</strong>：① 行为树的 RUNNING 状态有什么用？② 序列和选择节点的短路规则？③ 行为树怎么做性能优化？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能不看资料写出 Sequence、Selector、Inverter、Cooldown 四种节点</strong>；<br>
+    ② 能解释 RUNNING 状态的作用，以及它对跨帧动作的意义；<br>
+    ③ 能画出你项目中一个 AI 的完整行为树结构；<br>
+    ④ 知道黑板的作用与设计要点；<br>
+    ⑤ <strong>能说出至少四种行为树的性能优化手段</strong>，并知道为什么"条件前置"最有效。<br><br>
+    <em>第 ① 条是硬要求——行为树是面试中让你"现场设计"的高频题。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="16-state-machine.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">16 状态机 FSM ★★</div>
+  </a>
+  <a class="next" href="18-decision-tree.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">18 决策树与效用 AI ★</div>
+  </a>
+</nav>

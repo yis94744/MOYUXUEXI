@@ -1,0 +1,141 @@
+<h1>17 · 热更与版本管理 ★★★</h1>
+
+<p class="lead">这是 Lua 站<strong>最实用的一页</strong>。前面讲了原理与框架，这一页讲<em>怎么把热更真正跑起来</em>——包括那些<strong>上线后才会遇到的真实问题</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="version">一、版本管理的数据结构</h2>
+
+<p>版本管理<strong>看起来简单，但设计不好会埋下大坑</strong>。</p>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>17/hotpatch</code></div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>概念</th><th>含义</th><th>示例</th></tr></thead>
+  <tbody>
+    <tr><td><strong>App 版本</strong></td><td>安装包的版本</td><td>1.2.0（改这个要重新发版）</td></tr>
+    <tr><td><strong>资源版本</strong></td><td>资源的版本号</td><td>20240115（可热更）</td></tr>
+    <tr><td><strong>脚本版本</strong></td><td>Lua 脚本的版本</td><td>可能包含多个脚本的哈希</td></tr>
+    <tr><td><strong>清单文件</strong></td><td>记录所有文件的版本</td><td><strong>热更的核心</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="real-problems">二、四个上线后才会遇到的问题 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">问题一：热更后玩家卡在加载界面</span>
+  <strong>原因</strong>：下载了一半的脚本，校验失败，但客户端已经<em>用新脚本启动了</em>。<br>
+  <strong>典型场景</strong>：玩家弱网下载到 80% 退出，下次启动读到不完整的文件。<br><br>
+  <strong>解决方案</strong>：<br>
+  ① <strong>下载到临时目录，全部完成后再切换</strong>（原子操作）<br>
+  ② <strong>每个文件都要 MD5 校验</strong><br>
+  ③ <strong>保留完整的旧版本</strong>，新版本有问题就切回去<br><br>
+  <em>这三个措施缺一个都可能出事故。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">问题二：部分玩家没更新，联机出问题</span>
+  <strong>原因</strong>：热更不是强制的，有的玩家更新了，有的没有。<br>
+  <strong>后果</strong>：两人联机时<em>协议不一致</em> → 数据错乱或崩溃。<br><br>
+  <strong>解决方案</strong>：<br>
+  ① <strong>登录时强制校验版本</strong>——版本不一致就要求更新<br>
+  ② <strong>协议版本独立</strong>——协议变了必须是强更<br>
+  ③ <strong>服务器同时支持新旧协议</strong>（过渡期）<br><br>
+  <em>这一条在页 24（API 速查）会再次出现——它属于"上线检查清单"的必备项。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">问题三：热更把游戏更坏了，怎么回滚</span>
+  <strong>这是最要命的场景</strong>——推了一个有 bug 的脚本，<em>所有玩家立刻受影响</em>。<br><br>
+  <strong>必须有回滚能力</strong>：<br>
+  ① <strong>保留上一版本的完整脚本</strong>（不要覆盖）<br>
+  ② <strong>服务器切换"当前版本号"即可回滚</strong>（秒级）<br>
+  ③ <strong>客户端下次启动自动拉回旧版本</strong><br><br>
+  <strong>更保险的做法</strong>：<br>
+  · <strong>灰度发布</strong>——先推 1% 玩家，观察 30 分钟<br>
+  · <strong>错误率监控</strong>——异常自动触发回滚<br>
+  · <strong>一键停更</strong>——紧急情况下暂停所有热更<br><br>
+  <em>我在 C# 站页 16 说过一句话：没有回滚方案的热更，等于把线上项目放在没有刹车的车上。这里再重复一次——因为它值得重复。</em>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">问题四：状态残留导致疑难 bug</span>
+  <strong>场景</strong>：热更后重载了某模块，但<em>它持有的旧状态还在</em>。<br>
+  <strong>表现</strong>：<br>
+  · 玩家数据错乱（用了旧缓存）<br>
+  · 界面显示旧数据<br>
+  · <em>诡异且难以复现</em><br><br>
+  <strong>解决方案</strong>（回顾页 15）：<br>
+  ① <strong>模块提供 <code>reset()</code></strong>，热更后统一调用<br>
+  ② <strong>热更时做状态迁移</strong>——保存旧状态，注入新模块<br>
+  ③ <strong>把状态与逻辑分离</strong>——模块只管逻辑，数据放在专门的 Data 层<br><br>
+  <em>方案 ③ 是最彻底的——它让模块变成"无状态的"，热更时不需要担心状态问题。这是成熟框架的普遍做法。</em>
+</div>
+
+<h2 id="checklist">三、上线检查清单</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>检查项</th><th>为什么</th><th>不做的后果</th></tr></thead>
+  <tbody>
+    <tr><td><strong>文件校验</strong></td><td>防止下载损坏</td><td>热更后无法启动</td></tr>
+    <tr><td><strong>原子切换</strong></td><td>防止半包可用</td><td>卡加载界面</td></tr>
+    <tr><td><strong>版本强制校验</strong></td><td>防止协议不一致</td><td>联机数据错乱</td></tr>
+    <tr><td><strong>完整回滚</strong></td><td>出问题能恢复</td><td><strong>线上事故无法止损</strong></td></tr>
+    <tr><td><strong>灰度发布</strong></td><td>小范围验证</td><td>全量玩家受影响</td></tr>
+    <tr><td><strong>错误上报</strong></td><td>及时发现问题</td><td>靠玩家反馈</td></tr>
+    <tr><td><strong>停更开关</strong></td><td>紧急暂停</td><td>持续推送错误版本</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">把这些变成工具</span>
+  <strong>不要指望"每次都记得检查"</strong>——人会忘。<br>
+  <strong>做法</strong>：把这些检查写成<strong>自动化脚本</strong>：<br>
+  · 打包后自动校验所有文件<br>
+  · 上传前自动生成清单<br>
+  · 发布后自动监控错误率<br><br>
+  <em>这回到 C# 站页 19 讲的原则：同一个错误犯过两次，就该写工具防止第三次。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="17">
+  <div class="task"><input type="checkbox" id="t-17-1"><label for="t-17-1"><strong>设计清单格式</strong>：用 JSON 描述所有文件（路径 + MD5 + 大小 + 版本），写一个解析与比对函数。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-2"><label for="t-17-2"><strong>实现差异计算</strong>：给定"本地清单"与"服务器清单"，输出需要下载/删除的文件列表。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-3"><label for="t-17-3"><strong>实现原子切换</strong>：下载到临时目录，校验通过后一次性切换（用目录重命名）。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-4"><label for="t-17-4"><strong>实现版本回滚</strong>：保留两个版本目录，实现"切回上一版本"的能力。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-5"><label for="t-17-5"><strong>做灰度开关</strong>：实现"只对 N% 玩家生效"的版本控制。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-6"><label for="t-17-6"><strong>写上线清单</strong>：列出你项目的热更上线检查项，做成可打印的表格。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-7"><label for="t-17-7"><strong>回答面试题</strong>：① 怎么防止"下载一半就用了新脚本"？② 联机时版本不一致怎么处理？③ 热更出问题怎么回滚？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能设计清单文件格式并实现差异比对</strong>；<br>
+    ② <strong>知道"原子切换"的必要性与实现方式</strong>；<br>
+    ③ <strong>能说出热更上线后会遇到的四个真实问题</strong>；<br>
+    ④ 知道版本强制校验的作用；<br>
+    ⑤ <strong>能列出完整的上线检查清单</strong>。<br>
+    <br>
+    <em>第 ③ 条是这一页的核心——这些不是理论问题，而是每个做过热更的项目都遇到过的事故。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="16-framework-ui.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">16 UI 框架 ★★★</div>
+  </a>
+  <a class="next" href="18-debug.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">18 调试与排错 ★★</div>
+  </a>
+</nav>

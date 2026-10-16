@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>17 渲染与画面 — C++ + Unreal 路线｜从零基础到 3A 级项目开发</title>
+<meta name="description" content="Nanite、Lumen、材质系统、后处理、光照与阴影、性能开销与开关取舍">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C++ + Unreal 路线
+        <span>从零基础到 3A 级项目开发</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>17 · 渲染与画面 ★★</h1>
+
+<p class="lead">Unreal 的<strong>画面是它最大的卖点</strong>，也是<em>最容易"设置错了就卡"的地方</em>。这一页讲<em>UE5 的核心渲染技术与取舍</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="../unity/10-graphics.html#pipeline" data-brief="应用/几何/像素/后处理四阶段，性能瓶颈各在哪里"><span class="prereq__title">渲染管线</span><span class="prereq__page">10-graphics</span></a>
+          <a class="prereq__item" href="17-ue-render.html#ue5" data-brief="Nanite 的三个限制、Lumen 的性能代价"><span class="prereq__title">Nanite 与 Lumen</span><span class="prereq__page">17-ue-render</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="ue5">一、UE5 的两大核心技术</h2>
+
+<p>UE5 最受关注的两个特性，<strong>也是性能争议最大的两个</strong>。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>技术</th><th>解决什么</th><th>代价</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Nanite</strong></td><td><em>极高面数模型</em></td><td><strong>内存、不支持部分特性</strong></td></tr>
+    <tr><td><strong>Lumen</strong></td><td><strong>实时全局光照</strong></td><td><span class="mk mk--no">性能开销大</span></td></tr>
+    <tr><td><strong>Virtual Shadow Maps</strong></td><td><em>高精度阴影</em></td><td>内存与性能</td></tr>
+    <tr><td><strong>Temporal Super Resolution</strong></td><td><em>低分辨率渲染高分辨率输出</em></td><td><em>有残影</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">Nanite 的三个限制 ★★</span>
+  <strong>① 不支持半透明</strong><br><em>树叶、玻璃这类材质仍然要用传统方式</em>。<br><br><strong>② 不支持骨骼动画的顶点变形</strong><br><em>角色通常是传统模型</em>（<em>除非用 Nanite 的骨骼支持，但有限制</em>）。<br><br><strong>③ 内存占用大</strong><br><em>Nanite 数据本身占内存</em>——<strong>移动端尤其明显</strong>。<br><br><strong>什么时候值得用</strong>：<br>· <em>PC/主机的高精度场景</em>（岩石、建筑、道具）<br>· <em>不再需要 LOD 的静态物体</em><br><br><strong>什么时候不该用</strong>：<em>移动端、小物体、需要半透明的物体。</em>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">Lumen 的性能真相</span>
+  <strong>Lumen 能实时算全局光照</strong>——这在几年前是不可能的。<br><br><strong>但代价很大</strong>：<br>· <em>GPU 开销显著增加</em><br>· <em>需要 TSR（超分辨率）配合才能跑</em><br>· <strong>移动端基本不可用</strong><br><br><strong>替代方案</strong>：<br>· <strong>烘焙光照（Lightmap）</strong>——<em>静态场景，性能最好</em><br>· <strong>SSGI</strong>——<em>屏幕空间，比 Lumen 便宜但质量差</em><br>· <strong>反射捕获</strong>——<em>手动放置，可控</em><br><br><strong>实战建议</strong>：<br>· <em>PC/主机大作 → Lumen</em><br>· <em>移动端 / 性能敏感 → 烘焙</em><br>· <strong>混合使用</strong>——<em>关键区域用 Lumen，其他用烘焙</em>
+</div>
+
+<h2 id="material">二、材质系统的关键概念</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>概念</th><th>作用</th><th>性能</th></tr></thead>
+  <tbody>
+    <tr><td><strong>材质（Material）</strong></td><td><em>定义外观</em></td><td><strong>越复杂越慢</strong></td></tr>
+    <tr><td><strong>材质实例（MaterialInstance）</strong></td><td><strong>改参数不改 Shader</strong></td><td><span class="mk mk--yes">便宜</span></td></tr>
+    <tr><td><strong>材质函数</strong></td><td>复用逻辑</td><td><em>会被内联</em></td></tr>
+    <tr><td><strong>Shading Model</strong></td><td><em>光照模型</em></td><td>影响开销</td></tr>
+    <tr><td><strong>Master Material</strong></td><td><strong>基础材质模板</strong></td><td><em>推荐做法</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">最重要的实践：用材质实例</span>
+  <strong>问题</strong>：<em>如果每个物体都用独立的 Material，会有大量 Shader 变体</em>——<strong>编译慢、内存大</strong>。<br><br><strong>正确做法</strong>：<br>① 做一个 <strong>Master Material</strong>（<em>定义参数</em>）<br>② 创建 <strong>Material Instance</strong>（<em>只改参数</em>）<br>③ 所有物体用实例<br><br><strong>好处</strong>：<br>· <em>只编译一次 Shader</em><br>· <strong>改参数立刻生效</strong>（<em>不用重新编译</em>）<br>· <em>美术能自己调</em><br><br><strong>这是页 14 原则在材质上的应用——"易变的配置"和"不变的结构"分离。</strong>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="17">
+  <div class="task"><input type="checkbox" id="t-17-1"><label for="t-17-1"><strong>测 Nanite</strong>：用同一个高面数模型，开/关 Nanite 对比帧率。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-2"><label for="t-17-2"><strong>测 Lumen</strong>：切换 Lumen 和烘焙光照，对比画质与性能。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-3"><label for="t-17-3"><strong>做 Master Material</strong>：建一个带参数的母材质，创建几个实例。<em>观察 Shader 编译次数。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-17-4"><label for="t-17-4"><strong>用 stat 命令</strong>：跑 <code>stat RHI</code>、<code>stat GPU</code> 看渲染开销。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-5"><label for="t-17-5"><strong>做 LOD</strong>：给一个模型设置 LOD，观察远处物体的面数下降。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-6"><label for="t-17-6"><strong>回答面试题</strong>：① Nanite 的三个限制？② Lumen 的代价？③ 为什么要用材质实例？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出 UE5 的四个核心渲染技术</strong>；<br>
+    ② <strong>知道 Nanite 的三个限制</strong>；<br>
+    ③ <strong>知道 Lumen 的性能代价及替代方案</strong>；<br>
+    ④ 能说出材质系统的五个概念；<br>
+    ⑤ <strong>知道要用 Master Material + 实例的实践</strong>。<br>
+    <br>
+    <em>第 ② 和 第 ⑤ 条最实用——**前者帮你避免踩坑，后者是必须遵守的实践**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="16-ue-anim.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">16 动画系统</div>
+  </a>
+  <a class="next" href="18-ue-niagara.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">18 Niagara 与物理</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

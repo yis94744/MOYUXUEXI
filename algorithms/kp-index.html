@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>知识点索引 — 游戏算法与系统设计｜从数据结构到完整系统，覆盖游戏开发全部核心算法</title>
+<meta name="description" content="全站知识点总目录">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">游戏算法与系统设计
+        <span>从数据结构到完整系统，覆盖游戏开发全部核心算法</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+      <h1>知识点索引</h1>
+      <p class="lead">这一页是<strong>全部四个站点的知识点总目录</strong>。在任何页面遇到不熟的概念，都可以回到这里查找。</p>
+      <div class="callout callout--tip">
+        <span class="callout__title">跨站跳转说明</span>
+        这一份索引汇总了 <strong>C# + Unity</strong>、<strong>C++ + Unreal</strong>、<strong>Lua 热更</strong>、<strong>游戏算法</strong> 四个站点的知识点。
+        点击<em>其他站点</em>的条目时会跳转到那个站点——<strong>这是有意设计的，方便你交叉查阅</strong>。
+      </div>
+      <h2 id="kg1">C# 语言</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../unity/03-cs-basic.html#value-ref">
+          <div class="kp-index__title">值类型与引用类型</div>
+          <div class="kp-index__brief">赋值时拷贝内容还是拷贝地址，这决定了对象会不会被共享</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/03-cs-basic.html#cs1612">
+          <div class="kp-index__title">CS1612 属性返回值</div>
+          <div class="kp-index__brief">返回 struct 的属性不能直接改成员，必须取出改再写回</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/03-cs-basic.html#boxing">
+          <div class="kp-index__title">装箱与拆箱</div>
+          <div class="kp-index__brief">值类型转 object 会在堆上分配，是 GC 压力的头号来源</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/03-cs-basic.html#choose">
+          <div class="kp-index__title">struct 与 class 选型</div>
+          <div class="kp-index__brief">小、不可变、数量大用 struct；需要继承或引用语义用 class</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/03-cs-basic.html#string">
+          <div class="kp-index__title">字符串与不可变性</div>
+          <div class="kp-index__brief">string 不可变，每次拼接都新建对象，循环拼接是 GC 灾难</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/03-cs-basic.html#collections">
+          <div class="kp-index__title">集合选型</div>
+          <div class="kp-index__brief">数组/List/Dictionary/HashSet 的复杂度与适用场景</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/04-cs-oop.html#three">
+          <div class="kp-index__title">封装与属性</div>
+          <div class="kp-index__brief">把变化隔离在一处：用属性集中校验、去重、发通知</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/04-cs-oop.html#inherit">
+          <div class="kp-index__title">继承与多态</div>
+          <div class="kp-index__brief">virtual/override/new 的区别，new 只做静态隐藏不走多态</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/04-cs-oop.html#interface">
+          <div class="kp-index__title">接口与抽象类</div>
+          <div class="kp-index__brief">接口是能力契约，抽象类是公共基类；Unity 不能序列化接口字段</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/04-cs-oop.html#compose">
+          <div class="kp-index__title">组合优于继承</div>
+          <div class="kp-index__brief">Unity 的核心哲学：用组件组合能力，避免继承链组合爆炸</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/04-cs-oop.html#extends">
+          <div class="kp-index__title">扩展方法</div>
+          <div class="kp-index__brief">给无法修改的类型加方法，但不能访问私有成员、不参与多态</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/05-cs-adv.html#delegate">
+          <div class="kp-index__title">委托与事件</div>
+          <div class="kp-index__brief">event 是委托的安全封装，订阅必须成对取消否则内存泄漏</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/05-cs-adv.html#closure">
+          <div class="kp-index__title">闭包与捕获</div>
+          <div class="kp-index__brief">Lambda 捕获外部变量会生成堆对象，每帧执行就是每帧分配</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/05-cs-adv.html#linq">
+          <div class="kp-index__title">LINQ 与延迟执行</div>
+          <div class="kp-index__brief">查询不立即执行，遍历时才跑；每次查询都分配对象</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/06-cs-modern.html#generic">
+          <div class="kp-index__title">泛型与约束</div>
+          <div class="kp-index__brief">写一次适配所有类型且不装箱；where 约束既是限制也是文档</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/06-cs-modern.html#reflection">
+          <div class="kp-index__title">反射</div>
+          <div class="kp-index__brief">运行时检查类型；慢 100~1000 倍，IL2CPP 下泛型反射有限制</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/06-cs-modern.html#attribute">
+          <div class="kp-index__title">特性 Attribute</div>
+          <div class="kp-index__brief">给代码贴元数据标签，由框架或反射读取</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/06-cs-modern.html#exception">
+          <div class="kp-index__title">异常处理</div>
+          <div class="kp-index__brief">用 TryXxx 表达预期内失败，不要用异常做流程控制</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/06-cs-modern.html#modern">
+          <div class="kp-index__title">现代 C# 特性</div>
+          <div class="kp-index__brief">C# 6 到 9 语法与 Unity 支持矩阵，DIM 不可用、C# 10+ 不支持</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/07-cs-memory.html#model">
+          <div class="kp-index__title">Unity 内存模型</div>
+          <div class="kp-index__brief">托管堆 / Native / 栈 / 非托管，GC 只管托管堆</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/07-cs-memory.html#boehm">
+          <div class="kp-index__title">Boehm GC</div>
+          <div class="kp-index__brief">非分代、非压缩、全停顿；增量 GC 拆分停顿但不减少垃圾总量</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/07-cs-memory.html#sources">
+          <div class="kp-index__title">GC 分配十大来源</div>
+          <div class="kp-index__brief">字符串/装箱/数组/LINQ/闭包/协程等待对象等高频分配点</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/07-cs-memory.html#detect">
+          <div class="kp-index__title">Profiler 定位分配</div>
+          <div class="kp-index__brief">打开 GC Alloc 列、排序、看调用栈、验证修复效果</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/07-cs-memory.html#layout">
+          <div class="kp-index__title">缓存友好与 SoA</div>
+          <div class="kp-index__brief">struct 数组内存连续，利用缓存行，比 class 数组快 2 到 5 倍</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/08-cs-async.html#coroutine">
+          <div class="kp-index__title">协程</div>
+          <div class="kp-index__brief">主线程上分帧执行，全部 yield 指令的恢复时机</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/08-cs-async.html#trap">
+          <div class="kp-index__title">协程四大陷阱</div>
+          <div class="kp-index__brief">SetActive 停止协程不恢复、不能 try-catch yield、等待对象分配</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/08-cs-async.html#async">
+          <div class="kp-index__title">async/await 与线程</div>
+          <div class="kp-index__brief">await 后是否在主线程取决于等待对象，线程池上不能调 Unity API</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/08-cs-async.html#unitask">
+          <div class="kp-index__title">UniTask</div>
+          <div class="kp-index__brief">零分配的 Unity 异步方案，与 PlayerLoop 集成</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+      </div>
+      <h2 id="kg2">数学与图形</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../unity/09-math.html#vector">
+          <div class="kp-index__title">向量运算</div>
+          <div class="kp-index__brief">位置/方向/速度都是向量；sqrMagnitude 比 Distance 快</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/09-math.html#dot-cross">
+          <div class="kp-index__title">点积与叉积</div>
+          <div class="kp-index__brief">点积判断前后与夹角，叉积判断左右；视野检测的标准做法</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/09-math.html#quaternion">
+          <div class="kp-index__title">四元数</div>
+          <div class="kp-index__brief">轴加角表示旋转；a*b 表示先 b 后 a，从右往左读</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/09-math.html#interp">
+          <div class="kp-index__title">插值与缓动</div>
+          <div class="kp-index__brief">帧率无关的平滑：MoveTowards/SmoothDamp/Exp 逼近</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/10-graphics.html#pipeline">
+          <div class="kp-index__title">渲染管线</div>
+          <div class="kp-index__brief">应用/几何/像素/后处理四阶段，性能瓶颈各在哪里</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/10-graphics.html#spaces">
+          <div class="kp-index__title">坐标空间变换</div>
+          <div class="kp-index__brief">模型到世界到观察到裁剪到屏幕，MVP 矩阵从右往左应用</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/10-graphics.html#batching">
+          <div class="kp-index__title">Draw Call 与合批</div>
+          <div class="kp-index__brief">静态/动态/SRP Batcher/GPU Instancing，合批失败的常见原因</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/10-graphics.html#shader">
+          <div class="kp-index__title">Shader 基础</div>
+          <div class="kp-index__brief">ShaderLab 结构、顶点/片元着色器、兰伯特光照公式</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/10-graphics.html#urp">
+          <div class="kp-index__title">URP 渲染管线</div>
+          <div class="kp-index__brief">Built-in/URP/HDRP 的选型，迁移成本与判断方法</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+      </div>
+      <h2 id="kg3">Unity 引擎</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../unity/11-unity-core.html#lifecycle">
+          <div class="kp-index__title">生命周期与执行顺序</div>
+          <div class="kp-index__brief">Awake/Start/Update/FixedUpdate/LateUpdate 的选择依据</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/11-unity-core.html#find">
+          <div class="kp-index__title">查找 API 与性能</div>
+          <div class="kp-index__brief">组件式架构、查找 API 的性能对照、缓存策略</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/11-unity-core.html#lifecycle">
+          <div class="kp-index__title">Transform 与坐标</div>
+          <div class="kp-index__brief">世界与局部坐标转换、父子关系的性能影响</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/11-unity-core.html#prefab">
+          <div class="kp-index__title">预制体</div>
+          <div class="kp-index__brief">Instantiate/Destroy 的真实成本，对象池的适用场景</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/11-unity-core.html#so">
+          <div class="kp-index__title">ScriptableObject</div>
+          <div class="kp-index__brief">数据与代码分离：配置表、事件通道、全局数据容器</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/11-unity-core.html#prefab">
+          <div class="kp-index__title">预制体与对象池</div>
+          <div class="kp-index__brief">Instantiate/Destroy 成本、对象池、场景加载策略</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/12-unity-physics.html#rigidbody">
+          <div class="kp-index__title">物理系统</div>
+          <div class="kp-index__brief">Rigidbody、力的四种模式、速度与 MovePosition 的选择</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/12-unity-physics.html#collision">
+          <div class="kp-index__title">碰撞与触发器</div>
+          <div class="kp-index__brief">碰撞检测矩阵：谁和谁会触发、静态物体之间不碰撞</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/12-unity-physics.html#raycast">
+          <div class="kp-index__title">射线检测</div>
+          <div class="kp-index__brief">Raycast/SphereCast/Overlap，NonAlloc 零分配版本</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/12-unity-physics.html#perf">
+          <div class="kp-index__title">物理性能优化</div>
+          <div class="kp-index__brief">图层碰撞矩阵、固定时间步、Kinematic 与 CharacterController</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/13-unity-anim.html#animator">
+          <div class="kp-index__title">Animator 状态机</div>
+          <div class="kp-index__brief">参数、状态、过渡、混合树、动画事件、StringToHash 缓存</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/13-unity-anim.html#ik">
+          <div class="kp-index__title">IK 与 Root Motion</div>
+          <div class="kp-index__brief">反向动力学与根运动，让动画与物理地形贴合</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/13-unity-anim.html#tween">
+          <div class="kp-index__title">代码动画与 Tween</div>
+          <div class="kp-index__brief">简单的位移缩放用代码做，比 Animator 更轻量</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/14-unity-ui.html#ugui">
+          <div class="kp-index__title">UGUI 布局与锚点</div>
+          <div class="kp-index__brief">RectTransform 锚点、多分辨率适配、LayoutGroup 的代价</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/14-unity-ui.html#rebuild">
+          <div class="kp-index__title">Canvas 重建机制</div>
+          <div class="kp-index__brief">任何元素变化都重建整个 Canvas，所以要拆分 Canvas</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/14-unity-ui.html#tmp">
+          <div class="kp-index__title">TextMeshPro</div>
+          <div class="kp-index__brief">SetText 的零分配重载、不解析 :F1 格式说明符</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/14-unity-ui.html#optimize">
+          <div class="kp-index__title">UGUI 优化清单</div>
+          <div class="kp-index__brief">Raycast Target、CanvasGroup、图集、TMP 的选型与优化</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/15-unity-input.html#legacy-detail">
+          <div class="kp-index__title">旧输入系统</div>
+          <div class="kp-index__brief">Input.GetAxis/GetKey，轴配置与移动端适配</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/15-unity-input.html#two-systems">
+          <div class="kp-index__title">Input System</div>
+          <div class="kp-index__brief">InputAction、回调与轮询、手柄与触屏、按键重映射</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/15-unity-input.html#audio">
+          <div class="kp-index__title">音频系统</div>
+          <div class="kp-index__brief">AudioSource/AudioMixer、3D 音效衰减、音量转 dB</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/16-unity-assets.html#resources-problem">
+          <div class="kp-index__title">Resources 的陷阱</div>
+          <div class="kp-index__brief">全量打包、启动变慢、无法热更，官方不推荐使用</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/16-unity-assets.html#bundle-pain">
+          <div class="kp-index__title">AssetBundle</div>
+          <div class="kp-index__brief">依赖管理、加载与卸载、Unload 参数的含义</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/16-unity-assets.html#addressables-value">
+          <div class="kp-index__title">Addressables</div>
+          <div class="kp-index__brief">自动依赖、可远程、引用计数，现代项目的首选资源方案</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/16-unity-assets.html#hotupdate">
+          <div class="kp-index__title">热更新方案</div>
+          <div class="kp-index__brief">资源热更与代码热更的区别，主流方案与合规边界</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/17-unity-render.html#priority">
+          <div class="kp-index__title">Unity 渲染管线配置</div>
+          <div class="kp-index__brief">URP 资产配置、渲染顺序、相机堆叠</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/17-unity-render.html#tiers">
+          <div class="kp-index__title">光照与阴影</div>
+          <div class="kp-index__brief">实时光与烘焙光、Lightmap、阴影距离与性能</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/17-unity-render.html#mpb">
+          <div class="kp-index__title">后处理</div>
+          <div class="kp-index__brief">Volume 系统、各效果的开销排序、移动端取舍</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/17-unity-render.html#mpb">
+          <div class="kp-index__title">LOD 与剔除</div>
+          <div class="kp-index__brief">LOD Group、视锥剔除、遮挡剔除、Culling 设置</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/18-unity-ecs.html#why">
+          <div class="kp-index__title">Job System</div>
+          <div class="kp-index__brief">多线程并行计算，Job 内不能访问托管对象、不能用异常</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/18-unity-ecs.html#burst">
+          <div class="kp-index__title">Burst 编译器</div>
+          <div class="kp-index__brief">SIMD 向量化，纯数学运算快 5 到 20 倍</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/18-unity-ecs.html#concepts">
+          <div class="kp-index__title">NativeContainer</div>
+          <div class="kp-index__brief">非托管容器，必须手动 Dispose，否则泄漏</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/18-unity-ecs.html#ecs">
+          <div class="kp-index__title">ECS 架构</div>
+          <div class="kp-index__brief">Entity/Component/System，数据导向设计，何时值得迁移</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/19-unity-editor.html#rules">
+          <div class="kp-index__title">自定义 Inspector</div>
+          <div class="kp-index__brief">CustomEditor、PropertyDrawer，让策划少犯错</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/19-unity-editor.html#rules">
+          <div class="kp-index__title">EditorWindow</div>
+          <div class="kp-index__brief">自制编辑器工具窗口，批量处理资产</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/19-unity-editor.html#toolchain">
+          <div class="kp-index__title">资产导入与构建管线</div>
+          <div class="kp-index__brief">AssetPostprocessor 自动处理导入，构建脚本自动化</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+      </div>
+      <h2 id="kg4">通用能力</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../unity/20-patterns.html#five">
+          <div class="kp-index__title">单例</div>
+          <div class="kp-index__brief">注意假 null 与静态状态残留，DontDestroyOnLoad 的取舍</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/20-patterns.html#five">
+          <div class="kp-index__title">观察者与事件总线</div>
+          <div class="kp-index__brief">跨模块解耦，但要注意订阅泄漏与调用链追踪</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/20-patterns.html#five">
+          <div class="kp-index__title">状态机</div>
+          <div class="kp-index__brief">枚举加 switch 适合简单场景，类状态机适合可扩展需求</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/20-patterns.html#five">
+          <div class="kp-index__title">对象池</div>
+          <div class="kp-index__brief">降低 Instantiate/Destroy 成本，但不是所有场景都适合</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/20-patterns.html#five">
+          <div class="kp-index__title">MVC/MVP 与 DI</div>
+          <div class="kp-index__brief">把业务逻辑与 Unity 解耦，便于单元测试</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/21-perf.html#workflow">
+          <div class="kp-index__title">性能分析工具</div>
+          <div class="kp-index__brief">Profiler/Frame Debugger/Memory Profiler 的分工</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/21-perf.html#four-types">
+          <div class="kp-index__title">CPU 瓶颈定位</div>
+          <div class="kp-index__brief">从 PlayerLoop 定位到具体方法，区分主线程与渲染线程</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/21-perf.html#four-types">
+          <div class="kp-index__title">GPU 瓶颈与画质取舍</div>
+          <div class="kp-index__brief">分辨率/阴影/后处理/粒子，移动端优化的优先级</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/21-perf.html#four-types">
+          <div class="kp-index__title">内存优化</div>
+          <div class="kp-index__brief">纹理压缩、图集、资源卸载、内存峰值控制</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/21-perf.html#mobile">
+          <div class="kp-index__title">真机调优流程</div>
+          <div class="kp-index__brief">连真机 Profile、发热降频、机型分级策略</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/22-network-eng.html#sync">
+          <div class="kp-index__title">帧同步 vs 状态同步</div>
+          <div class="kp-index__brief">两种同步方案的原理、适用类型与实现难度</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/22-network-eng.html#sync">
+          <div class="kp-index__title">Unity 网络方案</div>
+          <div class="kp-index__brief">NGO/Mirror/Photon 的选型对比</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/22-network-eng.html#engineering">
+          <div class="kp-index__title">Git 与 LFS</div>
+          <div class="kp-index__brief">Unity 项目的版本控制配置、大文件处理、冲突解决</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/22-network-eng.html#engineering">
+          <div class="kp-index__title">程序集定义 asmdef</div>
+          <div class="kp-index__brief">拆分程序集加快编译、强制依赖管理</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/22-network-eng.html#engineering">
+          <div class="kp-index__title">测试与 CI/CD</div>
+          <div class="kp-index__brief">单元测试、自动化构建、多平台打包上架</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+      </div>
+      <h2 id="kg5">AI 时代</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../unity/23-ai.html#workflow">
+          <div class="kp-index__title">AI 辅助开发</div>
+          <div class="kp-index__brief">AI 编程助手的真实效果、失效场景、版权红线</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/23-ai.html#npc">
+          <div class="kp-index__title">AI NPC 架构</div>
+          <div class="kp-index__brief">LLM 驱动 NPC 的四步循环、延迟与成本控制、安全防护</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+      </div>
+      <h2 id="kg6">实践与参考</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../unity/24-projects.html#projects">
+          <div class="kp-index__title">实战项目集</div>
+          <div class="kp-index__brief">从入门到作品级的十项目，含验收标准</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/25-interview.html#questions">
+          <div class="kp-index__title">面试与求职</div>
+          <div class="kp-index__brief">四级理解标准、高频题分类、项目深挖准备</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+        <a class="kp-index__item" href="../unity/25-interview.html#portfolio">
+          <div class="kp-index__title">作品集与资源</div>
+          <div class="kp-index__brief">怎么把项目包装成能打动面试官的作品</div>
+          <div class="kp-index__page">↗ gamedev-csharp-unity</div>
+        </a>
+      </div>
+      <h2 id="kg7">C++ 语言</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../unreal/03-cpp-basic.html#difference">
+          <div class="kp-index__title">C++ 编译模型</div>
+          <div class="kp-index__brief">声明与定义分离、编译/链接/运行时三类错误</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/03-cpp-basic.html#header">
+          <div class="kp-index__title">头文件规范</div>
+          <div class="kp-index__brief">头文件保护、前向声明、禁止 using namespace</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/04-cpp-memory.html#raii">
+          <div class="kp-index__title">RAII</div>
+          <div class="kp-index__brief">资源绑定对象生命周期，构造获取、析构释放</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/04-cpp-memory.html#raii">
+          <div class="kp-index__title">智能指针</div>
+          <div class="kp-index__brief">unique/shared/weak，循环引用的陷阱与解法</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/05-cpp-oop.html#vtable">
+          <div class="kp-index__title">虚函数与多态</div>
+          <div class="kp-index__brief">vtable 原理、虚析构、对象切片的坑</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/05-cpp-oop.html#value-semantics">
+          <div class="kp-index__title">对象切片</div>
+          <div class="kp-index__brief">值语义持有基类会导致多态失效</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/06-cpp-template.html#difference">
+          <div class="kp-index__title">C++ 模板</div>
+          <div class="kp-index__brief">编译期代码生成、代码膨胀、错误信息解读</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/07-cpp-modern.html#cpp11">
+          <div class="kp-index__title">现代 C++ 特性</div>
+          <div class="kp-index__brief">auto、范围 for、lambda、nullptr、移动语义</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/08-cpp-concurrency.html#threads">
+          <div class="kp-index__title">C++ 并发</div>
+          <div class="kp-index__brief">线程、原子、数据竞争与死锁</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/09-cpp-build.html#unreal-build">
+          <div class="kp-index__title">C++ 构建系统</div>
+          <div class="kp-index__brief">UBT 用 C# 写、.Build.cs 模块依赖</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+      </div>
+      <h2 id="kg8">Unreal 引擎</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../unreal/12-ue-cpp.html#macros">
+          <div class="kp-index__title">Unreal 宏系统</div>
+          <div class="kp-index__brief">UCLASS/UPROPERTY/UFUNCTION 与 UHT</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/12-ue-cpp.html#gc">
+          <div class="kp-index__title">UPROPERTY 与 GC</div>
+          <div class="kp-index__brief">最大作用是防 GC 回收，漏写会导致指针变 nullptr</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/12-ue-cpp.html#naming">
+          <div class="kp-index__title">UE 命名约定</div>
+          <div class="kp-index__brief">A/U/F/I/T/E 前缀是编译要求不是风格问题</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/13-ue-framework.html#classes">
+          <div class="kp-index__title">Gameplay 框架</div>
+          <div class="kp-index__brief">Actor/Pawn/Controller/GameMode/GameState</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/13-ue-framework.html#lifecycle">
+          <div class="kp-index__title">Actor 生命周期</div>
+          <div class="kp-index__brief">Constructor/BeginPlay/Tick/EndPlay 的顺序与禁忌</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/14-ue-blueprint.html#boundary">
+          <div class="kp-index__title">C++ 与蓝图边界</div>
+          <div class="kp-index__brief">按「多久变一次」划分，蓝图慢 10~40 倍</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/14-ue-blueprint.html#expose">
+          <div class="kp-index__title">暴露给蓝图</div>
+          <div class="kp-index__brief">BlueprintCallable/NativeEvent 与 _Implementation 后缀</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/15-ue-gas.html#should-use">
+          <div class="kp-index__title">GAS 技能系统</div>
+          <div class="kp-index__brief">先判断要不要用，五个核心概念与 GameplayTag</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/16-ue-anim.html#animbp">
+          <div class="kp-index__title">UE 动画系统</div>
+          <div class="kp-index__brief">状态机、Blend Space、Anim Notify 做攻击判定</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/17-ue-render.html#ue5">
+          <div class="kp-index__title">Nanite 与 Lumen</div>
+          <div class="kp-index__brief">Nanite 的三个限制、Lumen 的性能代价</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/18-ue-niagara.html#niagara">
+          <div class="kp-index__title">Niagara 特效</div>
+          <div class="kp-index__brief">CPU/GPU 粒子选择、特效的性能预算</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/18-ue-niagara.html#physics">
+          <div class="kp-index__title">Chaos 物理</div>
+          <div class="kp-index__brief">刚体/破碎/布料，物理的性能陷阱</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/19-ue-network.html#model">
+          <div class="kp-index__title">网络复制</div>
+          <div class="kp-index__brief">服务器权威、三种 RPC、客户端预测</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/20-ue-ui.html#umg">
+          <div class="kp-index__title">UMG 性能陷阱</div>
+          <div class="kp-index__brief">每帧重绘是最大陷阱，要用 Invalidation Box</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/20-ue-ui.html#audio">
+          <div class="kp-index__title">UE 音频</div>
+          <div class="kp-index__brief">Concurrency 并发限制、Sound Class 音量分组</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/21-ue-editor.html#tools">
+          <div class="kp-index__title">编辑器扩展</div>
+          <div class="kp-index__brief">Editor Utility Widget 是最容易上手的</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/22-patterns.html#subsystem">
+          <div class="kp-index__title">Subsystem</div>
+          <div class="kp-index__brief">替代手写单例，引擎管理生命周期</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/22-patterns.html#component">
+          <div class="kp-index__title">UE 接口</div>
+          <div class="kp-index__brief">用接口替代 Cast 到具体类</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/23-perf.html#workflow">
+          <div class="kp-index__title">UE 性能排查</div>
+          <div class="kp-index__brief">PIE 数据不可信，stat unit 怎么读</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/24-engineering.html#vcs">
+          <div class="kp-index__title">UE 版本控制</div>
+          <div class="kp-index__brief">.uasset 必须 LFS 且无法合并</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../unreal/24-engineering.html#build">
+          <div class="kp-index__title">UE 打包</div>
+          <div class="kp-index__brief">四种配置、BuildCookRun 的五个阶段</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+      </div>
+      <h2 id="kg9">Lua 语言</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../lua/03-lua-basic.html#types">
+          <div class="kp-index__title">Lua 基础语法</div>
+          <div class="kp-index__brief">索引从 1 开始、只有 nil 和 false 是假值</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../lua/04-lua-table.html#table-basic">
+          <div class="kp-index__title">Lua table</div>
+          <div class="kp-index__brief"># 对含 nil 的表不可靠，用 select 计数</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../lua/04-lua-table.html#metatable">
+          <div class="kp-index__title">元表</div>
+          <div class="kp-index__brief">__index 两种形式、__newindex、运算符重载</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../lua/06-lua-oop.html#oop">
+          <div class="kp-index__title">Lua 实现类</div>
+          <div class="kp-index__brief">__index 链实现继承</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../lua/15-framework-oop.html#super-trap">
+          <div class="kp-index__title">super 无限递归</div>
+          <div class="kp-index__brief">self.super 查到的是实例的类，三级继承必崩</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../lua/07-lua-advanced.html#coroutine">
+          <div class="kp-index__title">协程</div>
+          <div class="kp-index__brief">resume 与 wrap 的错误处理差异，写迭代器</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../lua/07-lua-advanced.html#error">
+          <div class="kp-index__title">Lua 错误处理</div>
+          <div class="kp-index__brief">error 的 level 参数、xpcall 抓堆栈</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../lua/07-lua-advanced.html#gc">
+          <div class="kp-index__title">GC 与弱表</div>
+          <div class="kp-index__brief">弱表做缓存，不阻止对象被回收</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../lua/07-lua-advanced.html#sandbox">
+          <div class="kp-index__title">环境与沙箱</div>
+          <div class="kp-index__brief">_ENV 与 load 的第四参数做沙箱</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../lua/08-lua-perf.html#data">
+          <div class="kp-index__title">Lua 性能基础</div>
+          <div class="kp-index__brief">table.concat 快 17~30 倍，缓存全局函数无收益</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../lua/09-hotupdate-basics.html#require">
+          <div class="kp-index__title">require 与模块</div>
+          <div class="kp-index__brief">package.loaded 缓存，热更要清缓存</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../lua/11-xlua-advanced.html#cost">
+          <div class="kp-index__title">xLua 跨语言边界</div>
+          <div class="kp-index__brief">调用开销 5~20 倍，核心是减少调用次数</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../lua/13-framework-design.html#module">
+          <div class="kp-index__title">模块管理器</div>
+          <div class="kp-index__brief">注册/初始化/逆序销毁</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../lua/13-framework-design.html#event">
+          <div class="kp-index__title">事件系统</div>
+          <div class="kp-index__brief">快照遍历 + 队列化派发，防止回调中修改列表</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../lua/16-framework-ui.html#stack">
+          <div class="kp-index__title">UI 界面栈</div>
+          <div class="kp-index__brief">三种界面类型、返回键、订阅自动取消</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../lua/09-hotupdate-basics.html#require">
+          <div class="kp-index__title">热更新原理</div>
+          <div class="kp-index__brief">清 package.loaded + 重新 require，旧引用问题</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+      </div>
+      <h2 id="kg10">算法基础</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="02-complexity.html#budget">
+          <div class="kp-index__title">复杂度直觉</div>
+          <div class="kp-index__brief">每帧 16.7ms，单系统 1~2ms 预算</div>
+          <div class="kp-index__page">02-complexity.html</div>
+        </a>
+        <a class="kp-index__item" href="03-array-list.html#ring-apps">
+          <div class="kp-index__title">数组与环形缓冲</div>
+          <div class="kp-index__brief">环形缓冲索引环绕、三个经典应用</div>
+          <div class="kp-index__page">03-array-list.html</div>
+        </a>
+        <a class="kp-index__item" href="04-linked-stack-queue.html#linked-list">
+          <div class="kp-index__title">链表、栈与队列</div>
+          <div class="kp-index__brief">游戏里为什么少用链表；队列不该用 remove(t,1)</div>
+          <div class="kp-index__page">04-linked-stack-queue.html</div>
+        </a>
+        <a class="kp-index__item" href="05-hash.html#load">
+          <div class="kp-index__title">哈希表</div>
+          <div class="kp-index__brief">负载因子、浮点不能做 key、索引优化</div>
+          <div class="kp-index__page">05-hash.html</div>
+        </a>
+        <a class="kp-index__item" href="06-tree-basic.html#trees-in-games">
+          <div class="kp-index__title">树结构</div>
+          <div class="kp-index__brief">游戏里的九种树、BST 退化</div>
+          <div class="kp-index__page">06-tree-basic.html</div>
+        </a>
+        <a class="kp-index__item" href="07-heap-priority.html#topk">
+          <div class="kp-index__title">堆与优先队列</div>
+          <div class="kp-index__brief">Top-K 用最小堆，建堆是 O(n)</div>
+          <div class="kp-index__page">07-heap-priority.html</div>
+        </a>
+        <a class="kp-index__item" href="08-trie.html#problem">
+          <div class="kp-index__title">Trie 与敏感词</div>
+          <div class="kp-index__brief">O(文本长) 而非 O(词数×文本长)</div>
+          <div class="kp-index__page">08-trie.html</div>
+        </a>
+        <a class="kp-index__item" href="09-union-find.html#optimizations">
+          <div class="kp-index__title">并查集</div>
+          <div class="kp-index__brief">路径压缩 + 按秩合并，朴素版慢 8 倍</div>
+          <div class="kp-index__page">09-union-find.html</div>
+        </a>
+      </div>
+      <h2 id="kg11">核心算法</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="10-graph.html#traversal">
+          <div class="kp-index__title">图与遍历</div>
+          <div class="kp-index__brief">BFS 用队列找最短，DFS 用栈判连通</div>
+          <div class="kp-index__page">10-graph.html</div>
+        </a>
+        <a class="kp-index__item" href="11-pathfinding.html#heuristic">
+          <div class="kp-index__title">A* 寻路</div>
+          <div class="kp-index__brief">启发函数减少 60% 扩展，h 高估会非最优</div>
+          <div class="kp-index__page">11-pathfinding.html</div>
+        </a>
+        <a class="kp-index__item" href="12-spatial.html#grid">
+          <div class="kp-index__title">空间划分</div>
+          <div class="kp-index__brief">格子 < 半径会静默漏检（33/167）</div>
+          <div class="kp-index__page">12-spatial.html</div>
+        </a>
+        <a class="kp-index__item" href="13-sorting.html#no-sort">
+          <div class="kp-index__title">排序与选择</div>
+          <div class="kp-index__brief">Top-K 快 8.4 倍、快速选择 O(n)、小数组用插入</div>
+          <div class="kp-index__page">13-sorting.html</div>
+        </a>
+        <a class="kp-index__item" href="14-search.html#index">
+          <div class="kp-index__title">查找与索引</div>
+          <div class="kp-index__brief">索引比遍历快 159 倍，二分有六个易错点</div>
+          <div class="kp-index__page">14-search.html</div>
+        </a>
+        <a class="kp-index__item" href="15-dynamic-programming.html#do-you-need">
+          <div class="kp-index__title">动态规划与贪心</div>
+          <div class="kp-index__brief">游戏里 DP 用得不多，贪心更适合</div>
+          <div class="kp-index__page">15-dynamic-programming.html</div>
+        </a>
+      </div>
+      <h2 id="kg12">游戏 AI</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="16-state-machine.html#five">
+          <div class="kp-index__title">状态机</div>
+          <div class="kp-index__brief">状态数 > 10 时转移爆炸，要换行为树</div>
+          <div class="kp-index__page">16-state-machine.html</div>
+        </a>
+        <a class="kp-index__item" href="17-behavior-tree.html#status">
+          <div class="kp-index__title">行为树</div>
+          <div class="kp-index__brief">六种节点、与状态机的选择依据</div>
+          <div class="kp-index__page">17-behavior-tree.html</div>
+        </a>
+        <a class="kp-index__item" href="18-decision-tree.html#utility">
+          <div class="kp-index__title">决策树与效用</div>
+          <div class="kp-index__brief">效用评分让 AI 决策更平滑</div>
+          <div class="kp-index__page">18-decision-tree.html</div>
+        </a>
+        <a class="kp-index__item" href="19-goap-planner.html#when">
+          <div class="kp-index__title">GOAP</div>
+          <div class="kp-index__brief">规划器本质是 A*，代价是可预测性</div>
+          <div class="kp-index__page">19-goap-planner.html</div>
+        </a>
+        <a class="kp-index__item" href="20-boids-flock.html#three-rules">
+          <div class="kp-index__title">Boids 群体</div>
+          <div class="kp-index__brief">分离/对齐/聚合三条规则，必须用空间划分优化</div>
+          <div class="kp-index__page">20-boids-flock.html</div>
+        </a>
+      </div>
+      <h2 id="kg13">系统设计</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="21-reddot.html#basic">
+          <div class="kp-index__title">红点系统</div>
+          <div class="kp-index__brief">脏标记向上传播，避免每帧遍历</div>
+          <div class="kp-index__page">21-reddot.html</div>
+        </a>
+        <a class="kp-index__item" href="22-quest-achievement.html#tracking">
+          <div class="kp-index__title">任务与成就</div>
+          <div class="kp-index__brief">事件驱动代替轮询，进度要持久化</div>
+          <div class="kp-index__page">22-quest-achievement.html</div>
+        </a>
+        <a class="kp-index__item" href="23-buff-skill.html#buff">
+          <div class="kp-index__title">Buff 与技能</div>
+          <div class="kp-index__brief">四种叠加规则，控制类必须设上限</div>
+          <div class="kp-index__page">23-buff-skill.html</div>
+        </a>
+        <a class="kp-index__item" href="24-inventory-drop.html#weighted-random">
+          <div class="kp-index__title">背包与掉落</div>
+          <div class="kp-index__brief">权重是相对值，前缀和+二分优化</div>
+          <div class="kp-index__page">24-inventory-drop.html</div>
+        </a>
+        <a class="kp-index__item" href="25-time-scheduler.html#problems">
+          <div class="kp-index__title">定时器调度</div>
+          <div class="kp-index__brief">五个实战问题，标记删除防泄漏</div>
+          <div class="kp-index__page">25-time-scheduler.html</div>
+        </a>
+      </div>
+      <h2 id="kg14">性能工程</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="26-perf-patterns.html#counter">
+          <div class="kp-index__title">性能模式库</div>
+          <div class="kp-index__brief">六种模式，三个可能反而更慢的反例</div>
+          <div class="kp-index__page">26-perf-patterns.html</div>
+        </a>
+        <a class="kp-index__item" href="27-cache-lru.html#policies">
+          <div class="kp-index__title">缓存与 LRU</div>
+          <div class="kp-index__brief">四种淘汰策略，LRU 要哈希表+双向链表</div>
+          <div class="kp-index__page">27-cache-lru.html</div>
+        </a>
+        <a class="kp-index__item" href="28-bitwise.html#value">
+          <div class="kp-index__title">位运算</div>
+          <div class="kp-index__brief">价值在省空间不是省时间</div>
+          <div class="kp-index__page">28-bitwise.html</div>
+        </a>
+        <a class="kp-index__item" href="29-serialize.html#safety">
+          <div class="kp-index__title">存档与序列化</div>
+          <div class="kp-index__brief">向后兼容、原子写入、备份</div>
+          <div class="kp-index__page">29-serialize.html</div>
+        </a>
+        <a class="kp-index__item" href="30-debug-tools.html#tools">
+          <div class="kp-index__title">调试工具</div>
+          <div class="kp-index__brief">时间线录制用环形缓冲，日志要条件包裹</div>
+          <div class="kp-index__page">30-debug-tools.html</div>
+        </a>
+      </div>
+      <div class="milestone">
+        <p class="mb0">
+          <strong>自测方法</strong>：随机挑 10 个知识点，<em>不看内容</em>说清它的原理和典型陷阱。能说清 8 个以上说明基础扎实。
+        </p>
+      </div>
+      <nav class="page-nav">
+        <a href="index.html">
+          <div class="dir">← 返回</div>
+          <div class="title">路线总览</div>
+        </a>
+      </nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

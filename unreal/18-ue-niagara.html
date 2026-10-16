@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>18 Niagara 与物理 — C++ + Unreal 路线｜从零基础到 3A 级项目开发</title>
+<meta name="description" content="Niagara 粒子系统、Chaos 物理、破坏系统、布料与流体、性能控制">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C++ + Unreal 路线
+        <span>从零基础到 3A 级项目开发</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>18 · Niagara 与物理</h1>
+
+<p class="lead">特效与物理<strong>是"看起来酷"和"跑得动"之间的战场</strong>。<em>很多项目在这里翻车</em>——因为特效太吃性能了。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="../unity/10-graphics.html#pipeline" data-brief="应用/几何/像素/后处理四阶段，性能瓶颈各在哪里"><span class="prereq__title">渲染管线</span><span class="prereq__page">10-graphics</span></a>
+          <a class="prereq__item" href="../unity/21-perf.html#four-types" data-brief="分辨率/阴影/后处理/粒子，移动端优化的优先级"><span class="prereq__title">GPU 瓶颈与画质取舍</span><span class="prereq__page">21-perf</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="niagara">一、Niagara 特效系统</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>概念</th><th>作用</th><th>性能</th></tr></thead>
+  <tbody>
+    <tr><td><strong>System</strong></td><td><em>整个特效</em></td><td><strong>看粒子数</strong></td></tr>
+    <tr><td><strong>Emitter</strong></td><td><em>一组粒子</em></td><td>可单独开关</td></tr>
+    <tr><td><strong>CPU 粒子</strong></td><td><strong>逻辑灵活</strong></td><td><span class="mk mk--no">受 CPU 限制</span></td></tr>
+    <tr><td><strong>GPU 粒子</strong></td><td><em>数量大</em></td><td><span class="mk mk--yes">并行快</span></td></tr>
+    <tr><td><strong>Niagara Data Channel</strong></td><td><em>粒子间通信</em></td><td>高级特性</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">特效的性能预算 ★★★</span>
+  <strong>特效是"看起来免费但实际很贵"的东西。</strong><br><br><strong>性能开销来源</strong>：<br>① <strong>Overdraw</strong>——<em>半透明叠加，每个像素画多次</em>（<em>页 11</em>）<br>② <strong>粒子数量</strong>——<em>CPU 侧的逻辑计算</em><br>③ <strong>材质复杂度</strong>——<em>每个粒子都要跑 Shader</em><br>④ <strong>动态光源</strong>——<em>特效带光源代价极大</em><br><br><strong>建立预算</strong>：<br>· <em>单个特效</em>——不超过 100 个粒子（<em>移动端</em>）<br>· <em>同屏特效</em>——不超过 5~10 个大型特效<br>· <strong>绝对禁止</strong>——<em>每个粒子一个动态光源</em><br><br><strong>实践建议</strong>：<em>用 Niagara 的"Effect Type"设置预算，超过就自动降级。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">CPU 粒子 vs GPU 粒子</span>
+  <strong>怎么选</strong>：<br><div class="table-wrap"><table><thead><tr><th>场景</th><th>选择</th><th>原因</th></tr></thead><tbody><tr><td>数量少（&lt;100）</td><td><strong>CPU</strong></td><td><em>逻辑更灵活</em></td></tr><tr><td>数量大（&gt;1000）</td><td><strong>GPU</strong></td><td><em>并行计算</em></td></tr><tr><td>需要碰撞</td><td><em>CPU</em></td><td>GPU 碰撞有限制</td></tr><tr><td>需要读游戏数据</td><td><em>CPU</em></td><td><strong>GPU 不能访问 UObject</strong></td></tr><tr><td>纯视觉（火花、烟）</td><td><strong>GPU</strong></td><td><em>收益最大</em></td></tr></tbody></table></div><br><strong>关键限制</strong>：<em>GPU 粒子不能在逻辑里访问游戏对象</em>——<strong>只能做纯视觉的模拟</strong>。
+</div>
+
+<h2 id="physics">二、Chaos 物理系统</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>功能</th><th>用途</th><th>开销</th></tr></thead>
+  <tbody>
+    <tr><td><strong>刚体物理</strong></td><td><em>碰撞、受力</em></td><td>中</td></tr>
+    <tr><td><strong>Chaos Destruction</strong></td><td><strong>破碎效果</strong></td><td><span class="mk mk--no">大</span></td></tr>
+    <tr><td><strong>Chaos Cloth</strong></td><td><em>布料模拟</em></td><td>中</td></tr>
+    <tr><td><strong>Chaos Vehicles</strong></td><td><em>载具</em></td><td>中</td></tr>
+    <tr><td><strong>物理约束</strong></td><td><em>关节、连接</em></td><td><em>看数量</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">物理的性能陷阱</span>
+  <strong>物理是"数量敏感"的系统</strong>：<br>· <em>10 个刚体</em>——完全没问题<br>· <em>100 个</em>——开始有开销<br>· <strong>1000 个</strong>——<em>必须优化</em><br><br><strong>优化手段</strong>：<br>① <strong>休眠（Sleep）</strong>——<em>静止的物体不参与计算</em><br>② <strong>简化碰撞形状</strong>——<em>用胶囊/盒体而不是复杂网格</em><br>③ <strong>降低物理帧率</strong>——<em>不用每帧算</em><br>④ <em>限制物理半径</em>——<em>只算附近的对象</em><br><br><strong>破碎效果特别贵</strong>：<br><em>Chaos Destruction 会产生大量碎片</em>——<br><strong>建议</strong>：<em>碎片数量限制在 20~50，用"延迟销毁"减少同时存在的数量。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="18">
+  <div class="task"><input type="checkbox" id="t-18-1"><label for="t-18-1"><strong>建一个特效</strong>：用 Niagara 做一个简单的粒子效果。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-2"><label for="t-18-2"><strong>对比 CPU/GPU</strong>：同一个效果分别用 CPU 和 GPU 粒子实现，对比性能。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-3"><label for="t-18-3"><strong>测 Overdraw</strong>：叠 10 层大颗粒特效，观察帧率下降。<em>感受特效的代价。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-18-4"><label for="t-18-4"><strong>设预算</strong>：给特效设置 Effect Type 的预算限制，验证超限行为。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-5"><label for="t-18-5"><strong>做破碎</strong>：用 Chaos Destruction 做一个破碎效果，观察碎片数量对性能的影响。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-6"><label for="t-18-6"><strong>回答面试题</strong>：① 特效的性能开销来源？② CPU 和 GPU 粒子怎么选？③ 物理优化的四个手段？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出 Niagara 的五个概念；<br>
+    ② <strong>知道特效的四个性能开销来源，能建立预算意识</strong>；<br>
+    ③ <strong>知道 CPU 和 GPU 粒子的选择标准</strong>；<br>
+    ④ 能说出 Chaos 的五个功能；<br>
+    ⑤ <strong>知道物理的性能陷阱及四个优化手段</strong>。<br>
+    <br>
+    <em>第 ② 条最重要——**"建立预算意识"能避免项目后期特效失控**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="17-ue-render.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">17 渲染与画面 ★★</div>
+  </a>
+  <a class="next" href="19-ue-network.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">19 网络与多人游戏 ★★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

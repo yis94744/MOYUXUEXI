@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>13 Gameplay Framework — C++ + Unreal 路线｜从零基础到 3A 级项目开发</title>
+<meta name="description" content="GameMode/GameState/PlayerController/Pawn/Character/Actor/Component 职责与协作">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C++ + Unreal 路线
+        <span>从零基础到 3A 级项目开发</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>13 · Gameplay Framework ★★★</h1>
+
+<p class="lead">Unreal 有一套<strong>预设好的游戏框架</strong>——Actor、Pawn、Controller、GameMode。<em>不理解它，你会一直在"这套东西为什么要这样"里挣扎</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="12-ue-cpp.html#macros" data-brief="UCLASS/UPROPERTY/UFUNCTION 与 UHT"><span class="prereq__title">Unreal 宏系统</span><span class="prereq__page">12-ue-cpp</span></a>
+          <a class="prereq__item" href="12-ue-cpp.html#gc" data-brief="最大作用是防 GC 回收，漏写会导致指针变 nullptr"><span class="prereq__title">UPROPERTY 与 GC</span><span class="prereq__page">12-ue-cpp</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="classes">一、核心类与继承关系</h2>
+
+<p>Unreal 的 Gameplay Framework 有<strong>明确的职责划分</strong>。<em>理解每个类"该做什么"，比记住继承关系更重要。</em></p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>类</th><th>职责</th><th>谁创建</th></tr></thead>
+  <tbody>
+    <tr><td><strong>UObject</strong></td><td><em>所有对象的基类</em></td><td>—</td></tr>
+    <tr><td><strong>AActor</strong></td><td><strong>可放入关卡的物体</strong></td><td><em>关卡 / 代码 / Spawn</em></td></tr>
+    <tr><td><strong>UActorComponent</strong></td><td><strong>给 Actor 加能力</strong></td><td><em>Actor 创建</em></td></tr>
+    <tr><td><strong>USceneComponent</strong></td><td>有 Transform 的组件</td><td><em>Actor 创建</em></td></tr>
+    <tr><td><strong>APawn</strong></td><td><strong>可被控制的 Actor</strong></td><td>GameMode</td></tr>
+    <tr><td><strong>ACharacter</strong></td><td><em>带移动的 Pawn</em></td><td>GameMode</td></tr>
+    <tr><td><strong>AController</strong></td><td><strong>控制 Pawn 的抽象</strong></td><td>GameMode</td></tr>
+    <tr><td><strong>APlayerController</strong></td><td><em>玩家控制</em></td><td>GameMode</td></tr>
+    <tr><td><strong>AAIController</strong></td><td><em>AI 控制</em></td><td>GameMode</td></tr>
+    <tr><td><strong>AGameMode</strong></td><td><strong>游戏规则（服务器）</strong></td><td>引擎</td></tr>
+    <tr><td><strong>AGameState</strong></td><td><em>游戏状态（所有端）</em></td><td>引擎</td></tr>
+    <tr><td><strong>APlayerState</strong></td><td><em>玩家状态（所有端）</em></td><td>GameMode</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">GameMode 与 GameState 的区别 ★★</span>
+  <strong>这是最容易搞混的一对。</strong><br><br><strong>AGameMode</strong>：<br>· <em>游戏规则</em>——"怎么玩"<br>· <strong>只在服务器存在</strong>（<em>单机也有</em>）<br>· <em>存放服务器专属逻辑</em>（<em>分数计算、胜负判定</em>）<br><br><strong>AGameState</strong>：<br>· <em>游戏状态</em>——"现在什么样"<br>· <strong>所有客户端都有</strong><br>· <em>存放需要复制的状态</em>（<em>比分、倒计时</em>）<br><br><strong>判断标准</strong>：<br>· <em>"这个数据客户端能看到吗？"</em><br>· 能 → <strong>GameState</strong><br>· 不能 → <strong>GameMode</strong><br><br><strong>典型错误</strong>：<em>把比分存在 GameMode 里，客户端拿不到</em>。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">Controller 与 Pawn 的分离设计</span>
+  <strong>为什么要把"控制"和"被控制"分开</strong>：<br><br><strong>场景 1：角色死亡</strong><br><em>Pawn 销毁，但 Controller 保留</em>——<strong>可以复活、可以观察其他角色</strong><br><br><strong>场景 2：切换角色</strong><br><em>Controller 不变，只换它控制的 Pawn</em>——<strong>玩家的输入配置不变</strong><br><br><strong>场景 3：AI 接管</strong><br><em>PlayerController 换成 AIController，Pawn 不变</em>——<strong>实现了"掉线托管"</strong><br><br><strong>这个设计的意义</strong>：<em>把"意图"和"实体"解耦</em>——<strong>这是 UE 框架最精妙的设计之一。</strong>
+</div>
+
+<h2 id="lifecycle">二、Actor 的生命周期</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>阶段</th><th>函数</th><th>注意</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1. 构造</strong></td><td><code>Constructor</code></td><td><em>编辑器也会调用</em></td></tr>
+    <tr><td><strong>2. 初始化</strong></td><td><code>PostInitializeComponents</code></td><td>组件已就绪</td></tr>
+    <tr><td><strong>3. 开始</strong></td><td><code>BeginPlay</code></td><td><strong>游戏开始时</strong></td></tr>
+    <tr><td><strong>4. 每帧</strong></td><td><code>Tick</code></td><td><em>需手动开启</em></td></tr>
+    <tr><td><strong>5. 销毁</strong></td><td><code>EndPlay</code></td><td><em>清理资源</em></td></tr>
+    <tr><td><strong>6. 析构</strong></td><td><code>Destroyed</code> / <code>BeginDestroy</code></td><td><strong>不一定立即调用</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">Constructor 的三个坑</span>
+  <strong>① Constructor 在编辑器里也会执行</strong><br><em>每次打开编辑器、拖入关卡都会调用</em>。<br><strong>所以不要在这里做游戏逻辑</strong>（<em>比如随机数、读文件</em>）。<br><br><strong>② 不要在 Constructor 里调游戏 API</strong><br><em>World 还不存在</em>——<code>GetWorld()</code> 可能返回 nullptr。<br><strong>要放到 BeginPlay。</strong><br><br><strong>③ 组件要在 Constructor 里创建</strong><br><code>AMyActor::AMyActor()</code><br><code>{</code><br><code>&nbsp;&nbsp;PrimaryActorTick.bCanEverTick = true;   // 开启 Tick</code><br><code>&nbsp;&nbsp;Mesh = CreateDefaultSubobject&lt;UStaticMeshComponent&gt;(TEXT("Mesh"));</code><br><code>&nbsp;&nbsp;RootComponent = Mesh;</code><br><code>}</code><br><em>这是 UE 的标准写法——组件是"默认子对象"。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="13">
+  <div class="task"><input type="checkbox" id="t-13-1"><label for="t-13-1"><strong>创建一个 Actor</strong>：继承 AActor，写 Constructor / BeginPlay / Tick。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-2"><label for="t-13-2"><strong>加一个组件</strong>：在 Constructor 里 CreateDefaultSubobject，验证能在编辑器看到。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-3"><label for="t-13-3"><strong>测生命周期</strong>：在每个阶段加 UE_LOG，观察调用顺序。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-4"><label for="t-13-4"><strong>对比 GameMode/GameState</strong>：把同一个数据分别存在两处，联机测试看客户端能否拿到。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-5"><label for="t-13-5"><strong>实现 Controller 切换</strong>：让玩家死亡后 Controller 保留，实现复活或观察。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-6"><label for="t-13-6"><strong>回答面试题</strong>：① GameMode 和 GameState 的区别？② Constructor 里能做什么？③ Controller 和 Pawn 为什么要分离？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出 Gameplay Framework 的核心类及职责</strong>；<br>
+    ② <strong>能区分 GameMode 和 GameState（服务器 vs 所有端）</strong>；<br>
+    ③ <strong>理解 Controller 与 Pawn 分离的意义</strong>；<br>
+    ④ 知道 Actor 生命周期的六个阶段；<br>
+    ⑤ <strong>知道 Constructor 的三个坑</strong>。<br>
+    <br>
+    <em>第 ② 和 第 ③ 条是这一页的核心——**理解了它们，你才真正理解了 UE 的架构**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="12-ue-cpp.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">12 Unreal C++ 与宏系统 ★★★</div>
+  </a>
+  <a class="next" href="14-ue-blueprint.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">14 蓝图与 C++ 协作 ★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

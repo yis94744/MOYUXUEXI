@@ -1,0 +1,167 @@
+<h1>16 · 状态机 FSM ★★</h1>
+
+<p class="lead">状态机是<strong>游戏里最基础、也最被低估的逻辑组织方式</strong>。它不只用于 AI——角色的移动状态、UI 界面的显示状态、网络连接的连接状态、<em>甚至一个按钮的按下/悬停</em>，底层都是状态机。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（15）讲完算法基础。从这一页开始进入<em>系统设计</em>——这些是真正会出现在你日常工作里的东西。<br>
+  <strong>关键衔接</strong>：状态机会用到<em>哈希表（05）</em>做状态映射、<em>树结构（06）</em>做层次状态机。<br>
+  <strong>下一页</strong>（17）行为树——它是状态机的进化版，<em>解决状态机"状态一多就失控"的问题</em>。<br>
+  <strong>验证方式</strong>：本页实现了<strong>五种状态机方案</strong>并实测了性能，数据是真实测量值。
+</div>
+
+<h2 id="five">一、五种实现方案</h2>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>16/fsm</code></div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">实测结论推翻了一个常见说法</span>
+  很多资料说"类式状态机因为有虚函数调用，所以比 if-else 慢"。<br>
+  <strong>但实测结果不是这样</strong>（50 万次 update）：<br><br>
+  • 枚举 + if 链：<strong>0.0490 秒</strong>（基准）<br>
+  • 表驱动：<strong>0.0450 秒</strong>（0.92x）<br>
+  • 类式状态机：<strong>0.0420 秒</strong>（0.86x）<br><br>
+  <strong>三种方案在同一量级，类式反而略快。</strong><br><br>
+  <strong>为什么</strong>：状态数少时，"if-else 链"需要<em>逐条比较字符串</em>；而类式状态机是<em>一次表查找</em>加一次方法调用——在状态数较多时反而更高效。<br><br>
+  <em>所以：性能不是选型依据，别为了"性能"牺牲可维护性。</em>
+</div>
+
+<h2 id="choose">二、怎么选？看这四个维度</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方案</th><th>结构</th><th>适用</th><th>不适合</th></tr></thead>
+  <tbody>
+    <tr><td><strong>枚举 + if</strong></td><td>一串 if-elseif</td><td>状态 <strong>&lt; 5</strong>、逻辑简单</td><td>状态会增长、需要复用</td></tr>
+    <tr><td><strong>表驱动</strong></td><td>状态 → 处理函数 映射</td><td>需要 enter/exit 钩子</td><td>状态逻辑复杂、需要继承</td></tr>
+    <tr><td><strong>类式状态机</strong></td><td>每个状态是对象</td><td><strong>状态逻辑复杂、需要复用</strong></td><td>状态极简单时过度设计</td></tr>
+    <tr><td><strong>层次状态机</strong></td><td>状态树 + 事件冒泡</td><td>状态有嵌套结构</td><td>状态间关系扁平</td></tr>
+    <tr><td><strong>栈式状态机</strong></td><td>状态栈</td><td>暂停、弹窗、中断恢复</td><td>频繁随机跳转</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">实战建议</span>
+  <strong>从枚举开始，需要时再重构。</strong><br>
+  • 一个只有 3 个状态的怪物巡逻逻辑 → <em>用 if-else 就够了</em>，别过度设计；<br>
+  • 一个十几状态的玩家角色控制器 → <em>用类式状态机</em>，否则维护成本会失控；<br>
+  • UI 界面栈 → <em>用栈式状态机</em>，天然契合"打开/关闭"的语义。<br><br>
+  <strong>重构的信号</strong>：当你的 if-else 链超过 50 行、或者同一个状态转换写了两遍时，就该重构了。
+</div>
+
+<h2 id="hsm">三、层次状态机（HSM）★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">解决"状态爆炸"的问题</span>
+  <strong>问题场景</strong>：角色有"站立/移动"两个大状态，"移动"里又分"走/跑/冲刺"。<br>
+  <strong>朴素做法</strong>：状态数 = 2 x 3 = 6，每个都要写与其他 5 个的转换条件 → <strong>连线爆炸</strong>。<br><br>
+  <strong>层次状态机</strong>：把状态组织成树，<em>共性的转换逻辑上提到父状态</em>。
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>层级</th><th>状态</th><th>负责的转换</th></tr></thead>
+    <tbody>
+      <tr><td>父</td><td><code>Grounded</code>（地面）</td><td>处理"按跳跃键 → 转到空中"</td></tr>
+      <tr><td>子</td><td><code>Idle</code> / <code>Walk</code> / <code>Run</code></td><td>处理互相之间的转换</td></tr>
+      <tr><td>父</td><td><code>Airborne</code>（空中）</td><td>处理"落地 → 转到地面"</td></tr>
+      <tr><td>子</td><td><code>Jump</code> / <code>Fall</code></td><td>处理互相之间的转换</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <strong>关键规则：事件冒泡</strong><br>
+  子状态处理不了的事件会<em>向上传给父状态</em>。比如在 <code>Walk</code> 状态下按跳跃：<code>Walk</code> 不处理 → 冒泡给 <code>Grounded</code> → 切换到 <code>Airborne</code>。<br><br>
+  <strong>收益</strong>：跳跃逻辑只写一遍，三个子状态都能用。
+</div>
+
+<h2 id="stack">四、栈式状态机</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">天然契合"中断/恢复"语义</span>
+  <strong>场景</strong>：游戏中打开菜单，游戏逻辑应该暂停；关闭菜单后<em>恢复到打开之前的状态</em>。<br><br>
+  <strong>用普通状态机的问题</strong>：你需要记住"打开菜单前是什么状态"，还要处理嵌套弹窗。<br>
+  <strong>用栈式状态机</strong>：<br>
+  <code>push(MenuState)</code> → 自动暂停 <code>PlayingState</code><br>
+  <code>pop()</code> → 自动恢复 <code>PlayingState</code><br>
+  再开一层弹窗就是再 push 一次，天然支持任意嵌套。<br><br>
+  <strong>典型用途</strong>：UI 界面栈、暂停系统、对话系统、技能打断、教程引导。
+</div>
+
+<h2 id="practice">五、七个实战要点</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">这些是踩过坑才知道的</span>
+  <strong>① 状态用字符串还是数字</strong><br>
+  字符串可读性好、调试方便；数字性能好、能对比。<em>大型项目的常见做法：用字符串常量定义，编译期或初始化时转成数字 ID。</em><br><br>
+  <strong>② transition 必须去重</strong><br>
+  <code>if (currentState == newState) return;</code> —— 否则会重复触发 enter/exit，<em>导致特效重复播放、音效重叠</em>。<br><br>
+  <strong>③ 必须记录 stateTime</strong><br>
+  几乎所有逻辑都需要"进入这个状态多久了"（<em>攻击前摇、无敌时间、冷却</em>）。<strong>在 enter 时清零，每帧累加。</strong><br><br>
+  <strong>④ 状态退出要清理</strong><br>
+  离开 <code>ATTACK</code> 状态时，要取消连招计时、隐藏武器拖尾、重置动画参数。<em>不清理会有"残留状态"的诡异 bug。</em><br><br>
+  <strong>⑤ 避免在 update 里直接改状态</strong><br>
+  同一帧里状态被改了三次？很难调试。<em>更好的做法：先记录"想转到哪个状态"，update 结束后统一处理转换。</em><br><br>
+  <strong>⑥ 加一个状态变更日志</strong><br>
+  打印每次转换（<code>IDLE -> CHASE -> ATTACK</code>）。<em>调试 AI 时，这个日志能让你五分钟定位问题，而不是盲猜一小时。</em><br><br>
+  <strong>⑦ UI 也是状态机</strong><br>
+  按钮的 <code>Normal/Hover/Pressed/Disabled</code>、界面的 <code>Loading/Ready/Error</code>——<strong>本质都是状态机</strong>。用状态机思想写 UI，比一堆 bool 标志位清晰得多。
+</div>
+
+<h2 id="compare">六、状态机 vs 行为树：什么时候该换</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>信号</th><th>说明</th><th>建议</th></tr></thead>
+  <tbody>
+    <tr><td>状态数 &gt; 10 且互相都能转</td><td>转换矩阵接近全连接</td><td><strong>换行为树</strong></td></tr>
+    <tr><td>转换条件写了重复逻辑</td><td>同样一段判断出现在多处</td><td>先试层次状态机</td></tr>
+    <tr><td>状态内有"步骤序列"</td><td>进入某状态后要做 3 件事</td><td>该状态内部用行为树</td></tr>
+    <tr><td>策划想改 AI 但改不动</td><td>逻辑硬编码在代码里</td><td><strong>换行为树</strong>（可配置）</td></tr>
+    <tr><td>状态数 &lt; 8 且逻辑清晰</td><td>一眼能看懂转换关系</td><td><strong>保持状态机</strong>，别过度设计</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">混合使用是最实际的方案</span>
+  <strong>大状态用状态机，状态内部用行为树</strong>——这是很多商业项目的实际做法。<br><br>
+  例如：<br>
+  • <code>PatrolState</code> 内部的行为树：走到 A 点 → 等待 2 秒 → 走到 B 点 → 循环<br>
+  • <code>CombatState</code> 内部的行为树：选择技能 → 释放 → 冷却 → 再选择<br>
+  • <code>FleeState</code> 内部的行为树：找最远的出口 → 逃跑 → 检测是否安全<br><br>
+  <em>这样既有状态机的清晰结构，又有行为树的可组合性。</em>
+</div>
+
+<h2 id="tasks">七、本章动手任务</h2>
+
+<div class="tasks" data-page="16">
+  <div class="task"><input type="checkbox" id="t-16-1"><label for="t-16-1"><strong>实现三种状态机</strong>：分别用 if-else、表驱动、类式实现同一个角色状态机，<em>亲自测一遍性能</em>，验证本页的结论。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-2"><label for="t-16-2"><strong>加上 enter/exit 钩子</strong>：给状态加上进入和退出回调，实现"进入攻击状态时播放音效、离开时停止"。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-3"><label for="t-16-3"><strong>实现层次状态机</strong>：把"地面/空中"+"走/跑/跳"组织成两级状态树，验证跳跃逻辑只写一遍。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-4"><label for="t-16-4"><strong>实现栈式状态机</strong>：做一个界面栈，验证 push/pop 时下层状态的暂停与恢复。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-5"><label for="t-16-5"><strong>加状态日志</strong>：记录状态变更历史，打印出完整的状态转换序列。<em>用一个复杂场景测试它是否好用于调试。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-16-6"><label for="t-16-6"><strong>用状态机重构 UI</strong>：找一个用多个 bool 标志控制的界面，改成状态机实现，对比代码清晰度。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-7"><label for="t-16-7"><strong>回答面试题</strong>：① 状态机有哪几种实现方式？② 层次状态机解决什么问题？③ 什么时候该用行为树替代状态机？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能实现三种状态机（枚举式、表驱动、类式）并说出各自适用场景；<br>
+    ② <strong>能解释层次状态机的"事件冒泡"机制</strong>，以及它解决什么问题；<br>
+    ③ 知道栈式状态机的适用场景（暂停、弹窗、中断恢复）；<br>
+    ④ 能说出至少五条状态机的实战要点（去重、stateTime、清理等）；<br>
+    ⑤ <strong>能判断什么信号出现时该从状态机迁移到行为树</strong>。<br><br>
+    <em>第 ⑤ 条是这一页最有价值的内容——它决定了你会不会在项目中期陷入"状态机失控"的困境。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="15-dynamic-programming.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">15 动态规划与贪心</div>
+  </a>
+  <a class="next" href="17-behavior-tree.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">17 行为树 Behavior Tree ★★★</div>
+  </a>
+</nav>

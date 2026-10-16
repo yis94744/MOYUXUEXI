@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>07 现代 C++（11/14/17/20） — C++ + Unreal 路线｜从零基础到 3A 级项目开发</title>
+<meta name="description" content="lambda 与捕获、右值引用与完美转发、constexpr、结构化绑定、协程与模块">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C++ + Unreal 路线
+        <span>从零基础到 3A 级项目开发</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>07 · 现代 C++（11/14/17/20）★★</h1>
+
+<p class="lead">C++11 是<strong>一道分水岭</strong>——它之后的 C++ 和之前几乎是两种语言。这一页讲<em>游戏里真正会用到的现代特性</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="04-cpp-memory.html#raii" data-brief="unique/shared/weak，循环引用的陷阱与解法"><span class="prereq__title">智能指针</span><span class="prereq__page">04-cpp-memory</span></a>
+          <a class="prereq__item" href="04-cpp-memory.html#raii" data-brief="资源绑定对象生命周期，构造获取、析构释放"><span class="prereq__title">RAII</span><span class="prereq__page">04-cpp-memory</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="cpp11">一、C++11 的六个关键特性</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>特性</th><th>解决什么</th><th>游戏里怎么用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>auto</strong></td><td>类型推导</td><td><em>简化迭代器写法</em></td></tr>
+    <tr><td><strong>范围 for</strong></td><td>遍历容器</td><td><strong>替代下标循环</strong></td></tr>
+    <tr><td><strong>lambda</strong></td><td>匿名函数</td><td><strong>回调、排序比较</strong></td></tr>
+    <tr><td><strong>移动语义</strong></td><td>避免拷贝</td><td><strong>转移大对象</strong></td></tr>
+    <tr><td><strong>智能指针</strong></td><td>自动内存管理</td><td><strong>页 04 已讲</strong></td></tr>
+    <tr><td><strong>nullptr</strong></td><td>类型安全的空指针</td><td><em>替代 NULL</em></td></tr>
+    <tr><td><strong>override/final</strong></td><td>明确重写意图</td><td><strong>页 05 已讲</strong></td></tr>
+    <tr><td><strong>右值引用 &amp;&amp;</strong></td><td>移动语义基础</td><td><em>理解即可</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">nullptr vs NULL：一个真实的坑</span>
+  <strong>NULL 在 C++ 里就是 0</strong>——这会导致重载解析错误：<br>
+  <code>void F(int x);</code><br>
+  <code>void F(char* p);</code><br>
+  <code>F(NULL);    // ❌ 调用 F(int)！因为 NULL 是 0</code><br>
+  <code>F(nullptr); // ✅ 调用 F(char*)</code><br><br>
+  <strong>nullptr 是类型安全的</strong>——它<em>有独立的类型 <code>std::nullptr_t</code></em>。<br><br>
+  <strong>Unreal 里的实践</strong>：<em>UE 用 <code>nullptr</code>，不用 <code>NULL</code>。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">范围 for 与 lambda 的实战价值</span>
+  <strong>范围 for</strong>——少写很多代码：<br>
+  <code>// 老写法</code><br>
+  <code>for (int i = 0; i &lt; arr.Num(); ++i) { arr[i]... }</code><br>
+  <code>// 新写法</code><br>
+  <code>for (auto&amp; item : arr) { item... }</code><br>
+  <strong>注意</strong>：<em><code>auto&amp;</code> 是引用（能改原对象），<code>auto</code> 是拷贝</em>。<br><br>
+  <strong>lambda</strong>——游戏里到处都用：<br>
+  <code>Items.Sort([](const FItem&amp; A, const FItem&amp; B) {</code><br>
+  <code>&nbsp;&nbsp;return A.Price &lt; B.Price;</code><br>
+  <code>});</code><br>
+  <em>比写一个独立的比较函数方便得多。</em><br><br>
+  <strong>捕获方式很重要</strong>：<br>
+  · <code>[=]</code>——按值捕获（<em>拷贝，安全但可能慢</em>）<br>
+  · <code>[&amp;]</code>——按引用捕获（<strong>危险：可能悬垂</strong>）<br>
+  · <code>[this]</code>——捕获 this 指针<br>
+  · <code>[x, &amp;y]</code>——精确指定（<strong>推荐</strong>）
+</div>
+
+<h2 id="later">二、C++14/17/20 的重要特性</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>版本</th><th>特性</th><th>价值</th></tr></thead>
+  <tbody>
+    <tr><td><strong>14</strong></td><td>泛型 lambda、<code>auto</code> 返回类型</td><td><em>写起来更简洁</em></td></tr>
+    <tr><td><strong>17</strong></td><td><code>std::optional</code></td><td><strong>表示"可能没有值"</strong></td></tr>
+    <tr><td><strong>17</strong></td><td><code>std::string_view</code></td><td><em>避免字符串拷贝</em></td></tr>
+    <tr><td><strong>17</strong></td><td><code>if constexpr</code></td><td><strong>编译期分支</strong></td></tr>
+    <tr><td><strong>17</strong></td><td>结构化绑定</td><td><em>解构 pair/tuple</em></td></tr>
+    <tr><td><strong>20</strong></td><td>concept</td><td><strong>模板约束（页 06）</strong></td></tr>
+    <tr><td><strong>20</strong></td><td>ranges</td><td><em>管道式数据处理</em></td></tr>
+    <tr><td><strong>20</strong></td><td>modules</td><td><strong>替代头文件（UE 尚未采用）</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">Unreal 的 C++ 版本支持情况</span>
+  <strong>UE5 的 C++ 标准</strong>：<br>
+  · UE5.0-5.2：<em>默认 C++17</em><br>
+  · UE5.3+：<em>逐步支持 C++20</em><br>
+  · <strong>但很多特性还没法用</strong>（<em>因为 UE 自己还没迁移</em>）<br><br>
+  <strong>实践中能用的</strong>：<br>
+  · <strong>C++11/14</strong>——完全可用<br>
+  · <strong>C++17</strong>——大部分可用（<em><code>optional</code>/<code>string_view</code>/<code>if constexpr</code></em>）<br>
+  · <strong>C++20</strong>——<em>部分可用，谨慎使用</em><br><br>
+  <strong>重要提示</strong>：<br>
+  · <strong>UE 有自己的容器</strong>（<code>TArray</code> 而不是 <code>std::vector</code>）<br>
+  · <strong>UE 有自己的字符串</strong>（<code>FString</code> 而不是 <code>std::string</code>）<br>
+  · <em>用 UE 的，不要混用 STL</em>——<strong>除非在纯计算模块里</strong><br><br>
+  <em>这是 UE 开发的一条重要约定。</em>
+</div>
+
+<h2 id="principles">三、现代 C++ 的三条实践原则</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">原则一：能推导就不写类型</span>
+  <strong>用 auto 减少重复</strong>：<br>
+  <code>std::vector&lt;Monster&gt;::iterator it = ...;  // 老写法</code><br>
+  <code>auto it = ...;                              // 新写法</code><br><br>
+  <strong>但不要滥用</strong>：<br>
+  · <em>类型不明显时，写出来更清晰</em><br>
+  · <strong>UE 的容器迭代器类型很长，auto 更合适</strong><br>
+  <br>
+  <strong>判断标准</strong>：<em>如果写出来反而更难读，就用 auto。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">原则二：优先用标准库和引擎容器</span>
+  <strong>不要自己实现链表、动态数组</strong>：<br>
+  · 标准库的 <code>std::vector</code> 已经高度优化<br>
+  · UE 的 <code>TArray</code> 针对游戏场景优化过<br>
+  · <em>自己写的几乎不可能更好</em><br><br>
+  <strong>选择容器</strong>：<br>
+  · 动态数组 → <code>TArray</code><br>
+  · 哈希表 → <code>TMap</code> / <code>TSet</code><br>
+  · 固定大小 → <code>TStaticArray</code><br><br>
+  <strong>标准库的 <code>&lt;algorithm&gt;</code> 也值得用</strong>：<br>
+  <code>std::sort</code>、<code>std::find</code>、<code>std::max_element</code>...
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">原则三：不要为了"现代"而现代</span>
+  <strong>常见的过度使用</strong>：<br>
+  · <em>为了用 lambda 而把所有循环改成 lambda</em><br>
+  · <em>为了用 auto 而让类型完全不可读</em><br>
+  · <strong>为了炫技写复杂的模板元编程</strong><br><br>
+  <strong>判断标准</strong>：<br>
+  <em>"这样写让代码更好懂了吗？"</em><br>
+  · 是 → 用<br>
+  · 否 → 用老写法<br><br>
+  <strong>尤其注意</strong>：<em>团队的水平决定可用的特性</em>。<br>
+  如果一个特性团队里一半人看不懂，<strong>它的维护成本就超过了收益</strong>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="07">
+  <div class="task"><input type="checkbox" id="t-07-1"><label for="t-07-1"><strong>对比写法</strong>：把一个老式循环改成范围 for + auto，感受简洁度。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-2"><label for="t-07-2"><strong>验证 nullptr</strong>：写两个重载函数，分别用 NULL 和 nullptr 调用，观察解析差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-3"><label for="t-07-3"><strong>用 lambda 排序</strong>：用 lambda 做自定义排序，对比写独立函数的方式。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-4"><label for="t-07-4"><strong>测捕获方式</strong>：分别用 <code>[=]</code> 和 <code>[&amp;]</code> 捕获，观察大对象拷贝的开销。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-5"><label for="t-07-5"><strong>检查你的编译器</strong>：确认项目用的 C++ 标准（<em><code>/std:c++17</code></em>）。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-6"><label for="t-07-6"><strong>回答面试题</strong>：① auto 有什么风险？② lambda 的捕获方式？③ UE 为什么用自己的容器？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能列举 C++11 的六个关键特性；<br>
+    ② <strong>知道 nullptr 为什么比 NULL 好</strong>；<br>
+    ③ <strong>知道 lambda 三种捕获方式的区别与风险</strong>；<br>
+    ④ 知道 UE 的 C++ 标准支持情况；<br>
+    ⑤ <strong>理解"不要为了现代而现代"这条原则</strong>。<br>
+    <br>
+    <em>第 ⑤ 条最重要——**它体现的是工程判断力，不是技术知识**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="06-cpp-template.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">06 模板与泛型编程</div>
+  </a>
+  <a class="next" href="08-cpp-concurrency.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">08 并发与性能 ★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

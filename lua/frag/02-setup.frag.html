@@ -1,0 +1,103 @@
+<h1>02 · 环境搭建</h1>
+
+<p class="lead">这一页的目标很明确：<strong>半天之内跑通第一段 Lua 脚本</strong>。不需要装 Unity，不需要配复杂环境——<em>一个解释器加一个编辑器就够了</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（01）讲了为什么学。这一页<em>把手弄脏</em>。<br>
+  <strong>原则</strong>：<strong>不要在没跑通代码之前读任何理论。</strong>装好环境、跑出 Hello World，再回到 03 页学语法。<br>
+  <strong>下一页</strong>（03）基础语法。<em>那时你已经有了能立刻验证的环境。</em>
+</div>
+
+<h2 id="install">一、装一个 Lua 解释器</h2>
+
+<p>学 Lua <strong>不需要 Unity</strong>。装一个独立的解释器，就能练习所有语法。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>平台</th><th>方式</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Windows</strong></td><td>官网下载 <code>lua-5.4.x_Win64_bin.zip</code></td><td>解压即用</td></tr>
+    <tr><td><strong>Windows（推荐）</strong></td><td>用 VS 编译源码</td><td><em>能得到最新的 5.4.7</em></td></tr>
+    <tr><td><strong>macOS</strong></td><td><code>brew install lua</code></td><td>Homebrew 安装</td></tr>
+    <tr><td><strong>Linux</strong></td><td><code>sudo apt install lua5.4</code></td><td>包管理器</td></tr>
+    <tr><td><strong>免安装</strong></td><td>在线 Lua 运行网站</td><td><em>仅用于快速试验</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">自学建议：用 VS 编译源码</span>
+  <strong>为什么推荐自己编译</strong>：<br>
+  · 官网的 Windows 二进制包往往<em>版本较旧</em>，且包含的是 32 位版本<br>
+  · 自己编译能得到<em>最新版 + 64 位 + DLL</em>（DLL 可以给 C# 用）<br><br>
+  <strong>步骤</strong>（VS 2022）：<br>
+  ① 下载源码：<code>https://www.lua.org/ftp/lua-5.4.7.tar.gz</code><br>
+  ② 解压后进入 <code>src/</code> 目录<br>
+  ③ 用 <code>vcvars64.bat</code> 初始化环境<br>
+  ④ <code>cl /O2 /LD /DLUA_BUILD_AS_DLL *.c /Fe:lua54.dll</code>（编译 DLL）<br>
+  ⑤ <code>cl /O2 *.c /Fe:lua.exe</code>（编译解释器）<br>
+  ⑥ 运行 <code>lua.exe -v</code> 验证<br><br>
+  <em>整个流程不到 10 分钟，而且你会得到最新版本。</em>
+</div>
+
+<h2 id="editor">二、编辑器与调试</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>工具</th><th>用途</th><th>推荐度</th></tr></thead>
+  <tbody>
+    <tr><td><strong>VS Code + Lua 插件</strong></td><td>语法高亮、跳转、提示</td><td><span class="mk mk--yes">强烈推荐</span></td></tr>
+    <tr><td><strong>Lua Debug (VS Code)</strong></td><td>断点调试</td><td>推荐</td></tr>
+    <tr><td><strong>ZeroBrane Studio</strong></td><td>轻量 Lua IDE</td><td>可选</td></tr>
+    <tr><td><strong>Notepad++</strong></td><td>快速看文件</td><td><em>不够用</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">调试能力很重要</span>
+  <strong>游戏里的 Lua 代码通常在 Unity 编辑器里调试</strong>（通过 xLua 的调试支持）。<br>
+  但<em>纯 Lua 逻辑</em>（配置解析、算法、数据转换）可以<strong>在独立环境里调试</strong>——<em>速度快得多，而且能断点</em>。<br><br>
+  <strong>建议</strong>：<em>把可独立运行的部分写成独立脚本</em>，先在 VS Code 里调通，再集成到 Unity。<br>
+  这能大幅提升调试效率——因为 Unity 里调 Lua 一次要等很久。
+</div>
+
+<h2 id="first">三、第一个脚本</h2>
+
+<p>创建 <code>hello.lua</code>，写入下面的内容，然后运行 <code>lua hello.lua</code>。</p>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>02/hello</code></div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="02">
+  <div class="task"><input type="checkbox" id="t-02-1"><label for="t-02-1"><strong>装好解释器</strong>：运行 <code>lua -v</code> 能看到版本号。</label></div>
+  <div class="task"><input type="checkbox" id="t-02-2"><label for="t-02-2"><strong>跑通第一个脚本</strong>：创建 <code>hello.lua</code> 并运行。</label></div>
+  <div class="task"><input type="checkbox" id="t-02-3"><label for="t-02-3"><strong>配好编辑器</strong>：装 VS Code 的 Lua 插件，确认语法高亮和跳转正常。</label></div>
+  <div class="task"><input type="checkbox" id="t-02-4"><label for="t-02-4"><strong>试试交互模式</strong>：直接运行 <code>lua</code>（不带参数），进入 REPL，输入几行表达式。</label></div>
+  <div class="task"><input type="checkbox" id="t-02-5"><label for="t-02-5"><strong>写一个计算器</strong>：写一个脚本，读两个数并输出四则运算结果。<em>熟悉文件运行方式。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-02-6"><label for="t-02-6"><strong>回答面试题</strong>：① Lua 有哪几个主要版本，差异是什么？② 为什么推荐 5.4？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能在命令行运行 .lua 文件并看到输出</strong>；<br>
+    ② 编辑器有语法高亮和基本提示；<br>
+    ③ 知道怎么进入交互模式（REPL）快速试验；<br>
+    ④ 知道 Lua 5.3+ 引入了整数类型、5.4 引入了 <code>&lt;close&gt;</code>。<br>
+    <br>
+    <em>这一页的标准很低但很硬——**跑不通就不要往下走**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="01-role.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">01 为什么用 Lua 热更</div>
+  </a>
+  <a class="next" href="kp-index.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">知识点索引</div>
+  </a>
+</nav>

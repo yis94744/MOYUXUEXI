@@ -1,0 +1,150 @@
+<h1>12 · 空间划分与碰撞优化 ★★</h1>
+
+<p class="lead">这是<strong>游戏里最能体现"算法改变性能"的一个领域</strong>。1000 个物体的碰撞检测，朴素的"两两比较"需要 50 万次；用空间划分后只需要几千次——<em>76 倍的差距，而且随对象数量增长还会继续拉大</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（11）寻路解决"怎么走过去"。这一页解决<em>"如何快速找出附近的物体"</em>——这是碰撞、AI 感知、范围技能的共同基础。<br>
+  <strong>关键衔接</strong>：空间划分用到<em>树结构（06）</em>和<em>哈希表（05）</em>。它也是<strong>性能优化模式库（26）</strong>中最重要的一个模式。<br>
+  <strong>验证方式</strong>：本页实现了<strong>四种空间划分方案</strong>并实测，数据是真实测量值。其中还<em>实测出了一个会导致线上事故的陷阱</em>。
+</div>
+
+<h2 id="brute">一、基准：朴素两两检测</h2>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>12/spatial</code></div>
+
+<h2 id="grid">二、均匀网格与那个致命陷阱 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">实测发现的静默漏检（这是本页最重要的内容）</span>
+  在测试"格子大小对结果的影响"时，出现了一个异常现象：<br><br>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>格子大小</th><th>检测对数</th><th>检出碰撞数</th><th>正确性</th></tr></thead>
+    <tbody>
+      <tr><td>5</td><td>33</td><td><strong>33</strong></td><td><span class="mk mk--no">漏检</span></td></tr>
+      <tr><td>10</td><td>112</td><td><strong>111</strong></td><td><span class="mk mk--no">漏检</span></td></tr>
+      <tr><td>20</td><td>424</td><td>167</td><td><span class="mk mk--yes">正确</span></td></tr>
+      <tr><td>40</td><td>1701</td><td>167</td><td><span class="mk mk--yes">正确</span></td></tr>
+      <tr><td>200</td><td>32974</td><td>167</td><td><span class="mk mk--yes">正确</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <strong>正确答案是 167 个碰撞（暴力法的结果）。</strong><br>
+  但格子大小 5 时只检出 33 个，格子 10 时只检出 111 个——<em>都漏检了！</em><br><br>
+  <strong>为什么</strong>：查询半径是 20，而格子只有 5。<br>
+  只查「3×3 邻格」最多只能覆盖 15 个单位的范围，<strong>距离在 15~20 之间的碰撞全被漏掉了</strong>。<br><br>
+  <strong>最危险的地方</strong>：格子 5 的"检测对数只有 33"，看起来<em>比其他方案快得多</em>——如果你只看性能数字，会以为这是最优配置，实际上<strong>结果是错的</strong>。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">铁律：格子大小必须 >= 查询半径</span>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>格子大小</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr><td>格子 &lt; 半径</td><td><span class="mk mk--no">漏检</span>（结果是错的！）</td></tr>
+      <tr><td>格子 = 半径</td><td>刚好够，但边界情况容易出问题</td></tr>
+      <tr><td><strong>格子 = 2 倍半径</strong></td><td><span class="mk mk--yes">推荐值</span></td></tr>
+      <tr><td>格子 &gt;&gt; 半径</td><td>每格对象过多，退化成暴力法</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <strong>这个坑的可怕之处在于</strong>：它<em>不会报错、不会崩溃</em>，只是"某些碰撞检测不到"。<br>
+  表现为——<strong>子弹偶尔穿人、范围技能偶尔漏怪、玩家偶尔穿过墙体</strong>。<br>
+  <em>这类 bug 极难复现，因为取决于物体的精确位置是否恰好落在某个边界上。</em>
+</div>
+
+<h2 id="quad">三、四叉树：处理分布不均</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">网格的弱点与四叉树的解法</span>
+  <strong>网格的问题</strong>：如果所有物体都挤在地图的一个角落，<em>那一格里会有几百个对象</em>——退化成暴力法。<br><br>
+  <strong>四叉树的解法</strong>：<em>物体密集的地方自动细分</em>，稀疏的地方保持大格子。<br><br>
+  <strong>但四叉树有自己的代价</strong>：
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>均匀网格</th><th>四叉树</th></tr></thead>
+    <tbody>
+      <tr><td>构建复杂度</td><td>O(n)</td><td>O(n log n)</td></tr>
+      <tr><td>查询复杂度</td><td>O(1) 定位</td><td>O(log n) 下降</td></tr>
+      <tr><td><strong>动态更新</strong></td><td><strong>O(1)</strong> 改格子索引</td><td>O(log n) 删除+重插</td></tr>
+      <tr><td>内存</td><td>固定</td><td>动态（节点多时更大）</td></tr>
+      <tr><td>适用</td><td><strong>动态物体</strong></td><td><strong>静态物体</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <strong>关键结论</strong>：<em>频繁移动的物体，网格方案的更新成本远低于四叉树</em>。<br>
+  所以四叉树更适合地形、建筑、植被这类<strong>静态或缓慢移动</strong>的对象。
+</div>
+
+<h2 id="hash">四、空间哈希：无限地图的选择</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">空间哈希解决了什么</span>
+  均匀网格需要<strong>预先知道地图边界</strong>（要分配 cols × rows 的数组）。<br>
+  但开放世界、程序化生成的地图<em>可能非常大甚至无限</em>。<br><br>
+  <strong>空间哈希</strong>用哈希表代替二维数组：<br>
+  • 格子的 key = <code>hash(cellX, cellY)</code><br>
+  • 只创建<em>有物体的格子</em>，稀疏数据下内存占用极小<br>
+  • 支持负坐标（无限地图）<br><br>
+  <strong>注意</strong>：哈希会有<em>冲突</em>——不同格子可能映射到同一个 key。<em>实践中这个概率极低，且冲突只影响性能（多查几个对象），不影响正确性。</em>
+</div>
+
+<h2 id="compare">五、四种方案完整对比</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方案</th><th>构建</th><th>查询</th><th>动态更新</th><th>内存</th><th>适用场景</th></tr></thead>
+  <tbody>
+    <tr><td><strong>暴力两两</strong></td><td>无</td><td>O(n²)</td><td>无</td><td>无</td><td><strong>n &lt; 100</strong></td></tr>
+    <tr><td><strong>均匀网格</strong></td><td>O(n)</td><td>O(1)</td><td>O(1)</td><td>固定</td><td>分布均匀、地图固定</td></tr>
+    <tr><td><strong>四叉树</strong></td><td>O(n log n)</td><td>O(log n)</td><td>O(log n)</td><td>动态</td><td>分布不均、<strong>静态为主</strong></td></tr>
+    <tr><td><strong>空间哈希</strong></td><td>O(n)</td><td>O(1)</td><td>O(1)</td><td>稀疏</td><td><strong>无限地图、动态增删</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">实战选型建议</span>
+  <strong>① 首选均匀网格或空间哈希</strong>——实现简单、性能好，<em>90% 的场景够用</em>。<br>
+  <strong>② 四叉树只适合静态物体</strong>——地形、建筑、植被。<em>动态物体用它会得不偿失</em>。<br>
+  <strong>③ 格子大小取 2 倍查询半径</strong>——并且<strong>一定要用 Profiler 实测你项目的最优值</strong>。<br>
+  <strong>④ 记住 Broad Phase 与 Narrow Phase 的分工</strong>——空间划分只是<em>粗筛</em>，筛出候选后仍要做精确检测。<br>
+  <strong>⑤ Unity 的 Physics.OverlapSphere 已经优化过</strong>——但有自己的开销和 GC 问题（见 C# 站页 26）。<em>当你需要自定义单位范围查询、或在服务端做逻辑时，才需要自己实现。</em>
+</div>
+
+<h2 id="tasks">六、本章动手任务</h2>
+
+<div class="tasks" data-page="12">
+  <div class="task"><input type="checkbox" id="t-12-1"><label for="t-12-1"><strong>复现漏检 bug</strong>：把格子大小设成比查询半径小，对比检出数量与暴力法。<em>这是本页最重要的实验。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-12-2"><label for="t-12-2"><strong>实现均匀网格</strong>：包含 insert 和 queryNeighbors，验证结果与暴力法一致。</label></div>
+  <div class="task"><input type="checkbox" id="t-12-3"><label for="t-12-3"><strong>实现四叉树</strong>：包含 subdivide 和 query，测试不均匀分布下的性能。</label></div>
+  <div class="task"><input type="checkbox" id="t-12-4"><label for="t-12-4"><strong>实现空间哈希</strong>：用哈希表代替二维数组，测试负坐标是否正常工作。</label></div>
+  <div class="task"><input type="checkbox" id="t-12-5"><label for="t-12-5"><strong>测动态更新成本</strong>：让所有物体每帧随机移动，对比网格（改索引）与四叉树（重插）的耗时差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-12-6"><label for="t-12-6"><strong>画性能曲线</strong>：n 从 100 增到 10000，测四种方案的耗时，画出增长曲线并验证复杂度分析。</label></div>
+  <div class="task"><input type="checkbox" id="t-12-7"><label for="t-12-7"><strong>回答面试题</strong>：① 为什么要做空间划分？② 网格和四叉树怎么选？③ 格子太小会有什么问题？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出四种空间划分方案的复杂度与适用场景；<br>
+    ② <strong>能解释"格子小于查询半径会静默漏检"这个陷阱及其后果</strong>；<br>
+    ③ 知道为什么四叉树不适合频繁移动的物体；<br>
+    ④ 能手写均匀网格与空间哈希；<br>
+    ⑤ 理解 Broad Phase（粗筛）与 Narrow Phase（精检）的分工。<br><br>
+    <em>第 ② 条是这一页最有价值的内容——它是个"不会报错的 bug"，只有理解原理才能提前避免。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="11-pathfinding.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">11 寻路算法 ★★★</div>
+  </a>
+  <a class="next" href="13-sorting.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">13 排序与选择算法</div>
+  </a>
+</nav>

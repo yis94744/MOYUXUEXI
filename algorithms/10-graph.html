@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10 图的表示与遍历 — 游戏算法与系统设计｜从数据结构到完整系统，覆盖游戏开发全部核心算法</title>
+<meta name="description" content="邻接表与邻接矩阵、DFS/BFS、拓扑排序、依赖解析">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">游戏算法与系统设计
+        <span>从数据结构到完整系统，覆盖游戏开发全部核心算法</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>10 · 图的表示与遍历</h1>
+
+<p class="lead">图是<strong>游戏里最"隐形"的数据结构</strong>——你可能不会直接写"图"，但<em>地图、任务依赖、技能前置、社交关系本质上都是图</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="09-union-find.html#optimizations" data-brief="路径压缩 + 按秩合并，朴素版慢 8 倍"><span class="prereq__title">并查集</span><span class="prereq__page">09-union-find</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="hidden-graphs">一、游戏里"伪装成其他东西"的图</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>游戏元素</th><th>图的模型</th><th>节点</th><th>边</th></tr></thead>
+  <tbody>
+    <tr><td><strong>地图格子</strong></td><td>网格图</td><td>每个可通行格子</td><td>上下左右相邻</td></tr>
+    <tr><td><strong>导航网格</strong></td><td>多边形图</td><td>每个 NavMesh 多边形</td><td>共享边的多边形</td></tr>
+    <tr><td><strong>任务链</strong></td><td><strong>有向图</strong></td><td>每个任务</td><td>前置 → 后继</td></tr>
+    <tr><td><strong>技能树</strong></td><td>有向图</td><td>每个技能</td><td>前置技能 → 后继</td></tr>
+    <tr><td><strong>剧情分支</strong></td><td>有向图</td><td>每个剧情节点</td><td>选项 → 结果</td></tr>
+    <tr><td><strong>社交关系</strong></td><td>无向图</td><td>每个玩家</td><td>好友关系</td></tr>
+    <tr><td><strong>状态机</strong></td><td><strong>有向图</strong></td><td>每个状态</td><td>状态转移</td></tr>
+    <tr><td><strong>依赖加载</strong></td><td>有向无环图</td><td>每个资源</td><td>依赖关系</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">认出来就是理解了一半</span>
+  <strong>很多"复杂的系统设计"，本质就是图上的算法</strong>：<br>
+  · <em>任务系统</em>要判断"前置是否完成" → <strong>拓扑排序</strong><br>
+  · <em>技能树</em>要检查"循环依赖" → <strong>环检测</strong><br>
+  · <em>剧情分支</em>要判断"能否到达某结局" → <strong>可达性</strong><br>
+  · <em>资源加载</em>要决定"先加载谁" → <strong>拓扑排序</strong><br><br>
+  <strong>能一眼看出"这是图问题"，就已经成功了一半。</strong><br>
+  <em>剩下的是选择遍历方式（BFS/DFS）和合适的数据结构。</em>
+</div>
+
+<h2 id="traversal">二、两种遍历的本质区别 ★★</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>对比</th><th>BFS（广度优先）</th><th>DFS（深度优先）</th></tr></thead>
+  <tbody>
+    <tr><td>数据结构</td><td><strong>队列</strong></td><td><strong>栈（或递归）</strong></td></tr>
+    <tr><td>顺序</td><td>先近后远</td><td>一条路走到黑</td></tr>
+    <tr><td>能否求最短路</td><td><span class="mk mk--yes">能（无权图）</span></td><td><span class="mk mk--no">不能</span></td></tr>
+    <tr><td>内存占用</td><td>可能很大（存一层）</td><td><em>取决于深度</em></td></tr>
+    <tr><td>适用</td><td><strong>最短路径、分层</strong></td><td><strong>连通性、拓扑排序</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">什么时候用 BFS、什么时候用 DFS</span>
+  <strong>问自己一个问题：我要找"最近的"还是"有没有"？</strong><br><br>
+  <strong>用 BFS</strong>：<br>
+  · 找最短路径（<em>无权图，比如格子步数</em>）<br>
+  · 找最近的敌人/资源<br>
+  · 传染扩散（<em>火势、毒圈</em>）<br>
+  · 分层处理<br><br>
+  <strong>用 DFS</strong>：<br>
+  · 判断连通性（<em>能不能到达</em>）<br>
+  · 拓扑排序（<em>任务顺序、加载顺序</em>）<br>
+  · 找环<br>
+  · 遍历所有可能（<em>回溯、搜索解</em>）<br><br>
+  <strong>关键区别</strong>：<em>BFS 保证第一次到达就是最短；DFS 不保证。</em><br>
+  所以"找最近的"必须用 BFS。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">DFS 的递归陷阱</span>
+  <strong>问题</strong>：递归 DFS 在<em>大图上会栈溢出</em>。<br>
+  比如 1000×1000 的地图，递归深度可能达到<strong>百万级</strong>。<br><br>
+  <strong>解决方案</strong>：<br>
+  ① <strong>改成迭代版</strong>——用显式的栈代替递归调用<br>
+  ② <strong>限制深度</strong>——超过阈值就返回<br>
+  ③ 用<strong>BFS 代替</strong>（如果问题允许）<br><br>
+  <strong>Lua 的递归限制</strong>：<em>默认约 20 万层</em>（受 C 栈限制）。<br>
+  <strong>C# 更低</strong>（约几千层）——所以 C# 里写递归 DFS 要特别小心。
+</div>
+
+<h2 id="topological">三、拓扑排序：任务系统的核心 ★★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">什么是拓扑排序</span>
+  <strong>问题</strong>：有 10 个任务，每个有前置任务，<em>怎么排出合理的完成顺序？</em><br><br>
+  <strong>拓扑排序的答案</strong>：找到一个顺序，使得<em>每个任务都在它的所有前置之后</em>。<br><br>
+  <strong>算法（Kahn 算法）</strong>：<br>
+  ① 统计每个节点的<strong>入度</strong>（有多少前置）<br>
+  ② 把入度为 0 的节点放入队列<br>
+  ③ 取出一个，加入结果，<em>把它的所有后继入度减 1</em><br>
+  ④ 如果后继入度变成 0，加入队列<br>
+  ⑤ 重复直到队列空<br><br>
+  <strong>关键性质</strong>：<em>如果结果数量小于节点总数，说明存在环</em>——<strong>这正好可以用来检测循环依赖！</strong><br><br>
+  <strong>游戏应用</strong>：<br>
+  · 任务完成顺序<br>
+  · 技能点分配顺序<br>
+  · <strong>资源加载顺序</strong>（A 依赖 B 就先加载 B）<br>
+  · 编译顺序
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="10">
+  <div class="task"><input type="checkbox" id="t-10-1"><label for="t-10-1"><strong>实现两种遍历</strong>：BFS 用队列，DFS 用栈（迭代版，不用递归）。</label></div>
+  <div class="task"><input type="checkbox" id="t-10-2"><label for="t-10-2"><strong>对比差异</strong>：在同一个图上跑 BFS 和 DFS，观察访问顺序的不同。</label></div>
+  <div class="task"><input type="checkbox" id="t-10-3"><label for="t-10-3"><strong>做最短路径</strong>：用 BFS 在网格地图上找最短路径，验证步数最少。</label></div>
+  <div class="task"><input type="checkbox" id="t-10-4"><label for="t-10-4"><strong>实现拓扑排序</strong>：给定任务依赖，输出合理的完成顺序。</label></div>
+  <div class="task"><input type="checkbox" id="t-10-5"><label for="t-10-5"><strong>检测循环依赖</strong>：构造一个带环的依赖图，验证拓扑排序能检测出来。</label></div>
+  <div class="task"><input type="checkbox" id="t-10-6"><label for="t-10-6"><strong>回答面试题</strong>：① BFS 和 DFS 的区别？② 为什么最短路径要用 BFS？③ 拓扑排序怎么检测环？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出八种"伪装成其他东西"的图；<br>
+    ② <strong>知道 BFS 用队列、DFS 用栈</strong>；<br>
+    ③ <strong>知道"找最近的用 BFS，判断有没有用 DFS"</strong>；<br>
+    ④ 知道 DFS 递归会栈溢出，以及三种解法；<br>
+    ⑤ <strong>能实现拓扑排序并用它检测循环依赖</strong>。<br>
+    <br>
+    <em>第 ⑤ 条最实用——任务系统、技能树、资源加载都会用到。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="09-union-find.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">09 并查集与图论基础 ★★</div>
+  </a>
+  <a class="next" href="11-pathfinding.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">11 寻路算法 ★★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

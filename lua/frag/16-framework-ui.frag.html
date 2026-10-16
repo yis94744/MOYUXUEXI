@@ -1,0 +1,118 @@
+<h1>16 · UI 框架 ★★★</h1>
+
+<p class="lead">UI 是<strong>Lua 层代码量最大的部分</strong>。这一页讲完整的 UI 框架设计：<em>界面栈、生命周期、数据绑定、红点集成</em>。<strong>这是最能体现框架设计功力的一页。</strong></p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="elements">一、UI 框架的六大要素</h2>
+
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>16/ui-framework</code></div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>要素</th><th>作用</th><th>关键设计</th></tr></thead>
+  <tbody>
+    <tr><td><strong>界面栈</strong></td><td>管理打开/关闭顺序</td><td><em>栈结构，后进先出</em></td></tr>
+    <tr><td><strong>生命周期</strong></td><td>OnCreate/OnOpen/OnClose</td><td><strong>明确的责任划分</strong></td></tr>
+    <tr><td><strong>数据绑定</strong></td><td>数据变化自动刷新 UI</td><td>事件 + 脏标记</td></tr>
+    <tr><td><strong>资源管理</strong></td><td>加载图集与预制体</td><td><em>引用计数（页 14）</em></td></tr>
+    <tr><td><strong>红点集成</strong></td><td>显示红点</td><td>算法站页 21</td></tr>
+    <tr><td><strong>层级管理</strong></td><td>控制显示顺序</td><td>Canvas 分组</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="stack">二、界面栈：为什么一定是栈 ★★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">栈天然解决了"返回上一级"</span>
+  <strong>场景</strong>：主界面 → 背包 → 装备详情 → 使用确认<br>
+  <strong>用栈的做法</strong>：<code>push(主界面)</code> → <code>push(背包)</code> → …<br>
+  按返回键 <code>pop()</code>——<em>自动回到上一层</em>。<br><br>
+  <strong>不用栈的问题</strong>：<br>
+  · 你需要自己记住"打开详情前是什么界面"<br>
+  · 处理任意层级的嵌套<br>
+  · <em>返回顺序可能出错</em><br><br>
+  <strong>栈的三种操作</strong>：<br>
+  · <code>Push</code>——打开新界面（旧界面可能隐藏但保留）<br>
+  · <code>Pop</code>——返回上一级<br>
+  · <code>Replace</code>——替换当前界面（不增加层级）
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三种界面类型要区分</span>
+  <strong>① 全屏界面</strong>（如主界面、背包）<br>
+  · 打开时<em>隐藏下层</em><br>
+  · 返回时<em>恢复下层</em><br><br>
+  <strong>② 弹窗</strong>（如确认框、提示）<br>
+  · 打开时<em>下层仍然可见</em>（半透明遮罩）<br>
+  · <strong>可以同时存在多个</strong><br><br>
+  <strong>③ 飘字/Toast</strong>（如获得道具提示）<br>
+  · <em>不入栈</em>，自动消失<br>
+  · 可以有多个同时显示<br><br>
+  <strong>混淆这三种类型会导致</strong>：返回键行为混乱、界面叠在一起、飘字挡住按钮。<em>这是 UI 框架设计时最容易出错的地方。</em>
+</div>
+
+<h2 id="binding">三、数据绑定：两种模式</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>模式</th><th>做法</th><th>优缺点</th></tr></thead>
+  <tbody>
+    <tr><td><strong>拉模式（Poll）</strong></td><td>每帧或定时检查数据变化</td><td><em>简单但浪费</em></td></tr>
+    <tr><td><strong>推模式（Push）</strong></td><td>数据变化时通知 UI</td><td><strong>高效，主流</strong></td></tr>
+    <tr><td><strong>混合</strong></td><td>事件通知 + 惰性刷新</td><td><span class="mk mk--yes">最优</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">推模式的经典问题：界面已关闭但还在刷新</span>
+  <strong>问题</strong>：界面关闭了，但事件订阅没取消。<br>
+  数据变化时<em>回调仍然执行</em>——访问已销毁的 UI 对象 → <strong>报错</strong>。<br><br>
+  <strong>这是 Lua UI 框架最常见的 bug。</strong><br>
+  <strong>解决方法</strong>：<br>
+  ① <strong>OnClose 时取消所有订阅</strong>（必须成对）<br>
+  ② <strong>在回调里检查界面是否还活着</strong><br>
+  ③ 用<strong>弱引用表</strong>管理订阅（见页 07）<br><br>
+  <em>页 13 的事件系统必须提供"按所有者批量取消订阅"的接口——这是框架设计要提前考虑的。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="16">
+  <div class="task"><input type="checkbox" id="t-16-1"><label for="t-16-1"><strong>实现界面栈</strong>：支持 push/pop/replace，处理全屏与弹窗的区别。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-2"><label for="t-16-2"><strong>定义生命周期</strong>：实现 OnCreate/OnOpen/OnClose/OnDestroy 并验证调用顺序。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-3"><label for="t-16-3"><strong>做数据绑定</strong>：实现"数据变化 → 界面刷新"，验证界面关闭后不再收到通知。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-4"><label for="t-16-4"><strong>做批量取消订阅</strong>：给事件系统加"按所有者取消"的接口。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-5"><label for="t-16-5"><strong>集成红点</strong>：把算法站的红点系统接进 UI 框架。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-6"><label for="t-16-6"><strong>回答面试题</strong>：① UI 为什么用栈？② 全屏与弹窗的区别？③ 怎么避免"界面关闭后还在刷新"？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出 UI 框架的六大要素</strong>；<br>
+    ② <strong>能解释为什么界面栈是栈，以及三种界面类型的区别</strong>；<br>
+    ③ 能设计清晰的生命周期回调；<br>
+    ④ <strong>知道"界面关闭后还在刷新"的问题及三种解法</strong>；<br>
+    ⑤ 能实现"数据变化自动刷新"的绑定机制。<br>
+    <br>
+    <em>第 ② 和第 ④ 条是这一页的核心——前者是设计思路，后者是最容易踩的坑。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="15-framework-oop.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">15 面向对象框架 ★★</div>
+  </a>
+  <a class="next" href="17-framework-hot-patch.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">17 热更与版本管理 ★★★</div>
+  </a>
+</nav>

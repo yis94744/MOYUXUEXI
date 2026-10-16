@@ -1,0 +1,252 @@
+{
+  "title": "游戏算法与系统设计",
+  "subtitle": "从数据结构到完整系统，覆盖游戏开发全部核心算法",
+  "key": "algo",
+  "pages": [
+    {
+      "file": "index.html",
+      "num": "",
+      "group": "开始",
+      "title": "路线总览",
+      "desc": "游戏开发算法全景图、七阶段路线、与三站的关系"
+    },
+    {
+      "file": "01-why.html",
+      "num": "01",
+      "group": "开始",
+      "title": "为什么游戏程序员要懂算法",
+      "desc": "算法在游戏里的真实位置、面试占比、学习方法"
+    },
+    {
+      "file": "02-complexity.html",
+      "num": "02",
+      "group": "开始",
+      "title": "复杂度与性能直觉",
+      "desc": "大 O 的实际含义、常数因子的影响、实测对比方法"
+    },
+    {
+      "file": "kp-index.html",
+      "num": "",
+      "group": "开始",
+      "title": "知识点索引",
+      "desc": "全站知识点总目录"
+    },
+    {
+      "file": "03-array-list.html",
+      "num": "03",
+      "group": "基础数据结构",
+      "title": "数组、动态数组与环形缓冲",
+      "desc": "连续内存、扩容策略、环形队列、复用缓冲区"
+    },
+    {
+      "file": "04-linked-stack-queue.html",
+      "num": "04",
+      "group": "基础数据结构",
+      "title": "链表、栈与队列",
+      "desc": "链表在游戏中的真实用途、栈与递归、双端队列"
+    },
+    {
+      "file": "05-hash.html",
+      "num": "05",
+      "group": "基础数据结构",
+      "title": "哈希表与哈希函数 ★",
+      "desc": "冲突解决、负载因子、字符串哈希、游戏中的对象映射"
+    },
+    {
+      "file": "06-tree-basic.html",
+      "num": "06",
+      "group": "基础数据结构",
+      "title": "树与二叉搜索树",
+      "desc": "遍历方式、BST、平衡树概念、游戏中的层级结构"
+    },
+    {
+      "file": "07-heap-priority.html",
+      "num": "07",
+      "group": "基础数据结构",
+      "title": "堆与优先队列 ★",
+      "desc": "二叉堆实现、A* 的开放列表、事件调度、Top-K 问题"
+    },
+    {
+      "file": "08-trie.html",
+      "num": "08",
+      "group": "基础数据结构",
+      "title": "字典树 Trie 与敏感词过滤 ★",
+      "desc": "Trie 结构、AC 自动机、敏感词、技能 ID 前缀匹配"
+    },
+    {
+      "file": "09-union-find.html",
+      "num": "09",
+      "group": "基础数据结构",
+      "title": "并查集与图论基础",
+      "desc": "路径压缩、按秩合并、连通性判断、关卡区域划分"
+    },
+    {
+      "file": "10-graph.html",
+      "num": "10",
+      "group": "基础数据结构",
+      "title": "图的表示与遍历",
+      "desc": "邻接表与邻接矩阵、DFS/BFS、拓扑排序、依赖解析"
+    },
+    {
+      "file": "11-pathfinding.html",
+      "num": "11",
+      "group": "游戏核心算法",
+      "title": "寻路算法 ★★★",
+      "desc": "A*、Dijkstra、启发函数、JPS、NavMesh、流场寻路"
+    },
+    {
+      "file": "12-spatial.html",
+      "num": "12",
+      "group": "游戏核心算法",
+      "title": "空间划分与碰撞优化 ★★",
+      "desc": "四叉树、八叉树、网格、空间哈希、BVH、Broad Phase"
+    },
+    {
+      "file": "13-sorting.html",
+      "num": "13",
+      "group": "游戏核心算法",
+      "title": "排序与选择算法",
+      "desc": "快排、归并、堆排序、稳定排序、Top-K、部分排序"
+    },
+    {
+      "file": "14-search.html",
+      "num": "14",
+      "group": "游戏核心算法",
+      "title": "查找与字符串算法",
+      "desc": "二分查找、滑窗、KMP、字符串匹配、模糊搜索"
+    },
+    {
+      "file": "15-dynamic-programming.html",
+      "num": "15",
+      "group": "游戏核心算法",
+      "title": "动态规划与贪心",
+      "desc": "背包问题、最长公共子序列、状态压缩、贪心适用条件"
+    },
+    {
+      "file": "16-state-machine.html",
+      "num": "16",
+      "group": "游戏系统设计",
+      "title": "状态机 FSM ★★",
+      "desc": "枚举式、类式、层次状态机、状态机在角色/AI/UI 的应用"
+    },
+    {
+      "file": "17-behavior-tree.html",
+      "num": "17",
+      "group": "游戏系统设计",
+      "title": "行为树 Behavior Tree ★★★",
+      "desc": "节点类型、组合节点、装饰器、黑板、运行时可视化调试"
+    },
+    {
+      "file": "18-decision-tree.html",
+      "num": "18",
+      "group": "游戏系统设计",
+      "title": "决策树与效用 AI ★",
+      "desc": "决策树、效用系统、模糊逻辑、目标优先级评分"
+    },
+    {
+      "file": "19-goap-planner.html",
+      "num": "19",
+      "group": "游戏系统设计",
+      "title": "GOAP 与规划型 AI",
+      "desc": "目标导向行动规划、前向搜索、行动代价、与行为树的取舍"
+    },
+    {
+      "file": "20-boids-flock.html",
+      "num": "20",
+      "group": "游戏系统设计",
+      "title": "群体行为与 Boids",
+      "desc": "分离/对齐/聚合、羊群、鱼群、群体寻路、性能优化"
+    },
+    {
+      "file": "21-reddot.html",
+      "num": "21",
+      "group": "游戏系统设计",
+      "title": "红点系统 ★★★",
+      "desc": "树形结构、聚合规则、脏标记、异步刷新、百万级节点优化"
+    },
+    {
+      "file": "22-quest-achievement.html",
+      "num": "22",
+      "group": "游戏系统设计",
+      "title": "任务与成就系统",
+      "desc": "条件表达式、事件驱动进度、任务链、前置依赖、存档兼容"
+    },
+    {
+      "file": "23-buff-skill.html",
+      "num": "23",
+      "group": "游戏系统设计",
+      "title": "Buff 与技能系统",
+      "desc": "效果叠加规则、属性修改器链、触发时机、序列化"
+    },
+    {
+      "file": "24-inventory-drop.html",
+      "num": "24",
+      "group": "游戏系统设计",
+      "title": "背包、掉落与权重随机",
+      "desc": "背包格子与堆叠、掉落表、权重随机、伪随机分布 PRD"
+    },
+    {
+      "file": "25-time-scheduler.html",
+      "num": "25",
+      "group": "游戏系统设计",
+      "title": "定时器与事件调度",
+      "desc": "时间轮、堆调度、分帧执行、服务器定时任务"
+    },
+    {
+      "file": "26-perf-patterns.html",
+      "num": "26",
+      "group": "性能与工程",
+      "title": "性能优化模式库 ★★",
+      "desc": "对象池、内存池、缓存、批处理、分帧、惰性计算、空间换时间"
+    },
+    {
+      "file": "27-cache-lru.html",
+      "num": "27",
+      "group": "性能与工程",
+      "title": "缓存策略与 LRU",
+      "desc": "LRU/LFU、缓存淘汰、资源缓存、预加载策略、缓存穿透"
+    },
+    {
+      "file": "28-bitwise.html",
+      "num": "28",
+      "group": "性能与工程",
+      "title": "位运算与数据压缩",
+      "desc": "位掩码、位域、标志位、序列化压缩、浮点量化、变长编码"
+    },
+    {
+      "file": "29-serialize.html",
+      "num": "29",
+      "group": "性能与工程",
+      "title": "存档与序列化",
+      "desc": "版本兼容、增量存档、数据校验、防篡改、压缩"
+    },
+    {
+      "file": "30-debug-tools.html",
+      "num": "30",
+      "group": "性能与工程",
+      "title": "调试工具与可视化",
+      "desc": "编辑器可视化、运行时 Gizmos、算法性能对比、Profiler 集成"
+    },
+    {
+      "file": "31-interview.html",
+      "num": "31",
+      "group": "面试与实战",
+      "title": "面试题库",
+      "desc": "算法题、系统设计题、手写实现题、复杂度分析"
+    },
+    {
+      "file": "32-projects.html",
+      "num": "32",
+      "group": "面试与实战",
+      "title": "实战项目",
+      "desc": "分阶段实现全部系统的完整项目，含验收标准"
+    },
+    {
+      "file": "33-reference.html",
+      "num": "33",
+      "group": "面试与实战",
+      "title": "算法速查",
+      "desc": "复杂度对照表、模板代码、常见陷阱速查"
+    }
+  ]
+}

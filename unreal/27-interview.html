@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>27 面试、作品集与资源 — C++ + Unreal 路线｜从零基础到 3A 级项目开发</title>
+<meta name="description" content="C++ 与 UE 面试高频题、四级理解标准、作品集、权威资源、行业数据">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C++ + Unreal 路线
+        <span>从零基础到 3A 级项目开发</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>27 · 面试、作品集与资源</h1>
+
+<p class="lead">这是<strong>全站最后一页</strong>。前面 26 页给了你知识，这一页告诉你<em>怎么把知识变成 offer</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="levels">一、四级理解标准</h2>
+
+<p>判断自己"会不会"一个知识点，用<strong>四个等级</strong>。<em>大多数人停在第二级就以为学会了。</em></p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>等级</th><th>标准</th><th>面试结果</th></tr></thead>
+  <tbody>
+    <tr><td><strong>L1 听过</strong></td><td>"我知道有这个东西"</td><td><span class="mk mk--no">直接淘汰</span></td></tr>
+    <tr><td><strong>L2 能说</strong></td><td>"我能说出它的定义"</td><td><span class="mk mk--warn">勉强及格</span></td></tr>
+    <tr><td><strong>L3 能讲</strong></td><td>"我能说清原理、场景、代价"</td><td><span class="mk mk--yes">合格</span></td></tr>
+    <tr><td><strong>L4 做过</strong></td><td>"我做过，遇到 X 问题，用 Y 解决，效果 Z"</td><td><span class="mk mk--yes">优秀</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">自测方法</span>
+  拿下面的高频题，<strong>合上资料口头讲一遍</strong>。<br><br>讲的过程中出现这些情况，说明还没到 L3：<br>· <em>"呃……就是那个……"</em><br>· <em>说了一半发现逻辑不对</em><br>· <em>只会背定义，说不出"什么时候不该用"</em><br><br><em>建议录音回放——你会发现自己讲得比想象中乱。</em>
+</div>
+
+<h2 id="questions">二、UE 高频题分类</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>主题</th><th>高频题</th><th>考点页</th></tr></thead>
+  <tbody>
+    <tr><td><strong>C++ 基础</strong></td><td><em>声明与定义；UB 是什么；智能指针</em></td><td>03, 04</td></tr>
+    <tr><td><strong>内存管理</strong></td><td><strong>RAII；循环引用；UPROPERTY 与 GC</strong></td><td>04, 12</td></tr>
+    <tr><td><strong>UE 宏系统</strong></td><td><strong>UPROPERTY 的最大作用；命名前缀规则</strong></td><td>12</td></tr>
+    <tr><td><strong>Gameplay 框架</strong></td><td><strong>GameMode vs GameState；Controller/Pawn 分离</strong></td><td>13</td></tr>
+    <tr><td><strong>蓝图协作</strong></td><td><strong>C++ 与蓝图怎么划分；蓝图慢多少</strong></td><td>14</td></tr>
+    <tr><td><strong>GAS</strong></td><td><em>什么时候该用；五个核心概念</em></td><td>15</td></tr>
+    <tr><td><strong>动画</strong></td><td><strong>攻击判定为什么用 Anim Notify</strong></td><td>16</td></tr>
+    <tr><td><strong>渲染</strong></td><td><em>Nanite 限制；Lumen 代价</em></td><td>17</td></tr>
+    <tr><td><strong>特效</strong></td><td><em>性能开销来源；CPU vs GPU 粒子</em></td><td>18</td></tr>
+    <tr><td><strong>网络</strong></td><td><strong>服务器权威；三种 RPC；客户端预测</strong></td><td>19</td></tr>
+    <tr><td><strong>UI</strong></td><td><em>UMG 的性能陷阱；Invalidation Box</em></td><td>20</td></tr>
+    <tr><td><strong>架构</strong></td><td><strong>Subsystem 解决什么；接口 vs Cast</strong></td><td>22</td></tr>
+    <tr><td><strong>性能</strong></td><td><strong>PIE 数据不可信；stat unit 怎么读</strong></td><td>23</td></tr>
+    <tr><td><strong>工程</strong></td><td><em>版本控制；Cook 阶段</em></td><td>24</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">加粗的题是"必问"</span>
+  上面加粗的题，<strong>几乎每一场 UE 面试都会出现至少两道</strong>。<br><br>如果这些答不上来，<em>其他答得再好也很难通过</em>。<br><br><strong>特别是这三道</strong>：<br>· <strong>"UPROPERTY 的最大作用是什么？"</strong>（<em>页 12</em>）<br>· <strong>"GameMode 和 GameState 的区别？"</strong>（<em>页 13</em>）<br>· <strong>"客户端能不能改权威状态？"</strong>（<em>页 19</em>）<br><br><em>这三道题能立刻区分"用过 UE"和"理解 UE"。</em>
+</div>
+
+<h2 id="portfolio">三、作品集的包装</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">一个项目的描述应该包含什么</span>
+  <strong>模板</strong>：<br><code>[项目类型] + [技术亮点] + [量化结果] + [我的职责]</code><br><br><strong>差的写法</strong>：<br><em>"用 UE5 做了一个射击游戏，实现了角色移动和射击。"</em><br><br><strong>好的写法</strong>：<br><em>"UE5 联网射击原型。<strong>用 UE 的网络复制与客户端预测实现流畅的射击体验</strong>；<strong>用 Insights 定位 Tick 开销，关闭 60% 不必要的 Tick 把帧率从 45 提升到 70</strong>。负责全部程序部分。"</em><br><br><strong>区别在于</strong>：<em>量化 + 技术决策 + 取舍原因</em>。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">面试官最想听的三个问题</span>
+  <strong>① "这个项目里最难的技术问题是什么？"</strong><br>→ 准备一个具体故事：<em>怎么发现、怎么定位、怎么解决、效果如何</em>。<br><br><strong>② "为什么用这个方案，不用另一个？"</strong><br>→ 考察<em>技术选型能力</em>。<br><em>准备 2~3 个"取舍"的例子</em>——<em>比如"为什么没用 GAS"</em>（<em>页 15</em>）。<br><br><strong>③ "如果给你更多时间，你会怎么改进？"</strong><br>→ 考察<em>技术视野与自我认知</em>。<br><em>能说出"我知道这里做得不够好，应该这样改"，比"我做得很完美"更可信。</em>
+</div>
+
+<h2 id="resources">四、资源与下一步</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>类型</th><th>推荐</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><strong>官方文档</strong></td><td>Epic 官方文档</td><td><em>最权威</em></td></tr>
+    <tr><td><strong>源码</strong></td><td><strong>UE 源码（GitHub）</strong></td><td><em>完整开放，最好的老师</em></td></tr>
+    <tr><td><strong>社区</strong></td><td>Epic 论坛 / 知乎 UE 话题</td><td><em>具体问题</em></td></tr>
+    <tr><td><strong>C# 路线</strong></td><td><a href="../unity/index.html">本站 Unity 路线</a></td><td>对比学习</td></tr>
+    <tr><td><strong>算法</strong></td><td><a href="../algorithms/index.html">本站算法路线</a></td><td><em>补齐算法短板</em></td></tr>
+    <tr><td><strong>实践</strong></td><td><strong>做一个完整项目</strong></td><td><em>最有效的学习方式</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">最后一段话</span>
+  <strong>这份路线到这里就结束了。</strong><br><br>它给了你一个完整的知识体系，但<em>知识本身不产生价值</em>——<strong>把它用出来才有价值</strong>。<br><br><strong>建议的下一步</strong>：<br>① <em>合上这份文档，去做一个项目</em><br>② <em>遇到问题时回来查对应的页面</em><br>③ <em>做完后，回头看一遍"四级理解标准"，检查自己到了哪一级</em><br><br><em>UE 的门槛比 Unity 高，但也意味着<strong>会的人更少、价值更高</strong>。</em><br><br><strong>剩下的，就是去做。</strong>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="27">
+  <div class="task"><input type="checkbox" id="t-27-1"><label for="t-27-1"><strong>做四级自测</strong>：拿高频题表逐条口头讲，标记自己到哪一级。</label></div>
+  <div class="task"><input type="checkbox" id="t-27-2"><label for="t-27-2"><strong>准备三个故事</strong>：最难的技术问题、一次取舍决策、一次性能优化。<em>每个都要量化。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-27-3"><label for="t-27-3"><strong>重写项目描述</strong>：用"技术亮点 + 量化结果"的模板重写作品集。</label></div>
+  <div class="task"><input type="checkbox" id="t-27-4"><label for="t-27-4"><strong>补短板</strong>：把低于 L3 的知识点，回到对应页面重读。</label></div>
+  <div class="task"><input type="checkbox" id="t-27-5"><label for="t-27-5"><strong>模拟面试</strong>：找人互相提问，练习"讲清楚"的能力。</label></div>
+  <div class="task"><input type="checkbox" id="t-27-6"><label for="t-27-6"><strong>开始下一个项目</strong>：把这份文档收起来，去做东西。</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能用四级标准评估自己的每个知识点</strong>；<br>
+    ② 高频题中至少 <strong>80% 能讲到 L3 以上</strong>；<br>
+    ③ <strong>有至少三个能量化讲出来的技术故事</strong>；<br>
+    ④ 作品集描述包含"技术亮点 + 量化结果"；<br>
+    ⑤ 知道自己接下来该补什么、该做什么。<br>
+    <br>
+    <em>这五条做到，你就可以去面试了。剩下的交给运气和更多练习。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="26-projects.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">26 实战项目集</div>
+  </a>
+  <a class="next" href="../algorithms/index.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">返回路线总览</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>06 模板与泛型编程 — C++ + Unreal 路线｜从零基础到 3A 级项目开发</title>
+<meta name="description" content="函数模板与类模板、特化、可变参数模板、SFINAE、concepts、编译期计算">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C++ + Unreal 路线
+        <span>从零基础到 3A 级项目开发</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>06 · 模板与泛型编程</h1>
+
+<p class="lead">C++ 模板<strong>比 C# 泛型强大得多，也复杂得多</strong>。这一页讲<em>游戏里真正需要的模板知识</em>——不是元编程炫技。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="../unity/06-cs-modern.html#generic" data-brief="写一次适配所有类型且不装箱；where 约束既是限制也是文档"><span class="prereq__title">泛型与约束</span><span class="prereq__page">06-cs-modern</span></a>
+          <a class="prereq__item" href="03-cpp-basic.html#difference" data-brief="声明与定义分离、编译/链接/运行时三类错误"><span class="prereq__title">C++ 编译模型</span><span class="prereq__page">03-cpp-basic</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="difference">一、模板与 C# 泛型的区别 ★★</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>维度</th><th>C# 泛型</th><th>C++ 模板</th></tr></thead>
+  <tbody>
+    <tr><td><strong>实现方式</strong></td><td>运行时（JIT 生成）</td><td><strong>编译期（代码生成）</strong></td></tr>
+    <tr><td><strong>约束</strong></td><td>where 子句</td><td><em>concept（C++20）/ SFINAE</em></td></tr>
+    <tr><td><strong>实例化时机</strong></td><td>运行时</td><td><strong>编译时</strong></td></tr>
+    <tr><td><strong>代码膨胀</strong></td><td>较小</td><td><span class="mk mk--no">可能很大</span></td></tr>
+    <tr><td><strong>编译错误</strong></td><td>清晰</td><td><strong>极长（几百行）</strong></td></tr>
+    <tr><td><strong>能力</strong></td><td>类型参数</td><td><strong>类型 + 值 + 模板模板参数</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">C++ 模板的代价：编译时间与错误信息</span>
+  <strong>实例化的意思</strong>：<em>每个不同的类型参数都会生成一份代码</em>。<br>
+  <code>template&lt;typename T&gt; T Max(T a, T b);</code><br>
+  <code>Max&lt;int&gt;(1, 2);      // 生成 int 版本</code><br>
+  <code>Max&lt;float&gt;(1, 2);    // 生成 float 版本</code><br>
+  <code>Max&lt;MyClass&gt;(...);   // 又生成一份</code><br><br>
+  <strong>后果</strong>：<br>
+  · <strong>编译时间增长</strong>——每个实例都要编译一遍<br>
+  · <strong>可执行文件变大</strong>——多个版本的代码<br>
+  · <em>这是 Unreal 编译慢的原因之一</em><br><br>
+  <strong>错误信息为什么那么长</strong>：<br>
+  模板错误会显示<em>完整的实例化链</em>：<br>
+  <code>在实例化 "TArray&lt;UMyClass&gt;::Sort" 时...</code><br>
+  <code>在实例化 "TArray&lt;UMyClass&gt;::HeapSort" 时...</code><br>
+  <code>... (几十层)</code><br>
+  <em>真正的错误往往在最后几行——从后往前读。</em>
+</div>
+
+<h2 id="scenarios">二、游戏里需要的三个模板场景</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>场景</th><th>例子</th><th>收益</th></tr></thead>
+  <tbody>
+    <tr><td><strong>通用容器</strong></td><td><code>TArray&lt;T&gt;</code>、<code>TMap&lt;K,V&gt;</code></td><td><strong>类型安全 + 零开销</strong></td></tr>
+    <tr><td><strong>通用算法</strong></td><td><code>template&lt;typename T&gt; void Sort(...)</code></td><td><em>一次编写，多类型使用</em></td></tr>
+    <tr><td><strong>对象池</strong></td><td><code>template&lt;typename T&gt; class Pool</code></td><td><strong>每种类型一个池</strong></td></tr>
+    <tr><td><strong>单例模板</strong></td><td><code>template&lt;typename T&gt; class Singleton</code></td><td><em>避免重复代码</em></td></tr>
+    <tr><td><strong>编译期计算</strong></td><td><code>constexpr</code></td><td>把计算移到编译期</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">最实用的场景：对象池模板</span>
+  <strong>游戏里每个类型都需要对象池</strong>：<br>
+  <code>Pool&lt;Bullet&gt; bulletPool;</code><br>
+  <code>Pool&lt;Enemy&gt; enemyPool;</code><br>
+  <code>Pool&lt;Particle&gt; particlePool;</code><br>
+  <strong>模板让一份代码服务所有类型</strong>。<br><br>
+  <strong>对比 C#</strong>：<br>
+  C# 也能用泛型做到，但<em>C++ 的版本没有装箱、没有虚调用</em>——<strong>更快</strong>。<br>
+  <strong>而且 C++ 的模板能做 C# 做不到的事</strong>：<br>
+  · <em>编译期计算容量</em><br>
+  · <em>编译期选择策略</em><br>
+  · <strong>零运行时开销</strong><br><br>
+  <strong>Unreal 的实践</strong>：<em><code>TArray</code>/<code>TMap</code> 就是模板，UE 还提供了 <code>TObjectPtr</code> 等模板工具。</em>
+</div>
+
+<h2 id="concept">三、C++20 的 concept：模板约束的革命</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">concept 解决了什么</span>
+  <strong>问题</strong>：C++20 之前，模板约束靠 <em>SFINAE</em>——<strong>极其难写难读</strong>。<br>
+  <code>template&lt;typename T, typename = std::enable_if_t&lt;std::is_integral_v&lt;T&gt;&gt;&gt;</code><br>
+  <em>这一行代码只有专家能看懂。</em><br><br>
+  <strong>C++20 的 concept</strong>：<br>
+  <code>template&lt;std::integral T&gt;</code><br>
+  <code>T Add(T a, T b) { return a + b; }</code><br>
+  <em>清晰多了。</em><br><br>
+  <strong>自定义 concept</strong>：<br>
+  <code>template&lt;typename T&gt;</code><br>
+  <code>concept Damageable = requires(T t, int d) {</code><br>
+  <code>&nbsp;&nbsp;{ t.TakeDamage(d) } -&gt; std::same_as&lt;void&gt;;</code><br>
+  <code>};</code><br><br>
+  <strong>Unreal 的支持情况</strong>：<br>
+  · UE5 逐步支持 C++20<br>
+  · <em>但很多项目还在用 C++17</em><br>
+  · <strong>concept 会被越来越多地使用</strong>（<em>因为错误信息友好得多</em>）
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="06">
+  <div class="task"><input type="checkbox" id="t-06-1"><label for="t-06-1"><strong>写一个 Max 模板</strong>：对比 <code>Max&lt;int&gt;</code> 和 <code>Max&lt;float&gt;</code> 的调用。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-2"><label for="t-06-2"><strong>观察代码膨胀</strong>：用同一个模板实例化 10 种类型，看编译后的大小。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-3"><label for="t-06-3"><strong>读模板错误</strong>：故意传错类型，从后往前读错误信息，找到真正的错误。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-4"><label for="t-06-4"><strong>写对象池模板</strong>：用模板实现一个支持任意类型的对象池。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-5"><label for="t-06-5"><strong>用 concept</strong>：如果编译器支持 C++20，用 concept 约束一个模板。<em>对比 SFINAE 的写法。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-06-6"><label for="t-06-6"><strong>回答面试题</strong>：① C++ 模板和 C# 泛型的区别？② 模板为什么会导致编译慢？③ concept 解决了什么？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道 C++ 模板是"编译期代码生成"</strong>；<br>
+    ② 能说出模板实例化的代价（编译时间 + 代码膨胀）；<br>
+    ③ <strong>能读懂模板错误信息（从后往前读）</strong>；<br>
+    ④ 能说出游戏里模板的三个实用场景；<br>
+    ⑤ 知道 concept 的作用（C++20）。<br>
+    <br>
+    <em>第 ① 和 第 ③ 条最实用——**理解模板是编译期生成，就能理解为啥编译那么慢**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="05-cpp-oop.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">05 面向对象与多态</div>
+  </a>
+  <a class="next" href="07-cpp-modern.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">07 现代 C++（11/14/17/20）★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

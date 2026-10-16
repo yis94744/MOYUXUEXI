@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>06 树与二叉搜索树 — 游戏算法与系统设计｜从数据结构到完整系统，覆盖游戏开发全部核心算法</title>
+<meta name="description" content="遍历方式、BST、平衡树概念、游戏中的层级结构">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">游戏算法与系统设计
+        <span>从数据结构到完整系统，覆盖游戏开发全部核心算法</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>06 · 树与二叉搜索树</h1>
+
+<p class="lead">树结构在游戏里<strong>无处不在</strong>——场景层级、UI 层级、技能树、红点树、行为树。<em>这一页讲树的基础，以及为什么游戏偏爱"树"这种结构。</em></p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（05）的哈希表擅长"精确查找"。这一页的树适合<em>范围查找与层级关系</em>。
+  <strong>关键衔接</strong>：这一页是<em>红点系统（21）、行为树（17）、决策树（18）</em>的共同基础。
+  <strong>下一页</strong>（07）堆——它是树的特殊形式（完全二叉树），但用数组存储。
+  <strong>验证方式</strong>：本页实现的树结构在 Lua 5.4.7 实测运行。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="02-complexity.html#budget" data-brief="每帧 16.7ms，单系统 1~2ms 预算"><span class="prereq__title">复杂度直觉</span><span class="prereq__page">02-complexity</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="trees-in-games">一、游戏里的树结构</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>树</th><th>用途</th><th>相关页</th></tr></thead>
+  <tbody>
+    <tr><td><strong>场景层级树</strong></td><td>Transform 的父子关系</td><td>C# 站 11</td></tr>
+    <tr><td><strong>UI 层级树</strong></td><td>Canvas 与元素嵌套</td><td>C# 站 14</td></tr>
+    <tr><td><strong>红点树</strong></td><td>UI 红点的聚合传播</td><td><strong>算法站 21</strong></td></tr>
+    <tr><td><strong>行为树</strong></td><td>AI 行为组织</td><td><strong>算法站 17</strong></td></tr>
+    <tr><td><strong>决策树</strong></td><td>AI 决策、技能选择</td><td>算法站 18</td></tr>
+    <tr><td><strong>技能树</strong></td><td>技能点分配的前置依赖</td><td>业务系统</td></tr>
+    <tr><td><strong>四叉树/八叉树</strong></td><td>空间划分</td><td><strong>算法站 12</strong></td></tr>
+    <tr><td><strong>Trie</strong></td><td>敏感词、前缀匹配</td><td>算法站 08</td></tr>
+    <tr><td><strong>二叉堆</strong></td><td>优先队列</td><td>算法站 07</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">为什么游戏偏爱树</span>
+  <strong>因为游戏里充满了"层级"与"聚合"关系</strong>：
+  · <em>层级</em>：父物体移动子物体跟着动、父界面关闭子界面跟着关闭
+  · <em>聚合</em>：子节点任一为真则父节点为真（红点）；子节点都成功才成功（行为树的 Sequence）
+  <strong>树天然表达了这两种关系。</strong>
+  <em>而哈希表表达的是"平铺的映射"，不擅长层级与聚合。</em>
+</div>
+
+<h2 id="traversal">二、二叉树的三种遍历</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>遍历</th><th>顺序</th><th>典型用途</th></tr></thead>
+  <tbody>
+    <tr><td><strong>前序</strong></td><td>根 → 左 → 右</td><td><em>复制树、序列化</em></td></tr>
+    <tr><td><strong>中序</strong></td><td>左 → 根 → 右</td><td><strong>BST 输出有序序列</strong></td></tr>
+    <tr><td><strong>后序</strong></td><td>左 → 右 → 根</td><td><em>销毁树、计算子树聚合值</em></td></tr>
+    <tr><td><strong>层序（BFS）</strong></td><td>按层从左到右</td><td>找最短路径、按层处理</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">红点系统为什么用后序</span>
+  红点树的聚合是"子节点影响父节点"：
+  <code>父节点亮 = 自身条件成立 OR 任一子节点亮</code>
+  <strong>后序遍历</strong>（先处理左右子节点，再处理根）<em>天然符合这个顺序</em>——先得到子节点的结果，再计算父节点。
+  <strong>但实战中红点用的是"脏标记反向传播"</strong>（见算法站页 21）——
+  · 数据变化时<em>向上标记</em>
+  · 查询时<em>惰性计算</em>
+  <em>这比每次后序遍历整个树快得多。</em>
+</div>
+
+<h2 id="bst">三、二叉搜索树（BST）</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">BST 的退化问题（重要）</span>
+  <strong>BST 的性质</strong>：左子树都小于根，右子树都大于根。<em>查找 O(log n)</em>。
+  <strong>但前提是树是"平衡"的。</strong>
+  <strong>退化场景</strong>：如果按 <code>1, 2, 3, 4, 5</code> 的顺序插入，<em>BST 会退化成链表</em>，查找变成 O(n)。
+  <strong>解决方案</strong>：
+  · <strong>AVL 树</strong>：严格平衡，<em>插入/删除时旋转</em>
+  · <strong>红黑树</strong>：近似平衡，旋转次数少，<em>STL 的 map/set 用它</em>
+  · <strong>B 树/B+ 树</strong>：多路平衡，<em>数据库索引用它</em>
+  <strong>实战建议</strong>：<em>游戏里几乎不会自己实现平衡树</em>——用哈希表（精确查找）或堆（取最值）就够了。
+  <strong>但要理解</strong>：为什么"有序数组 + 二分查找"在很多场景比 BST 更好（<em>缓存友好</em>）。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">什么时候用 BST 而不是哈希表</span>
+  <strong>BST 的优势场景</strong>（哈希表做不到的）：
+  · <strong>范围查询</strong>：找出所有 <code>level 在 10~20</code> 之间的玩家
+  · <strong>有序遍历</strong>：按顺序输出（哈希表的顺序是不确定的）
+  · <strong>找前驱/后继</strong>：比某个值稍大/稍小的元素
+  · <strong>Top-K</strong>：虽然堆更好，但 BST 也能做
+  <strong>游戏里的实际应用</strong>：
+  · 排行榜的范围查询（<em>但通常用有序数组或专门的数据库</em>）
+  · 时间轴查询（"这个时间段内有哪些事件"）
+  <em>结论：游戏里 BST 用得不多，但"有序 + 范围查询"的需求真实存在。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="06">
+  <div class="task"><input type="checkbox" id="t-06-1"><label for="t-06-1"><strong>实现二叉树的三种遍历</strong>：递归版与迭代版各写一遍。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-2"><label for="t-06-2"><strong>手写 BST</strong>：实现插入/查找/中序遍历，验证输出有序。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-3"><label for="t-06-3"><strong>复现 BST 退化</strong>：按 1~10 的顺序插入，观察树退化成链表，测量查找步数。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-4"><label for="t-06-4"><strong>实现红点树聚合</strong>：用后序遍历计算"任一子节点为真则父节点为真"。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-5"><label for="t-06-5"><strong>对比遍历实现</strong>：递归 vs 迭代，测量性能差异并说明各自优缺点。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-6"><label for="t-06-6"><strong>回答面试题</strong>：① 三种遍历的应用场景？② BST 什么时候退化成链表？③ 游戏里树结构用在哪？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出至少六种游戏里的树结构及其用途；<br>
+    ② 能实现二叉树的三种遍历（递归与迭代）；<br>
+    ③ <strong>知道 BST 的退化问题及三种平衡树方案</strong>；<br>
+    ④ 能解释"红点为什么用后序遍历思想"；<br>
+    ⑤ 知道什么时候该用 BST 而不是哈希表（范围查询、有序遍历）。<br>
+    <br>
+    <em>第 ③ 条是这一页的核心——理解退化的原因，才能理解为什么实战中很少自己实现 BST。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="05-hash.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">05 哈希表与哈希函数 ★</div>
+  </a>
+  <a class="next" href="07-heap-priority.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">07 堆与优先队列 ★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

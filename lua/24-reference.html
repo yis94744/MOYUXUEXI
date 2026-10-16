@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>24 API 速查 — Lua 热更新路线｜从零基础到独立搭建可上线的热更框架</title>
+<meta name="description" content="Lua 标准库真实签名 + xLua API 速查">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">Lua 热更新路线
+        <span>从零基础到独立搭建可上线的热更框架</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>24 · API 速查</h1>
+
+<p class="lead">这一页是<strong>查手册</strong>——不需要背，但要知道<em>有什么、在哪查</em>。所有内容基于 <strong>Lua 5.4.7</strong>（本页所有函数都经过实际验证）。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="basic">一、基础函数</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>函数</th><th>作用</th><th>示例</th></tr></thead>
+  <tbody>
+    <tr><td><code>print(...)</code></td><td>输出</td><td><code>print("a", 1)</code></td></tr>
+    <tr><td><code>type(v)</code></td><td>返回类型字符串</td><td><code>type({}) == "table"</code></td></tr>
+    <tr><td><code>tostring(v)</code></td><td>转字符串</td><td><code>tostring(42) == "42"</code></td></tr>
+    <tr><td><code>tonumber(s [, base])</code></td><td>转数字</td><td><code>tonumber("42")</code></td></tr>
+    <tr><td><code>#t</code></td><td>长度</td><td><code>#{1,2,3} == 3</code></td></tr>
+    <tr><td><code>select(n, ...)</code></td><td>取第 n 个起 / 计数</td><td><code>select("#",1,nil,3) == 3</code></td></tr>
+    <tr><td><code>assert(v, msg)</code></td><td>断言</td><td><code>assert(x, "不能为nil")</code></td></tr>
+    <tr><td><code>error(msg [, level])</code></td><td>抛错</td><td><code>error("出错了", 2)</code></td></tr>
+    <tr><td><code>pcall(f, ...)</code></td><td>保护调用</td><td>返回 <code>ok, ...</code></td></tr>
+    <tr><td><code>xpcall(f, h, ...)</code></td><td>带处理器</td><td><strong>h 里可拿堆栈</strong></td></tr>
+    <tr><td><code>ipairs(t)</code></td><td>数组迭代</td><td><strong>连续数组</strong></td></tr>
+    <tr><td><code>pairs(t)</code></td><td>全表迭代</td><td><em>顺序不确定</em></td></tr>
+    <tr><td><code>next(t [, k])</code></td><td>下一个键值</td><td><code>pairs</code> 的底层</td></tr>
+    <tr><td><code>rawget/rawset</code></td><td>绕过元表</td><td><strong>不触发 <code>__index</code></strong></td></tr>
+    <tr><td><code>rawequal</code></td><td>绕过 <code>__eq</code></td><td>直接比较</td></tr>
+    <tr><td><code>setmetatable/getmetatable</code></td><td>元表操作</td><td><strong>Lua 的核心机制</strong></td></tr>
+    <tr><td><code>load(chunk [, name [, mode [, env]]])</code></td><td>加载代码</td><td><strong>第 4 参可做沙箱</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">三个必须记牢的</span>
+  <strong>① <code>select("#", ...)</code> 是唯一可靠的参数计数</strong><br>
+  <code>#arg</code> 对含 <code>nil</code> 的表是未定义行为。<br><br>
+  <strong>② <code>rawget</code> 绕过元表</strong><br>
+  想确认"表里真的有没有这个字段"，必须用 <code>rawget</code>。<br><br>
+  <strong>③ <code>load</code> 的第四个参数是沙箱的关键</strong><br>
+  <code>load(code, name, "t", customEnv)</code> —— <em>这样脚本里的全局变量会去 customEnv 找</em>。
+</div>
+
+<h2 id="string">二、string 库</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>函数</th><th>作用</th><th>备注</th></tr></thead>
+  <tbody>
+    <tr><td><code>string.format(fmt, ...)</code></td><td>格式化</td><td>类似 <code>printf</code></td></tr>
+    <tr><td><code>string.rep(s, n [, sep])</code></td><td>重复</td><td><code>rep("ab",3)</code> → ababab</td></tr>
+    <tr><td><code>string.sub(s, i [, j])</code></td><td>子串</td><td><strong>负数索引从末尾算</strong></td></tr>
+    <tr><td><code>string.len(s)</code></td><td>长度</td><td>等同 <code>#s</code></td></tr>
+    <tr><td><code>string.upper/lower</code></td><td>大小写</td><td><em>只处理 ASCII</em></td></tr>
+    <tr><td><code>string.find(s, pat [, init [, plain]])</code></td><td>查找</td><td><strong>第 4 参 true = 不用模式</strong></td></tr>
+    <tr><td><code>string.match(s, pat)</code></td><td>提取捕获</td><td>返回捕获组</td></tr>
+    <tr><td><code>string.gmatch(s, pat)</code></td><td>迭代匹配</td><td><code>for w in s:gmatch("%a+")</code></td></tr>
+    <tr><td><code>string.gsub(s, pat, repl [, n])</code></td><td>替换</td><td>repl 可以是函数</td></tr>
+    <tr><td><code>string.byte/char</code></td><td>字符码</td><td><code>byte("A") == 65</code></td></tr>
+    <tr><td><code>string.reverse</code></td><td>反转</td><td></td></tr>
+    <tr><td><code>string.pack/unpack</code></td><td><strong>二进制打包</strong></td><td><em>5.3+ 新增</em></td></tr>
+    <tr><td><code>string.packsize</code></td><td>计算打包大小</td><td><em>5.4 新增</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title"><code>%</code> 转义与 <code>plain</code> 参数</span>
+  <strong>Lua 的模式不是正则</strong>，但语法相似——<em>大部分特殊字符要加 <code>%</code> 转义</em>：<br>
+  <code>"a.b.c":match("%.")</code> → 匹配字面量 <code>.</code><br>
+  <code>"a.b.c":match(".")</code> → <code>.</code> 匹配任意字符<br><br>
+  <strong><code>find</code> 的第四个参数</strong>（<code>plain</code>）：<br>
+  <code>find("a.b.c", ".", 1, true)</code> → 返回 <strong>2</strong>（按纯文本找）<br>
+  <code>find("a.b.c", ".")</code> → 返回 <strong>1</strong>（按模式匹配）<br><br>
+  <em>要查找用户输入的字符串（可能含特殊字符），必须传 <code>true</code>。</em>
+</div>
+
+<h2 id="table">三、table 库</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>函数</th><th>作用</th><th>注意</th></tr></thead>
+  <tbody>
+    <tr><td><code>table.insert(t, [pos,] v)</code></td><td>插入</td><td><em>pos 处插入会移动后续元素</em></td></tr>
+    <tr><td><code>table.remove(t [, pos])</code></td><td>删除并返回</td><td><strong><code>remove(t,1)</code> 是 O(n)</strong></td></tr>
+    <tr><td><code>table.concat(t [, sep [, i [, j]]])</code></td><td>拼接</td><td><strong>循环拼接必须用它</strong></td></tr>
+    <tr><td><code>table.sort(t [, comp])</code></td><td>排序</td><td><em>comp 必须是严格弱序</em></td></tr>
+    <tr><td><code>table.unpack(t [, i [, j]])</code></td><td>展开</td><td><em>5.2+ 从 <code>unpack</code> 改名</em></td></tr>
+    <tr><td><code>table.pack(...)</code></td><td>打包</td><td><strong>带 <code>n</code> 字段</strong></td></tr>
+    <tr><td><code>table.move(a1, f, e, t [, a2])</code></td><td>移动</td><td><em>5.3+ 新增</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">两个易错点</span>
+  <strong>① <code>table.sort</code> 的比较函数必须是"严格弱序"</strong><br>
+  <em>错误写法</em>：<code>function(a,b) return a &lt;= b end</code> —— 用了 <code>&lt;=</code><br>
+  <em>这会导致</em>：<code>invalid order function for sorting</code> 错误<br>
+  <em>正确写法</em>：<code>function(a,b) return a &lt; b end</code><br><br>
+  <strong>② <code>table.remove(t, 1)</code> 是 O(n)</strong><br>
+  删除第一个元素要<em>移动后面所有元素</em>。<br>
+  队列应该用<strong>环形缓冲</strong>或<strong>头尾索引</strong>（见算法站页 03）。<br>
+  <em>实测差距可达 500 倍。</em>
+</div>
+
+<h2 id="math">四、math 库</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>函数</th><th>作用</th><th>备注</th></tr></thead>
+  <tbody>
+    <tr><td><code>math.floor/ceil</code></td><td>向下/上取整</td><td></td></tr>
+    <tr><td><code>math.abs/max/min</code></td><td>绝对值/最值</td><td></td></tr>
+    <tr><td><code>math.sqrt(x)</code></td><td>平方根</td><td></td></tr>
+    <tr><td><code>math.huge</code></td><td><strong>无穷大</strong></td><td><em>比任何数都大</em></td></tr>
+    <tr><td><code>math.pi</code></td><td>圆周率</td><td></td></tr>
+    <tr><td><code>math.maxinteger/mininteger</code></td><td>整数边界</td><td><em>5.3+ 新增</em></td></tr>
+    <tr><td><code>math.type(x)</code></td><td><strong>区分 integer/float</strong></td><td><em>5.3+ 新增</em></td></tr>
+    <tr><td><code>math.tointeger(x)</code></td><td>转整数（失败返回 nil）</td><td><em>5.3+ 新增</em></td></tr>
+    <tr><td><code>math.random([m [, n]])</code></td><td>随机数</td><td><strong>随机种子见下</strong></td></tr>
+    <tr><td><code>math.randomseed(x)</code></td><td>设种子</td><td><em>5.4 起可以不调</em></td></tr>
+    <tr><td><code>math.fmod</code></td><td>取余</td><td><em>与 <code>%</code> 在负数时不同</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">整数与浮点的三个坑</span>
+  <strong>① <code>3</code> 和 <code>3.0</code> 相等但不是同一类型</strong><br>
+  <code>3 == 3.0</code> → <strong>true</strong>（值相等）<br>
+  <code>math.type(3)</code> → <code>"integer"</code><br>
+  <code>math.type(3.0)</code> → <code>"float"</code><br>
+  <em>做哈希 key 或序列化时，这两个要区分对待。</em><br><br>
+  <strong>② 整数除法与浮点除法是两个运算符</strong><br>
+  <code>7 / 2</code> → <strong>3.5</strong>（浮点）<br>
+  <code>7 // 2</code> → <strong>3</strong>（整除）<br><br>
+  <strong>③ 整数会溢出回绕（不会变浮点）</strong><br>
+  <code>math.maxinteger + 1 == math.mininteger</code> → <strong>true</strong>
+</div>
+
+<h2 id="os">五、os / io / 协程</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>函数</th><th>作用</th><th>备注</th></tr></thead>
+  <tbody>
+    <tr><td><code>os.time()</code></td><td>时间戳（秒）</td><td><em>不是毫秒</em></td></tr>
+    <tr><td><code>os.clock()</code></td><td>CPU 时间</td><td><strong>测性能用这个</strong></td></tr>
+    <tr><td><code>os.date(fmt)</code></td><td>格式化时间</td><td><code>os.date("%Y-%m-%d")</code></td></tr>
+    <tr><td><code>os.getenv(name)</code></td><td>读环境变量</td><td><em>沙箱里要禁用</em></td></tr>
+    <tr><td><code>os.execute(cmd)</code></td><td><strong>执行命令</strong></td><td><em>沙箱里必须禁用</em></td></tr>
+    <tr><td><code>io.open(path, mode)</code></td><td>打开文件</td><td><em>沙箱里要禁用</em></td></tr>
+    <tr><td><code>io.write(...)</code></td><td>写输出</td><td><em>不自动换行</em></td></tr>
+    <tr><td><code>coroutine.create(f)</code></td><td>创建协程</td><td><em>不会自动运行</em></td></tr>
+    <tr><td><code>coroutine.resume(co, ...)</code></td><td>恢复</td><td>返回 <code>ok, ...</code></td></tr>
+    <tr><td><code>coroutine.yield(...)</code></td><td>暂停</td><td><em>交出控制权</em></td></tr>
+    <tr><td><code>coroutine.wrap(f)</code></td><td>包装</td><td><strong>出错会抛出</strong></td></tr>
+    <tr><td><code>coroutine.status(co)</code></td><td>状态</td><td><code>suspended</code>/<code>dead</code></td></tr>
+    <tr><td><code>coroutine.isyieldable()</code></td><td>能否 yield</td><td><em>5.3+ 新增</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">两个测性能的选择</span>
+  <strong>测性能用 <code>os.clock()</code></strong><br>
+  它返回 <em>CPU 时间</em>，不受系统调度、其他进程影响。<br>
+  <strong>测真实时间用 <code>os.time()</code></strong>——但精度只有<em>秒</em>，太粗。<br><br>
+  <strong>需要毫秒级真实时间</strong>：<br>
+  · Unity 项目里用 C# 的 <code>Time.realtimeSinceStartup</code>（通过 xLua 调）<br>
+  · 或 <code>os.clock()</code>（绝大多数性能测试够用）<br><br>
+  <em>本站在所有性能测试里用的都是 <code>os.clock()</code>。</em>
+</div>
+
+<h2 id="new">六、Lua 5.4 新增特性</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>特性</th><th>说明</th><th>用途</th></tr></thead>
+  <tbody>
+    <tr><td><strong>to-be-closed 变量</strong></td><td><code>local x &lt;close&gt; = res</code></td><td><em>离开作用域自动清理</em></td></tr>
+    <tr><td><strong><code>__close</code> 元方法</strong></td><td>配合 <code>&lt;close&gt;</code></td><td><strong>相当于 C# 的 using</strong></td></tr>
+    <tr><td><strong>const 变量</strong></td><td><code>local x &lt;const&gt; = v</code></td><td>编译期常量，<em>可能被优化</em></td></tr>
+    <tr><td><strong>整数除法 <code>//</code></strong></td><td>向下取整</td><td><em>5.3+</em></td></tr>
+    <tr><td><strong><code>math.type</code></strong></td><td>区分整型/浮点</td><td><em>5.3+</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">to-be-closed 最实用的场景</span>
+  <strong>自动释放资源</strong>：<br>
+  <pre><code>do
+  local file &lt;close&gt; = io.open("data.txt")
+  -- 使用 file
+end
+-- 离开作用域时自动 close()</code></pre>
+  <strong>对比手动管理</strong>：<em>忘记 close 会泄漏文件句柄</em>。<br>
+  <strong>对比 pcall 包装</strong>：<em>即使中途 error，<code>__close</code> 也会被调用</em>。<br><br>
+  <strong>在游戏里可用于</strong>：<br>
+  · 加锁/解锁<br>
+  · 临时修改状态后自动还原<br>
+  · 性能计时的自动结束<br><br>
+  <em>这是 5.4 最值得用的新特性。</em>
+</div>
+
+<h2 id="debug">七、调试相关</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>函数</th><th>作用</th><th>备注</th></tr></thead>
+  <tbody>
+    <tr><td><code>debug.traceback([msg])</code></td><td><strong>获取调用栈</strong></td><td><em>配合 xpcall 使用</em></td></tr>
+    <tr><td><code>debug.getinfo([thread,] f [, what])</code></td><td>获取函数信息</td><td><em>性能开销大</em></td></tr>
+    <tr><td><code>debug.sethook(hook, mask)</code></td><td>设置钩子</td><td><em>可用于 profiler</em></td></tr>
+    <tr><td><code>debug.getupvalue(f, n)</code></td><td>读闭包变量</td><td><em>调试用</em></td></tr>
+    <tr><td><code>debug.getlocal(level, n)</code></td><td>读局部变量</td><td><em>调试用</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">debug 库的性能代价</span>
+  <strong><code>debug.getinfo</code> 非常慢</strong>——它会生成完整的函数信息表。<br>
+  <em>千万不要在热路径上调用。</em><br><br>
+  <strong>安全的用法</strong>：<br>
+  · <code>debug.traceback</code> 只在<strong>错误处理时</strong>调用<br>
+  · <code>debug.getinfo</code> 只在<strong>调试工具里</strong>用<br>
+  · 生产环境可以考虑<strong>移除 debug 库</strong>（减小包体、提升安全）<br><br>
+  <em>沙箱环境里通常也会移除 debug 库。</em>
+</div>
+
+<h2 id="snippets">八、常用代码片段</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">片段一：安全的深拷贝</span>
+  <pre><code>local function deepCopy(obj, seen)
+  if type(obj) ~= "table" then return obj end
+  seen = seen or {}
+  if seen[obj] then return seen[obj] end
+  local copy = {}
+  seen[obj] = copy
+  for k, v in pairs(obj) do
+    copy[deepCopy(k, seen)] = deepCopy(v, seen)
+  end
+  return setmetatable(copy, getmetatable(obj))
+end</code></pre>
+  <strong>关键点</strong>：用 <code>seen</code> 表处理<em>循环引用</em>，否则会无限递归。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">片段二：带堆栈的错误处理</span>
+  <pre><code>local function try(fn, ...)
+  local ok, err = xpcall(fn, debug.traceback, ...)
+  if not ok then
+    print("[错误] " .. tostring(err))
+    -- 上报服务器
+  end
+  return ok, err
+end</code></pre>
+  <strong>用法</strong>：<em>框架的顶层回调（UI 按钮、网络回调、定时器）都应该用它包一层</em>。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">片段三：类型安全的断言</span>
+  <pre><code>local function checkArgs(...)
+  local args = { ... }
+  for i = 1, select("#", ...) do
+    assert(args[i] ~= nil,
+      "参数 " .. i .. " 不能为 nil")
+  end
+end</code></pre>
+  <strong>关键点</strong>：用 <code>select("#", ...)</code> 而不是 <code>#args</code>——<em>因为参数可能含 nil</em>。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">片段四：只读表</span>
+  <pre><code>local function readonly(t)
+  return setmetatable({}, {
+    __index = t,
+    __newindex = function()
+      error("这是只读表", 2)
+    end,
+    __len = function() return #t end,
+    __pairs = function() return pairs(t) end,
+  })
+end</code></pre>
+  <strong>用途</strong>：<em>配置表加载后设为只读，防止业务代码意外修改</em>（见页 14）。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">片段五：性能计时</span>
+  <pre><code>local function timeIt(name, fn)
+  local t = os.clock()
+  local results = { fn() }
+  local dt = (os.clock() - t) * 1000
+  if dt > 1 then   -- 只报告超过 1ms 的
+    print(string.format("[耗时] %s: %.2f ms", name, dt))
+  end
+  return table.unpack(results)
+end</code></pre>
+  <strong>关键点</strong>：<em>只报告超过阈值的</em>——避免日志本身成为瓶颈（见页 19）。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="24">
+  <div class="task"><input type="checkbox" id="t-24-1"><label for="t-24-1"><strong>验证 select 的用法</strong>：用 <code>select("#", 1, nil, 3)</code> 和 <code>#({1,nil,3})</code> 对比，理解为什么前者可靠。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-2"><label for="t-24-2"><strong>验证 rawget</strong>：给表设 <code>__index</code>，用 <code>t.k</code> 和 <code>rawget(t,"k")</code> 对比结果。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-3"><label for="t-24-3"><strong>验证 find 的 plain 参数</strong>：<code>find("a.b.c", ".", 1, true)</code> vs <code>find("a.b.c", ".")</code>。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-4"><label for="t-24-4"><strong>验证整数与浮点</strong>：检查 <code>3 == 3.0</code>、<code>math.type(3)</code>、<code>math.maxinteger + 1</code>。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-5"><label for="t-24-5"><strong>用 to-be-closed</strong>：写一个带 <code>__close</code> 的对象，验证离开作用域时自动调用。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-6"><label for="t-24-6"><strong>抄五个代码片段</strong>：把上面的片段抄进你的工具库，<em>实际用一次</em>。</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 知道 <code>select("#", ...)</code> 是可靠的参数计数方式；<br>
+    ② 知道 <code>rawget</code> 绕过元表；<br>
+    ③ 知道 <code>find</code> 的第四个参数用于纯文本查找；<br>
+    ④ <strong>知道整数与浮点在 Lua 5.3+ 是两种类型</strong>；<br>
+    ⑤ 能用 <code>to-be-closed</code> 自动清理资源。<br>
+    <br>
+    <em>这一页不需要背——收藏起来，用到时回来查。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="23-projects.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">23 实战项目</div>
+  </a>
+  <a class="next" href="../algorithms/index.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">返回路线总览</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

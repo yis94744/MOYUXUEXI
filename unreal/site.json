@@ -1,0 +1,203 @@
+{
+  "title": "C++ + Unreal 路线",
+  "subtitle": "从零基础到 3A 级项目开发",
+  "key": "cppue",
+  "pages": [
+    {
+      "file": "index.html",
+      "num": "",
+      "group": "开始",
+      "title": "路线总览",
+      "desc": "C++ + Unreal 完整学习地图、七阶段路线、每阶段验收标准、怎么用这份指南"
+    },
+    {
+      "file": "01-role.html",
+      "num": "01",
+      "group": "开始",
+      "title": "岗位与行业现实",
+      "desc": "UE 岗位分类、真实 JD 拆解、薪资区间、3A 与主机行业门槛、职业风险"
+    },
+    {
+      "file": "02-setup.html",
+      "num": "02",
+      "group": "开始",
+      "title": "环境搭建与第一个项目",
+      "desc": "Visual Studio 配置、UE 版本选择、源码编译、项目结构、调试与热重载"
+    },
+    {
+      "file": "03-cpp-basic.html",
+      "num": "03",
+      "group": "C++ 语言线",
+      "title": "C++ 基础与编译模型",
+      "desc": "类型系统、编译链接过程、头文件与 ODR、命名空间、引用与 const、Auto 与类型推导"
+    },
+    {
+      "file": "04-cpp-memory.html",
+      "num": "04",
+      "group": "C++ 语言线",
+      "title": "指针、内存与 RAII",
+      "desc": "栈与堆、指针与引用、new/delete、RAII、智能指针、移动语义、内存泄漏排查"
+    },
+    {
+      "file": "05-cpp-oop.html",
+      "num": "05",
+      "group": "C++ 语言线",
+      "title": "面向对象与多态",
+      "desc": "类与访问控制、构造析构、继承与虚函数、虚表原理、多重继承、运算符重载"
+    },
+    {
+      "file": "06-cpp-template.html",
+      "num": "06",
+      "group": "C++ 语言线",
+      "title": "模板与泛型编程",
+      "desc": "函数模板与类模板、特化、可变参数模板、SFINAE、concepts、编译期计算"
+    },
+    {
+      "file": "07-cpp-modern.html",
+      "num": "07",
+      "group": "C++ 语言线",
+      "title": "现代 C++（11/14/17/20）",
+      "desc": "lambda 与捕获、右值引用与完美转发、constexpr、结构化绑定、协程与模块"
+    },
+    {
+      "file": "08-cpp-concurrency.html",
+      "num": "08",
+      "group": "C++ 语言线",
+      "title": "并发与性能",
+      "desc": "线程与 mutex、原子操作与内存序、无锁编程、任务并行、缓存友好与分支预测"
+    },
+    {
+      "file": "09-cpp-build.html",
+      "num": "09",
+      "group": "C++ 语言线",
+      "title": "构建系统与工具链",
+      "desc": "编译链接细节、CMake、静态与动态库、调试器、性能剖析工具、UB 与 Sanitizer"
+    },
+    {
+      "file": "10-math.html",
+      "num": "10",
+      "group": "数学与图形",
+      "title": "游戏数学基础",
+      "desc": "向量与矩阵、坐标系与手性、四元数旋转、UE 的 FTransform、插值与曲线"
+    },
+    {
+      "file": "11-graphics.html",
+      "num": "11",
+      "group": "数学与图形",
+      "title": "图形学与渲染管线",
+      "desc": "渲染管线、坐标空间、光照模型、PBR、延迟渲染、Shader 编写与 HLSL"
+    },
+    {
+      "file": "12-ue-cpp.html",
+      "num": "12",
+      "group": "Unreal 引擎线",
+      "title": "Unreal C++ 与宏系统",
+      "desc": "UCLASS/UPROPERTY/UFUNCTION 宏、反射系统、UObject 生命周期与 GC、UE 命名规范"
+    },
+    {
+      "file": "13-ue-framework.html",
+      "num": "13",
+      "group": "Unreal 引擎线",
+      "title": "Gameplay Framework",
+      "desc": "GameMode/GameState/PlayerController/Pawn/Character/Actor/Component 职责与协作"
+    },
+    {
+      "file": "14-ue-blueprint.html",
+      "num": "14",
+      "group": "Unreal 引擎线",
+      "title": "蓝图与 C++ 协作",
+      "desc": "蓝图通信、暴露接口、BlueprintImplementableEvent、数据驱动设计、性能对比与选型"
+    },
+    {
+      "file": "15-ue-gas.html",
+      "num": "15",
+      "group": "Unreal 引擎线",
+      "title": "GAS 技能系统",
+      "desc": "AbilitySystemComponent、GameplayAbility、AttributeSet、GameplayEffect、技能与 Buff 实现"
+    },
+    {
+      "file": "16-ue-anim.html",
+      "num": "16",
+      "group": "Unreal 引擎线",
+      "title": "动画系统",
+      "desc": "动画蓝图、状态机、混合空间、Control Rig、IK Retargeting、Motion Warping、Root Motion"
+    },
+    {
+      "file": "17-ue-render.html",
+      "num": "17",
+      "group": "Unreal 引擎线",
+      "title": "渲染与画面",
+      "desc": "Nanite、Lumen、材质系统、后处理、光照与阴影、性能开销与开关取舍"
+    },
+    {
+      "file": "18-ue-niagara.html",
+      "num": "18",
+      "group": "Unreal 引擎线",
+      "title": "Niagara 与物理",
+      "desc": "Niagara 粒子系统、Chaos 物理、破坏系统、布料与流体、性能控制"
+    },
+    {
+      "file": "19-ue-network.html",
+      "num": "19",
+      "group": "Unreal 引擎线",
+      "title": "网络与多人游戏",
+      "desc": "复制系统、RPC、属性同步、相关性、预测与回滚、专用服务器、延迟补偿"
+    },
+    {
+      "file": "20-ue-ui.html",
+      "num": "20",
+      "group": "Unreal 引擎线",
+      "title": "UI 与音频",
+      "desc": "UMG 控件、Slate 底层、CommonUI、音频系统与 MetaSounds、世界音效"
+    },
+    {
+      "file": "21-ue-editor.html",
+      "num": "21",
+      "group": "Unreal 引擎线",
+      "title": "编辑器扩展与插件",
+      "desc": "Editor Module、自定义细节面板、资产类型、命令行工具、插件架构与打包"
+    },
+    {
+      "file": "22-patterns.html",
+      "num": "22",
+      "group": "通用能力",
+      "title": "架构与设计模式",
+      "desc": "游戏编程模式、组件与实体、事件系统、状态机、数据驱动、大型项目架构"
+    },
+    {
+      "file": "23-perf.html",
+      "num": "23",
+      "group": "通用能力",
+      "title": "性能优化实战",
+      "desc": "Unreal Insights、Stat 命令、GPU 与 CPU 分析、Draw Call、内存、加载优化"
+    },
+    {
+      "file": "24-engineering.html",
+      "num": "24",
+      "group": "通用能力",
+      "title": "工程化与发布",
+      "desc": "Perforce/Git+LFS、编译加速、自动化测试、打包与 Cook、多平台部署上架"
+    },
+    {
+      "file": "25-ai.html",
+      "num": "25",
+      "group": "AI 时代",
+      "title": "AI 辅助开发与 AI NPC",
+      "desc": "AI 编程助手在 C++/UE 上的边界、AI 资产生成、LLM 驱动的 NPC、UE 中的集成方案"
+    },
+    {
+      "file": "26-projects.html",
+      "num": "26",
+      "group": "实践与参考",
+      "title": "实战项目集",
+      "desc": "从入门到作品级的 10 个项目，含 UE 特色方向（GAS、网络、渲染）"
+    },
+    {
+      "file": "27-interview.html",
+      "num": "27",
+      "group": "实践与参考",
+      "title": "面试、作品集与资源",
+      "desc": "C++ 与 UE 面试高频题、四级理解标准、作品集、权威资源、行业数据"
+    }
+  ]
+}

@@ -1,0 +1,166 @@
+<h1>04 · 指针、内存与 RAII ★★★</h1>
+
+<p class="lead">这是<strong>C++ 最难也最重要的知识点</strong>。很多人卡在这里，是因为<em>把内存管理当成"手动挡"</em>——但现代 C++ 的核心思想是<strong>用 RAII 让编译器帮你管理</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="stack-heap">一、栈与堆：两种内存</h2>
+
+<p>理解 C++ 内存管理，首先要理解<strong>两种内存区域的区别</strong>。</p>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>04/memory</code></div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th></th><th>栈（Stack）</th><th>堆（Heap）</th></tr></thead>
+  <tbody>
+    <tr><td><strong>分配速度</strong></td><td><span class="mk mk--yes">极快（移动指针）</span></td><td><span class="mk mk--no">慢（找空闲块）</span></td></tr>
+    <tr><td><strong>大小限制</strong></td><td><em>小（通常 1~8 MB）</em></td><td><strong>大（受物理内存限制）</strong></td></tr>
+    <tr><td><strong>生命周期</strong></td><td><strong>离开作用域自动销毁</strong></td><td><em>手动管理</em></td></tr>
+    <tr><td><strong>缓存友好</strong></td><td><span class="mk mk--yes">是（连续）</span></td><td><em>看分配情况</em></td></tr>
+    <tr><td><strong>C# 里对应</strong></td><td><em>值类型（结构体）</em></td><td><strong>引用类型（类）</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">C# 程序员最容易犯的错</span>
+  <strong>在 C++ 里习惯性地把一切放在堆上</strong>：<br>
+  <code>Monster* m = new Monster(...);   // ❌ 不必要的堆分配</code><br>
+  <strong>应该这样</strong>：<br>
+  <code>Monster m(...);                   // ✅ 栈对象</code><br><br>
+  <strong>为什么</strong>：<br>
+  · 栈分配<em>几乎零成本</em>（只是移动栈指针）<br>
+  · 堆分配要<em>查找空闲块、可能有锁竞争</em><br>
+  · 栈对象<strong>自动销毁</strong>——不会忘记 delete<br>
+  · 栈对象<strong>缓存友好</strong>——连续访问<br><br>
+  <strong>判断标准</strong>：<em>只有在对象"需要活过当前作用域"或"很大"时，才用堆。</em>
+</div>
+
+<h2 id="raii">二、RAII：C++ 最重要的设计思想 ★★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">RAII 是什么</span>
+  <strong>RAII = Resource Acquisition Is Initialization</strong><br>
+  （资源获取即初始化）<br><br>
+  <strong>核心思想</strong>：<em>把资源的生命周期绑定到对象的生命周期</em>。<br>
+  · <strong>构造函数</strong>里获取资源<br>
+  · <strong>析构函数</strong>里释放资源<br><br>
+  <strong>本页实测的输出</strong>：<br>
+  <code>打开文件: save.dat</code><br>
+  <code>正在使用: save.dat</code><br>
+  <code>关闭文件: save.dat</code>  ← <em>离开作用域自动调用！</em><br>
+  <code>离开了作用域</code><br><br>
+  <strong>为什么这是最重要的</strong>：<br>
+  · 即使中途<strong>抛异常</strong>，析构函数也会被调用<br>
+  · 即使<strong>提前 return</strong>，也会被调用<br>
+  · <em>不可能"忘记释放"——因为编译器帮你记着</em><br><br>
+  <strong>这正是 C# 的 using / Python 的 with 的底层原理。</strong>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">智能指针：RAII 的标准实现</span>
+  <strong>三种智能指针的选择</strong>：<br>
+  <div class="table-wrap"><table>
+  <thead><tr><th>指针</th><th>所有权</th><th>什么时候用</th></tr></thead>
+  <tbody>
+    <tr><td><code>unique_ptr</code></td><td><strong>独占</strong></td><td><em>默认选择</em></td></tr>
+    <tr><td><code>shared_ptr</code></td><td>共享（引用计数）</td><td>确实需要多方持有</td></tr>
+    <tr><td><code>weak_ptr</code></td><td><strong>不持有</strong></td><td><em>打破循环引用</em></td></tr>
+  </tbody>
+  </table></div>
+  <strong>原则</strong>：<em>能用 unique_ptr 就用 unique_ptr</em>。<br>
+  · <strong>更轻量</strong>（没有引用计数的原子操作）<br>
+  · <strong>更清晰</strong>（所有权唯一，不会搞混）<br>
+  · 需要共享时<em>再改成 shared_ptr</em><br><br>
+  <strong>本页实测输出验证</strong>：<br>
+  · unique_ptr 移动后，原指针变空<br>
+  · shared_ptr 的引用计数会正确增减<br>
+  · weak_ptr 能检测对象是否已销毁
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">循环引用：shared_ptr 的致命陷阱</span>
+  <strong>本页实测演示了这个陷阱</strong>：<br>
+  <code>a->next = b;</code><br>
+  <code>b->next = a;   // ❌ 形成环</code><br>
+  <em>两个对象的引用计数都是 2（自己 + 对方），永远不会归零</em><br>
+  → <strong>内存泄漏</strong><br><br>
+  <strong>本页输出验证</strong>：<br>
+  <code>a 计数: 2, b 计数: 2</code><br>
+  <code>【注意】离开作用域后，这两个对象【不会】被销毁</code><br><br>
+  <strong>正确做法</strong>：<em>一端用 weak_ptr</em><br>
+  <code>a->next = b;        // 强引用</code><br>
+  <code>b->weakNext = a;    // 弱引用（不形成环）</code><br>
+  <strong>本页输出验证</strong>：两个对象<em>都能正常销毁</em>。<br><br>
+  <strong>实战经验</strong>：<em>父子关系、双向关联、观察者模式都要考虑这个问题。</em>
+</div>
+
+<h2 id="errors">三、三类内存错误</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>错误</th><th>原因</th><th>后果</th><th>预防</th></tr></thead>
+  <tbody>
+    <tr><td><strong>内存泄漏</strong></td><td>new 后忘记 delete</td><td><em>内存持续增长</em></td><td><strong>用智能指针</strong></td></tr>
+    <tr><td><strong>悬垂指针</strong></td><td>delete 后继续使用</td><td><span class="mk mk--no">未定义行为</span></td><td><em>delete 后置空</em></td></tr>
+    <tr><td><strong>双重释放</strong></td><td>同一块内存 delete 两次</td><td><strong>崩溃</strong></td><td><strong>用智能指针</strong></td></tr>
+    <tr><td><strong>越界访问</strong></td><td>数组下标超范围</td><td><em>可能不崩溃（更糟）</em></td><td>用 <code>at()</code> 或 <code>vector</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">什么是"未定义行为"（UB）</span>
+  <strong>C++ 里最危险的概念</strong>：<em>标准没有规定会发生什么</em>。<br><br>
+  <strong>UB 的可能表现</strong>：<br>
+  · <em>崩溃</em>（<strong>运气好的情况</strong>）<br>
+  · <em>读到垃圾数据</em>（<strong>更糟——bug 会传到后面</strong>）<br>
+  · <em>看起来正常运行</em>（<strong>最糟——在不同机器上崩溃</strong>）<br>
+  · 甚至<em>编译器可以把 UB 当作"不可能发生"来优化</em>，导致诡异结果<br><br>
+  <strong>常见 UB</strong>：<br>
+  · 数组越界<br>
+  · 空指针解引用<br>
+  · 使用已释放的内存<br>
+  · 有符号整数溢出<br>
+  · 未初始化的变量<br><br>
+  <strong>防护手段</strong>：<em>用 <code>std::vector</code> 的 <code>at()</code>、开编译器警告、用 AddressSanitizer。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="04">
+  <div class="task"><input type="checkbox" id="t-04-1"><label for="t-04-1"><strong>观察 RAII</strong>：写一个带析构函数的类，在作用域内提前 return，验证析构仍被调用。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-2"><label for="t-04-2"><strong>复现循环引用</strong>：用两个 shared_ptr 互指，观察对象不被销毁。<em>这是本页代码里的实测。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-04-3"><label for="t-04-3"><strong>用 weak_ptr 修复</strong>：改成 weak_ptr，验证对象能正常销毁。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-4"><label for="t-04-4"><strong>测试移动语义</strong>：用 <code>std::move</code> 转移一个 vector，观察原 vector 变空。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-5"><label for="t-04-5"><strong>制造 UB</strong>：故意访问已 delete 的指针，观察会发生什么。<em>注意：可能不崩溃，这更危险。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-04-6"><label for="t-04-6"><strong>回答面试题</strong>：① RAII 是什么？② 三种智能指针的区别？③ 循环引用怎么解决？④ 什么是 UB？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出栈与堆的四个区别</strong>；<br>
+    ② <strong>理解 RAII：资源绑定到对象生命周期</strong>；<br>
+    ③ <strong>知道 unique_ptr 是默认选择，什么时候用 shared_ptr</strong>；<br>
+    ④ <strong>能识别并解决循环引用</strong>；<br>
+    ⑤ 知道三类内存错误及预防手段。<br>
+    <br>
+    <em>这是全站最重要的一页——**C++ 的难点几乎都源于内存管理**。理解 RAII，你就理解了现代 C++。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="03-cpp-basic.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">03 C++ 基础与编译模型 ★★</div>
+  </a>
+  <a class="next" href="05-cpp-oop.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">05 面向对象与多态</div>
+  </a>
+</nav>

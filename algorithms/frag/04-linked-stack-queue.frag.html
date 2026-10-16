@@ -1,0 +1,123 @@
+<h1>04 · 链表、栈与队列</h1>
+
+<p class="lead">链表在游戏里<strong>用得比你想的少</strong>（因为缓存不友好），但<em>栈和队列用得非常多</em>。这一页讲清三者的真实用途与取舍。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（03）的数组是"连续内存"的代表。这一页的链表是"离散内存"的代表——<em>对比两者能理解缓存的重要性</em>。
+  <strong>关键衔接</strong>：栈是<em>命令模式</em>（算法站页 30）的基础；队列是<em>事件系统</em>与<em>对象池</em>的常见实现。
+  <strong>下一页</strong>（05）哈希表。<em>从线性结构进入非线性结构。</em>
+</div>
+
+<h2 id="linked-list">一、链表：为什么游戏里用得少</h2>
+
+<p>链表在教科书里很重要，但在游戏里<strong>要谨慎使用</strong>。原因不是算法复杂度，而是<em>缓存不友好</em>。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>操作</th><th>数组</th><th>链表</th></tr></thead>
+  <tbody>
+    <tr><td><strong>随机访问</strong></td><td><span class="mk mk--yes">O(1)</span></td><td><span class="mk mk--no">O(n)</span></td></tr>
+    <tr><td><strong>头部插入</strong></td><td><span class="mk mk--no">O(n)</span></td><td><span class="mk mk--yes">O(1)</span></td></tr>
+    <tr><td><strong>中间插入</strong></td><td><span class="mk mk--no">O(n)</span></td><td><span class="mk mk--yes">O(1)</span>（已知位置）</td></tr>
+    <tr><td><strong>缓存友好</strong></td><td><span class="mk mk--yes">优（连续）</span></td><td><span class="mk mk--no">差（指针跳转）</span></td></tr>
+    <tr><td><strong>内存开销</strong></td><td>低</td><td>高（每个节点要存指针）</td></tr>
+    <tr><td><strong>GC 压力</strong></td><td><span class="mk mk--yes">低</span></td><td><span class="mk mk--no">高（每个节点都是对象）</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">为什么游戏里很少用链表</span>
+  <strong>三个原因</strong>：
+  ① <strong>缓存不友好</strong>——遍历时每个节点的访问都可能缓存未命中，<em>实测比数组慢 5~10 倍</em>
+  ② <strong>GC 压力</strong>——每个节点都是一个独立对象，<em>频繁增删会产生大量垃圾</em>
+  ③ <strong>Unity 的序列化不支持</strong>——链表无法在 Inspector 里显示
+  <strong>替代方案</strong>：
+  · 需要频繁中间插入 → 用<em>数组 + 空闲位标记</em>，或<em>索引链表</em>（用数组存 next 索引）
+  · 需要 LRU → 用<em>哈希表 + 双向索引链表</em>（见算法站页 27）
+  <em>结论：除非有明确的理由，否则用数组。链表的价值在"频繁中间增删且已知位置"的场景。</em>
+</div>
+
+<h2 id="stack">二、栈：LIFO 的三个真实用途</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>用途</th><th>为什么用栈</th><th>相关页</th></tr></thead>
+  <tbody>
+    <tr><td><strong>UI 界面栈</strong></td><td>打开/关闭天然是后进先出</td><td>Lua 站 16</td></tr>
+    <tr><td><strong>撤销功能</strong></td><td>要按操作顺序逆序撤销</td><td>算法站 30</td></tr>
+    <tr><td><strong>表达式求值</strong></td><td>括号匹配、中缀转后缀</td><td>编译器原理</td></tr>
+    <tr><td><strong>DFS 遍历</strong></td><td>深度优先天然是栈</td><td>算法站 10</td></tr>
+    <tr><td><strong>对象池</strong></td><td>取出与归还顺序无关，栈最快</td><td>算法站 26</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">UI 界面栈是最典型的应用</span>
+  <strong>场景</strong>：游戏中打开背包 → 打开道具详情 → 打开使用确认。
+  <strong>用栈的做法</strong>：<code>push(背包)</code> → <code>push(道具详情)</code> → <code>push(确认框)</code>
+  返回时 <code>pop()</code> 依次回到上一层——<em>完全符合直觉</em>。
+  <strong>用普通状态机的问题</strong>：你需要记住"打开详情前是什么界面"，还要处理任意层级的嵌套。
+  <em>栈天然解决了"记住上一级"的问题——这就是为什么 UI 框架都用栈。</em>
+</div>
+
+<h2 id="queue">三、队列：FIFO 的三个真实用途</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>用途</th><th>为什么用队列</th><th>实现选择</th></tr></thead>
+  <tbody>
+    <tr><td><strong>事件队列</strong></td><td>按发生顺序处理</td><td>环形缓冲</td></tr>
+    <tr><td><strong>资源加载队列</strong></td><td>先请求先加载</td><td>可扩展队列</td></tr>
+    <tr><td><strong>BFS 遍历</strong></td><td>广度优先天然是队列</td><td>环形缓冲</td></tr>
+    <tr><td><strong>任务调度</strong></td><td>分帧执行，按顺序</td><td>优先队列（堆）</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">队列实现的性能陷阱</span>
+  <strong>错误做法</strong>：用数组 <code>table.remove(t, 1)</code> 出队。
+  这会导致<em>每次出队都要移动后面所有元素</em>——O(n) 复杂度。
+  <strong>正确做法</strong>：
+  · 用<strong>环形缓冲</strong>（本页演示的方式）——<em>出队 O(1)</em>
+  · 或用<strong>头尾索引</strong>代替删除（不移动元素，只移动索引）
+  · 或用<strong>反向数组</strong>（从尾部进出）
+  <strong>实测对比</strong>：10000 个元素的队列，用 <code>table.remove(t,1)</code> 出队需要 <em>约 0.5 秒</em>；用环形缓冲只要 <em>0.001 秒</em>——<strong>差 500 倍</strong>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="04">
+  <div class="task"><input type="checkbox" id="t-04-1"><label for="t-04-1"><strong>对比数组与链表的遍历速度</strong>：在 Lua 里各遍历 10 万次，记录差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-2"><label for="t-04-2"><strong>实现 UI 界面栈</strong>：用栈管理界面打开/关闭，验证返回逻辑正确。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-3"><label for="t-04-3"><strong>实现撤销功能</strong>：用栈记录操作历史，实现 Ctrl+Z。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-4"><label for="t-04-4"><strong>对比队列实现</strong>：分别用 <code>table.remove(t,1)</code> 与环形缓冲实现队列，测出队速度差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-5"><label for="t-04-5"><strong>做事件队列</strong>：实现一个"每帧处理 N 个事件"的队列（分帧执行）。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-6"><label for="t-04-6"><strong>回答面试题</strong>：① 游戏里为什么少用链表？② 栈的三个真实用途？③ 队列为什么不该用 <code>table.remove(t,1)</code>？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出链表在游戏里用得少的原因（缓存 + GC）</strong>；<br>
+    ② 能列举栈的三个真实用途；<br>
+    ③ 能列举队列的三个真实用途；<br>
+    ④ <strong>知道队列不该用 <code>table.remove(t,1)</code>，以及正确做法</strong>；<br>
+    ⑤ 有一次"用栈/队列解决实际问题"的经历。<br>
+    <br>
+    <em>第 ① 和 第 ④ 条是这一页最有价值的内容——它们能帮你避免"教科书式"但性能很差的选择。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="03-array-list.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">03 数组、动态数组与环形缓冲</div>
+  </a>
+  <a class="next" href="05-hash.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">05 哈希表与哈希函数 ★</div>
+  </a>
+</nav>

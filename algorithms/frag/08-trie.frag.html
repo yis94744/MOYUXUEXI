@@ -1,0 +1,103 @@
+<h1>08 · 字典树 Trie 与敏感词过滤 ★★</h1>
+
+<p class="lead">Trie（前缀树）在游戏里有三个必须用它的场景：<strong>敏感词过滤</strong>（聊天/昵称/公会名）、<strong>输入提示</strong>（搜索框自动补全）、<strong>ID 前缀归类</strong>。它的核心价值是——<em>查询复杂度只与文本长度相关，与词库大小无关</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（07）的堆是"取最值"的最佳结构。这一页的 Trie 是"前缀匹配"的最佳结构。<br>
+  <strong>关键衔接</strong>：Trie 本质是<em>树结构（06）</em>，每个节点代表一个字符。<br>
+  <strong>验证方式</strong>：本页实现了 <strong>Trie 和 AC 自动机两种方案</strong>，并在真实场景下实测了性能。
+</div>
+
+<h2 id="problem">一、先看暴力法的代价</h2>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>08/trie</code></div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">实测发现了一个重要的语义差异</span>
+  暴力法和 Trie 的过滤结果<strong>不一致</strong>——但这不是 bug，是<em>语义差异</em>：<br><br>
+  词库里有「垃圾」和「垃圾游戏」两个词：<br>
+  • <strong>暴力法</strong>：先替换「垃圾」→ 变成「****游戏」，之后「垃圾游戏」再也匹配不到<br>
+  • <strong>Trie</strong>：最长匹配优先 → 直接命中「垃圾游戏」整体替换<br><br>
+  <strong>实际输出对比</strong>：<br>
+  • 暴力法：<code>这******游戏真难玩</code>（只替换了「垃圾」）<br>
+  • Trie：<code>这************真难玩</code>（替换了整个「垃圾游戏」）<br><br>
+  <strong>结论：Trie 的"最长匹配"才是正确行为。</strong>否则「垃圾游戏」会被替换成「****游戏」，<em>剩余部分仍然可见</em>。<br>
+  这是 Trie 相比暴力法的<strong>正确性优势</strong>，不只是性能优势。
+</div>
+
+<h2 id="ac">二、AC 自动机：Trie 的进化版</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">Trie 的瓶颈在哪里</span>
+  Trie 虽然比暴力法快得多，但仍有一个浪费：<em>每个位置都要从根节点重新开始尝试匹配</em>。<br><br>
+  <strong>AC 自动机（Aho-Corasick）</strong>给每个节点加了一个<strong>失败指针（fail pointer）</strong>：<br>
+  当匹配失败时，<em>跳到"最长公共后缀"对应的节点继续</em>，而不是回到根。<br><br>
+  <strong>复杂度对比</strong>（文本长度 n，最长的词长度 m）：<br>
+  • 暴力法：<code>O(n x 词数)</code><br>
+  • Trie：<code>O(n x m)</code> 最坏情况<br>
+  • <strong>AC 自动机：<code>O(n + 命中数)</code></strong>——<em>严格线性，一次扫描搞定</em>
+</div>
+
+<h2 id="utf8">三、UTF-8 中文处理：一个必踩的坑</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">string.sub 按字节切，会让中文乱码</span>
+  Lua 的 <code>string.sub</code> 是<strong>按字节</strong>操作的，而一个中文字符占 3 个字节（UTF-8）。<br><br>
+  <code>"垃圾":sub(1, 3)</code> —— 看起来是取第一个字符，实际上<em>只取了"垃"的 3 个字节中的一部分</em>，结果是乱码。<br><br>
+  <strong>正确做法</strong>：Lua 5.3+ 提供了 <code>utf8</code> 库：<br>
+  • <code>utf8.len(s)</code> —— 字符数（不是字节数）<br>
+  • <code>utf8.codes(s)</code> —— 按字符遍历<br>
+  • <code>utf8.offset(s, n)</code> —— 取第 n 个字符的字节位置<br><br>
+  <em>做敏感词过滤必须用 utf8 库，否则中文词永远匹配不对。</em>
+</div>
+
+<h2 id="engineering">四、工程实践要点</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>问题</th><th>做法</th></tr></thead>
+  <tbody>
+    <tr><td><strong>词库预处理</strong></td><td>上线前构建好 Trie，序列化成二进制，运行时直接加载（<em>省掉构建时间</em>）</td></tr>
+    <tr><td><strong>分级词库</strong></td><td>分「禁止」「替换」「提示」三级，不同级别不同处理</td></tr>
+    <tr><td><strong>变体绕过</strong></td><td>用户会用「垃*圾」「垃 圾」绕过，需要先做<strong>归一化</strong>（去符号、去空格、全半角统一）</td></tr>
+    <tr><td><strong>同音字</strong></td><td>「拉鸡」这类需要额外的拼音映射表，<em>复杂度大增</em></td></tr>
+    <tr><td><strong>性能预算</strong></td><td>聊天过滤应在 1 毫秒内完成，超过要考虑异步或降级</td></tr>
+    <tr><td><strong>客户端 vs 服务端</strong></td><td>客户端只做基础过滤（<em>防不了外挂改内存</em>），<strong>真正的审核放服务端</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="tasks">五、本章动手任务</h2>
+
+<div class="tasks" data-page="08">
+  <div class="task"><input type="checkbox" id="t-08-1"><label for="t-08-1"><strong>实现 Trie</strong>：不看示例写出 insert / matchAt / filter 三个方法，并测试最长匹配行为。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-2"><label for="t-08-2"><strong>实现 AC 自动机</strong>：加失败指针，用 BFS 构建，验证匹配结果与 Trie 一致。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-3"><label for="t-08-3"><strong>测性能曲线</strong>：词库从 100 增加到 10000，分别测暴力法、Trie、AC 的耗时，画出增长曲线。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-4"><label for="t-08-4"><strong>处理中文</strong>：用 <code>utf8</code> 库改造你的实现，验证中文敏感词能被正确匹配。<em>先用 string.sub 制造一次乱码，理解问题所在。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-08-5"><label for="t-08-5"><strong>做变体归一化</strong>：实现"去掉所有非字母数字字符 + 全角转半角"，测试「垃*圾」能否被识别。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-6"><label for="t-08-6"><strong>回答面试题</strong>：① Trie 的复杂度是多少？② AC 自动机比 Trie 强在哪？③ 敏感词过滤有哪些绕过手段，怎么防？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能手写 Trie 的插入与匹配；<br>
+    ② <strong>能解释为什么 Trie 的最长匹配是正确行为，而暴力法会漏掉长词</strong>；<br>
+    ③ 知道 AC 自动机的失败指针原理，以及它为什么能做到 O(n)；<br>
+    ④ 知道中文必须用 utf8 库处理，以及按字节切会导致什么；<br>
+    ⑤ 能说出至少三种敏感词绕过手段与对应的防御措施。<br><br>
+    <em>第 ④ 条看起来是细节，但在处理中文游戏时它是必修课。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="07-heap-priority.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">07 堆与优先队列 ★</div>
+  </a>
+  <a class="next" href="09-union-find.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">09 并查集与图论基础</div>
+  </a>
+</nav>

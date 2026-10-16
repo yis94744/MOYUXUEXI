@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>01 为什么用 Lua 热更 — Lua 热更新路线｜从零基础到独立搭建可上线的热更框架</title>
+<meta name="description" content="热更新的本质、四种方案对比、Lua 在游戏行业的真实地位">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">Lua 热更新路线
+        <span>从零基础到独立搭建可上线的热更框架</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>01 · 为什么用 Lua 热更</h1>
+
+<p class="lead">在学语法之前，先搞清楚<strong>为什么这个行业要用 Lua</strong>。答案不是"Lua 语言好"，而是<em>它解决了一个 C# 解决不了的问题——热更新</em>。理解了这一点，你才知道自己学的是什么、为什么值得学。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（首页）给了路线图。这一页回答"<em>为什么</em>"。<br>
+  <strong>下一页</strong>（02）环境搭建——<em>当天就能跑通第一段脚本</em>。<br>
+  <strong>提醒</strong>：这一页不讲技术细节，只讲<strong>行业现实与取舍</strong>。<em>如果你已经确定要用 Lua，可以快速扫过。</em>
+</div>
+
+<h2 id="hotupdate">一、热更新的本质</h2>
+
+<p><strong>热更新 = 不重新发版就能改线上代码。</strong>听起来简单，但在移动端它是个硬需求。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>场景</th><th>没有热更</th><th>有热更</th></tr></thead>
+  <tbody>
+    <tr><td><strong>改一个战斗公式</strong></td><td>重新打包 → 提审 → 等审核（iOS 可能几天）</td><td><strong>推送脚本，几分钟生效</strong></td></tr>
+    <tr><td><strong>线上紧急 bug</strong></td><td>同样要走完整流程</td><td><strong>立即修复</strong></td></tr>
+    <tr><td><strong>做限时活动</strong></td><td>必须提前几周发版</td><td>活动当天推脚本</td></tr>
+    <tr><td><strong>调数值平衡</strong></td><td>每次都要发版</td><td>策划自己改配置</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">为什么不能直接用 C# 热更</span>
+  <strong>iOS 的 AOT 限制</strong>是根本原因：<br>
+  · iOS 不允许运行时动态生成机器码（<em>JIT 被禁</em>）<br>
+  · C# 代码必须提前编译成机器码，<strong>无法运行时替换</strong><br><br>
+  <strong>而解释型语言（Lua）可以</strong>——因为它<em>不需要编译，直接解释文本或字节码</em>。<br><br>
+  <em>这就是为什么手游行业普遍用 Lua 做逻辑层——不是因为它快，而是因为它是"能热更的语言里最合适的一个"。</em>
+</div>
+
+<h2 id="position">二、Lua 在行业里的真实地位</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>维度</th><th>真相</th></tr></thead>
+  <tbody>
+    <tr><td><strong>性能</strong></td><td>比 C# 慢 3~10 倍（<em>但逻辑层通常够用</em>）</td></tr>
+    <tr><td><strong>使用率</strong></td><td>国内手游<strong>绝大多数</strong>项目的逻辑层用 Lua</td></tr>
+    <tr><td><strong>典型分工</strong></td><td>引擎/渲染/物理用 C#；<em>玩法/UI/活动/配置用 Lua</em></td></tr>
+    <tr><td><strong>岗位</strong></td><td>几乎每个手游团队都需要<em>懂 Lua 的客户端</em></td></tr>
+    <tr><td><strong>趋势</strong></td><td>HybridCLR 等方案在兴起，<em>但 Lua 仍是主流</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">为什么不是"全都用 Lua"</span>
+  <strong>因为 Lua 慢。</strong>它不是"更好的 C#"，而是"能热更的逻辑层"。<br><br>
+  典型的分工边界：<br>
+  · <strong>C#</strong>：引擎层、渲染、物理、<em>性能敏感的核心战斗计算</em><br>
+  · <strong>Lua</strong>：玩法逻辑、UI、活动、配置、<em>需要频繁调整的部分</em><br><br>
+  <em>这个分工不是绝对的，但它是经过大量项目验证的成本最优解。</em>
+</div>
+
+<h2 id="path">三、学习路径建议</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">如果你有 C# 基础</span>
+  <strong>Lua 语法一周就能上手</strong>——它比 C# 简单得多。<br>
+  真正的难点在<strong>三个地方</strong>：<br>
+  ① <strong>元表机制</strong>（页 04）——不懂它就看不懂任何框架源码<br>
+  ② <strong>C# 与 Lua 的边界</strong>（页 10）——<em>这是性能黑洞，也是 bug 高发区</em><br>
+  ③ <strong>框架设计</strong>（页 13-17）——<em>这才是区分"会 Lua"和"能做热更"的地方</em><br><br>
+  <strong>建议</strong>：快速过 03-08（语言），<em>把时间花在 09-17</em>。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">不需要背的东西</span>
+  <strong>不要花时间背 Lua 标准库的所有函数。</strong><br>
+  常用的就几十个（<code>string</code>/<code>table</code>/<code>math</code> 各十来个），其余用到了查 24 页的速查。<br><br>
+  <strong>也不要纠结 Lua 的"高级技巧"</strong>（比如各种元表奇技淫巧）——<em>实际项目里用的就那么几个</em>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="01">
+  <div class="task"><input type="checkbox" id="t-01-1"><label for="t-01-1"><strong>查证你所在项目的技术栈</strong>：如果用 Lua，看看代码结构；如果不用，了解为什么。</label></div>
+  <div class="task"><input type="checkbox" id="t-01-2"><label for="t-01-2"><strong>对比一份 C# 代码与等价的 Lua 代码</strong>：感受语法差异与代码量。</label></div>
+  <div class="task"><input type="checkbox" id="t-01-3"><label for="t-01-3"><strong>看一个真实的热更日志</strong>：找一份线上的热更记录，理解更新流程。</label></div>
+  <div class="task"><input type="checkbox" id="t-01-4"><label for="t-01-4"><strong>回答面试题</strong>：① 为什么要用 Lua 热更？② iOS 为什么不能热更 C#？③ 什么该用 Lua、什么该用 C#？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说清热更新的本质与必要性</strong>；<br>
+    ② 知道 iOS AOT 限制与 Lua 的关系；<br>
+    ③ 能说出 Lua 与 C# 的典型分工边界；<br>
+    ④ 知道学习的重点在元表、跨语言边界、框架设计这三处。<br>
+    <br>
+    <em>这一页的标准很低——只要你能回答"为什么"就够了。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="../algorithms/index.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">路线总览</div>
+  </a>
+  <a class="next" href="02-setup.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">02 环境搭建</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

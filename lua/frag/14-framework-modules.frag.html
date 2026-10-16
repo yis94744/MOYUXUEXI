@@ -1,0 +1,109 @@
+<h1>14 · 核心模块实现</h1>
+
+<p class="lead">上一页搭了框架骨架（模块管理 + 事件系统）。这一页实现<strong>四个最常用的核心模块</strong>：<em>资源管理、网络层、配置表、定时器</em>。<strong>每个都能直接抄进项目。</strong></p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（13）搭了骨架。这一页填上具体的模块。
+  <strong>关键衔接</strong>：页 08 的<em>性能优化</em>在这一页大量使用（缓冲区复用、局部化）；页 16 的 <em>UI 框架</em>会用到这一页的资源模块。
+  <strong>下一页</strong>（15）面向对象框架。<em>让这些模块有统一的代码风格。</em>
+</div>
+
+<h2 id="resource">一、资源管理模块</h2>
+
+<p>Lua 层的资源管理<strong>不是"加载资源"</strong>——那是 C# 的事。它做的是<em>缓存、引用计数、生命周期管理</em>。</p>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>14/modules</code></div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>职责</th><th>说明</th><th>关键点</th></tr></thead>
+  <tbody>
+    <tr><td><strong>缓存</strong></td><td>同路径只加载一次</td><td><em>用哈希表做 path → handle 映射</em></td></tr>
+    <tr><td><strong>引用计数</strong></td><td>知道什么时候能卸载</td><td><strong>Load 加一，Release 减一</strong></td></tr>
+    <tr><td><strong>异步加载</strong></td><td>不阻塞主线程</td><td>回调 + 队列管理</td></tr>
+    <tr><td><strong>预加载</strong></td><td>提前加载，避免卡顿</td><td>加载界面统一处理</td></tr>
+    <tr><td><strong>LRU 淘汰</strong></td><td>内存不足时清理</td><td><em>见算法站页 27</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="timer">二、定时器模块</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">定时器的两种实现</span>
+  <strong>方案一：每帧遍历（简单）</strong>
+  · 维护一个列表，每帧检查每个定时器是否到期
+  · <em>O(n) 每帧</em>——定时器少时够用
+  <strong>方案二：最小堆（高效）</strong>
+  · 用堆按"触发时间"排序（见算法站页 07）
+  · 每帧只需检查<em>堆顶</em>是否到期
+  · <em>O(log n) 插入，O(1) 检查</em>
+  <strong>选择依据</strong>：
+  · 定时器 < 100 个 → 方案一（更简单）
+  · 定时器 > 1000 个（比如每个 Buff 一个）→ <strong>方案二</strong>
+  <em>实战中，方案二更常用——因为服务器端的定时任务数量往往很大。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">定时器最容易出的三个 bug</span>
+  <strong>① 定时器泄漏</strong>：对象销毁了，但定时器还在，回调时访问已销毁对象。
+  <em>解决</em>：把定时器绑定到对象，对象销毁时批量清理。
+  <strong>② 同一帧触发多次</strong>：如果帧间隔大于定时器周期，可能一帧触发多次。
+  <em>解决</em>：明确设计——是"每次到期触发一次"还是"补足所有遗漏的触发"。
+  <strong>③ 在回调里删自己</strong>：遍历中修改列表 → 索引错位。
+  <em>解决</em>：用<strong>快照遍历</strong>或<strong>标记删除</strong>（和页 13 的事件系统一样）。
+</div>
+
+<h2 id="config">三、配置表模块</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">配置表的三个设计要点</span>
+  <strong>① 索引优于遍历</strong>
+  加载配置时<strong>建立常用索引</strong>：
+  · <code>byId[id] = config</code>
+  · <code>byName[name] = config</code>
+  · <code>byType[type] = { config1, config2 }</code>
+  <em>把 O(n) 的遍历变成 O(1) 的查找。</em>
+  <strong>② 只读保护</strong>
+  配置加载后应该<strong>只读</strong>——防止业务代码意外修改。
+  用元表的 <code>__newindex</code> 实现（见页 04）。
+  <strong>③ 支持热重载</strong>
+  开发期能重新加载配置而不重启游戏。<em>这能大幅提升调试效率。</em>
+  <strong>实现</strong>：重新解析文件 + 重建索引 + 通知订阅者刷新。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="14">
+  <div class="task"><input type="checkbox" id="t-14-1"><label for="t-14-1"><strong>实现资源缓存</strong>：用哈希表做 path → handle 映射，确保同路径只加载一次。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-2"><label for="t-14-2"><strong>加引用计数</strong>：实现 Load/Release 配对，验证计数归零才真正卸载。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-3"><label for="t-14-3"><strong>实现堆版定时器</strong>：用最小堆管理定时器，测 1000 个定时器的每帧开销。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-4"><label for="t-14-4"><strong>实现配置索引</strong>：给一份配置建立三种索引（byId/byName/byType），对比遍历查找的速度。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-5"><label for="t-14-5"><strong>做配置只读</strong>：用 <code>__newindex</code> 阻止修改，验证写入会报错。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-6"><label for="t-14-6"><strong>回答面试题</strong>：① Lua 层的资源管理做什么？② 定时器为什么用堆？③ 配置表为什么要建索引？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能实现"缓存 + 引用计数"的资源管理；<br>
+    ② <strong>知道定时器该用堆而不是每帧遍历（定时器多时）</strong>；<br>
+    ③ 能说出定时器的三个常见 bug 及解决思路；<br>
+    ④ 能给配置表建立索引，把 O(n) 变 O(1)；<br>
+    ⑤ 知道配置应该只读，以及热重载的实现思路。<br>
+    <br>
+    <em>第 ① 和第 ② 条最实用——它们是每个项目都会用到的模块。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="13-framework-design.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">13 框架总体设计 ★★★</div>
+  </a>
+  <a class="next" href="15-framework-oop.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">15 面向对象框架</div>
+  </a>
+</nav>

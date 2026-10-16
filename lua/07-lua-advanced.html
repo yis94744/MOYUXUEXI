@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>07 高级特性 — Lua 热更新路线｜从零基础到独立搭建可上线的热更框架</title>
+<meta name="description" content="协程、错误处理、垃圾回收、弱表、环境与模块">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">Lua 热更新路线
+        <span>从零基础到独立搭建可上线的热更框架</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>07 · 高级特性</h1>
+
+<p class="lead">这一页讲 Lua 的<strong>四件"高级但常用"的事</strong>：<em>协程、错误处理、垃圾回收、环境沙箱</em>。它们不是语法糖，而是<em>框架设计的核心工具</em>——你在 xLua、各种 Lua 框架里都会看到它们。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（06）讲的元表是 Lua 的"地基"。这一页讲的是<em>建立在地基之上的高级能力</em>。<br>
+  <strong>关键衔接</strong>：协程是<strong>状态机</strong>的另一种实现方式（对比算法站的页 16）；弱表是<strong>缓存</strong>的实现手段（见算法站页 27）。<br>
+  <strong>下一页</strong>（08）性能优化——<em>这一页的所有特性都有性能代价，下一页会量化它</em>。<br>
+  <strong>验证方式</strong>：本页所有代码在 <em>Lua 5.4.7</em> 实测运行，输出结果是真实的。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="04-lua-table.html#metatable" data-brief="__index 两种形式、__newindex、运算符重载"><span class="prereq__title">元表</span><span class="prereq__page">04-lua-table</span></a>
+          <a class="prereq__item" href="07-lua-advanced.html#coroutine" data-brief="resume 与 wrap 的错误处理差异，写迭代器"><span class="prereq__title">协程</span><span class="prereq__page">07-lua-advanced</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="coroutine">一、协程：Lua 的并发原语 ★</h2>
+
+<p>协程<strong>不是线程</strong>，而是<em>可以暂停与恢复的函数</em>。它的价值在于——<strong>用同步的写法表达异步的逻辑</strong>。</p>
+
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  Lua 高级特性：协程、错误处理、GC、环境
+-- ============================================================
+
+print("=== 1. 协程（coroutine）：Lua 的并发原语 ===")
+-- 协程不是线程，而是【可以暂停与恢复的函数】。
+-- 它解决了"状态机要写一堆变量来记住进度"的问题。
+
+local co = coroutine.create(function(a, b)
+  print("  协程开始, 参数:", a, b)
+
+  local c = coroutine.yield(a + b)      -- 暂停，交出控制权
+  print("  协程恢复, 收到:", c)
+
+  local d = coroutine.yield(c * 2)
+  print("  再次恢复, 收到:", d)
+
+  return "完成"
+end)
+
+print("  状态:", coroutine.status(co))                   -- suspended
+print("  第一次 resume:", coroutine.resume(co, 10, 20))  -- true, 30
+print("  状态:", coroutine.status(co))                   -- suspended
+print("  第二次 resume:", coroutine.resume(co, 5))       -- true, 10
+print("  第三次 resume:", coroutine.resume(co, 99))      -- true, "完成"
+print("  状态:", coroutine.status(co))                   -- dead
+
+-- 对已结束的协程 resume
+local ok, err = coroutine.resume(co)
+print("  对已结束的协程 resume:", ok, err)
+
+print()
+print("=== 2. 用协程写迭代器（最实用的场景）===")
+-- 协程配合 coroutine.wrap 可以写非常优雅的遍历器
+
+-- 用协程生成斐波那契数列（无限序列）
+local function fibGenerator()
+  return coroutine.wrap(function()
+    local a, b = 0, 1
+    while true do
+      coroutine.yield(a)
+      a, b = b, a + b
+    end
+  end)
+end
+
+local fib = fibGenerator()
+local result = {}
+for i = 1, 10 do
+  result[#result + 1] = fib()
+end
+print("  斐波那契前 10 项:", table.concat(result, ", "))
+
+-- 用协程遍历树（比递归+回调更直观）
+local tree = {
+  value = 1,
+  children = {
+    { value = 2, children = { { value = 4 }, { value = 5 } } },
+    { value = 3, children = { { value = 6 } } },
+  }
+}
+
+local function traverse(node)
+  return coroutine.wrap(function()
+    local function walk(n)
+      coroutine.yield(n.value)
+      if n.children then
+        for _, child in ipairs(n.children) do
+          walk(child)
+        end
+      end
+    end
+    walk(node)
+  end)
+end
+
+local values = {}
+for v in traverse(tree) do
+  values[#values + 1] = v
+end
+print("  树遍历结果:", table.concat(values, ", "))
+
+print()
+print("=== 3. 错误处理：pcall / xpcall / error ===")
+
+-- pcall：protected call，捕获异常
+local ok2, err2 = pcall(function()
+  error("出错了")
+end)
+print("  pcall 捕获:", ok2, err2)
+
+-- 【重要】error 的第二个参数决定错误位置信息
+-- level 0：不添加位置信息
+-- level 1（默认）：报错位置是 error 被调用的地方
+-- level 2：报错位置是【调用 error 所在函数】的地方
+local function badFunc()
+  error("内部错误", 2)   -- 报错会指向调用 badFunc 的地方
+end
+local ok3, err3 = pcall(badFunc)
+print("  level 2 的错误信息:", err3)
+
+-- xpcall：带消息处理器（可以获取堆栈）
+local ok4, err4 = xpcall(
+  function() error("带堆栈的错误") end,
+  function(e)
+    return "处理过的: " .. tostring(e)
+  end
+)
+print("  xpcall:", ok4, err4)
+
+-- 【5.2+ 新特性】xpcall 支持额外参数
+local ok5, err5 = xpcall(
+  function(a, b) error("参数是 " .. a .. "," .. b) end,
+  function(e) return e end,
+  "X", "Y"
+)
+print("  xpcall 传参:", ok5, err5)
+
+-- 【错误处理的最佳实践】返回 nil + 错误信息 而不是抛异常
+local function divideSafely(a, b)
+  if b == 0 then
+    return nil, "除数不能为 0"
+  end
+  return a / b
+end
+local r, e = divideSafely(10, 0)
+print("  安全除法:", r, e)
+
+print()
+print("=== 4. assert：条件断言 ===")
+local ok6, err6 = pcall(function()
+  assert(1 == 2, "断言失败的信息")
+end)
+print("  assert 失败:", ok6, err6)
+
+-- assert 的常见用法：校验参数
+local function mustBePositive(n)
+  assert(type(n) == "number", "参数必须是数字")
+  assert(n &gt; 0, "参数必须为正数")
+  return n
+end
+print("  合法参数:", mustBePositive(5))
+local ok7, err7 = pcall(mustBePositive, -1)
+print("  非法参数:", ok7, err7)
+
+print()
+print("=== 5. 垃圾回收与弱表 ===")
+
+-- collectgarbage 的常用操作
+print("  当前内存占用(KB):", math.floor(collectgarbage("count")))
+
+-- 创建大量垃圾
+for i = 1, 10000 do
+  local _ = { i, i + 1 }
+end
+collectgarbage("collect")
+print("  GC 后内存(KB):", math.floor(collectgarbage("count")))
+
+-- 【重要】弱表：对象不被引用时自动回收
+local weakCache = setmetatable({}, { __mode = "v" })
+
+-- 强引用存在时，弱表条目保留
+local strongRef = { name = "被引用" }
+weakCache.a = strongRef
+collectgarbage("collect")
+print("  强引用还在:", weakCache.a ~= nil)
+
+-- 去掉强引用后，弱表条目消失
+strongRef = nil
+collectgarbage("collect")
+print("  强引用移除后:", weakCache.a)
+
+-- 【实战应用】弱表做对象缓存，不会阻止对象被回收
+local function createWeakCache()
+  return setmetatable({}, { __mode = "k" })
+end
+local boundData = createWeakCache()   -- key 是对象，对象没了条目就自动清
+
+print()
+print("=== 6. 环境与模块 ===")
+
+-- _ENV 是 Lua 5.2+ 的机制，取代了旧版的 setfenv/getfenv
+local function sandboxed()
+  -- 通过 _ENV 限制这个函数能访问的全局变量
+  local env = {
+    print = print,
+    result = nil,
+  }
+
+  local f = load([[
+    print("  沙箱内可以调用 print")
+    result = 42
+  ]], "sandbox", "t", env)
+
+  f()
+  return env.result
+end
+print("  沙箱返回值:", sandboxed())
+
+-- 【实战应用】沙箱用于：配置表的限制执行、热更脚本的安全加载
+print("  沙箱的用途: 限制脚本能访问的 API，防止恶意/错误代码破坏环境")
+
+print()
+print("=== 7. 元表高级：__gc 与 __close ===")
+
+-- __gc：对象被回收前调用（需要在元表里【提前】设置）
+local gcLog = {}
+do
+  local mt = {
+    __gc = function(obj)
+      gcLog[#gcLog + 1] = obj.name
+    end
+  }
+  -- 【注意】必须在 setmetatable 时元表就已经有 __gc
+  local a = setmetatable({ name = "objA" }, mt)
+  local b = setmetatable({ name = "objB" }, mt)
+end
+collectgarbage("collect")
+print("  __gc 触发:", table.concat(gcLog, ", "))
+
+-- __close（Lua 5.4）：to-be-closed 变量，离开作用域时自动调用
+do
+  local closer = setmetatable({ name = "资源" }, {
+    __close = function(self, err)
+      print("  __close 被调用:", self.name, "错误:", err)
+    end
+  })
+  local resource &lt;close&gt; = closer
+  print("  to-be-closed 变量已创建")
+end
+print("  离开作用域后 __close 自动触发")
+
+-- 【实战应用】__close 用于自动释放资源（文件句柄、锁）
+-- 相当于 C# 的 using 或 Python 的 with
+
+print()
+print("=== 8. 字符串与模式匹配 ===")
+
+-- Lua 的模式匹配（不是正则，但够用且更快）
+local text = "玩家ID: 12345, 等级: 30, 金币: 9999"
+
+-- 提取所有数字
+local nums = {}
+for n in text:gmatch("%d+") do
+  nums[#nums + 1] = n
+end
+print("  提取的数字:", table.concat(nums, ", "))
+
+-- 捕获组
+local id, level, gold = text:match("ID: (%d+), 等级: (%d+), 金币: (%d+)")
+print("  捕获组:", id, level, gold)
+
+-- gsub 替换
+local masked = text:gsub("%d+", "***")
+print("  替换后:", masked)
+
+-- 【重要】模式的特殊字符需要用 % 转义
+local special = "价格是 99.9 元"
+local price = special:match("(%d+%.?%d*)")    -- . 需要转义成 %.
+print("  提取价格:", price)
+
+-- find 的 plain 参数：第四个参数为 true 时按纯文本查找
+local pos = string.find("a.b.c", ".", 1, true)    -- true = 不用模式
+print("  纯文本查找 . 的位置:", pos)               -- 2
+
+local pos2 = string.find("a.b.c", ".")            -- 不用 true 时 . 匹配任意字符
+print("  模式查找 . 的位置:", pos2)                -- 1
+
+print()
+print("=== 9. 实用工具函数 ===")
+
+-- 深拷贝（处理循环引用）
+local function deepCopy(obj, seen)
+  if type(obj) ~= "table" then return obj end
+  seen = seen or {}
+  if seen[obj] then return seen[obj] end
+
+  local copy = {}
+  seen[obj] = copy
+  for k, v in pairs(obj) do
+    copy[deepCopy(k, seen)] = deepCopy(v, seen)
+  end
+  return setmetatable(copy, getmetatable(obj))
+end
+
+local original = { a = 1, b = { c = 2 } }
+original.self = original                   -- 循环引用
+local copied = deepCopy(original)
+print("  深拷贝:", copied.a, copied.b.c, "循环引用:", copied.self == copied)
+
+-- 表序列化（用于调试输出）
+local function serialize(t, indent)
+  indent = indent or ""
+  if type(t) ~= "table" then
+    if type(t) == "string" then return string.format("%q", t) end
+    return tostring(t)
+  end
+
+  local parts = {}
+  for k, v in pairs(t) do
+    parts[#parts + 1] = indent .. "  [" .. serialize(k) .. "] = " .. serialize(v, indent .. "  ")
+  end
+  return "{\n" .. table.concat(parts, ",\n") .. "\n" .. indent .. "}"
+end
+
+print("  序列化:", serialize({ x = 1, name = "test" }))
+
+-- 参数校验工具
+local function checkArgs(...)
+  local args = { ... }
+  for i, v in ipairs(args) do
+    print(string.format("    参数 %d: %s = %s", i, type(v), tostring(v)))
+  end
+end
+print("  参数校验:")
+checkArgs(1, "str", true, {})</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>函数</th><th>作用</th><th>返回值</th></tr></thead>
+  <tbody>
+    <tr><td><code>coroutine.create</code></td><td>创建协程</td><td>协程对象</td></tr>
+    <tr><td><code>coroutine.resume</code></td><td>启动/恢复</td><td><strong>true/false, 返回值</strong></td></tr>
+    <tr><td><code>coroutine.yield</code></td><td>暂停并交出值</td><td>—</td></tr>
+    <tr><td><code>coroutine.status</code></td><td>查询状态</td><td><code>suspended</code>/<code>running</code>/<code>dead</code></td></tr>
+    <tr><td><code>coroutine.wrap</code></td><td>包装成函数</td><td><strong>直接调用，出错会抛出</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">resume 不会抛异常，wrap 会</span>
+  <strong><code>coroutine.resume(co)</code></strong> 返回 <code>false, errmsg</code>——<em>错误被捕获，不会中断调用方</em>。<br>
+  <strong><code>coroutine.wrap(f)</code></strong> 返回一个函数，调用它时<em>如果协程内部出错，错误会直接抛出</em>。<br><br>
+  <strong>怎么选</strong>：<br>
+  · 需要处理错误 → 用 <code>resume</code>（能拿到错误信息）<br>
+  · 写迭代器、确信不会出错 → 用 <code>wrap</code>（代码更简洁）
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">协程最实用的场景：写迭代器</span>
+  看本页代码里的两个例子：<br>
+  <strong>① 无限序列</strong>（斐波那契）——协程可以<em>暂停在任意位置</em>，天然适合生成无限序列。<br>
+  <strong>② 树的递归遍历</strong>——用递归写逻辑，用协程<em>把递归结果变成线性序列</em>。<br><br>
+  <em>对比一下：如果不用协程，这两个都要自己维护状态变量。协程把"状态"变成了"代码位置"。</em>
+</div>
+
+<h2 id="error">二、错误处理</h2>
+
+<p>Lua 的错误处理有<strong>两种风格</strong>，混用会导致灾难。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>风格</th><th>写法</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>抛异常</strong></td><td><code>error()</code> + <code>pcall</code></td><td><em>真正的意外</em></td></tr>
+    <tr><td><strong>返回 nil+msg</strong></td><td><code>return nil, "错误"</code></td><td><strong>预期内的失败</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">error 的第二个参数（level）</span>
+  <strong>默认 level = 1</strong>：错误信息里包含<em>调用 error 的那一行</em>。<br>
+  <strong>level = 2</strong>：错误信息指向<em>调用当前函数的那一行</em>——<strong>写工具函数时应该用这个</strong>。<br>
+  <strong>level = 0</strong>：不添加位置信息，错误信息就是纯文本。<br><br>
+  <strong>为什么 level = 2 更合适</strong>：如果你写的 <code>validateNumber(n)</code> 内部 <code>error("参数非法")</code>，用默认 level 会报错在 <code>validateNumber</code> 内部——<em>但真正的问题是调用方传了错参数</em>。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">xpcall 能拿到堆栈，pcall 不能</span>
+  <strong><code>pcall(f)</code></strong> 只给你错误消息，<em>看不到调用栈</em>。<br>
+  <strong><code>xpcall(f, handler)</code></strong> 让你在 handler 里<em>用 <code>debug.traceback</code> 获取完整堆栈</em>。<br><br>
+  <strong>实战建议</strong>：<em>框架的顶层调用应该用 xpcall + debug.traceback</em>——出问题时能看到完整调用链，而不是一行孤立的错误信息。<br>
+  Lua 5.2+ 的 xpcall 还支持<strong>给函数传参</strong>，避免用闭包包装。<br><br>
+  <strong>最佳实践</strong>：<em>预期内的失败（文件不存在、参数非法）用 <code>return nil, msg</code>；真正的意外（数组越界、类型错误）才用 error。</em>
+</div>
+
+<h2 id="gc">三、垃圾回收与弱表 ★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">弱表：不阻止对象被回收的容器</span>
+  <strong><code>__mode = "v"</code></strong>：值是弱引用——<em>值不被其他地方引用时，这个条目自动消失</em>。<br>
+  <strong><code>__mode = "k"</code></strong>：键是弱引用——<em>键对象被回收时，整个条目消失</em>。<br>
+  <strong><code>__mode = "kv"</code></strong>：两者都是弱引用。<br><br>
+  <strong>最实用的场景</strong>：给对象挂"附加数据"而不阻止它被回收。<br>
+  例如：<code>local extraData = setmetatable({}, {__mode = "k"})</code><br>
+  <code>extraData[someEntity] = {...}</code><br>
+  <em>当 someEntity 被回收时，对应的附加数据自动清理</em>——不需要手动管理。<br><br>
+  <strong>这正是"缓存"的一种实现</strong>（见算法站页 27）。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">collectgarbage 不要频繁调用</span>
+  <strong><code>collectgarbage("collect")</code></strong> 会触发一次完整的 GC 循环，<em>是同步阻塞的</em>。<br>
+  在游戏的帧循环里调用它，会造成明显卡顿。<br><br>
+  <strong>什么时候可以调</strong>：<br>
+  · 加载界面（玩家不在意这点延迟）<br>
+  · 场景切换时<br>
+  · 内存告警时的兜底<br><br>
+  <strong>什么时候不要调</strong>：<em>Update 里、战斗过程中、任何帧率敏感的位置。</em>
+</div>
+
+<h2 id="sandbox">四、环境与沙箱</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">_ENV 与沙箱</span>
+  <strong>Lua 5.2+ 用 <code>_ENV</code> 取代了旧版的 <code>setfenv</code>。</strong><br>
+  每个函数都有一个 <code>_ENV</code> 上值，<em>所有全局变量访问实际是在访问 <code>_ENV</code> 的字段</em>。<br><br>
+  <strong>沙箱的用途</strong>：<br>
+  · 让配置脚本只能访问<em>白名单内的 API</em><br>
+  · 热更脚本的安全加载（防止恶意代码）<br>
+  · 玩家自定义脚本（UGC）<br><br>
+  <strong>做法</strong>：<code>load(code, name, "t", customEnv)</code> —— 第四个参数指定环境表。<br>
+  <em>这样脚本里的 <code>print</code>、<code>os.execute</code> 等都会去 customEnv 里找，找不到就是 nil。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="07">
+  <div class="task"><input type="checkbox" id="t-07-1"><label for="t-07-1"><strong>手写协程迭代器</strong>：不看示例，用 <code>coroutine.wrap</code> 写一个遍历树的迭代器。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-2"><label for="t-07-2"><strong>验证 error level</strong>：分别用 level 1/2/0 抛错，对比错误信息的位置差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-3"><label for="t-07-3"><strong>用 xpcall 抓堆栈</strong>：写一个 <code>xpcall</code> + <code>debug.traceback</code> 的错误处理函数，看完整调用链。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-4"><label for="t-07-4"><strong>做弱表缓存</strong>：用 <code>__mode = "k"</code> 给对象挂附加数据，验证对象被回收后条目自动消失。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-5"><label for="t-07-5"><strong>测 collectgarbage 的开销</strong>：在循环里调 <code>collectgarbage("count")</code>，测量耗时。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-6"><label for="t-07-6"><strong>做一个沙箱</strong>：用 <code>load</code> 的第四个参数限制脚本能访问的 API，验证 <code>os.execute</code> 不可用。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-7"><label for="t-07-7"><strong>回答面试题</strong>：① 协程和线程的区别？② error 的 level 参数作用？③ 弱表的用途？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能用协程写一个迭代器</strong>；<br>
+    ② 知道 <code>resume</code> 与 <code>wrap</code> 的错误处理差异；<br>
+    ③ <strong>能解释 error 的 level 参数，并知道什么时候该用 2</strong>；<br>
+    ④ 知道弱表的用途（不阻止对象回收的附加数据）；<br>
+    ⑤ 能用 <code>_ENV</code> 做一个限制 API 的沙箱。<br>
+    <br>
+    <em>第 ① 和第 ④ 条在框架源码里非常常见——看懂它们才能看懂 xLua 等框架的实现。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="06-lua-oop.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">06 面向对象与继承</div>
+  </a>
+  <a class="next" href="08-lua-perf.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">08 性能优化 ★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

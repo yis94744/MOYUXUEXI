@@ -1,0 +1,98 @@
+<h1>游戏算法与系统设计</h1>
+
+<p class="lead">这是一份<strong>补齐"工程能力"的路线</strong>。前面三个站点（C#+Unity / C+++Unreal / Lua 热更）教的是<em>语言、引擎、框架</em>；而这一站教的是<strong>真正决定程序上限的东西——算法与系统设计</strong>。</p>
+
+<p class="lead">全站 <strong>35 页</strong>，覆盖从数据结构到完整游戏系统的全部核心内容。每一页的代码都在<strong>真实 Lua 5.4 解释器</strong>里跑过，性能数据是实测值而不是"据说"。</p>
+
+<div class="callout callout--tip">
+  <span class="callout__title">这一站为什么独立出来</span>
+  <strong>算法不在语言里，也不在引擎里。</strong>用 C# 写红点系统和用 Lua 写红点系统，<em>算法完全一样</em>。<br>
+  所以这一站的内容是<strong>跨语言、跨引擎</strong>的：<em>你学到的知识在 Unity、Unreal、甚至服务端都能用</em>。<br><br>
+  <strong>另外</strong>：这些内容也是<strong>面试的主要考点</strong>——尤其是行为树、红点、寻路、空间划分这四个，几乎每场游戏程序面试都会问。
+</div>
+
+<h2 id="scope">一、覆盖范围</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>分组</th><th>页数</th><th>核心内容</th></tr></thead>
+  <tbody>
+    <tr><td><strong>开始</strong></td><td>4</td><td>算法在游戏里的位置、复杂度与性能直觉</td></tr>
+    <tr><td><strong>基础数据结构</strong></td><td>8</td><td>数组/环形缓冲、栈队列、哈希、树、<strong>堆</strong>、<strong>Trie</strong>、并查集、图</td></tr>
+    <tr><td><strong>游戏核心算法</strong></td><td>5</td><td><strong>A* 寻路</strong>、<strong>空间划分</strong>、排序、查找、动态规划</td></tr>
+    <tr><td><strong>游戏系统设计</strong></td><td>10</td><td><strong>状态机</strong>、<strong>行为树</strong>、<strong>决策树与效用</strong>、GOAP、Boids、<strong>红点系统</strong>、任务、Buff、背包掉落、定时器</td></tr>
+    <tr><td><strong>性能与工程</strong></td><td>5</td><td>性能模式库、缓存与 LRU、位运算压缩、存档序列化、调试工具</td></tr>
+    <tr><td><strong>面试与实战</strong></td><td>3</td><td>面试题库、实战项目、算法速查</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="highlights">二、这一站的三个特点</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">① 全部代码可运行，性能数据是实测的</span>
+  本站的每个算法都有<strong>完整可运行的实现</strong>，性能对比是<em>真实测量值</em>。这意味着：<br>
+  • 你能看到"快 6 倍"背后的真实数字，而不是某个博主转述的数字；<br>
+  • <strong>实测会推翻一些广为流传的说法</strong>——比如本站实测发现<em>类式状态机并不比 if-else 慢</em>，<em>元表 class 也不比闭包快</em>。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">② 会指出那些"会导致线上事故"的坑</span>
+  算法课本只讲思路，不讲工程陷阱。本站专门标注这些<strong>看起来对、实际错</strong>的地方：<br>
+  • 空间网格的格子小于查询半径 → <strong>静默漏检</strong>（本站实测：167 个碰撞只检出 33 个）<br>
+  • Trie 与暴力法的过滤结果不同 → <strong>语义差异</strong>，最长匹配才是对的<br>
+  • 红点全树递归 → 几十万节点时<strong>直接卡死</strong><br>
+  • 行为树每帧重建 → GC 爆炸
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">③ 讲系统，不只讲算法</span>
+  算法题会做，不等于能设计系统。本站的"游戏系统设计"章节（10 页）讲的是：<br>
+  • <strong>红点怎么支撑几十万节点</strong>（脏标记、批量合并、增量计数）<br>
+  • <strong>行为树怎么落地到项目</strong>（节点类型、黑板、可视化调试）<br>
+  • <strong>Buff 系统的叠加规则</strong>（加法/乘法/覆盖，顺序敏感）<br>
+  <em>这些才是真正区分"会写算法"和"能做项目"的地方。</em>
+</div>
+
+<h2 id="phases">三、七阶段路线图</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>阶段</th><th>目标</th><th>时间</th><th>页面</th><th>过关标准</th></tr></thead>
+  <tbody>
+    <tr><td><strong>阶段 0</strong><br>基础</td><td>建立复杂度直觉</td><td>2 天</td><td>01–02</td><td>能用实测数据比较两个算法</td></tr>
+    <tr><td><strong>阶段 1</strong><br>数据结构</td><td>能手写核心结构</td><td>2 周</td><td>03–10</td><td>能不看资料写出堆、Trie、并查集</td></tr>
+    <tr><td><strong>阶段 2</strong><br>核心算法</td><td>掌握寻路与空间划分</td><td>2 周</td><td>11–15</td><td>能实现 A* 并做性能优化</td></tr>
+    <tr><td><strong>阶段 3</strong><br>AI 系统</td><td>掌握状态机与行为树</td><td>2–3 周</td><td>16–20</td><td>能设计一个可扩展的 AI 架构</td></tr>
+    <tr><td><strong>阶段 4</strong><br>业务系统</td><td>能做完整的功能模块</td><td>3 周</td><td>21–25</td><td>能实现撑得住百万节点的红点</td></tr>
+    <tr><td><strong>阶段 5</strong><br>性能工程</td><td>会优化、会定位瓶颈</td><td>2 周</td><td>26–30</td><td>能把一个慢系统优化 10 倍以上</td></tr>
+    <tr><td><strong>阶段 6</strong><br>实战面试</td><td>串成完整能力</td><td>2–3 周</td><td>31–33</td><td>有一个包含全部系统的作品</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">和前面三个站的关系</span>
+  <strong>建议的学习顺序</strong>：<br>
+  ① 先学 <em>C# + Unity</em> 或 <em>C++ + Unreal</em>（掌握语言与引擎）<br>
+  ② 再学本站（算法与系统）<br>
+  ③ 最后学 <em>Lua 热更</em>（把系统部署上线）<br><br>
+  <strong>但如果你已经会写业务逻辑了</strong>，可以直接从本站开始——<em>它补齐的是最影响天花板的短板</em>。
+</div>
+
+<h2 id="reality">四、几句实话</h2>
+
+<div class="callout callout--warn">
+  <span class="callout__title">在开始之前</span>
+  <strong>① 算法不是背出来的，是写出来的。</strong>这一站的代码你要<em>自己敲一遍</em>，光看会觉得"我懂了"，但合上页面写不出来。<br>
+  <strong>② 复杂度不是全部。</strong>大 O 只描述增长趋势，<em>常数因子在游戏里经常更重要</em>——本站的实测数据会反复证明这一点。<br>
+  <strong>③ 不要为了用算法而用算法。</strong>100 个敌人的碰撞检测，暴力法就够了。<em>先测，再优化。</em><br>
+  <strong>④ 面试和实战是两件事。</strong>面试考手写红黑树，实战中你永远不会自己写红黑树。<em>但理解它们能让你知道什么时候该用现成的。</em>
+</div>
+
+<nav class="page-nav">
+  <a class="next" href="01-why.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">01 为什么游戏程序员要懂算法</div>
+  </a>
+</nav>

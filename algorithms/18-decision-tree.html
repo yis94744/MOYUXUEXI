@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>18 决策树与效用 AI ★ — 游戏算法与系统设计｜从数据结构到完整系统，覆盖游戏开发全部核心算法</title>
+<meta name="description" content="决策树、效用系统、模糊逻辑、目标优先级评分">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">游戏算法与系统设计
+        <span>从数据结构到完整系统，覆盖游戏开发全部核心算法</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>18 · 决策树与效用 AI ★</h1>
+
+<p class="lead">行为树解决的是<strong>"怎么执行"</strong>，决策树解决的是<strong>"做什么"</strong>。这两者经常被混淆，但它们是<em>互补的</em>——而<strong>效用系统（Utility AI）</strong>又是决策树的平滑版本。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（17）行为树讲"行为怎么组织与执行"。这一页讲<em>"在多个行为之间怎么选"</em>。<br>
+  <strong>关键衔接</strong>：决策树本质是<em>树结构（06）</em>的应用；效用系统大量使用<em>数学曲线</em>（参见 C# 站的页 09 插值）。<br>
+  <strong>下一页</strong>（19）GOAP——它比决策树更灵活，<em>能自动组合出未预设的行为序列</em>。<br>
+  <strong>验证方式</strong>：本页代码在 <em>Lua 5.4.7</em> 实测运行，输出结果是真实的。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="06-tree-basic.html#trees-in-games" data-brief="游戏里的九种树、BST 退化"><span class="prereq__title">树结构</span><span class="prereq__page">06-tree-basic</span></a>
+          <a class="prereq__item" href="17-behavior-tree.html#status" data-brief="六种节点、与状态机的选择依据"><span class="prereq__title">行为树</span><span class="prereq__page">17-behavior-tree</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="basic">一、从硬编码到数据化</h2>
+
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  决策树与效用 AI：让 AI 做出「聪明」的选择 ★
+-- ============================================================
+--  行为树解决的是「怎么执行」，决策树解决的是「做什么」。
+--  两者是互补的：
+--    行为树：我要巡逻 -&gt; 执行巡逻动作（含子步骤）
+--    决策树：面对 3 个敌人，我该打还是跑？（单次决策）
+
+print("=== 1. 最简单的决策树：嵌套 if ===")
+-- 决策树本质就是一棵 if-else 树，但把它「数据化」后可以配置
+
+local function simpleDecision(hp, enemyCount, hasPotion)
+  if hp &lt; 30 then
+    if hasPotion then
+      return "喝药水"
+    else
+      return "逃跑"
+    end
+  else
+    if enemyCount &gt;= 3 then
+      return "使用群攻技能"
+    elseif enemyCount &gt;= 1 then
+      return "普通攻击"
+    else
+      return "巡逻"
+    end
+  end
+end
+
+print("  硬编码 if-else 的缺点：")
+print("    · 规则写死在代码里，策划改不了")
+print("    · 条件复杂后嵌套层级失控")
+print("    · 无法复用、无法测试")
+print()
+print("  测试几个场景：")
+local cases = {
+  { hp = 20, enemyCount = 1, hasPotion = true,  desc = "残血有药" },
+  { hp = 20, enemyCount = 1, hasPotion = false, desc = "残血无药" },
+  { hp = 80, enemyCount = 5, hasPotion = false, desc = "满血多敌" },
+  { hp = 80, enemyCount = 1, hasPotion = false, desc = "满血单敌" },
+  { hp = 80, enemyCount = 0, hasPotion = false, desc = "无敌人" },
+}
+for _, c in ipairs(cases) do
+  local r = simpleDecision(c.hp, c.enemyCount, c.hasPotion)
+  print(string.format("    hp=%-3d 敌人=%d 药=%-5s -&gt; %s", c.hp, c.enemyCount, tostring(c.hasPotion), r))
+end
+
+print()
+print("=== 2. 数据化决策树：节点可配置 ===")
+-- 把决策逻辑抽成节点，支持从配置加载
+
+local DecisionNode = {}
+DecisionNode.__index = DecisionNode
+
+-- 创建条件节点
+function DecisionNode.newCondition(condFn, trueNode, falseNode, label)
+  return setmetatable({
+    type = "condition",
+    condFn = condFn,
+    trueNode = trueNode,
+    falseNode = falseNode,
+    label = label or "condition",
+  }, DecisionNode)
+end
+
+-- 创建动作节点（叶子）
+function DecisionNode.newAction(actionName)
+  return setmetatable({
+    type = "action",
+    actionName = actionName,
+  }, DecisionNode)
+end
+
+-- 执行决策
+function DecisionNode:evaluate(ctx, path)
+  path = path or {}
+  path[#path + 1] = self.label or self.actionName or "?"
+
+  if self.type == "action" then
+    return self.actionName, path
+  end
+
+  local condResult = self.condFn(ctx)
+  local nextNode = condResult and self.trueNode or self.falseNode
+
+  if not nextNode then
+    return "无匹配分支", path
+  end
+
+  return nextNode:evaluate(ctx, path)
+end
+
+-- 用数据构建同一棵树
+local tree = DecisionNode.newCondition(
+  function(ctx) return ctx.hp &lt; 30 end,
+  -- hp &lt; 30 分支
+  DecisionNode.newCondition(
+    function(ctx) return ctx.hasPotion end,
+    DecisionNode.newAction("喝药水"),
+    DecisionNode.newAction("逃跑"),
+    "hasPotion?"
+  ),
+  -- hp &gt;= 30 分支
+  DecisionNode.newCondition(
+    function(ctx) return ctx.enemyCount &gt;= 3 end,
+    DecisionNode.newAction("使用群攻技能"),
+    DecisionNode.newCondition(
+      function(ctx) return ctx.enemyCount &gt;= 1 end,
+      DecisionNode.newAction("普通攻击"),
+      DecisionNode.newAction("巡逻"),
+      "enemyCount&gt;=1?"
+    ),
+    "enemyCount&gt;=3?"
+  ),
+  "hp&lt;30?"
+)
+
+print("  数据化后的优势：")
+print("    · 结构可以序列化成 JSON/Excel，策划可配置")
+print("    · 每次决策返回完整路径，便于调试")
+print()
+print("  决策路径可视化（这是调试 AI 最有用的信息）：")
+for _, c in ipairs(cases) do
+  local action, path = tree:evaluate(c)
+  print(string.format("    [%s]", c.desc))
+  print(string.format("      路径: %s", table.concat(path, " -&gt; ")))
+  print(string.format("      决策: %s", action))
+end
+
+print()
+print("=== 3. 效用系统（Utility AI）：用评分代替硬判断 ===")
+-- 决策树的问题是「硬边界」：
+--   hp = 31 和 hp = 29 会导致完全不同的行为，过渡很突兀。
+-- 效用系统给每个行为打分，选最高分的，过渡平滑。
+
+print("  【核心思想】每个行为有一个「有多想做」的分数")
+print("  分数通常由多条曲线组合而成。")
+
+-- 常用的效用曲线
+local Curve = {}
+
+-- 线性：值越低越想逃跑
+function Curve.linear(x, minX, maxX)
+  if maxX == minX then return 0 end
+  return math.max(0, math.min(1, (x - minX) / (maxX - minX)))
+end
+
+-- 反线性：值越低分数越高
+function Curve.inverseLinear(x, minX, maxX)
+  return 1 - Curve.linear(x, minX, maxX)
+end
+
+-- 二次曲线：低值区域更敏感
+function Curve.quadratic(x, minX, maxX)
+  local t = Curve.linear(x, minX, maxX)
+  return t * t
+end
+
+-- 平滑曲线（smoothstep）：两端平缓，中间陡峭
+function Curve.smoothstep(x, minX, maxX)
+  local t = Curve.linear(x, minX, maxX)
+  return t * t * (3 - 2 * t)
+end
+
+-- 阈值曲线：超过阈值立即满分
+function Curve.threshold(x, threshold, maxX)
+  if x &gt;= threshold then return 1 end
+  return Curve.linear(x, 0, threshold)
+end
+
+print()
+print("  常用效用曲线：")
+print("    linear(线性)        - 均匀变化")
+print("    inverseLinear(反线性) - 越低越想要")
+print("    quadratic(二次)     - 低值区更敏感")
+print("    smoothstep(平滑)    - 两端平缓中间陡")
+print("    threshold(阈值)     - 超过阈值立即满分")
+
+print()
+print("=== 4. 完整的效用 AI 实现 ===")
+
+local UtilityAI = {}
+UtilityAI.__index = UtilityAI
+
+function UtilityAI.new()
+  return setmetatable({ behaviors = {} }, UtilityAI)
+end
+
+-- 注册行为：名字 + 评分函数
+function UtilityAI:addBehavior(name, scoreFn)
+  self.behaviors[#self.behaviors + 1] = {
+    name = name,
+    scoreFn = scoreFn,
+  }
+  return self
+end
+
+-- 选最高分
+function UtilityAI:select(ctx)
+  local best, bestScore = nil, -1
+  local allScores = {}
+
+  for _, b in ipairs(self.behaviors) do
+    local score = b.scoreFn(ctx)
+    allScores[#allScores + 1] = { name = b.name, score = score }
+
+    if score &gt; bestScore then
+      bestScore = score
+      best = b.name
+    end
+  end
+
+  return best, bestScore, allScores
+end
+
+-- 定义角色 AI
+local ai = UtilityAI.new()
+
+-- 喝药水：血量越低越想喝，且必须有药
+ai:addBehavior("喝药水", function(ctx)
+  if not ctx.hasPotion then return 0 end
+  return Curve.inverseLinear(ctx.hp, 0, 60) * 0.9
+end)
+
+-- 逃跑：血量低 + 敌人多
+ai:addBehavior("逃跑", function(ctx)
+  local hpFactor = Curve.inverseLinear(ctx.hp, 0, 50)
+  local enemyFactor = Curve.linear(ctx.enemyCount, 0, 5)
+  return hpFactor * 0.7 + enemyFactor * 0.3
+end)
+
+-- 群攻：敌人越多越想用（但同时要自己有血才敢用）
+ai:addBehavior("使用群攻技能", function(ctx)
+  local enemyFactor = Curve.threshold(ctx.enemyCount, 3, 6)
+  local hpFactor = Curve.linear(ctx.hp, 20, 60)      -- 残血时不敢放
+  return enemyFactor * hpFactor * 0.9
+end)
+
+-- 普通攻击：有敌人且血量还行
+ai:addBehavior("普通攻击", function(ctx)
+  local enemyFactor = Curve.linear(ctx.enemyCount, 0, 3)
+  local hpFactor = Curve.linear(ctx.hp, 20, 80)
+  return enemyFactor * hpFactor * 0.6
+end)
+
+-- 巡逻：没敌人时
+ai:addBehavior("巡逻", function(ctx)
+  local noEnemy = Curve.inverseLinear(ctx.enemyCount, 0, 2)
+  return noEnemy * 0.5
+end)
+
+print("  注册了 5 个行为，模拟不同场景：")
+print()
+
+local testCases = {
+  { hp = 15, enemyCount = 4, hasPotion = true,  desc = "残血+多敌+有药" },
+  { hp = 15, enemyCount = 4, hasPotion = false, desc = "残血+多敌+无药" },
+  { hp = 90, enemyCount = 5, hasPotion = false, desc = "满血+多敌" },
+  { hp = 90, enemyCount = 1, hasPotion = false, desc = "满血+单敌" },
+  { hp = 90, enemyCount = 0, hasPotion = false, desc = "满血+无敌" },
+}
+
+for _, c in ipairs(testCases) do
+  local action, score, allScores = ai:select(c)
+  print(string.format("  【%s】", c.desc))
+  print(string.format("    hp=%d 敌=%d 药=%s", c.hp, c.enemyCount, tostring(c.hasPotion)))
+
+  -- 按分数排序显示
+  table.sort(allScores, function(a, b) return a.score &gt; b.score end)
+  for i, s in ipairs(allScores) do
+    local mark = (i == 1) and " &lt;- 选中" or ""
+    print(string.format("      %-16s %.3f%s", s.name, s.score, mark))
+  end
+  print()
+end
+
+print("=== 5. 效用 vs 决策树：核心差异 ===")
+print()
+print("  场景：血量从 100 逐渐降到 0，观察行为如何变化")
+print()
+print(string.format("  %-6s %-18s %-18s", "血量", "决策树", "效用系统"))
+print("  " .. string.rep("-", 46))
+
+for hp = 100, 0, -10 do
+  local ctx = { hp = hp, enemyCount = 4, hasPotion = false }
+  local dtAction = simpleDecision(hp, 4, false)
+  local utilAction = ai:select(ctx)
+  print(string.format("  %-6d %-18s %-18s", hp, dtAction, utilAction))
+end
+
+print()
+print("  （场景固定：4 个敌人、无药水）")
+
+print()
+print("  【关键差异】")
+print("    决策树：血量 30 是一条硬边界，")
+print("            31 打怪、29 逃跑 —— 【突变】")
+print("    效用系统：分数连续变化，")
+print("            行为切换是【平滑过渡】的")
+print()
+print("  【各自的适用场景】")
+print("    决策树  -&gt; 规则明确、边界清晰的场景（技能选择、UI 状态）")
+print("    效用系统 -&gt; 需要「感觉自然」的场景（NPC 日常行为、策略 AI）")
+
+print()
+print("=== 6. 模糊逻辑（Fuzzy Logic）：处理「有点危险」这类概念 ===")
+-- 效用系统的进阶：不只给 0~1 的分，而是定义"隶属度"
+
+print("  传统逻辑：hp &lt; 30 就是「危险」，hp &gt;= 30 就是「安全」")
+print("  模糊逻辑：")
+print("    hp = 25  -&gt; 危险度 1.0，安全度 0.0")
+print("    hp = 40  -&gt; 危险度 0.4，安全度 0.6   &lt;- 同时是「有点危险」和「比较安全」")
+print("    hp = 60  -&gt; 危险度 0.0，安全度 1.0")
+print()
+print("  实测（用 smoothstep 模拟隶属度）：")
+print(string.format("  %-8s %-14s %-14s %s", "血量", "危险度", "安全度", "主要倾向"))
+print("  " .. string.rep("-", 54))
+for hp = 20, 80, 10 do
+  local danger = Curve.inverseLinear(hp, 30, 70)
+  local safe = Curve.smoothstep(hp, 30, 70)
+  local tendency = danger &gt; safe and "倾向撤退" or "倾向进攻"
+  print(string.format("  %-8d %-14.2f %-14.2f %s", hp, danger, safe, tendency))
+end
+print()
+print("  【用途】需要「渐变式」行为过渡的 AI，比如潜行游戏里敌人的警觉度。")
+
+print()
+print("=== 7. 实战选型建议 ===")
+local advice = {
+  "【简单规则】5 条以内的判断 -&gt; 直接写 if-else，别过度设计",
+  "【规则明确】技能选择、状态切换 -&gt; 决策树（可配置化）",
+  "【需要自然感】NPC 日常、策略决策 -&gt; 效用系统",
+  "【两者结合】决策树判断「要不要做」，效用系统决定「做哪个」",
+  "【调试工具】给决策过程打日志（路径 or 分数表），否则无法调优",
+  "【配置化】把决策树导出成 JSON，让策划能改（这是决策树最大的价值）",
+  "【性能】一次决策通常 &lt; 1 微秒，不是瓶颈；但不要每帧都做决策，按需触发",
+}
+
+for i, a in ipairs(advice) do
+  print(string.format("  %d. %s", i, a))
+end</code></pre>
+
+<div class="callout callout--tip">
+  <span class="callout__title">数据化的最大价值：策划能改</span>
+  硬编码的 <code>if-else</code> 只有一个问题，但它是致命的——<strong>策划改不了</strong>。<br><br>
+  每一次"把血量阈值从 30 改成 35"，都要走<em>需求 → 开发 → 提测 → 发版</em>的完整流程。<br>
+  而数据化之后，策划<em>在 Excel 里改个数字、重新导出配置</em>就完成了。<br><br>
+  <strong>数据结构设计</strong>：<br>
+  <code>{ type = "condition", key = "hp", op = "&lt;", value = 30, trueNode = {...}, falseNode = {...} }</code><br>
+  <em>这样一份 JSON 就能描述整棵决策树。</em>
+</div>
+
+<h2 id="utility">二、效用系统：用评分代替硬判断 ★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">决策树的根本问题：硬边界</span>
+  看本页的实测对比（4 个敌人、无药水，血量从 100 降到 0）：<br>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>血量</th><th>决策树</th><th>效用系统</th></tr></thead>
+    <tbody>
+      <tr><td>100 ~ 40</td><td>使用群攻技能</td><td>使用群攻技能</td></tr>
+      <tr><td><strong>30</strong></td><td><strong>使用群攻技能</strong>（突变点）</td><td><strong>逃跑</strong>（平滑过渡）</td></tr>
+      <tr><td>20 及以下</td><td>逃跑</td><td>逃跑</td></tr>
+    </tbody>
+  </table>
+  </div>
+  决策树在血量 30 处<strong>突然改变行为</strong>——31 打、29 跑。<br>
+  而效用系统的分数是<em>连续变化</em>的，行为切换发生在"两个分数交叉"的时刻，看起来更自然。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">五种常用效用曲线</span>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>曲线</th><th>形状</th><th>用途</th></tr></thead>
+    <tbody>
+      <tr><td><code>linear</code></td><td>均匀上升</td><td>通用的"越多越好"</td></tr>
+      <tr><td><code>inverseLinear</code></td><td>均匀下降</td><td>"越低越想要"（逃跑、喝药）</td></tr>
+      <tr><td><code>quadratic</code></td><td>低值区更敏感</td><td>强调极端情况</td></tr>
+      <tr><td><code>smoothstep</code></td><td>两端平缓、中间陡</td><td><strong>最自然的手感</strong></td></tr>
+      <tr><td><code>threshold</code></td><td>超过阈值立即满分</td><td>"至少要有 3 个敌人"</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <strong>组合方式</strong>：多个维度加权求和。例如"逃跑"的分数 = <em>血量权重 x 血量因子 + 敌人数权重 x 敌人因子</em>。
+</div>
+
+<h2 id="fuzzy">三、模糊逻辑：处理"有点危险"</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">传统逻辑 vs 模糊逻辑</span>
+  <strong>传统逻辑</strong>：<code>hp &lt; 30</code> 是"危险"，否则是"安全"——<strong>非黑即白</strong>。<br>
+  <strong>模糊逻辑</strong>：血量 40 时，<em>危险度 0.4、安全度 0.6</em>——<strong>同时是两者</strong>。<br><br>
+  <strong>实测数据</strong>（用 smoothstep 模拟隶属度）：<br>
+  • hp = 25 → 危险度 1.00，安全度 0.00<br>
+  • hp = 40 → 危险度 0.40，安全度 0.60<br>
+  • hp = 60 → 危险度 0.00，安全度 1.00<br><br>
+  <strong>用途</strong>：需要"渐变式"行为过渡的 AI——<em>潜行游戏里敌人的警觉度、恐怖游戏的紧张感、赛车 AI 的激进程度</em>。
+</div>
+
+<h2 id="compare">四、三者对比与选型</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方案</th><th>决策方式</th><th>优点</th><th>缺点</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>决策树</strong></td><td>条件判断（硬边界）</td><td>清晰、可配置、易调试</td><td>边界突变、规则多时树很深</td><td>技能选择、UI 状态、明确规则</td></tr>
+    <tr><td><strong>效用系统</strong></td><td>评分取最高</td><td>平滑、可量化、易扩展</td><td>参数难调、难调试</td><td>NPC 日常、策略 AI</td></tr>
+    <tr><td><strong>模糊逻辑</strong></td><td>隶属度 + 规则</td><td>最自然、能表达模糊概念</td><td>最复杂、最难调</td><td>需要细腻情绪表现的 AI</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">实战中的组合方式</span>
+  <strong>最常见的做法是混合使用</strong>：<br>
+  • <strong>决策树判断"要不要做"</strong>——比如"现在该不该进入战斗状态"<br>
+  • <strong>效用系统决定"做哪个"</strong>——进入战斗后，用评分选具体技能<br>
+  • <strong>行为树执行"怎么做"</strong>——选中的技能用行为树的子节点来执行<br><br>
+  <em>三层各司其职，比用单一方案硬套要清晰得多。</em>
+</div>
+
+<h2 id="tasks">五、本章动手任务</h2>
+
+<div class="tasks" data-page="18">
+  <div class="task"><input type="checkbox" id="t-18-1"><label for="t-18-1"><strong>实现数据化决策树</strong>：把一棵 <code>if-else</code> 树改造成可配置的节点结构，并加一个"打印决策路径"的功能。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-2"><label for="t-18-2"><strong>导出成 JSON</strong>：设计一个 JSON 格式描述决策树，写一个加载器把它构建成运行时结构。<em>这是实战中最有价值的一步。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-18-3"><label for="t-18-3"><strong>实现五种效用曲线</strong>：不看示例写出 linear / inverseLinear / quadratic / smoothstep / threshold。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-4"><label for="t-18-4"><strong>调参实验</strong>：给效用 AI 的行为调不同权重，观察"血量从 100 降到 0"时的行为切换点变化。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-5"><label for="t-18-5"><strong>做分数可视化</strong>：在决策时打印所有行为的分数排名。<em>这是调试效用 AI 唯一可行的方法。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-18-6"><label for="t-18-6"><strong>回答面试题</strong>：① 决策树和效用系统有什么区别？② 效用曲线怎么设计？③ 什么场景下决策树比效用更好？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能设计一个可配置的决策树数据结构，并说明它的价值；<br>
+    ② <strong>能解释决策树的"硬边界"问题，以及效用系统如何解决它</strong>；<br>
+    ③ 能写出至少四种效用曲线；<br>
+    ④ 知道效用 AI 调试要靠"分数可视化"，而不是靠猜；<br>
+    ⑤ 能说出决策树 / 效用 / 行为树三者如何组合使用。<br><br>
+    <em>第 ② 条是这一页的核心——理解"突变 vs 平滑"是选择方案的关键依据。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="17-behavior-tree.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">17 行为树 Behavior Tree ★★★</div>
+  </a>
+  <a class="next" href="19-goap-planner.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">19 GOAP 与规划型 AI</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

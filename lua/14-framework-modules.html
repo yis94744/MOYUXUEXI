@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>14 核心模块实现 — Lua 热更新路线｜从零基础到独立搭建可上线的热更框架</title>
+<meta name="description" content="事件系统、UI 管理、资源加载、网络层、配置表">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">Lua 热更新路线
+        <span>从零基础到独立搭建可上线的热更框架</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>14 · 核心模块实现</h1>
+
+<p class="lead">上一页搭了框架骨架（模块管理 + 事件系统）。这一页实现<strong>四个最常用的核心模块</strong>：<em>资源管理、网络层、配置表、定时器</em>。<strong>每个都能直接抄进项目。</strong></p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（13）搭了骨架。这一页填上具体的模块。
+  <strong>关键衔接</strong>：页 08 的<em>性能优化</em>在这一页大量使用（缓冲区复用、局部化）；页 16 的 <em>UI 框架</em>会用到这一页的资源模块。
+  <strong>下一页</strong>（15）面向对象框架。<em>让这些模块有统一的代码风格。</em>
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="13-framework-design.html#module" data-brief="注册/初始化/逆序销毁"><span class="prereq__title">模块管理器</span><span class="prereq__page">13-framework-design</span></a>
+          <a class="prereq__item" href="13-framework-design.html#event" data-brief="快照遍历 + 队列化派发，防止回调中修改列表"><span class="prereq__title">事件系统</span><span class="prereq__page">13-framework-design</span></a>
+          <a class="prereq__item" href="08-lua-perf.html#data" data-brief="table.concat 快 17~30 倍，缓存全局函数无收益"><span class="prereq__title">Lua 性能基础</span><span class="prereq__page">08-lua-perf</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="resource">一、资源管理模块</h2>
+
+<p>Lua 层的资源管理<strong>不是"加载资源"</strong>——那是 C# 的事。它做的是<em>缓存、引用计数、生命周期管理</em>。</p>
+
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  核心模块实现：资源、定时器、配置表
+-- ============================================================
+--  这些是每个项目都会用到的模块，代码可以直接抄。
+
+print("=== 1. 资源管理模块（缓存 + 引用计数）===")
+print()
+
+local ResourceManager = {}
+ResourceManager.__index = ResourceManager
+
+function ResourceManager.new()
+  return setmetatable({
+    cache = {},           -- path -&gt; { handle, refCount, data }
+    loadingQueue = {},    -- 异步加载队列
+    totalLoads = 0,       -- 统计：真实加载次数
+    cacheHits = 0,        -- 统计：缓存命中次数
+  }, ResourceManager)
+end
+
+-- 模拟真实加载（实际项目中这里调 xLua 的 C# 接口）
+local function realLoad(path)
+  return {
+    path = path,
+    data = "资源数据:" .. path,
+    size = #path * 100,
+  }
+end
+
+function ResourceManager:load(path)
+  local entry = self.cache[path]
+
+  if entry then
+    -- 缓存命中
+    entry.refCount = entry.refCount + 1
+    self.cacheHits = self.cacheHits + 1
+    return entry.data
+  end
+
+  -- 真实加载
+  self.totalLoads = self.totalLoads + 1
+  local data = realLoad(path)
+
+  self.cache[path] = {
+    data = data,
+    refCount = 1,
+  }
+
+  return data
+end
+
+function ResourceManager:release(path)
+  local entry = self.cache[path]
+  if not entry then
+    error("释放了未加载的资源: " .. tostring(path))
+  end
+
+  entry.refCount = entry.refCount - 1
+
+  if entry.refCount &lt;= 0 then
+    -- 引用计数归零，真正卸载
+    self.cache[path] = nil
+    return true          -- 表示真正卸载了
+  end
+
+  return false           -- 还有引用，不卸载
+end
+
+function ResourceManager:stats()
+  local cachedCount = 0
+  for _ in pairs(self.cache) do cachedCount = cachedCount + 1 end
+
+  return {
+    cached = cachedCount,
+    loads = self.totalLoads,
+    hits = self.cacheHits,
+    hitRate = (self.totalLoads + self.cacheHits) &gt; 0
+              and self.cacheHits / (self.totalLoads + self.cacheHits) or 0,
+  }
+end
+
+-- 测试
+local rm = ResourceManager.new()
+
+print("  模拟：100 个对象使用 3 个共享资源")
+for i = 1, 100 do
+  rm:load("icon_" .. (i % 3 + 1) .. ".png")
+end
+
+local st = rm:stats()
+print(string.format("    缓存中资源数: %d", st.cached))
+print(string.format("    真实加载次数: %d", st.loads))
+print(string.format("    缓存命中次数: %d", st.hits))
+print(string.format("    命中率: %.1f%%", st.hitRate * 100))
+print("    【关键】100 次请求只真实加载了 3 次")
+
+print()
+print("  引用计数测试:")
+
+local rm2 = ResourceManager.new()
+rm2:load("shared.png")     -- refCount = 1
+rm2:load("shared.png")     -- refCount = 2
+print("    加载两次后，释放一次:")
+local unloaded = rm2:release("shared.png")
+print("      是否真正卸载:", unloaded, "（false 表示还有引用）")
+
+print("    再释放一次:")
+unloaded = rm2:release("shared.png")
+print("      是否真正卸载:", unloaded, "（true 表示引用归零，已卸载）")
+
+print()
+print("=== 2. 定时器模块（最小堆实现）===")
+print()
+
+local TimerManager = {}
+TimerManager.__index = TimerManager
+
+function TimerManager.new()
+  return setmetatable({
+    heap = {},            -- 最小堆，按 fireTime 排序
+    nextId = 1,
+    currentTime = 0,
+  }, TimerManager)
+end
+
+-- 堆操作
+function TimerManager:_siftUp(i)
+  local heap = self.heap
+  while i &gt; 1 do
+    local parent = math.floor(i / 2)
+    if heap[parent].fireTime &lt;= heap[i].fireTime then break end
+    heap[parent], heap[i] = heap[i], heap[parent]
+    i = parent
+  end
+end
+
+function TimerManager:_siftDown(i)
+  local heap = self.heap
+  local n = #heap
+  while true do
+    local smallest = i
+    local l, r = i * 2, i * 2 + 1
+    if l &lt;= n and heap[l].fireTime &lt; heap[smallest].fireTime then smallest = l end
+    if r &lt;= n and heap[r].fireTime &lt; heap[smallest].fireTime then smallest = r end
+    if smallest == i then break end
+    heap[i], heap[smallest] = heap[smallest], heap[i]
+    i = smallest
+  end
+end
+
+-- 添加定时器
+function TimerManager:schedule(delay, callback, repeatCount, owner)
+  local timer = {
+    id = self.nextId,
+    fireTime = self.currentTime + delay,
+    interval = delay,
+    callback = callback,
+    repeatCount = repeatCount or 1,      -- -1 表示无限
+    firedCount = 0,
+    owner = owner,
+  }
+  self.nextId = self.nextId + 1
+
+  self.heap[#self.heap + 1] = timer
+  self:_siftUp(#self.heap)
+
+  return timer.id
+end
+
+-- 取消定时器（标记删除，不立即从堆移除）
+function TimerManager:cancel(id)
+  -- 【设计选择】不立即从堆移除，而是标记
+  -- 因为从堆中间删除元素是 O(n)
+  for i = 1, #self.heap do
+    if self.heap[i].id == id then
+      self.heap[i].cancelled = true
+      return true
+    end
+  end
+  return false
+end
+
+-- 每帧更新
+function TimerManager:update(deltaTime)
+  self.currentTime = self.currentTime + deltaTime
+
+  local fired = {}
+
+  -- 取出所有已到期的定时器
+  while #self.heap &gt; 0 do
+    local top = self.heap[1]
+    if top.fireTime &gt; self.currentTime then break end
+
+    -- 弹出堆顶
+    self.heap[1] = self.heap[#self.heap]
+    self.heap[#self.heap] = nil
+    if #self.heap &gt; 0 then self:_siftDown(1) end
+
+    -- 跳过已取消的
+    if not top.cancelled then
+      fired[#fired + 1] = top
+
+      -- 重复定时器：重新入堆
+      if top.repeatCount == -1 or top.firedCount &lt; top.repeatCount - 1 then
+        top.firedCount = top.firedCount + 1
+        top.fireTime = top.fireTime + top.interval
+        self.heap[#self.heap + 1] = top
+        self:_siftUp(#self.heap)
+      end
+    end
+  end
+
+  -- 【重要】先收集再执行 —— 避免在回调里修改堆导致问题
+  for _, timer in ipairs(fired) do
+    timer.callback(timer.id, timer.owner)
+  end
+
+  return #fired
+end
+
+function TimerManager:pendingCount()
+  local n = 0
+  for i = 1, #self.heap do
+    if not self.heap[i].cancelled then n = n + 1 end
+  end
+  return n
+end
+
+-- 测试
+local tm = TimerManager.new()
+local log = {}
+
+tm:schedule(1.0, function() log[#log + 1] = "1 秒后" end)
+tm:schedule(0.5, function() log[#log + 1] = "0.5 秒后" end)
+tm:schedule(2.0, function() log[#log + 1] = "2 秒后" end)
+tm:schedule(0.5, function() log[#log + 1] = "循环(每0.5秒)" end, -1)  -- 无限循环
+
+print("  调度了 4 个定时器（含一个无限循环）")
+print("  模拟 2.5 秒（每帧 0.25 秒）:")
+print()
+
+for frame = 1, 10 do
+  local before = #log
+  local fired = tm:update(0.25)
+  if fired &gt; 0 then
+    print(string.format("    第 %d 帧（t=%.2f）:", frame, tm.currentTime))
+    for i = before + 1, #log do
+      print("      " .. log[i])
+    end
+  end
+end
+
+print()
+print("  剩余未触发的定时器:", tm:pendingCount(), "（无限循环那个）")
+
+print()
+print("  取消定时器测试:")
+-- 用一个【全新的】定时器管理器，避免无限循环定时器干扰判断
+local tm2 = TimerManager.new()
+local fired2 = {}
+
+local cancelId = tm2:schedule(1.0, function() fired2[#fired2 + 1] = "被取消的" end)
+local keepId = tm2:schedule(1.0, function() fired2[#fired2 + 1] = "正常触发" end)
+
+tm2:cancel(cancelId)
+tm2:update(1.5)
+
+print("    触发的回调:", #fired2 &gt; 0 and table.concat(fired2, ", ") or "（无）")
+print("    被取消的定时器触发了吗:", fired2[1] == "被取消的" and "是【异常】" or "否【正确】")
+print("    正常的定时器触发了吗:", fired2[1] == "正常触发" and "是【正确】" or "否【异常】")
+
+print()
+print("=== 3. 配置表模块（索引 + 只读）===")
+print()
+
+local ConfigManager = {}
+ConfigManager.__index = ConfigManager
+
+function ConfigManager.new()
+  local self = setmetatable({
+    tables = {},          -- name -&gt; { byId, byName, all }
+  }, ConfigManager)
+
+  -- 用元表实现只读（见页 04）
+  return setmetatable(self, {
+    __index = ConfigManager,
+    __newindex = function(t, k, v)
+      if k == "tables" then
+        rawset(t, k, v)
+      else
+        error("配置管理器是只读的，不能修改字段: " .. tostring(k), 2)
+      end
+    end,
+  })
+end
+
+-- 加载配置并建立索引
+function ConfigManager:loadTable(name, data, idField, nameField)
+  local tableData = {
+    all = data,
+    byId = {},
+    byName = {},
+    byType = {},
+  }
+
+  -- 【关键】一次性建立所有常用索引
+  for _, item in ipairs(data) do
+    if idField and item[idField] then
+      tableData.byId[item[idField]] = item
+    end
+    if nameField and item[nameField] then
+      tableData.byName[item[nameField]] = item
+    end
+    if item.type then
+      tableData.byType[item.type] = tableData.byType[item.type] or {}
+      -- 【易错点】这里必须取到【类型对应的那个数组】，再追加
+      -- 写错成 table[...] 会静默失败（往全局 table 库上塞元素）
+      local bucket = tableData.byType[item.type]
+      bucket[#bucket + 1] = item
+    end
+  end
+
+  self.tables[name] = tableData
+  return tableData
+end
+
+function ConfigManager:getById(tableName, id)
+  local t = self.tables[tableName]
+  return t and t.byId[id]
+end
+
+function ConfigManager:getByName(tableName, name)
+  local t = self.tables[tableName]
+  return t and t.byName[name]
+end
+
+function ConfigManager:getByType(tableName, itemType)
+  local t = self.tables[tableName]
+  return t and t.byType[itemType] or {}
+end
+
+function ConfigManager:getAll(tableName)
+  local t = self.tables[tableName]
+  return t and t.all or {}
+end
+
+-- 测试
+local cm = ConfigManager.new()
+
+local items = {}
+for i = 1, 1000 do
+  items[i] = {
+    id = 1000 + i,
+    name = "装备" .. i,
+    type = (i % 5 == 0) and "武器" or ((i % 5 == 1) and "防具" or "饰品"),
+    attack = math.random(1, 100),
+  }
+end
+
+cm:loadTable("item", items, "id", "name")
+
+print("  加载了 1000 条装备配置，建立了三种索引")
+print()
+
+-- 性能对比：索引查找 vs 遍历查找
+local N = 10000
+
+local t1 = os.clock()
+local found
+for _ = 1, N do
+  found = cm:getById("item", 1500)
+end
+local indexedTime = os.clock() - t1
+
+local t2 = os.clock()
+for _ = 1, N do
+  local target = 1500
+  for _, item in ipairs(cm:getAll("item")) do
+    if item.id == target then found = item break end
+  end
+end
+local scanTime = os.clock() - t2
+
+print(string.format("  索引查找 %d 次: %.4f 秒", N, indexedTime))
+print(string.format("  遍历查找 %d 次: %.4f 秒", N, scanTime))
+print(string.format("  索引快 %.0f 倍", scanTime / indexedTime))
+
+print()
+print("  按类型查询:")
+local weapons = cm:getByType("item", "武器")
+print(string.format("    武器数量: %d，第一个: %s", #weapons, weapons[1] and weapons[1].name or "无"))
+
+print()
+print("  只读保护测试:")
+local ok, err = pcall(function()
+  cm.hackedField = "恶意修改"
+end)
+print("    尝试添加字段:", ok, err)
+
+print()
+print("=== 4. 三个模块的协作 ===")
+print()
+print("  真实框架里，这三个模块是互相配合的：")
+print()
+print("    配置表 -&gt; 提供数据（装备属性）")
+print("    资源管理 -&gt; 提供资源（装备图标）")
+print("    定时器 -&gt; 提供调度（Buff 到期、冷却完成）")
+print()
+print("  典型的业务流程：")
+print("    1. 从配置表读取装备 ID 和图标路径")
+print("    2. 用资源管理加载图标（带缓存）")
+print("    3. 用定时器调度 Buff 的到期检查")
+print("    4. 触发事件通知 UI 刷新（页 13 的事件系统）")</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>职责</th><th>说明</th><th>关键点</th></tr></thead>
+  <tbody>
+    <tr><td><strong>缓存</strong></td><td>同路径只加载一次</td><td><em>用哈希表做 path → handle 映射</em></td></tr>
+    <tr><td><strong>引用计数</strong></td><td>知道什么时候能卸载</td><td><strong>Load 加一，Release 减一</strong></td></tr>
+    <tr><td><strong>异步加载</strong></td><td>不阻塞主线程</td><td>回调 + 队列管理</td></tr>
+    <tr><td><strong>预加载</strong></td><td>提前加载，避免卡顿</td><td>加载界面统一处理</td></tr>
+    <tr><td><strong>LRU 淘汰</strong></td><td>内存不足时清理</td><td><em>见算法站页 27</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="timer">二、定时器模块</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">定时器的两种实现</span>
+  <strong>方案一：每帧遍历（简单）</strong>
+  · 维护一个列表，每帧检查每个定时器是否到期
+  · <em>O(n) 每帧</em>——定时器少时够用
+  <strong>方案二：最小堆（高效）</strong>
+  · 用堆按"触发时间"排序（见算法站页 07）
+  · 每帧只需检查<em>堆顶</em>是否到期
+  · <em>O(log n) 插入，O(1) 检查</em>
+  <strong>选择依据</strong>：
+  · 定时器 < 100 个 → 方案一（更简单）
+  · 定时器 > 1000 个（比如每个 Buff 一个）→ <strong>方案二</strong>
+  <em>实战中，方案二更常用——因为服务器端的定时任务数量往往很大。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">定时器最容易出的三个 bug</span>
+  <strong>① 定时器泄漏</strong>：对象销毁了，但定时器还在，回调时访问已销毁对象。
+  <em>解决</em>：把定时器绑定到对象，对象销毁时批量清理。
+  <strong>② 同一帧触发多次</strong>：如果帧间隔大于定时器周期，可能一帧触发多次。
+  <em>解决</em>：明确设计——是"每次到期触发一次"还是"补足所有遗漏的触发"。
+  <strong>③ 在回调里删自己</strong>：遍历中修改列表 → 索引错位。
+  <em>解决</em>：用<strong>快照遍历</strong>或<strong>标记删除</strong>（和页 13 的事件系统一样）。
+</div>
+
+<h2 id="config">三、配置表模块</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">配置表的三个设计要点</span>
+  <strong>① 索引优于遍历</strong>
+  加载配置时<strong>建立常用索引</strong>：
+  · <code>byId[id] = config</code>
+  · <code>byName[name] = config</code>
+  · <code>byType[type] = { config1, config2 }</code>
+  <em>把 O(n) 的遍历变成 O(1) 的查找。</em>
+  <strong>② 只读保护</strong>
+  配置加载后应该<strong>只读</strong>——防止业务代码意外修改。
+  用元表的 <code>__newindex</code> 实现（见页 04）。
+  <strong>③ 支持热重载</strong>
+  开发期能重新加载配置而不重启游戏。<em>这能大幅提升调试效率。</em>
+  <strong>实现</strong>：重新解析文件 + 重建索引 + 通知订阅者刷新。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="14">
+  <div class="task"><input type="checkbox" id="t-14-1"><label for="t-14-1"><strong>实现资源缓存</strong>：用哈希表做 path → handle 映射，确保同路径只加载一次。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-2"><label for="t-14-2"><strong>加引用计数</strong>：实现 Load/Release 配对，验证计数归零才真正卸载。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-3"><label for="t-14-3"><strong>实现堆版定时器</strong>：用最小堆管理定时器，测 1000 个定时器的每帧开销。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-4"><label for="t-14-4"><strong>实现配置索引</strong>：给一份配置建立三种索引（byId/byName/byType），对比遍历查找的速度。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-5"><label for="t-14-5"><strong>做配置只读</strong>：用 <code>__newindex</code> 阻止修改，验证写入会报错。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-6"><label for="t-14-6"><strong>回答面试题</strong>：① Lua 层的资源管理做什么？② 定时器为什么用堆？③ 配置表为什么要建索引？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能实现"缓存 + 引用计数"的资源管理；<br>
+    ② <strong>知道定时器该用堆而不是每帧遍历（定时器多时）</strong>；<br>
+    ③ 能说出定时器的三个常见 bug 及解决思路；<br>
+    ④ 能给配置表建立索引，把 O(n) 变 O(1)；<br>
+    ⑤ 知道配置应该只读，以及热重载的实现思路。<br>
+    <br>
+    <em>第 ① 和第 ② 条最实用——它们是每个项目都会用到的模块。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="13-framework-design.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">13 框架总体设计 ★★★</div>
+  </a>
+  <a class="next" href="15-framework-oop.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">15 面向对象框架</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

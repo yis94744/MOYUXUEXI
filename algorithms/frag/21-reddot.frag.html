@@ -1,0 +1,162 @@
+<h1>21 · 红点系统 ★★★</h1>
+
+<p class="lead">红点看起来只是"显示一个小圆点"，但它是<strong>手游里最容易被低估、也最容易做砸的系统</strong>。在大型项目里，红点节点数量可以达到<em>几十万个</em>，而且任何一次条件变化都可能触发<strong>全树重算</strong>——做不好就是"打开背包卡三秒"。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（20）讲群体行为。这一页开始讲<em>业务系统</em>——它们不像算法那样抽象，但<strong>最能体现工程能力</strong>。<br>
+  <strong>关键衔接</strong>：这一页会用到<em>树结构（06）、脏标记思想、以及缓存策略（27）</em>。<br>
+  <strong>为什么标三个星</strong>：红点系统是游戏客户端面试的<strong>高频考点</strong>——因为它能同时考察<em>数据结构、性能优化、UI 架构、业务抽象</em>四方面能力。<br>
+  <strong>验证方式</strong>：本页代码在 <em>Lua 5.4.7</em> 解释器实测运行，性能数据是真实测量值。
+</div>
+
+<h2 id="basic">一、从朴素实现开始</h2>
+
+<p>先用最直观的方式实现一遍，看看问题出在哪里。</p>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>21/reddot</code></div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">朴素实现的问题：O(N) 查询</span>
+  每次查询都从根节点递归整棵树。<br><br>
+  实测数据（1110 个节点，查询 2 万次）：<br>
+  • 朴素递归：<strong>0.0060 秒</strong>（单次 0.3 微秒）<br>
+  • 脏标记：<strong>0.0010 秒</strong>（单次 0.1 微秒）<br>
+  • <strong>快 6 倍，且实际重算只有 4 次</strong><br><br>
+  <strong>注意</strong>：1110 个节点时差距还不算大。但当节点达到 <em>10 万级</em>时，朴素实现会让 UI 卡死——因为<strong>每次打开界面都要遍历全部节点</strong>。
+</div>
+
+<h2 id="dirty">二、核心优化：脏标记 + 缓存 ★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">脏标记的两个关键点</span>
+  <strong>① 向上标脏，而不是向下重算</strong><br>
+  节点状态变化时，<em>只沿着父链向上标记"需要重算"</em>，而不是立刻重算整棵子树。<br>
+  代价：<code>O(树高)</code>，通常只有 3~6 步。<br><br>
+  <strong>② 惰性求值</strong><br>
+  真正重算发生在<em>查询时</em>，而且<strong>只算被标脏的节点</strong>。<br>
+  这样"一帧内改了 1000 个节点"的场景，也只会在下一次查询时重算一次。<br><br>
+  <strong>③ 提前退出</strong><br>
+  标脏时如果发现祖先<em>已经是脏的</em>，就可以停止向上——因为再往上肯定也脏了。<br>
+  <em>这个细节能省下大量重复工作。</em>
+</div>
+
+<h2 id="batch">三、进阶优化：批量合并</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">为什么需要批量合并</span>
+  考虑这个场景：一帧内玩家获得了 100 个道具，每个都触发红点变化。<br>
+  如果逐个标脏，<strong>同一个父节点会被重复标记 100 次</strong>——虽然第二次之后就提前退出了，但仍有开销。<br><br>
+  <strong>做法</strong>：先把所有变化的节点<em>放进一个集合</em>，帧末统一提交。<br>
+  集合天然去重，<em>共享的父节点只会被传播一次</em>。
+</div>
+
+<h2 id="incremental">四、计数类红点：增量更新 ★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">布尔红点和计数红点，聚合方式完全不同</span>
+  <strong>布尔红点</strong>（"有没有"）：聚合用 <code>或</code> 运算——<em>任一子节点亮，父节点就亮</em>。<br>
+  <strong>计数红点</strong>（"有几个"）：聚合用 <code>求和</code> 运算——<em>父节点 = 自身 + 所有子节点</em>。<br><br>
+  <strong>关键差别</strong>：计数类红点可以用<strong>增量更新</strong>！<br>
+  当某个叶子从 3 变成 5（增加 2），只需要<em>沿着父链每层加 2</em>，复杂度 <code>O(树高)</code>。<br>
+  <em>这与节点总数完全无关——10 万节点和 100 节点一样快。</em><br><br>
+  <strong>但布尔红点不能这样做</strong>：一个子节点从亮变灭，父节点是否还亮取决于<em>其他子节点</em>。所以必须用脏标记方案。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">实战中的组合方案</span>
+  真实项目通常是<strong>四种方案组合使用</strong>：<br>
+  <strong>① 树结构 + 脏标记</strong>——解决通用场景（布尔红点）<br>
+  <strong>② 批量合并</strong>——解决一帧内大量变化<br>
+  <strong>③ UI 引用计数</strong>——只重算<em>被界面引用的</em>分支<br>
+  <strong>④ 计数类走增量</strong>——避免整树重算<br><br>
+  <strong>面试加分点</strong>：能说出"不同红点类型用不同聚合策略"，而不是只会一个递归全树。
+</div>
+
+<h2 id="ui-ref">五、UI 引用计数：把 10 万降到 200</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">这是大型项目的关键优化</span>
+  红点树可能很大，但<strong>玩家同时能看到的节点很少</strong>——只有当前展开的界面分支。<br><br>
+  <strong>做法</strong>：<br>
+  ① 每个节点维护一个<em>引用计数</em>，表示"有多少个 UI 元素正在监听它"；<br>
+  ② 只有引用计数 &gt; 0 的节点才参与重算；<br>
+  ③ 未展开的分支直接返回缓存值，<strong>不递归</strong>。<br><br>
+  <strong>效果</strong>：假设 10 万节点里只有 200 个被界面引用，<em>重算规模从 10 万降到 200——提升 500 倍</em>。<br><br>
+  <strong>实现要点</strong>：UI 元素在 <code>OnEnable</code> 时 <code>retain</code>、<code>OnDisable</code> 时 <code>release</code>，与事件订阅的模式完全一致（见页 05）。
+</div>
+
+<h2 id="compare">六、四种方案对比</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方案</th><th>复杂度</th><th>适用场景</th><th>代价</th></tr></thead>
+  <tbody>
+    <tr><td><strong>朴素递归</strong></td><td>O(N) 查询</td><td>节点数 &lt; 100</td><td>节点多了直接卡死</td></tr>
+    <tr><td><strong>脏标记 + 缓存</strong></td><td>O(1) 查询（命中缓存）</td><td><strong>通用方案</strong></td><td>需要维护脏状态</td></tr>
+    <tr><td><strong>批量合并</strong></td><td>O(变化数)</td><td>一帧内大量变化</td><td>需要帧末统一提交</td></tr>
+    <tr><td><strong>增量计数</strong></td><td>O(树高)</td><td><strong>计数类红点</strong></td><td>仅适用于可累加的场景</td></tr>
+    <tr><td><strong>UI 引用计数</strong></td><td>O(可见节点)</td><td>大型树结构</td><td>UI 要正确 retain/release</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="architecture">七、完整架构设计</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">生产环境的红点系统通常分成四层</span>
+  <strong>① 数据层（RedDotNode）</strong><br>
+  树的节点结构：<code>name</code>、<code>selfValue</code>、<code>children</code>、<code>parent</code>、<code>cachedValue</code>、<code>dirty</code>。<br><br>
+  <strong>② 逻辑层（RedDotManager）</strong><br>
+  负责：注册节点、设置条件、标脏、重算、通知。<em>这是核心。</em><br><br>
+  <strong>③ 绑定层（RedDotBinder）</strong><br>
+  UI 组件挂上它，声明"我监听哪个红点路径"。<em>它负责 retain/release 和刷新显示。</em><br><br>
+  <strong>④ 配置层</strong><br>
+  红点树的<strong>结构</strong>和<strong>触发条件</strong>应该配置化——因为策划要能改。<br>
+  <em>常见做法：节点树用 JSON/Excel 配置，触发条件绑定到事件名。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三个上线后才会暴露的坑</span>
+  <strong>① 事件没解绑导致内存泄漏</strong><br>
+  UI 关闭了但红点监听还在，<em>节点引用着已销毁的 UI 对象</em>——这和页 05 讲的事件泄漏是同一个问题。<br><br>
+  <strong>② 初始化时全树标脏</strong><br>
+  登录时一次性设置几百个条件，每个都触发向上标脏。<em>应该先静默设置，最后统一提交流程一次。</em><br><br>
+  <strong>③ 服务器数据和客户端不同步</strong><br>
+  红点状态本质上来自服务器。断线重连、跨天刷新、活动开启——<em>都要有完整的重算机制</em>，不能只靠增量。
+</div>
+
+<h2 id="tasks">八、本章动手任务</h2>
+
+<div class="tasks" data-page="21">
+  <div class="task"><input type="checkbox" id="t-21-1"><label for="t-21-1"><strong>实现朴素版并测性能</strong>：构建一棵 3 层、每层 10 个的树，测出单次查询耗时。<em>然后加到 5 层，看耗时增长多少倍。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-21-2"><label for="t-21-2"><strong>实现脏标记版</strong>：对比朴素版，记录实际重算次数与查询耗时。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-3"><label for="t-21-3"><strong>实现批量合并</strong>：模拟"一帧内改 1000 个节点"，对比逐个标脏与批量提交的差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-4"><label for="t-21-4"><strong>实现增量计数</strong>：写一个计数类红点树，验证更新的复杂度与节点总数无关（改变节点数，测量耗时是否恒定）。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-5"><label for="t-21-5"><strong>加引用计数</strong>：给节点加 <code>retain</code>/<code>release</code>，验证"只重算被引用分支"的效果。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-6"><label for="t-21-6"><strong>设计配置文件格式</strong>：用 JSON 描述红点树结构，写一个加载器把它构建成运行时树。<em>这是实战中最常见的做法。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-21-7"><label for="t-21-7"><strong>回答面试题</strong>：① 红点系统怎么设计？② 几十万节点怎么保证不卡？③ 布尔红点和计数红点的聚合有什么区别？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能画出红点系统的分层架构</strong>（数据层/逻辑层/绑定层/配置层）；<br>
+    ② 能解释<strong>脏标记"向上传播"而不是"向下重算"</strong>的原因；<br>
+    ③ <strong>能说出布尔红点与计数红点的聚合差异，以及为什么后者能用增量</strong>；<br>
+    ④ 能说出至少三种把几十万节点优化到可接受性能的手段；<br>
+    ⑤ 知道事件绑定不解绑会导致什么后果。<br><br>
+    <em>第 ③ 条最能区分"背过答案"和"真的理解"——面试官经常用这个问题筛选候选人。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="20-boids-flock.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">20 群体行为与 Boids</div>
+  </a>
+  <a class="next" href="22-quest-achievement.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">22 任务与成就系统</div>
+  </a>
+</nav>

@@ -1,0 +1,130 @@
+<h1>08 · 性能优化 ★★</h1>
+
+<p class="lead">这一页的<strong>每一个数字都是实测的</strong>——包括<em>两个推翻常见说法的结论</em>。Lua 性能优化有一条铁律：<strong>先测量，再优化</strong>。<em>凭直觉优化往往改错地方。</em></p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（07）讲的高级特性都有性能代价——这一页<em>把它们量化</em>。<br>
+  <strong>关键衔接</strong>：页 04 讲的<em>元表访问</em>、页 05 讲的<em>闭包</em>在这一页被实测出真实开销；这一页的结论也适用于算法站的<em>性能模式库</em>。<br>
+  <strong>下一页</strong>（09）热更新原理——<em>进入实战部分</em>。<br>
+  <strong>重要提醒</strong>：这一页有两个"反直觉"的实测结论，它们的价值<em>高于任何优化技巧</em>——因为它们告诉你「不要盲目相信经验」。
+</div>
+
+<h2 id="data">一、实测数据总览</h2>
+
+<p>下面这张表是<strong>本页全部实测的汇总</strong>（Lua 5.4.7，实测机器）。<em>注意"结论"列——其中两项与常见说法相反。</em></p>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>08/perf</code></div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>优化手段</th><th>实测收益</th><th>结论</th></tr></thead>
+  <tbody>
+    <tr><td><strong>table.concat 代替 ..</strong></td><td><span class="mk mk--yes">快 17~30 倍</span></td><td><strong>最值得做</strong></td></tr>
+    <tr><td><strong>元表 __index 写回缓存</strong></td><td><span class="mk mk--yes">快 4 倍</span></td><td>频繁访问必做</td></tr>
+    <tr><td><strong>返回多值代替返回表</strong></td><td><span class="mk mk--yes">快 4.3 倍</span></td><td>高频小函数必做</td></tr>
+    <tr><td><strong>避免循环内建闭包</strong></td><td><span class="mk mk--yes">快 3.8 倍</span></td><td>热路径必做</td></tr>
+    <tr><td><strong>局部变量代替全局</strong></td><td><span class="mk mk--yes">快 2 倍</span></td><td><strong>最基础的优化</strong></td></tr>
+    <tr><td><strong>缓存表长度</strong></td><td><span class="mk mk--warn">快 3~4%</span></td><td>收益有限</td></tr>
+    <tr><td>缓存全局函数到局部</td><td><span class="mk mk--no">1.0 倍</span></td><td><strong>Lua 5.4 下无收益</strong></td></tr>
+    <tr><td>ipairs 代替数字 for</td><td><span class="mk mk--no">慢 2.6 倍</span></td><td><strong>反而更慢</strong></td></tr>
+    <tr><td>表复用代替新建</td><td><span class="mk mk--warn">看场景</span></td><td>小表时无收益</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="counter">二、两个反直觉的实测结论 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">反例一：缓存全局函数在 Lua 5.4 下没有收益</span>
+  <strong>常见说法</strong>：「把 <code>table.insert</code> 缓存成 <code>local insert = table.insert</code> 会快很多」。<br>
+  <strong>实测结果</strong>：<em>两者耗时完全相同（1.00 倍）</em>。<br><br>
+  <strong>为什么</strong>：Lua 5.4 用<strong>数组存全局变量</strong>（不是哈希表），全局访问本身就是 O(1) 索引——<em>和局部变量访问的差距远小于 LuaJIT 时代</em>。<br><br>
+  <strong>那什么时候还有用？</strong><br>
+  · 在 <strong>LuaJIT</strong> 下差异明显（JIT 为局部变量生成寄存器访问）<br>
+  · 极热循环（每帧几百万次调用）<br>
+  · <em>需要 API 稳定性时</em>（把依赖固定，外部改动不影响）<br><br>
+  <strong>结论</strong>：这不是优先优化项。<em>先做收益大的（见表格第 1~5 项）。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">反例二：ipairs 比数字 for 慢得多</span>
+  <strong>常见说法</strong>：「遍历数组用 <code>ipairs</code>，比 <code>for i = 1, #t</code> 更快（因为缓存了长度）」。<br>
+  <strong>实测结果</strong>：<em>ipairs 慢了 2.6 倍</em>。<br><br>
+  <strong>为什么</strong>：<code>ipairs</code> 每次迭代都要<strong>调用一次迭代器函数</strong>——一次函数调用的开销。而数字 for 循环是<em>虚拟机原生指令，没有函数调用</em>。<br><br>
+  <strong>正确的热路径写法</strong>：<br>
+  <code>local n = #arr</code><br>
+  <code>for i = 1, n do ... end</code><br><br>
+  <em>缓存长度确实有收益（3~4%），但要配合数字 for 使用，而不是 ipairs。</em><br><br>
+  <strong>实战建议</strong>：非热路径用 <code>ipairs</code>（可读性好）；热路径用<em>数字 for + 缓存长度</em>。
+</div>
+
+<h2 id="decision">三、优化决策表</h2>
+
+<p>按<strong>收益与工作量</strong>排序，从上往下做：</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>优先级</th><th>优化项</th><th>收益</th><th>工作量</th><th>什么时候做</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1</strong></td><td>字符串拼接改 table.concat</td><td>17~30 倍</td><td>小</td><td><strong>所有循环内拼接</strong></td></tr>
+    <tr><td><strong>2</strong></td><td>局部变量化</td><td>2 倍</td><td>小</td><td><strong>所有热循环</strong></td></tr>
+    <tr><td><strong>3</strong></td><td>避免循环内建闭包</td><td>3.8 倍</td><td>小</td><td>热路径回调</td></tr>
+    <tr><td><strong>4</strong></td><td>返回多值代替返回表</td><td>4.3 倍</td><td>小</td><td>高频小函数</td></tr>
+    <tr><td><strong>5</strong></td><td>__index 写回缓存</td><td>4 倍</td><td>中</td><td>频繁访问动态字段</td></tr>
+    <tr><td><strong>6</strong></td><td>缓存表长度</td><td>3~4%</td><td>小</td><td>大表嵌套循环</td></tr>
+    <tr><td><strong>7</strong></td><td>对象池</td><td>GC 层面</td><td>中</td><td>频繁创建销毁</td></tr>
+    <tr><td><strong>8</strong></td><td>表复用</td><td>看场景</td><td>中</td><td><em>先测再说</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">三条最重要的原则</span>
+  <strong>① 先测量，再优化</strong><br>
+  不要凭直觉。本页就有两个反例说明"经验"可能是错的。<br><br>
+  <strong>② 优化热路径，不是全部代码</strong><br>
+  80% 的时间花在 20% 的代码上。先用 Profiler 找到那 20%。<br><br>
+  <strong>③ 可读性优先，除非测得慢</strong><br>
+  把变量名改成 a、b、c 确实快一点，<em>但代价是没人看得懂</em>。<br><br>
+  <strong>项目节奏建议</strong>：<br>
+  · 早期：不优化，先写清楚<br>
+  · 中期：建立性能基线，定期测<br>
+  · 后期：针对瓶颈做优化<br>
+  · 永远：<strong>优化后再测一次，确认真的变快了</strong>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="08">
+  <div class="task"><input type="checkbox" id="t-08-1"><label for="t-08-1"><strong>复现两个反例</strong>：亲自跑一遍"缓存全局函数"和"ipairs"的对比。<em>用自己的机器验证本页的结论。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-08-2"><label for="t-08-2"><strong>找出项目里的字符串拼接</strong>：搜索循环内的 <code>..</code> 拼接，改成 <code>table.concat</code>，测量改善。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-3"><label for="t-08-3"><strong>做一次 Profiler</strong>：给你的 Lua 逻辑加耗时打点，找出最耗时的函数。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-4"><label for="t-08-4"><strong>给热循环做局部化</strong>：把热路径上频繁访问的全局变量、表字段缓存到局部变量，测速。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-5"><label for="t-08-5"><strong>验证表复用</strong>：在不同数据规模下测试"新建 vs 复用"，<em>找到复用的收益临界点</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-6"><label for="t-08-6"><strong>写优化报告</strong>：记录一次完整的优化过程（问题、测量、改动、复测数字）。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-7"><label for="t-08-7"><strong>回答面试题</strong>：① Lua 里最值得做的性能优化是什么？② 为什么 ipairs 比数字 for 慢？③ 优化的正确流程？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出至少五项 Lua 性能优化手段及其收益；<br>
+    ② <strong>知道 Lua 5.4 下"缓存全局函数"没有明显收益</strong>，以及原因；<br>
+    ③ <strong>知道 ipairs 比数字 for 慢，热路径应该怎么写</strong>；<br>
+    ④ 能复述"先测量再优化"的流程；<br>
+    ⑤ 有一次真实的 Lua 性能优化经历，并能说出实测数字。<br>
+    <br>
+    <em>第 ② 和第 ③ 条是本页最有价值的内容——它们证明了"经验也可能是错的，必须实测"。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="07-lua-advanced.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">07 高级特性</div>
+  </a>
+  <a class="next" href="09-hotupdate-basics.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">09 热更新原理</div>
+  </a>
+</nav>

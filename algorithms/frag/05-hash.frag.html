@@ -1,0 +1,149 @@
+<h1>05 · 哈希表与哈希函数 ★</h1>
+
+<p class="lead">哈希表是<strong>游戏中最常用的查找结构</strong>，也是 Lua table 的底层实现。这一页不只讲原理，更讲<em>游戏里那些"看起来对但实际错"的用法</em>——比如用浮点坐标做 key。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（04）讲的栈与队列是线性结构。哈希表是第一个<em>非线性查找结构</em>。<br>
+  <strong>关键衔接</strong>：Lua 站的<em>table 与元表</em>讲的是"怎么用"；这一页讲<em>"为什么这样设计、什么时候会退化"</em>。<br>
+  <strong>下一页</strong>（06）树结构。哈希表擅长"精确查找"，树适合"范围查找"。<br>
+  <strong>验证方式</strong>：本页实现了完整的哈希表，<em>并实测出了负载因子对冲突次数的影响</em>。
+</div>
+
+<h2 id="core">一、哈希的核心与冲突解决</h2>
+
+<p>哈希的理想是<strong>一次计算定位数据</strong>。现实中不同的 key 会算出同一个下标，这叫<strong>哈希冲突</strong>。</p>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>05/hash</code></div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方法</th><th>原理</th><th>优缺点</th></tr></thead>
+  <tbody>
+    <tr><td><strong>链地址法</strong></td><td>每个槽挂一个链表</td><td><em>实现简单，删除方便</em>；但链表有指针开销</td></tr>
+    <tr><td><strong>开放寻址法</strong></td><td>冲突了就找下一个空位</td><td><strong>缓存友好</strong>；但删除麻烦（要标记墓碑）</td></tr>
+    <tr><td><strong>再哈希法</strong></td><td>冲突时换一个哈希函数</td><td>实现复杂，少用</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="load">二、负载因子：哈希表的生死线 ★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">负载因子超标 = 哈希表退化成链表</span>
+  本页实测了"容量 vs 1000 个元素的冲突次数"：<br>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>容量</th><th>冲突次数</th><th>负载因子</th><th>后果</th></tr></thead>
+    <tbody>
+      <tr><td>8</td><td><strong>992</strong></td><td>125.00</td><td><span class="mk mk--no">退化成链表</span></td></tr>
+      <tr><td>64</td><td>937</td><td>15.62</td><td><span class="mk mk--no">严重退化</span></td></tr>
+      <tr><td>256</td><td>785</td><td>3.91</td><td><span class="mk mk--warn">较慢</span></td></tr>
+      <tr><td>1024</td><td>630</td><td>0.98</td><td><span class="mk mk--yes">正常</span></td></tr>
+      <tr><td>4096</td><td>108</td><td>0.24</td><td><span class="mk mk--yes">很快（浪费内存）</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <strong>结论</strong>：容量太小会让冲突爆炸，查找从 O(1) <em>退化成 O(n)</em>。<br>
+  经验值：<strong>容量约为元素数量的 1.3~2 倍</strong>。<br>
+  <em>标准实现会在负载因子超过 0.75 时自动扩容。</em>
+</div>
+
+<h2 id="apps">三、游戏里的三个真实应用</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">应用一：用坐标做 key 的浮点陷阱</span>
+  <strong>这是游戏开发中最经典的坑。</strong><br><br>
+  实测输出：<br>
+  <code>0.1 + 0.2 = 0.30000000000000004</code><br>
+  <code>0.3       = 0.29999999999999999</code><br>
+  <code>0.1 + 0.2 == 0.3 → false</code><br><br>
+  <strong>后果</strong>：如果你用 <code>"x,y"</code> 拼字符串做 key，<em>明明在同一个位置却查不到</em>。<br>
+  这类 bug <strong>极难复现</strong>——因为取决于浮点运算的具体顺序。<br><br>
+  <strong>正确做法：量化成整数</strong><br>
+  <code>local SCALE = 100</code><br>
+  <code>return math.floor(x * SCALE) * 100000 + math.floor(y * SCALE)</code><br>
+  <em>实测验证：量化后 <code>posKey(0.3, 0)</code> 与 <code>posKey(0.1+0.2, 0)</code> 相等。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">应用二：ID → 数据的索引</span>
+  <strong>场景</strong>：你有 10000 个道具配置，经常需要"按名字查 ID"。<br>
+  <strong>做法</strong>：加载配置时<strong>额外构建一个反向索引表</strong>。<br>
+  <code>nameIndex[config.name] = config.id</code><br><br>
+  <em>这是"用内存换时间"的典型案例（见页 26 性能模式库）。</em><br>
+  收益：从"遍历查找 O(n)"变成"哈希查找 O(1)"。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">应用三：状态机的事件映射</span>
+  <strong>不用哈希表</strong>：一堆 if-else 判断"当前状态 + 事件"的组合。<br>
+  <strong>用哈希表</strong>：<code>transitions["walking:attack"] = "attacking"</code><br><br>
+  <em>好处</em>：<br>
+  · 新增状态转换只需<strong>加一行配置</strong>，不用改逻辑<br>
+  · <em>可以序列化成 JSON，让策划配置</em><br><br>
+  这是<strong>数据驱动设计</strong>的典型应用（对比算法站页 16 状态机）。
+</div>
+
+<h2 id="lua-table">四、Lua table 的四个性能要点</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>要点</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><strong>数字 key 最快</strong></td><td>数组部分用整数索引，是<em>纯数组访问</em></td></tr>
+    <tr><td><strong>字符串 key 有 intern 优化</strong></td><td>短字符串会被内部化，<strong>哈希是 O(1)</strong></td></tr>
+    <tr><td><strong>避免稀疏数组</strong></td><td><code>t[1]</code> 和 <code>t[1000000]</code> 之间的空洞<em>会占内存</em></td></tr>
+    <tr><td><strong>扩容是摊销 O(1)</strong></td><td>每次翻倍，总复制成本 O(n)，摊到每次就是 O(1)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">反例：Lua 里的"预分配技巧"反而更慢</span>
+  <strong>常见说法</strong>：「先用整数填满 table 触发扩容，清空后再用，能避免中间扩容」。<br>
+  <strong>实测结果</strong>：<em>不预分配 0.0070 秒，预分配 0.0110 秒</em>——<strong>预分配慢了 57%</strong>。<br><br>
+  <strong>为什么</strong>：<br>
+  · Lua 的扩容是<strong>摊销 O(1)</strong>，总成本已经很低<br>
+  · 而"先填满再清空"<em>多做了 n 次赋值 + n 次 nil 写入</em><br><br>
+  <strong>这和 C++ 完全不同</strong>：<br>
+  · C++ <code>vector.reserve(n)</code> 一次性分配，<em>避免中间所有扩容</em>——确实有效<br>
+  · Lua table <strong>没有 reserve API</strong>，所谓的"技巧"只是绕路<br><br>
+  <strong>结论</strong>：不要用这种技巧。<em>LuaJIT 用户可以用 <code>table.new(n)</code>，标准 Lua 直接接受摊销成本。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="05">
+  <div class="task"><input type="checkbox" id="t-05-1"><label for="t-05-1"><strong>实现链地址法哈希表</strong>：不看示例写一遍 set/get/remove，并用测试验证正确性。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-2"><label for="t-05-2"><strong>测负载因子</strong>：改变容量，测量查找耗时，<em>找到冲突开始恶化的临界点</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-3"><label for="t-05-3"><strong>复现浮点陷阱</strong>：用 <code>"x,y"</code> 字符串做 key，构造 <code>0.1+0.2</code> 查不到 <code>0.3</code> 的例子。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-4"><label for="t-05-4"><strong>改用整数 key</strong>：用量化后的整数做坐标 key，验证问题消失。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-5"><label for="t-05-5"><strong>做反向索引</strong>：给一个配置文件列表构建"名字 → ID"的索引表，对比遍历查找的速度。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-6"><label for="t-05-6"><strong>验证预分配反例</strong>：亲自跑一遍"预分配 vs 不预分配"，确认本页的结论。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-7"><label for="t-05-7"><strong>回答面试题</strong>：① 哈希冲突怎么解决？② 负载因子的作用？③ 为什么浮点不能做哈希 key？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能手写链地址法哈希表；<br>
+    ② <strong>能说出负载因子超标会怎样，以及合理范围</strong>；<br>
+    ③ <strong>知道浮点坐标做 key 的陷阱及量化解法</strong>；<br>
+    ④ 能说出 Lua table 的四个性能特性；<br>
+    ⑤ 知道 Lua 里"预分配技巧"反而更慢，以及原因。<br>
+    <br>
+    <em>第 ③ 条是这一页最实用的内容——它能帮你避免一类极难排查的线上 bug。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="04-linked-stack-queue.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">04 链表、栈与队列</div>
+  </a>
+  <a class="next" href="06-tree-basic.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">06 树与二叉搜索树</div>
+  </a>
+</nav>

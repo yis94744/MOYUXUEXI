@@ -1,0 +1,117 @@
+<h1>12 · Unreal C++ 与宏系统 ★★★</h1>
+
+<p class="lead">这是<strong>Unreal C++ 最独特、也最反直觉的部分</strong>：<em>宏、反射、垃圾回收</em>。理解这一页，你才能理解<em>为什么 UE 的 C++ 长这样</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="macros">一、四个核心宏</h2>
+
+<p>Unreal 用宏来实现<strong>反射</strong>——这是 C++ 本身没有的能力。<em>C# 有反射，C++ 没有，所以 UE 自己造了一套。</em></p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>宏</th><th>作用</th><th>必须放在哪</th></tr></thead>
+  <tbody>
+    <tr><td><strong>UCLASS()</strong></td><td>标记一个类参与反射</td><td><em>类声明前</em></td></tr>
+    <tr><td><strong>USTRUCT()</strong></td><td>标记一个结构体</td><td><em>结构体声明前</em></td></tr>
+    <tr><td><strong>UPROPERTY()</strong></td><td><strong>标记成员变量</strong></td><td><em>变量声明前</em></td></tr>
+    <tr><td><strong>UFUNCTION()</strong></td><td><strong>标记成员函数</strong></td><td><em>函数声明前</em></td></tr>
+    <tr><td><strong>UENUM()</strong></td><td>标记枚举</td><td><em>枚举声明前</em></td></tr>
+    <tr><td><strong>UINTERFACE()</strong></td><td>标记接口</td><td><em>接口声明前</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">UPROPERTY 最大的作用：防止被 GC 回收 ★★★</span>
+  <strong>这是 Unreal C++ 最重要的规则。</strong><br><br><strong>问题</strong>：UE 有垃圾回收。<em>如果一个 UObject 没有被任何 <code>UPROPERTY</code> 引用，它会被回收。</em><br><code>class AMyActor : public AActor {</code><br><code>&nbsp;&nbsp;UMyObject* Data;   // ❌ 没有 UPROPERTY，可能被回收！</code><br><code>};</code><br><em>表现为：运行一段时间后，<code>Data</code> 突然变成 nullptr，游戏崩溃。</em><br><br><strong>正确写法</strong>：<br><code>UPROPERTY()</code><br><code>UMyObject* Data;   // ✅ 被 GC 追踪</code><br><br><strong>为什么难查</strong>：<em>刚创建时有值，能正常工作</em>——<strong>只有 GC 跑过一次后才出问题</strong>。<br><br><strong>规则</strong>：<em>任何指向 UObject 的成员指针，都必须加 UPROPERTY。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">UPROPERTY 的常用说明符</span>
+  <div class="table-wrap"><table><thead><tr><th>说明符</th><th>作用</th></tr></thead><tbody><tr><td><code>EditAnywhere</code></td><td>编辑器里可编辑（<em>蓝图和实例都能改</em>）</td></tr><tr><td><code>VisibleAnywhere</code></td><td>可见但<em>不可编辑</em></td></tr><tr><td><code>BlueprintReadWrite</code></td><td>蓝图可读写</td></tr><tr><td><code>BlueprintReadOnly</code></td><td>蓝图只读</td></tr><tr><td><code>Category="X"</code></td><td>编辑器里的分组</td></tr><tr><td><code>Transient</code></td><td><strong>不保存到磁盘</strong></td></tr><tr><td><code>Replicated</code></td><td>网络复制（<em>页 19</em>）</td></tr></tbody></table></div><strong>组合示例</strong>：<br><code>UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Stats")</code><br><code>float MaxHealth = 100.f;</code><br><br><strong>注意</strong>：<em>说明符不改变代码逻辑</em>——它们只影响编辑器、蓝图、网络的<strong>元数据</strong>。<em>真正的效果由 UHT 生成的代码实现。</em>
+</div>
+
+<h2 id="gc">二、Unreal 的垃圾回收机制</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>概念</th><th>说明</th><th>注意</th></tr></thead>
+  <tbody>
+    <tr><td><strong>UObject</strong></td><td><strong>受 GC 管理</strong></td><td><em>必须用 UPROPERTY 持有</em></td></tr>
+    <tr><td><strong>非 UObject</strong></td><td><em>不受 GC 管理</em></td><td><strong>用智能指针或手动管理</strong></td></tr>
+    <tr><td><strong>GC 触发</strong></td><td>引擎定期执行</td><td><em>不是每帧</em></td></tr>
+    <tr><td><strong>引用追踪</strong></td><td>从根集合开始遍历</td><td><strong>UPROPERTY 是追踪线索</strong></td></tr>
+    <tr><td><strong>Mark &amp; Sweep</strong></td><td>标记可达对象，回收其余</td><td><em>会有停顿</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">什么时候 UObject 会被回收</span>
+  <strong>规则</strong>：<em>当一个 UObject 从"根集合"不可达时，就会被回收。</em><br><br><strong>根包括</strong>：<br>· <em>GameInstance、World、GameMode 等引擎持有的对象</em><br>· <strong>加了 UPROPERTY 的成员</strong><br>· <em>被 AddToRoot() 的对象</em><br><br><strong>危险场景</strong>：<br>① <em>局部变量持有</em>——<code>UMyObject* Temp = NewObject&lt;UMyObject&gt;();</code> → <strong>函数返回后被回收</strong><br>② <em>非 UPROPERTY 成员</em> → <strong>GC 后变 nullptr</strong><br>③ <em>只被 C++ 容器持有</em>——<code>std::vector&lt;UMyObject*&gt;</code> → <strong>不被追踪</strong><br><br><strong>解法</strong>：<br>· 成员用 <code>UPROPERTY()</code><br>· 临时持有时用 <code>TStrongObjectPtr</code>（<em>UE 提供的强引用</em>）<br>· 或 <code>AddToRoot()</code> / <code>RemoveFromRoot()</code>（<em>要配对</em>）
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">UObject 不能用智能指针</span>
+  <strong>常见困惑</strong>：<em>"我学了 RAII 和 shared_ptr，能不能用在 UObject 上？"</em><br><br><strong>答案：不能。</strong><br>· UObject 有<em>自己的 GC 系统</em>（<em>和 shared_ptr 的引用计数冲突</em>）<br>· 混用会导致<em>双重释放或泄漏</em><br><br><strong>正确的选择</strong>：<br><div class="table-wrap"><table><thead><tr><th>类型</th><th>用什么</th></tr></thead><tbody><tr><td><strong>UObject</strong></td><td><code>UPROPERTY()</code> + 裸指针</td></tr><tr><td><em>非 UObject 的堆对象</em></td><td>C++ 智能指针（<em>页 04</em>）</td></tr><tr><td>UE 的容器</td><td><code>TArray</code>/<code>TMap</code> 等</td></tr></tbody></table></div><br><strong>UE 也提供了 <code>TObjectPtr&lt;T&gt;</code></strong>（<em>UE5 推荐</em>）——<br>它<em>不是智能指针</em>，而是<strong>带访问追踪的 UObject 指针</strong>。<br><code>UPROPERTY() TObjectPtr&lt;UMyObject&gt; Data;</code>
+</div>
+
+<h2 id="naming">三、UE 的命名约定</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>前缀</th><th>含义</th><th>例子</th></tr></thead>
+  <tbody>
+    <tr><td><strong>A</strong></td><td>Actor 派生类</td><td><code>ACharacter</code></td></tr>
+    <tr><td><strong>U</strong></td><td>UObject 派生类</td><td><code>UActorComponent</code></td></tr>
+    <tr><td><strong>F</strong></td><td><em>普通结构体/类</em></td><td><code>FVector</code></td></tr>
+    <tr><td><strong>I</strong></td><td>接口</td><td><code>IDamageable</code></td></tr>
+    <tr><td><strong>T</strong></td><td>模板</td><td><code>TArray</code></td></tr>
+    <tr><td><strong>E</strong></td><td>枚举</td><td><code>EWeaponType</code></td></tr>
+    <tr><td><strong>B</strong></td><td>蓝图类</td><td><code>BP_Character</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">为什么命名约定这么重要</span>
+  <strong>UE 的命名不是"风格问题"，而是编译要求</strong>：<br>· <code>A</code> 和 <code>U</code> 前缀<em>是 UHT 识别类类型的依据</em><br>· 写错前缀<em>会导致编译错误或反射失败</em><br><br><strong>规则</strong>：<br>· <em>继承自 AActor → 用 A</em><br>· <em>继承自 UObject → 用 U</em><br>· <em>其他（含结构体）→ 用 F</em><br><br><strong>文件名要和类名一致</strong>：<br><em><code>MyActor.h</code> 里必须是 <code>class AMyActor</code></em>——<strong>否则 UHT 会报错。</strong>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="12">
+  <div class="task"><input type="checkbox" id="t-12-1"><label for="t-12-1"><strong>复现 GC 回收</strong>：写一个没有 UPROPERTY 的 UObject 指针成员，等待 GC，观察变 nullptr。</label></div>
+  <div class="task"><input type="checkbox" id="t-12-2"><label for="t-12-2"><strong>加 UPROPERTY 修复</strong>：加上 UPROPERTY 后重新测试，验证对象不再被回收。</label></div>
+  <div class="task"><input type="checkbox" id="t-12-3"><label for="t-12-3"><strong>看生成代码</strong>：在 <code>Intermediate/Build</code> 目录找到 <code>.generated.h</code>，看 UHT 生成了什么。</label></div>
+  <div class="task"><input type="checkbox" id="t-12-4"><label for="t-12-4"><strong>用 TObjectPtr</strong>：把成员改成 <code>TObjectPtr&lt;T&gt;</code>，理解它和裸指针的区别。</label></div>
+  <div class="task"><input type="checkbox" id="t-12-5"><label for="t-12-5"><strong>写一个 USTRUCT</strong>：定义带 UPROPERTY 的结构体，在编辑器里看到它。<em>注意 USTRUCT 成员必须是 public。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-12-6"><label for="t-12-6"><strong>回答面试题</strong>：① UPROPERTY 的最大作用是什么？② UObject 能不能用 shared_ptr？③ 命名前缀的规则？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道 UPROPERTY 的最大作用是防止 GC 回收</strong>；<br>
+    ② <strong>能说出 UObject 被回收的三种危险场景</strong>；<br>
+    ③ <strong>知道 UObject 不能用 shared_ptr，要用 TObjectPtr</strong>；<br>
+    ④ 能说出 UE 命名前缀的规则（A/U/F/I/T/E）；<br>
+    ⑤ 知道文件名要和类名一致。<br>
+    <br>
+    <em>第 ① 和 ② 条是本页的核心——**"UObject 突然变成 nullptr"是 UE 新手最常见的崩溃原因**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="11-graphics.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">11 图形学与渲染管线 ★★</div>
+  </a>
+  <a class="next" href="13-ue-framework.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">13 Gameplay Framework ★★★</div>
+  </a>
+</nav>

@@ -1,0 +1,152 @@
+<h1>02 · 复杂度与性能直觉</h1>
+
+<p class="lead">这一页讲<strong>游戏程序员最需要的那个能力</strong>：<em>看到一段代码，能立刻判断它会不会成为瓶颈</em>。这比记住任何算法都重要。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="budget">一、游戏程序的"复杂度预算"</h2>
+
+<p>游戏和普通程序最大的不同：<strong>每帧只有 16.7 毫秒</strong>（60 帧时）。<em>超了就是卡顿。</em></p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>数据量</th><th>O(n)</th><th>O(n log n)</th><th>O(n²)</th></tr></thead>
+  <tbody>
+    <tr><td>10</td><td>瞬时</td><td>瞬时</td><td>瞬时</td></tr>
+    <tr><td>100</td><td>瞬时</td><td>瞬时</td><td><span class="mk mk--warn">微秒级</span></td></tr>
+    <tr><td>1,000</td><td>瞬时</td><td>微秒</td><td><span class="mk mk--no">毫秒级（危险）</span></td></tr>
+    <tr><td>10,000</td><td>微秒</td><td><span class="mk mk--warn">毫秒</span></td><td><strong>秒级（不可接受）</strong></td></tr>
+    <tr><td>100,000</td><td><span class="mk mk--warn">毫秒</span></td><td><span class="mk mk--no">几十毫秒</span></td><td><strong>分钟级</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">记住这三个数字</span>
+  <strong>在 60 帧的游戏里，每帧预算是 16.7 毫秒。</strong><br>
+  但不要把这 16.7 毫秒全用在一个系统上——<em>要分给逻辑、物理、动画、UI、渲染</em>。<br><br>
+  <strong>实际的预算参考</strong>：<br>
+  · 单个系统：<strong>1~2 毫秒</strong><br>
+  · 单帧所有逻辑：<strong>5 毫秒以内</strong><br>
+  · 剩下留给渲染和引擎<br><br>
+  <strong>换算成操作次数</strong>（很粗略）：<br>
+  · 1 毫秒 ≈ <em>100 万次简单运算</em>（Lua 里约 10 万次）<br>
+  · 所以：<strong>每帧几十万次循环是危险的</strong><br><br>
+  <em>有了这个直觉，你就能快速判断一段代码能不能放在 Update 里。</em>
+</div>
+
+<h2 id="cheatsheet">二、常见操作的复杂度速查</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>操作</th><th>复杂度</th><th>游戏里的影响</th></tr></thead>
+  <tbody>
+    <tr><td>数组索引访问</td><td>O(1)</td><td>安全</td></tr>
+    <tr><td>哈希表查找</td><td>O(1) 平均</td><td>安全</td></tr>
+    <tr><td>哈希表最坏</td><td><strong>O(n)</strong></td><td><em>哈希冲突严重时</em></td></tr>
+    <tr><td>数组遍历</td><td>O(n)</td><td><strong>看 n 多大</strong></td></tr>
+    <tr><td>数组中间插入/删除</td><td><strong>O(n)</strong></td><td><em>要移动元素</em></td></tr>
+    <tr><td>队列头部删除</td><td><strong>O(n)</strong></td><td><strong>经典错误（应用环形缓冲）</strong></td></tr>
+    <tr><td>堆插入/取顶</td><td>O(log n)</td><td>安全</td></tr>
+    <tr><td>排序</td><td>O(n log n)</td><td><em>看 n，避免每帧排</em></td></tr>
+    <tr><td>嵌套循环</td><td><strong>O(n²)</strong></td><td><strong>n 超过 1000 就危险</strong></td></tr>
+    <tr><td>递归（无记忆化）</td><td>可能指数级</td><td><strong>非常危险</strong></td></tr>
+    <tr><td>字符串拼接（循环内）</td><td><strong>O(n²)</strong></td><td><em>必须用 table.concat</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三个最常见的性能杀手</span>
+  <strong>① 嵌套循环做邻近查询</strong><br>
+  <code>for i = 1, #units do</code><br>
+  <code>&nbsp;&nbsp;for j = i+1, #units do</code><br>
+  <code>&nbsp;&nbsp;&nbsp;&nbsp;if distance(units[i], units[j]) &lt; R then ... end</code><br>
+  <em>1000 个单位 = 50 万次距离计算 = 必卡</em><br>
+  <strong>解法</strong>：空间划分（<em>页 12</em>）<br><br>
+  <strong>② 队列用 <code>table.remove(t, 1)</code></strong><br>
+  <em>每次出队都要移动后面所有元素</em>——实测比环形缓冲<strong>慢 500 倍</strong><br>
+  <strong>解法</strong>：环形缓冲（<em>页 03</em>）<br><br>
+  <strong>③ 循环内字符串拼接</strong><br>
+  <code>local s = ""</code><br>
+  <code>for i = 1, n do s = s .. i end</code><br>
+  <em>每次 <code>..</code> 都创建新字符串</em><br>
+  <strong>解法</strong>：<code>table.concat</code>（<em>实测快 17~30 倍</em>）
+</div>
+
+<h2 id="intuition">三、怎么培养复杂度直觉</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">方法一：数循环嵌套的层数</span>
+  <strong>快速判断法</strong>：<br>
+  · 一层循环 → O(n)<br>
+  · 两层嵌套 → O(n²)<br>
+  · 循环里查哈希表 → 还是 O(n)（因为查找是 O(1)）<br>
+  · 循环里遍历另一个数组 → O(n²)<br>
+  · 循环里二分查找 → O(n log n)<br><br>
+  <strong>注意"隐藏的循环"</strong>：<br>
+  · <code>table.remove(t, 1)</code> 内部有循环 → O(n)<br>
+  · <code>s = s .. x</code> 内部要复制 → O(len)<br>
+  · <code>FindObjectsOfType</code> 内部遍历场景<br>
+  · <em>看起来是一个函数调用，实际是 O(n)</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">方法二：把数据量乘 10 试试</span>
+  <strong>最快的验证方式</strong>：<em>把数据量放大 10 倍，看耗时怎么变</em>。<br>
+  · 耗时也×10 → O(n)<br>
+  · 耗时×100 → O(n²)<br>
+  · 耗时×12 → O(n log n)<br><br>
+  <strong>为什么必须实测</strong>：因为<em>常数因子可能很大</em>。<br>
+  一个 O(n) 但每步都做复杂计算的算法，可能比 O(n²) 但每步很简单的慢。<br><br>
+  <em>本站所有算法都做了实测对比——因为实测数据比理论分析更可靠。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">方法三：先问"这个操作多久执行一次"</span>
+  <strong>执行频率决定了优化优先级</strong>：<br>
+  · <strong>每帧执行</strong>（Update 里的逻辑）→ <em>绝对要优化</em><br>
+  · <strong>每秒执行</strong>→ 要小心<br>
+  · <strong>打开界面时执行</strong>→ 可以慢一点<br>
+  · <strong>加载时执行一次</strong>→ <em>基本不用优化</em><br><br>
+  <strong>典型误判</strong>：<br>
+  · 花大力气优化"加载配置表"的代码——<em>但那只执行一次</em><br>
+  · 忽略了"每帧查找组件"——<em>看起来只是个小操作</em><br><br>
+  <strong>判断顺序</strong>：先问频率，再看复杂度。<em>高频 + O(n) 比低频 + O(n²) 更值得优化。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="02">
+  <div class="task"><input type="checkbox" id="t-02-1"><label for="t-02-1"><strong>检查你的 Update</strong>：找出其中所有循环，估算每帧执行多少次。<em>超过 10 万次的都是重点。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-02-2"><label for="t-02-2"><strong>找隐藏的 O(n)</strong>：搜索项目里的 <code>table.remove(t, 1)</code> 和循环内的字符串拼接。</label></div>
+  <div class="task"><input type="checkbox" id="t-02-3"><label for="t-02-3"><strong>做倍增实验</strong>：找一个耗时函数，把数据量×10，观察耗时变化，验证复杂度。</label></div>
+  <div class="task"><input type="checkbox" id="t-02-4"><label for="t-02-4"><strong>算一次预算</strong>：给你项目的某个系统做分段计时，看它占了多少毫秒。<em>和 1~2 毫秒的预算对比。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-02-5"><label for="t-02-5"><strong>回答面试题</strong>：① 游戏每帧的预算是多少？② 三个最常见的性能杀手是什么？③ 怎么快速判断复杂度？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道 60 帧下每帧 16.7 毫秒，单系统预算 1~2 毫秒</strong>；<br>
+    ② <strong>能说出三个最常见的性能杀手</strong>（嵌套循环、队列头部删除、循环内拼串）；<br>
+    ③ 能通过"数循环层数"快速判断复杂度；<br>
+    ④ 知道哪些操作"看起来是 O(1) 实际是 O(n)"；<br>
+    ⑤ <strong>会用"数据量×10"的方法验证复杂度</strong>。<br>
+    <br>
+    <em>第 ② 和 第 ④ 条最实用——它们能帮你避免大多数性能事故。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="01-why.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">01 为什么游戏程序员要懂算法</div>
+  </a>
+  <a class="next" href="03-array-list.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">03 数组、动态数组与环形缓冲</div>
+  </a>
+</nav>

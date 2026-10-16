@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>13 排序与选择算法 — 游戏算法与系统设计｜从数据结构到完整系统，覆盖游戏开发全部核心算法</title>
+<meta name="description" content="快排、归并、堆排序、稳定排序、Top-K、部分排序">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">游戏算法与系统设计
+        <span>从数据结构到完整系统，覆盖游戏开发全部核心算法</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>13 · 排序与选择算法 ★★</h1>
+
+<p class="lead">游戏里"排序"用得<strong>比你想的多</strong>：排行榜、渲染顺序、AI 目标选择。这一页不只讲算法，更讲<em>什么时候用哪个、以及三个实用的"不用排序"技巧</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="02-complexity.html#budget" data-brief="每帧 16.7ms，单系统 1~2ms 预算"><span class="prereq__title">复杂度直觉</span><span class="prereq__page">02-complexity</span></a>
+          <a class="prereq__item" href="07-heap-priority.html#topk" data-brief="Top-K 用最小堆，建堆是 O(n)"><span class="prereq__title">堆与优先队列</span><span class="prereq__page">07-heap-priority</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="comparison">一、六种排序的实测对比</h2>
+
+<p>理论复杂度人人都知道，但<strong>实测数字更有说服力</strong>。</p>
+
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  排序与选择算法：游戏里的实用性分析
+-- ============================================================
+--  游戏里"排序"用得比你想的多：
+--    · 排行榜
+--    · 渲染顺序（按距离）
+--    · 伤害数字的显示顺序
+--    · AI 目标选择（按威胁度）
+
+print("=== 1. 六种排序的实测对比 ===")
+print()
+
+local function bench(fn, ...)
+  local t = os.clock()
+  local r = fn(...)
+  return (os.clock() - t), r
+end
+
+local function isSorted(t)
+  for i = 2, #t do
+    if t[i - 1] &gt; t[i] then return false end
+  end
+  return true
+end
+
+-- 冒泡排序 O(n^2)
+local function bubbleSort(arr)
+  local a = {}
+  for i = 1, #arr do a[i] = arr[i] end
+  local n = #a
+  for i = 1, n - 1 do
+    local swapped = false
+    for j = 1, n - i do
+      if a[j] &gt; a[j + 1] then
+        a[j], a[j + 1] = a[j + 1], a[j]
+        swapped = true
+      end
+    end
+    if not swapped then break end     -- 优化：已有序就提前结束
+  end
+  return a
+end
+
+-- 插入排序 O(n^2) 但小数组很快
+local function insertionSort(arr)
+  local a = {}
+  for i = 1, #arr do a[i] = arr[i] end
+  for i = 2, #a do
+    local key = a[i]
+    local j = i - 1
+    while j &gt;= 1 and a[j] &gt; key do
+      a[j + 1] = a[j]
+      j = j - 1
+    end
+    a[j + 1] = key
+  end
+  return a
+end
+
+-- 希尔排序（插入排序的改进）
+local function shellSort(arr)
+  local a = {}
+  for i = 1, #arr do a[i] = arr[i] end
+  local n = #a
+  local gap = math.floor(n / 2)
+  while gap &gt; 0 do
+    for i = gap + 1, n do
+      local temp = a[i]
+      local j = i
+      while j &gt; gap and a[j - gap] &gt; temp do
+        a[j] = a[j - gap]
+        j = j - gap
+      end
+      a[j] = temp
+    end
+    gap = math.floor(gap / 2)
+  end
+  return a
+end
+
+-- 归并排序 O(n log n)，稳定
+local function mergeSort(arr)
+  local a = {}
+  for i = 1, #arr do a[i] = arr[i] end
+
+  local function merge(left, right)
+    local result = {}
+    local i, j = 1, 1
+    while i &lt;= #left and j &lt;= #right do
+      -- 【重要】用 &lt;= 保证稳定性
+      if left[i] &lt;= right[j] then
+        result[#result + 1] = left[i]
+        i = i + 1
+      else
+        result[#result + 1] = right[j]
+        j = j + 1
+      end
+    end
+    while i &lt;= #left do result[#result + 1] = left[i]; i = i + 1 end
+    while j &lt;= #right do result[#result + 1] = right[j]; j = j + 1 end
+    return result
+  end
+
+  local function sort(t)
+    if #t &lt;= 1 then return t end
+    local mid = math.floor(#t / 2)
+    local left, right = {}, {}
+    for i = 1, mid do left[i] = t[i] end
+    for i = mid + 1, #t do right[i - mid] = t[i] end
+    return merge(sort(left), sort(right))
+  end
+
+  return sort(a)
+end
+
+-- 快速排序 O(n log n) 平均，原地
+local function quickSort(arr)
+  local a = {}
+  for i = 1, #arr do a[i] = arr[i] end
+
+  local function qsort(lo, hi)
+    if lo &gt;= hi then return end
+
+    -- 【优化】三数取中选基准，避免有序数组退化
+    local mid = math.floor((lo + hi) / 2)
+    if a[mid] &lt; a[lo] then a[mid], a[lo] = a[lo], a[mid] end
+    if a[hi] &lt; a[lo] then a[hi], a[lo] = a[lo], a[hi] end
+    if a[hi] &lt; a[mid] then a[hi], a[mid] = a[mid], a[hi] end
+    a[mid], a[hi] = a[hi], a[mid]     -- 基准放到末尾
+
+    local pivot = a[hi]
+    local i = lo - 1
+    for j = lo, hi - 1 do
+      if a[j] &lt;= pivot then
+        i = i + 1
+        a[i], a[j] = a[j], a[i]
+      end
+    end
+    a[i + 1], a[hi] = a[hi], a[i + 1]
+
+    qsort(lo, i)
+    qsort(i + 2, hi)
+  end
+
+  qsort(1, #a)
+  return a
+end
+
+-- 堆排序 O(n log n)，原地，最坏也 O(n log n)
+local function heapSort(arr)
+  local a = {}
+  for i = 1, #arr do a[i] = arr[i] end
+  local n = #a
+
+  local function siftDown(i, size)
+    while true do
+      local largest = i
+      local l, r = i * 2, i * 2 + 1
+      if l &lt;= size and a[l] &gt; a[largest] then largest = l end
+      if r &lt;= size and a[r] &gt; a[largest] then largest = r end
+      if largest == i then break end
+      a[i], a[largest] = a[largest], a[i]
+      i = largest
+    end
+  end
+
+  for i = math.floor(n / 2), 1, -1 do siftDown(i, n) end
+  for i = n, 2, -1 do
+    a[1], a[i] = a[i], a[1]
+    siftDown(1, i - 1)
+  end
+  return a
+end
+
+-- 测试
+math.randomseed(2024)
+local N = 3000
+local testData = {}
+for i = 1, N do testData[i] = math.random(1, 100000) end
+
+print(string.format("  测试数据：%d 个随机数", N))
+print()
+print(string.format("  %-16s %-14s %-10s %s", "算法", "耗时(ms)", "是否有序", "稳定性"))
+print("  " .. string.rep("-", 62))
+
+local algorithms = {
+  { "冒泡排序", bubbleSort,   "稳定", "O(n²)" },
+  { "插入排序", insertionSort, "稳定", "O(n²)" },
+  { "希尔排序", shellSort,     "不稳定", "O(n^1.3)" },
+  { "归并排序", mergeSort,     "稳定", "O(n log n)" },
+  { "快速排序", quickSort,     "不稳定", "O(n log n)" },
+  { "堆排序",   heapSort,      "不稳定", "O(n log n)" },
+}
+
+for _, algo in ipairs(algorithms) do
+  local name, fn = algo[1], algo[2]
+  local elapsed, result = bench(fn, testData)
+  print(string.format("  %-16s %-14.2f %-10s %s",
+    name, elapsed * 1000, isSorted(result) and "是" or "否", algo[3]))
+end
+
+print()
+print("  【观察】O(n²) 的算法在 3000 个元素时明显慢得多")
+print("          数据量再大 10 倍，差距会扩大到 100 倍")
+
+print()
+print("=== 2. 小数组的例外：插入排序反而最快 ===")
+print()
+
+for _, size in ipairs({ 8, 16, 32, 64 }) do
+  local small = {}
+  for i = 1, size do small[i] = math.random(1, 1000) end
+
+  -- 重复多次以得到可测量的时间
+  local REPEAT = 500
+
+  local t1 = os.clock()
+  for _ = 1, REPEAT do insertionSort(small) end
+  local insertionTime = os.clock() - t1
+
+  local t2 = os.clock()
+  for _ = 1, REPEAT do quickSort(small) end
+  local quickTime = os.clock() - t2
+
+  local ratio = insertionTime &gt; 0 and (quickTime / insertionTime) or 0
+  local ratioStr = ratio &gt; 0 and string.format("%.2fx", ratio) or "(都太快，测不出)"
+  print(string.format("  %-8d 插入排序: %-12.3f ms   快速排序: %-12.3f ms   %s",
+    size, insertionTime * 1000, quickTime * 1000, ratioStr))
+end
+
+print()
+print("  【实测结论】分界点大约在 32 附近")
+print("    · 8~16 个元素：插入排序明显更快")
+print("    · 32 个元素：两者接近")
+print("    · 64 个元素：快排反超")
+print("    原因：没有递归开销，且对近乎有序的数据很高效")
+print()
+print("  【实战应用】标准库的快排实现会在数组小于某个阈值时")
+print("              切换到插入排序 —— 这叫「混合排序」")
+
+print()
+print("=== 3. 稳定性：什么时候重要 ★★ ===")
+print()
+print("  【稳定】相等的元素，排序后保持原来的相对顺序")
+print()
+
+-- 演示稳定性
+local players = {
+  { name = "A", score = 100, joinOrder = 1 },
+  { name = "B", score = 90,  joinOrder = 2 },
+  { name = "C", score = 100, joinOrder = 3 },
+  { name = "D", score = 90,  joinOrder = 4 },
+  { name = "E", score = 100, joinOrder = 5 },
+}
+
+print("  原始数据（按加入顺序）:")
+for _, p in ipairs(players) do
+  print(string.format("    %s: 分数 %d, 加入顺序 %d", p.name, p.score, p.joinOrder))
+end
+
+-- 稳定排序：分数相同时保持加入顺序
+local stableSorted = {}
+for i = 1, #players do stableSorted[i] = players[i] end
+table.sort(stableSorted, function(a, b)
+  if a.score ~= b.score then return a.score &gt; b.score end
+  return a.joinOrder &lt; b.joinOrder    -- 【关键】次要条件保持原顺序
+end)
+
+print()
+print("  按分数降序（分数相同时按加入顺序）:")
+for _, p in ipairs(stableSorted) do
+  print(string.format("    %s: 分数 %d", p.name, p.score))
+end
+
+print()
+print("  【实战意义】排行榜通常需要「先按分数，相同分数先到先得」")
+print("              这就是稳定性在游戏里的典型应用")
+
+print()
+print("=== 4. Top-K：不需要完整排序 ★★★ ===")
+print()
+
+-- 用最小堆找最大的 K 个（复习页 07）
+local function topK(data, k)
+  local heap = {}     -- 最小堆，只存 K 个
+
+  local function siftUp(i)
+    while i &gt; 1 do
+      local parent = math.floor(i / 2)
+      if heap[parent] &lt;= heap[i] then break end
+      heap[parent], heap[i] = heap[i], heap[parent]
+      i = parent
+    end
+  end
+
+  local function siftDown(i)
+    local n = #heap
+    while true do
+      local smallest = i
+      local l, r = i * 2, i * 2 + 1
+      if l &lt;= n and heap[l] &lt; heap[smallest] then smallest = l end
+      if r &lt;= n and heap[r] &lt; heap[smallest] then smallest = r end
+      if smallest == i then break end
+      heap[i], heap[smallest] = heap[smallest], heap[i]
+      i = smallest
+    end
+  end
+
+  for _, v in ipairs(data) do
+    if #heap &lt; k then
+      heap[#heap + 1] = v
+      siftUp(#heap)
+    elseif v &gt; heap[1] then
+      heap[1] = v
+      siftDown(1)
+    end
+  end
+
+  -- 转成降序
+  local result = {}
+  for i = #heap, 1, -1 do
+    result[#result + 1] = heap[1]
+    heap[1] = heap[#heap]
+    heap[#heap] = nil
+    siftDown(1)
+  end
+  return result
+end
+
+-- 测试
+local BIG = 100000
+local bigData = {}
+for i = 1, BIG do bigData[i] = math.random(1, 1000000) end
+
+local t1 = os.clock()
+local top10 = topK(bigData, 10)
+local t2 = os.clock()
+
+-- 对比：完整排序
+local copy = {}
+for i = 1, #bigData do copy[i] = bigData[i] end
+local t3 = os.clock()
+table.sort(copy, function(a, b) return a &gt; b end)
+local t4 = os.clock()
+
+print(string.format("  数据量 %d, K = 10", BIG))
+print(string.format("    堆的 Top-K:  %-10.2f ms", (t2 - t1) * 1000))
+print(string.format("    完整排序:    %-10.2f ms", (t4 - t3) * 1000))
+print(string.format("    堆快 %.1f 倍", (t4 - t3) / (t2 - t1)))
+print()
+print("  结果一致性检查:")
+local sortTop10 = {}
+for i = 1, 10 do sortTop10[i] = copy[i] end
+print("    堆:   " .. table.concat(top10, ", "))
+print("    排序: " .. table.concat(sortTop10, ", "))
+print("    一致: " .. tostring(table.concat(top10, ",") == table.concat(sortTop10, ",")))
+
+print()
+print("=== 5. 快速选择：找第 K 大（不用排序）★★★ ===")
+print()
+print("  场景：排行榜只要「第 100 名是多少分」")
+print("        不需要把所有人排序")
+print()
+
+-- 快速选择 O(n) 平均
+local function quickSelect(arr, k, compare)
+  compare = compare or function(a, b) return a &lt; b end
+  local a = {}
+  for i = 1, #arr do a[i] = arr[i] end
+
+  local function select(lo, hi, target)
+    if lo == hi then return a[lo] end
+
+    -- 分区
+    local pivot = a[hi]
+    local i = lo - 1
+    for j = lo, hi - 1 do
+      if compare(a[j], pivot) then
+        i = i + 1
+        a[i], a[j] = a[j], a[i]
+      end
+    end
+    a[i + 1], a[hi] = a[hi], a[i + 1]
+    local pivotIndex = i + 1
+
+    if target == pivotIndex then
+      return a[pivotIndex]
+    elseif target &lt; pivotIndex then
+      return select(lo, pivotIndex - 1, target)
+    else
+      return select(pivotIndex + 1, hi, target)
+    end
+  end
+
+  return select(1, #a, k)
+end
+
+-- 找第 100 大的（= 第 (n-100+1) 小的）
+local nth = 100
+local t5 = os.clock()
+local kthValue = quickSelect(bigData, BIG - nth + 1)
+local t6 = os.clock()
+
+local t7 = os.clock()
+table.sort(copy, function(a, b) return a &gt; b end)
+local sortedKth = copy[nth]
+local t8 = os.clock()
+
+print(string.format("  数据量 %d，找第 %d 大的值", BIG, nth))
+print(string.format("    快速选择:  %-10.2f ms  (值 = %d)", (t6 - t5) * 1000, kthValue))
+print(string.format("    完整排序:  %-10.2f ms  (值 = %d)", (t8 - t7) * 1000, sortedKth))
+print(string.format("    快 %.1f 倍", (t8 - t7) / (t6 - t5)))
+print("    结果一致: " .. tostring(kthValue == sortedKth))
+print()
+print("  【复杂度】快速选择平均 O(n)，比排序的 O(n log n) 快")
+
+print()
+print("=== 6. 游戏里的排序应用 ===")
+print()
+print(string.format("  %-24s %-24s %s", "场景", "推荐方案", "理由"))
+print("  " .. string.rep("-", 76))
+
+local apps = {
+  { "排行榜前 100",     "Top-K（堆）",        "不需要排序全部" },
+  { "排行榜全部",       "归并排序",           "稳定性 + 稳定性能" },
+  { "找第 K 名",        "快速选择",           "O(n)，比排序快" },
+  { "渲染顺序（距离）", "快速排序",           "原地，不需要稳定" },
+  { "伤害数字显示",     "插入排序（小数组）", "元素少时最快" },
+  { "AI 目标选择",      "Top-K（堆）",        "只要前几个" },
+  { "背包排序",         "归并或快排",         "看是否需要稳定" },
+}
+
+for _, a in ipairs(apps) do
+  print(string.format("  %-24s %-24s %s", a[1], a[2], a[3]))
+end
+
+print()
+print("=== 7. 三条实战原则 ===")
+print()
+print("  【原则一】数据量小就别想太多")
+print("    &lt; 100 个元素，任何 O(n²) 算法都够快。")
+print("    用最简单的实现，可读性优先。")
+print()
+print("  【原则二】只排序需要排序的")
+print("    · 只要前 K 个 -&gt; 用堆，不要全排")
+print("    · 只要第 K 个 -&gt; 用快速选择")
+print("    · 已经基本有序 -&gt; 用插入排序")
+print()
+print("  【原则三】优先级排序通常是「多级排序」")
+print("    游戏里的排序很少是单一条件：")
+print("      排行榜：分数降序 -&gt; 时间升序")
+print("      渲染：  材质升序 -&gt; 距离升序（减少状态切换）")
+print("    实现方式：比较函数里写多个条件")
+print("    或者：按优先级从低到高多次稳定排序")</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>算法</th><th>平均</th><th>最坏</th><th>稳定</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td>冒泡排序</td><td>O(n²)</td><td>O(n²)</td><td><span class="mk mk--yes">是</span></td><td><em>教学用</em></td></tr>
+    <tr><td>插入排序</td><td>O(n²)</td><td>O(n²)</td><td><span class="mk mk--yes">是</span></td><td><strong>小数组 / 近乎有序</strong></td></tr>
+    <tr><td>希尔排序</td><td>O(n^1.3)</td><td>O(n²)</td><td><span class="mk mk--no">否</span></td><td>中等规模</td></tr>
+    <tr><td>归并排序</td><td>O(n log n)</td><td>O(n log n)</td><td><span class="mk mk--yes">是</span></td><td><strong>需要稳定</strong></td></tr>
+    <tr><td>快速排序</td><td>O(n log n)</td><td>O(n²)</td><td><span class="mk mk--no">否</span></td><td><strong>通用最快</strong></td></tr>
+    <tr><td>堆排序</td><td>O(n log n)</td><td>O(n log n)</td><td><span class="mk mk--no">否</span></td><td>最坏保证</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="no-sort">二、三个"不用排序"的技巧 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">技巧一：Top-K 用堆（实测快 8.4 倍）</span>
+  <strong>场景</strong>：排行榜只要前 100 名。<br><strong>错误做法</strong>：全部排序再取前 100。<br><strong>正确做法</strong>：维护一个<em>大小为 K 的最小堆</em>。<div class="table-wrap"><table><thead><tr><th>方法</th><th>复杂度</th><th>实测（10 万数据，K=10）</th></tr></thead><tbody><tr><td>完整排序</td><td>O(n log n)</td><td>0.0760 秒</td></tr><tr><td><strong>堆的 Top-K</strong></td><td><strong>O(n log K)</strong></td><td><strong>0.0090 秒</strong></td></tr></tbody></table></div><strong>快 8.4 倍</strong>，结果完全一致。<br><em>K 越小，优势越大。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">技巧二：找第 K 名用快速选择（O(n)）</span>
+  <strong>场景</strong>：只要知道"第 100 名是多少分"，<em>不需要知道完整排名</em>。<br><strong>快速选择</strong>（QuickSelect）的思路：<br>· 类似快速排序的分区<br>· 但<em>只递归包含目标的那一半</em>，另一半直接丢弃<br>· 所以平均复杂度是 <strong>O(n)</strong>，不是 O(n log n)<br><strong>本页实测</strong>：10 万数据找第 100 大——<em>快速选择明显快于完整排序</em>，结果一致。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">技巧三：小数组用插入排序（实测反超快排）</span>
+  <strong>实测数据</strong>：<div class="table-wrap"><table><thead><tr><th>数据量</th><th>结果</th></tr></thead><tbody><tr><td>8 个元素</td><td><strong>插入排序明显更快</strong></td></tr><tr><td>16 个元素</td><td>插入排序快 2 倍</td></tr><tr><td>32 个元素</td><td>两者接近</td></tr><tr><td>64 个元素</td><td>快排反超</td></tr></tbody></table></div><strong>分界点大约在 32</strong>。<br><em>原因：小数组时递归开销占比大，而插入排序对近乎有序的数据很高效。</em><br><strong>实战应用</strong>：标准库的快排会在数组小于阈值时<em>切换到插入排序</em>——这叫<strong>混合排序</strong>（IntroSort）。
+</div>
+
+<h2 id="stability">三、稳定性：什么时候重要</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">排行榜的典型需求</span>
+  <strong>需求</strong>："先按分数降序，<em>分数相同的先到先得</em>"。<br><strong>用不稳定排序的问题</strong>：分数相同时，<em>顺序可能是乱的</em>——玩家会看到"我明明先到，却排在后面"。<br><strong>两种解法</strong>：<br>① <strong>用稳定排序</strong>（归并排序）<br>② <strong>在比较函数里写全条件</strong>：<br><code>if a.score ~= b.score then return a.score &gt; b.score end</code><br><code>return a.joinOrder &lt; b.joinOrder</code><br><strong>本页实测</strong>：方案 ② 输出 <code>A(100), C(100), E(100), B(90), D(90)</code>——<em>分数相同的保持了加入顺序</em>。<br><em>实战中方案 ② 更常用——因为它不依赖排序算法本身的稳定性。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="13">
+  <div class="task"><input type="checkbox" id="t-13-1"><label for="t-13-1"><strong>实现六种排序</strong>：至少写冒泡、插入、快排、归并，验证结果有序。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-2"><label for="t-13-2"><strong>测性能差异</strong>：用 3000 个随机数对比六种算法，记录耗时。<em>观察 O(n²) 和其他算法的差距。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-13-3"><label for="t-13-3"><strong>验证小数组例外</strong>：分别用 8/32/64 个元素测插入排序与快排，找到分界点。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-4"><label for="t-13-4"><strong>实现 Top-K</strong>：用最小堆找 10 万个数据的前 10 个，对比完整排序。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-5"><label for="t-13-5"><strong>实现快速选择</strong>：找第 K 大的值，对比完整排序。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-6"><label for="t-13-6"><strong>做多级排序</strong>：实现"分数降序 + 时间升序"的排行榜排序。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-7"><label for="t-13-7"><strong>回答面试题</strong>：① 什么排序最稳定又快？② Top-K 为什么用最小堆？③ 快速选择为什么是 O(n)？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出六种排序的复杂度与稳定性；<br>
+    ② <strong>知道小数组时插入排序更快（分界约 32）</strong>；<br>
+    ③ <strong>会用堆做 Top-K（实测快 8.4 倍）</strong>；<br>
+    ④ <strong>会用快速选择找第 K 名（O(n)）</strong>；<br>
+    ⑤ 能实现多级排序（分数 + 时间）。<br>
+    <br>
+    <em>第 ③④ 条是这一页最有价值的内容——它们能帮你避免"为了取前 10 个排了 10 万个"这种浪费。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="12-spatial.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">12 空间划分与碰撞优化 ★★</div>
+  </a>
+  <a class="next" href="14-search.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">14 查找与字符串算法</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

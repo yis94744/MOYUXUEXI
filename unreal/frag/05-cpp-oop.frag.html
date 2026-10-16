@@ -1,0 +1,141 @@
+<h1>05 · 面向对象与多态</h1>
+
+<p class="lead">C++ 的 OOP <strong>和 C# 差别很大</strong>：值语义、多重继承、虚函数表、没有接口。<em>这一页讲清这些差异，以及游戏里怎么用</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="value-semantics">一、值语义 vs 引用语义</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th></th><th>C#</th><th>C++</th></tr></thead>
+  <tbody>
+    <tr><td><strong>类默认</strong></td><td>引用语义</td><td><strong>值语义</strong></td></tr>
+    <tr><td><strong>赋值</strong></td><td>拷贝引用</td><td><strong>拷贝整个对象</strong></td></tr>
+    <tr><td><strong>传参</strong></td><td>传引用</td><td><strong>默认传值（拷贝）</strong></td></tr>
+    <tr><td><strong>比较</strong></td><td><code>==</code> 比引用</td><td><code>==</code> 比值（需重载）</td></tr>
+    <tr><td><strong>多态</strong></td><td>自动（引用类型）</td><td><strong>需要指针或引用</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">最重要的差异：多态需要指针或引用</span>
+  <strong>在 C# 里</strong>：<br>
+  <code>Animal a = new Cat();   // 直接多态</code><br>
+  <code>a.Speak();              // 调用 Cat 的版本</code><br><br>
+  <strong>在 C++ 里这样写会出问题</strong>：<br>
+  <code>Animal a = Cat();       // ❌ 对象切片！</code><br>
+  <code>a.Speak();              // 调用 Animal 的版本</code><br><br>
+  <strong>什么是"对象切片"（Object Slicing）</strong>：<br>
+  · <code>Animal a = Cat()</code> 会把 Cat 对象<strong>拷贝到 Animal 类型的空间</strong><br>
+  · Cat 特有的成员<em>被切掉了</em><br>
+  · 虚函数表也变成了 Animal 的<br><br>
+  <strong>正确写法</strong>：<br>
+  <code>Animal& a = cat;              // 引用</code><br>
+  <code>Animal* a = &cat;             // 指针</code><br>
+  <code>auto a = std::make_unique&lt;Cat&gt;();  // 智能指针（推荐）</code><br><br>
+  <strong>这是 C# 转 C++ 最容易踩的坑之一。</strong>
+</div>
+
+<h2 id="vtable">二、虚函数与虚函数表</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">虚函数表（vtable）的原理</span>
+  <strong>编译器怎么实现多态</strong>：<br>
+  ① 含有虚函数的类，<em>编译器会生成一张"虚函数表"</em><br>
+  ② 表里存着<strong>各个虚函数的实际地址</strong><br>
+  ③ 每个对象里有一个<em>隐藏的指针（vptr）</em>指向这张表<br>
+  ④ 调用虚函数时：<strong>通过 vptr 找到表，再找到函数地址</strong><br><br>
+  <strong>代价</strong>：<br>
+  · 每个对象<em>多一个指针的大小</em>（通常 8 字节）<br>
+  · 每个虚调用<em>多一次间接寻址</em>（<em>难以预测分支</em>）<br>
+  · <strong>无法内联</strong>（<em>因为不知道具体调用哪个</em>）<br><br>
+  <strong>游戏里的影响</strong>：<br>
+  · <em>大量频繁调用的虚函数会影响性能</em><br>
+  · 但绝大多数情况下<em>这点开销可以忽略</em><br>
+  · <strong>Unreal 的 <code>UObject</code> 系统大量使用虚函数</strong><br><br>
+  <strong>关键规则</strong>：<em>基类的析构函数必须是 virtual</em>——<br>
+  否则 delete 基类指针时，<strong>子类的析构函数不会被调用</strong>（<em>资源泄漏</em>）。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">override 和 final 关键字</span>
+  <strong>C++11 引入的两个关键字，强烈建议使用</strong>：<br><br>
+  <strong><code>override</code></strong>：<em>明确表示"我要重写基类的虚函数"</em><br>
+  <code>void Speak() override;</code><br>
+  · 如果基类<strong>没有</strong>这个虚函数 → <em>编译错误</em><br>
+  · <em>能防止"拼写错误导致没重写成功"</em><br><br>
+  <strong><code>final</code></strong>：<em>表示"不能再被重写"或"不能被继承"</em><br>
+  <code>void Speak() final;      // 子类不能重写</code><br>
+  <code>class Cat final;         // 不能被继承</code><br><br>
+  <strong>为什么建议用 override</strong>：<br>
+  这个错误非常隐蔽：<br>
+  <code>// 基类</code><br>
+  <code>virtual void Speak();</code><br>
+  <code>// 子类（忘了 const 或参数类型不同）</code><br>
+  <code>void Speak() const;   // ❌ 不是重写，是新函数！</code><br>
+  <em>加了 override 就会立刻报错。</em>
+</div>
+
+<h2 id="multiple-inheritance">三、多重继承与接口</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">C++ 没有 interface，但有纯虚函数</span>
+  <strong>用纯虚函数模拟接口</strong>：<br>
+  <code>class IDamageable</code><br>
+  <code>{</code><br>
+  <code>public:</code><br>
+  <code>&nbsp;&nbsp;virtual ~IDamageable() = default;</code><br>
+  <code>&nbsp;&nbsp;virtual void TakeDamage(int amount) = 0;   // 纯虚</code><br>
+  <code>};</code><br>
+  <em><code>= 0</code> 表示"没有实现，子类必须实现"</em><br><br>
+  <strong>然后可以多重继承</strong>：<br>
+  <code>class Enemy : public AActor, public IDamageable</code><br>
+  <code>{</code><br>
+  <code>&nbsp;&nbsp;void TakeDamage(int amount) override { /* ... */ }</code><br>
+  <code>};</code><br><br>
+  <strong>Unreal 的接口约定</strong>：<br>
+  · 接口类以 <code>U</code> 或 <code>I</code> 开头（<em>如 <code>IDamageable</code></em>）<br>
+  · 必须用 <code>UINTERFACE</code> 宏<br>
+  · 实现类用 <code>UCLASS</code> + 多继承<br>
+  <em>页 13 会详细讲 Unreal 的接口写法。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="05">
+  <div class="task"><input type="checkbox" id="t-05-1"><label for="t-05-1"><strong>复现对象切片</strong>：用值语义持有基类，观察多态失效。<em>这是本页最重要的实验。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-05-2"><label for="t-05-2"><strong>改用指针/引用</strong>：改成 <code>Animal&amp;</code> 或 <code>unique_ptr</code>，验证多态恢复。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-3"><label for="t-05-3"><strong>验证虚析构</strong>：写一个没 virtual 析构的基类，delete 子类指针，观察析构没被调用。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-4"><label for="t-05-4"><strong>用 override</strong>：故意把函数签名写错，看加了 override 之后的编译错误。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-5"><label for="t-05-5"><strong>实现接口</strong>：用纯虚函数写一个 <code>IDamageable</code>，让两个类实现它。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-6"><label for="t-05-6"><strong>回答面试题</strong>：① 什么是对象切片？② 虚函数的实现原理？③ 基类析构为什么必须 virtual？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道 C++ 默认是值语义（和 C# 相反）</strong>；<br>
+    ② <strong>能解释并避免对象切片</strong>；<br>
+    ③ 知道虚函数表的原理与代价；<br>
+    ④ <strong>知道基类析构函数必须是 virtual</strong>；<br>
+    ⑤ 会用纯虚函数模拟接口，并知道 Unreal 的接口约定。<br>
+    <br>
+    <em>第 ① 和 第 ② 条是 C# 转 C++ 最容易踩的坑——**对象切片导致的 bug 特别隐蔽**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="04-cpp-memory.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">04 指针、内存与 RAII ★★★</div>
+  </a>
+  <a class="next" href="06-cpp-template.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">06 模板与泛型编程</div>
+  </a>
+</nav>

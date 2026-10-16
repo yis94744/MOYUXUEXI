@@ -1,0 +1,90 @@
+<h1>15 · GAS 技能系统 ★★</h1>
+
+<p class="lead">GAS（GameplayAbilitySystem）是<strong>Epic 为 3A 项目准备的技能系统框架</strong>。它很强，但<em>也很复杂</em>——<strong>先搞清楚"要不要用"再学</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="should-use">一、先问：要不要用 GAS ★★★</h2>
+
+<p><strong>这是学 GAS 之前最重要的判断。</strong>用错了，项目会被<em>过度复杂的设计</em>拖累。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>情况</th><th>建议</th><th>理由</th></tr></thead>
+  <tbody>
+    <tr><td><strong>小型独立游戏</strong></td><td><span class="mk mk--no">不用</span></td><td><em>自己写更简单可控</em></td></tr>
+    <tr><td><strong>技能数量 &lt; 20</strong></td><td><span class="mk mk--no">不用</span></td><td><em>自己写 200 行就够</em></td></tr>
+    <tr><td><strong>单机游戏</strong></td><td><span class="mk mk--warn">看情况</span></td><td><em>不需要网络复制</em></td></tr>
+    <tr><td><strong>联网对战 + 大量技能</strong></td><td><span class="mk mk--yes">推荐</span></td><td><strong>GAS 的强项</strong></td></tr>
+    <tr><td><strong>RPG / MOBA 类</strong></td><td><span class="mk mk--yes">推荐</span></td><td>Buff/技能/属性体系复杂</td></tr>
+    <tr><td><strong>团队有 GAS 经验</strong></td><td><span class="mk mk--yes">推荐</span></td><td><em>学习成本已经付过了</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">GAS 的真实成本</span>
+  <strong>学习曲线</strong>：<em>至少 2~4 周才能上手</em>（<em>概念非常多</em>）。<br><br><strong>概念数量</strong>：<br>· <code>AbilitySystemComponent</code><br>· <code>GameplayAbility</code><br>· <code>GameplayEffect</code><br>· <code>AttributeSet</code><br>· <code>GameplayTag</code><br>· <code>AbilityTask</code><br><em>每个都有大量细节</em>。<br><br><strong>它解决的问题</strong>：<br>· <em>技能的网络复制</em>（<em>最难的部分</em>）<br>· <em>属性修改的预测</em><br>· <em>Buff 的叠加与驱散</em><br>· <em>技能冷却、消耗</em><br><br><strong>如果你不需要网络同步</strong>，<em>这些能力大部分用不上</em>——<br><strong>自己写一个简单的技能系统可能更合适。</strong>
+</div>
+
+<h2 id="concepts">二、GAS 的五个核心概念</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>概念</th><th>作用</th><th>类比</th></tr></thead>
+  <tbody>
+    <tr><td><strong>ASC</strong></td><td><em>AbilitySystemComponent</em></td><td><strong>技能系统的"总控"</strong></td></tr>
+    <tr><td><strong>GameplayAbility</strong></td><td><strong>一个具体的技能</strong></td><td><em>"火球术"</em></td></tr>
+    <tr><td><strong>GameplayEffect</strong></td><td><strong>状态的改变</strong></td><td><em>伤害、Buff、Debuff</em></td></tr>
+    <tr><td><strong>AttributeSet</strong></td><td><em>一组属性</em></td><td><strong>血量、蓝量、攻击力</strong></td></tr>
+    <tr><td><strong>GameplayTag</strong></td><td><strong>层级化的标签</strong></td><td><em>状态标记、技能分类</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">最精妙的设计：GameplayTag</span>
+  <strong>GameplayTag 是"层级化的字符串标签"</strong>：<br><code>State.Stunned</code><br><code>State.Burning</code><br><code>Ability.Fire.Fireball</code><br><code>Ability.Fire.Meteor</code><br><br><strong>层级的好处</strong>：<br>· <em>能查询父标签</em>——查 <code>Ability.Fire</code> 能匹配所有火系技能<br>· <em>能做批量判断</em>——<code>HasTag("State")</code> 能匹配所有状态<br>· <strong>编辑器里有下拉框</strong>（<em>不用手打字符串</em>）<br><br><strong>典型用法</strong>：<br>· <strong>技能冷却</strong>——<code>Cooldown.Fireball</code><br>· <strong>状态免疫</strong>——<em>"免疫所有控制类"用 <code>State.Control</code></em><br>· <strong>技能打断</strong>——<em>受击时取消 <code>Ability.Channel</code></em><br><br><em>这套标签系统是 GAS 最有价值的部分之一——即使不用 GAS，也值得借鉴。</em>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">GAS 与 C++/蓝图的关系</span>
+  <strong>GAS 的实践模式</strong>：<br>· <strong>GameplayAbility 用 C++ 写</strong>（<em>逻辑复杂、性能关键</em>）<br>· <strong>数据用蓝图配置</strong>（<em>数值、Tag、动画</em>）<br>· <strong>GameplayEffect 主要在编辑器配置</strong>（<em>很少写代码</em>）<br><br><strong>典型的技能实现步骤</strong>：<br>① C++ 写 <code>UGameplayAbility</code> 子类<br>② 定义 <code>ActivateAbility</code> 的逻辑<br>③ 蓝图继承并配置数值<br>④ 用 GameplayEffect 施加效果<br><br><em>这个模式呼应了页 14 的"C++ 框架 + 蓝图配置"原则。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="15">
+  <div class="task"><input type="checkbox" id="t-15-1"><label for="t-15-1"><strong>判断要不要用</strong>：列出你的项目需求，用本页的表格判断。<em>不要因为"GAS 很专业"就上。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-15-2"><label for="t-15-2"><strong>装 GAS 插件</strong>：如果决定用，先装好并跑通官方示例。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-3"><label for="t-15-3"><strong>实现一个技能</strong>：写一个最简单的 GameplayAbility，能造成伤害。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-4"><label for="t-15-4"><strong>配置 GameplayEffect</strong>：在编辑器里配置一个伤害效果，观察参数的含义。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-5"><label for="t-15-5"><strong>用 GameplayTag</strong>：给技能和状态加 Tag，实现"免疫控制"的判断。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-6"><label for="t-15-6"><strong>回答面试题</strong>：① 什么时候该用 GAS？② GAS 的五个核心概念？③ GameplayTag 的层级有什么好处？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能用表格判断"该不该用 GAS"</strong>；<br>
+    ② 知道 GAS 的真实学习成本（2~4 周）；<br>
+    ③ 能说出 GAS 的五个核心概念；<br>
+    ④ <strong>理解 GameplayTag 的层级设计及好处</strong>；<br>
+    ⑤ 知道 GAS 的 C++ / 蓝图分工模式。<br>
+    <br>
+    <em>第 ① 条最重要——**"不上 GAS"也是个正确的决策**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="14-ue-blueprint.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">14 蓝图与 C++ 协作 ★★</div>
+  </a>
+  <a class="next" href="16-ue-anim.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">16 动画系统</div>
+  </a>
+</nav>

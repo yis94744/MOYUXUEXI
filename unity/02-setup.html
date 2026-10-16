@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>02 环境搭建与第一个项目 — C# + Unity 路线｜从零基础到独立完成商业级项目</title>
+<meta name="description" content="Unity Hub 与版本选择、IDE 配置、项目结构、调试环境、跑通第一个可玩场景">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C# + Unity 路线
+        <span>从零基础到独立完成商业级项目</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+
+      <h1>02 · 环境搭建与第一个项目</h1>
+      <p class="lead">
+        这一章的目标只有一个：<strong>让你在 2 小时内跑起来一个能玩的东西</strong>。
+        听起来简单，但新手在这一步卡住的比例高得惊人——不是因为你笨，
+        而是因为<strong>版本选择、IDE 配置、包管理这三件事上，官方文档和网上教程给的建议经常互相矛盾</strong>。
+      </p>
+
+      <div class="callout callout--note">
+        <span class="callout__title">阶段目标</span>
+        约 <strong>1 天</strong>，6–8 小时。结束时你能：独立创建一个 URP 项目、配置好 IDE 智能提示、
+        用脚本控制一个物体移动、在 Console 看到自己的日志、并知道出问题时该去哪里找原因。
+      </div>
+
+      <h2 id="version">一、先定版本：别用最新版</h2>
+
+      <p>
+        这是第一个反直觉的建议。<strong>做商业项目，永远选 LTS（长期支持版），不要选 Tech Stream（技术预览版）。</strong>
+      </p>
+
+      <div class="cmp">
+        <div class="cmp__head">
+          <span>版本类型</span><span>命名规律</span><span>该不该用</span><span>原因</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>LTS</strong></span>
+          <span class="mono">2022.3.x</span>
+          <span><span class="mk mk--yes">用这个</span></span>
+          <span>两年支持周期，只修 bug 不加特性，第三方插件都适配过</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>Tech Stream</strong></span>
+          <span class="mono">2023.1 / 2023.2</span>
+          <span><span class="mk mk--no">项目别用</span></span>
+          <span>新特性尝鲜，但 API 会变、插件可能不兼容、有未知 bug</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>Unity 6</strong></span>
+          <span class="mono">6000.x</span>
+          <span><span class="mk mk--warn">看情况</span></span>
+          <span>已成为新的 LTS 主线，新项目可用；但要注意大量 API 改名</span>
+        </div>
+      </div>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">怎么选，一句话</span>
+        <strong>2025 年新开项目</strong>：Unity 6000.x LTS 或 2022.3 LTS 都可以。
+        <strong>接手已有项目</strong>：<em>必须用项目原本的版本</em>，不要升级——升版本是独立的、有风险的工作。
+        <strong>跟着某个教程学</strong>：<em>用它指定的版本</em>，否则你会把大量时间花在"为什么我的界面和他不一样"上。
+      </div>
+
+      <h2 id="install">二、安装：Unity Hub 是唯一入口</h2>
+
+      <p>
+        现在装 Unity <strong>必须通过 Unity Hub</strong>，官网不再提供独立的安装包。
+        这是好事——Hub 能让你同时管理多个版本，而<strong>你迟早会需要这个能力</strong>（不同项目锁不同版本）。
+      </p>
+
+      <h3 id="install-steps">安装步骤</h3>
+
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="t-02-1">
+          <label for="t-02-1"><strong>下载 Unity Hub</strong>：从官网 unity.com/download 获取，不要从第三方站点下。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-02-2">
+          <label for="t-02-2"><strong>注册 Unity ID</strong>：个人版免费，但<em>营收和融资超过阈值后必须升级付费版</em>，这是商业合规问题。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-02-3">
+          <label for="t-02-3"><strong>安装编辑器</strong>：在 Hub 的 Installs 页选版本 → 安装，<strong>务必勾选以下模块</strong>。</label>
+        </li>
+      </ul>
+
+      <div class="kp">
+        <div class="kp__head">安装时必须勾选的模块</div>
+        <div class="kp__row">
+          <div class="kp__body">
+            <p><strong>① Documentation</strong>：离线文档。断网或网络差时能救命，体积不大，勾上。</p>
+            <p><strong>② 目标平台支持</strong>：你要发布到哪个平台就勾哪个。做手游勾 <em>Android Build Support</em>（含 SDK/NDK/JDK），
+            做 PC 勾 <em>Windows Build Support</em>。注意：<strong>漏勾平台支持，后期补装要重新下载整个模块</strong>。</p>
+            <p><strong>③ 不要勾 Visual Studio</strong>（如果你已经装了的话）。Hub 会装一个捆绑版 VS，版本旧、还可能和你现有的冲突。
+            单独去官网下最新版 VS Community 更省事。</p>
+          </div>
+        </div>
+      </div>
+
+      <h2 id="ide">三、IDE 配置：让智能提示真正可用</h2>
+
+      <p>
+        <strong>这一步没配好，你后面写代码的效率会低一半。</strong>
+        常见症状是：Unity 里能跑的代码，IDE 里全是红波浪线；或者按下"跳转到定义"没反应。
+      </p>
+
+      <h3 id="ide-vs">方案 A：Visual Studio（Windows 首选）</h3>
+
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="t-02-4">
+          <label for="t-02-4">安装 VS 时勾选 <strong>"使用 Unity 的游戏开发"</strong> 工作负载——它会自动带上 Unity 调试器等必要组件。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-02-5">
+          <label for="t-02-5">Unity 中打开 <span class="mono">Edit → Preferences → External Tools</span>，把 <strong>External Script Editor</strong> 设成你的 VS。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-02-6">
+          <label for="t-02-6">在 <span class="mono">External Tools</span> 页勾选 <strong>Generate .csproj files for</strong> 下面的全部选项，然后点 <strong>Regenerate project files</strong>。</label>
+        </li>
+      </ul>
+
+      <div class="callout callout--warn">
+        <span class="callout__title">红波浪线的三种常见原因</span>
+        <strong>① 没生成 .csproj</strong>：点一下上面的 "Regenerate project files" 通常就好了。<br>
+        <strong>② IDE 打开了错误的 .sln</strong>：项目根目录有多个 .sln 时，认准和项目同名的那个。<br>
+        <strong>③ Unity 正在编译</strong>：等编译完成（右下角转圈结束）再切回 IDE，否则看到的是过期快照。
+      </div>
+
+      <h3 id="ide-rider">方案 B：JetBrains Rider（强烈推荐）</h3>
+
+      <p>
+        Rider 对 Unity 的支持<strong>明显好于 VS</strong>：能识别 Unity 特有 API、内联显示 <span class="mono">SerializeField</span> 的值、
+        直接提示"这个字段在 Inspector 里没赋值"、Profiler 深度集成。
+        对个人开发者有免费许可（非商业用途），公司使用需要付费。
+      </p>
+
+      <h2 id="project">四、创建项目：选哪个模板</h2>
+
+      <p>
+        Unity 的项目模板决定了初始配置。<strong>选错了后期改起来很麻烦</strong>（尤其是渲染管线，迁移成本高）。
+      </p>
+
+      <div class="cmp">
+        <div class="cmp__head">
+          <span>模板</span><span>渲染管线</span><span>适用</span><span>说明</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>Universal 2D</strong></span>
+          <span class="mono">URP</span>
+          <span>2D 游戏</span>
+          <span>正交相机、2D 光照、Sprite 工具链已配好</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>Universal 3D</strong></span>
+          <span class="mono">URP</span>
+          <span>手游 / 中低配 3D</span>
+          <span>性能友好，跨平台好，<strong>移动端首选</strong></span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>3D (Built-in)</strong></span>
+          <span class="mono">Built-in</span>
+          <span>老教程 / 简单项目</span>
+          <span>官方已不推荐新项目使用，但大量老教程基于它</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>HDRP</strong></span>
+          <span class="mono">HDRP</span>
+          <span>PC / 主机高画质</span>
+          <span>画面上限高，但配置复杂、移动端基本用不了</span>
+        </div>
+      </div>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">渲染管线选型是没有回头路的</span>
+        Built-in 和 URP 之间的迁移<strong>不是改个设置就完事</strong>——材质、Shader、后处理全都要重做。
+        新项目<strong>一律用 URP</strong>（除非你明确要做 PC 高画质，那就 HDRP），
+        学教程时如果教程用 Built-in，<em>注意区分哪些代码是通用的、哪些是管线相关的</em>。
+      </div>
+
+      <h2 id="first">五、跑通第一个可玩场景</h2>
+
+      <p>
+        不要一上来就学理论。<strong>先做出一个能动的东西，再回头理解原理</strong>——
+        这样学到的每个概念都有具体的挂靠点。
+      </p>
+
+      <h3 id="first-steps">30 分钟做出一个"能玩"的场景</h3>
+
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="t-02-7">
+          <label for="t-02-7"><strong>建地面</strong>：<span class="mono">GameObject → 3D Object → Plane</span>，缩放设为 (2,1,2) 让它大一些。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-02-8">
+          <label for="t-02-8"><strong>建玩家</strong>：<span class="mono">GameObject → 3D Object → Capsule</span>，位置 (0, 1, 0)，重命名为 Player。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-02-9">
+          <label for="t-02-9"><strong>加物理</strong>：给 Player 加 <span class="mono">Rigidbody</span> 组件，让它会掉到地面上。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-02-10">
+          <label for="t-02-10"><strong>写脚本</strong>：新建 C# 脚本命名 <span class="mono">PlayerMove</span>（<em>文件名必须和类名一致</em>），粘贴下面的代码。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-02-11">
+          <label for="t-02-11"><strong>挂脚本</strong>：把脚本拖到 Player 上，然后点 Play。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-02-12">
+          <label for="t-02-12"><strong>验证</strong>：用 WASD 或方向键能让胶囊移动，说明环境完全正常。</label>
+        </li>
+      </ul>
+
+      <div class="callout callout--note">
+        <span class="callout__title">关于"亲手敲一遍"</span>
+        下面的代码<strong>请手敲，不要复制粘贴</strong>。
+        手敲的过程中你会遇到编译错误、拼写错误、忘记分号——<em>这些错误正是学习的一部分</em>。
+        而且要建立"先看 IDE 报什么错、再看 Unity Console 报什么错"的条件反射。
+      </div>
+
+      <h3 id="first-code">你的第一个脚本</h3>
+
+      <pre class="mono" style="padding:16px;background:var(--c-code-bg);border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.7"><code>using UnityEngine;
+
+// 类名必须和文件名完全一致（区分大小写）
+public class PlayerMove : MonoBehaviour
+{
+    // [SerializeField] 让 private 字段显示在 Inspector 里
+    // 这是 Unity 的最佳实践：既保持封装，又能让策划调参
+    [SerializeField] private float _moveSpeed = 5f;
+
+    // 缓存组件引用：绝不在 Update 里反复调 GetComponent
+    private Rigidbody _rb;
+
+    // Awake 在对象创建时调用一次，适合做自身初始化
+    private void Awake()
+    {
+        _rb = GetComponent&lt;Rigidbody&gt;();
+    }
+
+    // Update 每帧调用一次，适合读输入
+    private void Update()
+    {
+        // GetAxisRaw 返回 -1 / 0 / 1，不做平滑；用 GetAxis 会有缓动
+        float h = Input.GetAxisRaw("Horizontal");
+        float v = Input.GetAxisRaw("Vertical");
+
+        // 组合成方向向量，ClampMagnitude 防止斜向移动更快
+        Vector3 dir = Vector3.ClampMagnitude(new Vector3(h, 0f, v), 1f);
+
+        if (dir.sqrMagnitude &gt; 0.001f)
+        {
+            // 让物体朝向移动方向
+            transform.forward = dir;
+
+            // 用 MovePosition 而不是直接改 position：
+            // 前者走物理系统，能正确触发碰撞；后者会"穿模"
+            Vector3 next = _rb.position + dir * (_moveSpeed * Time.fixedDeltaTime);
+            _rb.MovePosition(next);
+        }
+    }
+}</code></pre>
+
+      <div class="callout callout--warn">
+        <span class="callout__title">三个新手必踩的坑</span>
+        <strong>① 文件名和类名不一致</strong> → Unity 报 <span class="mono">"Can't add script component"</span>，
+        这是最常见的新手错误。<br>
+        <strong>② 忘记挂脚本</strong> → 代码没错，但没有任何反应。<em>检查 Inspector 上真的有这个组件</em>。<br>
+        <strong>③ 直接改 transform.position</strong> → 物体能穿过墙壁。用 <span class="mono">MovePosition</span> + <span class="mono">Rigidbody</span> 才走物理。
+      </div>
+
+      <h2 id="debug">六、出问题时的排查顺序</h2>
+
+      <p>
+        <strong>这一节比前面所有内容都重要。</strong>
+        新手和熟手的差距，很大程度上体现在"遇到问题时知道去哪看"。
+      </p>
+
+      <div class="kp">
+        <div class="kp__head">按这个顺序排查，能解决 90% 的问题</div>
+        <div class="kp__row">
+          <div class="kp__body">
+            <p><strong>第 1 步：看 Unity Console（Ctrl+Shift+C）</strong><br>
+            红色是错误（<em>必须解决，代码根本不会运行</em>），黄色是警告（<em>可以运行，但可能出问题</em>），
+            白色是普通日志。<strong>点开错误信息，双击能直接跳到出错的代码行。</strong></p>
+
+            <p><strong>第 2 步：看 IDE 的错误列表</strong><br>
+            Unity Console 有时只报"脚本编译失败"，具体原因要去 IDE 的 Error List 看。
+            <em>两边都看，才不容易漏。</em></p>
+
+            <p><strong>第 3 步：确认脚本真的挂上去了</strong><br>
+            选中目标对象，看 Inspector 里有没有你的组件。
+            <em>"代码没问题但没效果"十有八九是这个问题。</em></p>
+
+            <p><strong>第 4 步：加日志确认代码真的执行了</strong><br>
+            在方法开头加 <span class="mono">Debug.Log("到这里了")</span>。
+            没打印出来说明方法根本没被调用——<em>那问题就不在方法内部</em>，而在调用时机或对象状态上。</p>
+
+            <p><strong>第 5 步：用断点单步调试</strong><br>
+            在 IDE 里给行号左边点一下打断点，然后在 Unity 里点 Play →
+            在 IDE 里点"附加到 Unity"（Attach to Unity）。<em>这是唯一能看清"变量到底是多少"的方法。</em></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">一个能省下大量时间的习惯</span>
+        遇到问题时，<strong>先读完整条错误信息，再搜索</strong>。
+        很多人看到红色就慌了，直接复制一半去搜。<br>
+        Unity 的错误信息通常写得很清楚，包含<em>文件名、行号、错误类型、原因</em>。
+        把 <span class="mono">CS</span> 开头的错误码（如 <span class="mono">CS0103</span>）连同错误信息一起搜，命中率最高。
+      </div>
+
+      <h2 id="tasks">七、本章动手任务</h2>
+
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="t-02-13">
+          <label for="t-02-13"><strong>环境自检</strong>：装好 Unity + IDE，创建一个 URP 3D 项目，确认 IDE 里没有红波浪线。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-02-14">
+          <label for="t-02-14"><strong>跑通方块移动</strong>：按上面的步骤做出能动的小胶囊，用手敲代码不用复制。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-02-15">
+          <label for="t-02-15"><strong>故意制造三类错误</strong>：① 删掉一个分号；② 把文件名改得和类名不一致；③ 在脚本里访问一个不存在的变量。<em>观察 Console 分别报什么</em>。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-02-16">
+          <label for="t-02-16"><strong>用一次断点</strong>：在 <span class="mono">Update</span> 里打断点，单步执行，观察 <span class="mono">dir</span> 的值随按键变化。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-02-17">
+          <label for="t-02-17"><strong>扩展一下</strong>：加上"按空格跳跃"（提示：<span class="mono">AddForce</span> + <span class="mono">ForceMode.Impulse</span>），并防止空中连跳。</label>
+        </li>
+      </ul>
+
+      <div class="milestone">
+        <p class="mb0">
+          <strong>本章过关标准</strong>：<br>
+          ① 能不看文档说清楚 LTS 和 Tech Stream 的区别，以及为什么项目要用 LTS；<br>
+          ② 遇到"红波浪线 / 脚本无响应 / 物体穿墙"这三类问题时，知道各自的排查入口；<br>
+          ③ 能在 IDE 里成功附加调试器并单步执行；<br>
+          ④ 做出了一个用键盘控制、有物理碰撞的小场景。<br>
+          <br>
+          <em>如果第 ③ 条你还没做成功，先别往下走——调试能力是后面所有章节的地基。</em>
+        </p>
+      </div>
+
+      <nav class="page-nav">
+        <a href="../lua/01-role.html">
+          <div class="dir">← 开始</div>
+          <div class="title">01 岗位与行业现实</div>
+        </a>
+        <a class="next" href="03-cs-basic.html">
+          <div class="dir">C# 语言线 →</div>
+          <div class="title">03 C# 基础与类型系统</div>
+        </a>
+      </nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

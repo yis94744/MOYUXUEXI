@@ -1,0 +1,98 @@
+<h1>Lua 热更新路线</h1>
+
+<p class="lead">这是一份<strong>自成体系</strong>的 Lua 游戏热更新路线：从"没写过 Lua"一直走到"能独立搭建一个可上线、可回滚、经得起线上考验的热更框架"。它不假设你有任何 Lua 基础，但假设你<strong>会用 Unity 并能读懂 C#</strong>。</p>
+
+<p class="lead">全站 <strong>26 页</strong>，按 <strong>"语言 → 原理 → 框架 → 工程 → 实战"</strong> 的顺序组织。每一页都给出<strong>可验证的过关标准</strong>——不是"了解"、"熟悉"这类没法检验的词。</p>
+
+<div class="callout callout--tip">
+  <span class="callout__title">这份路线和其他 Lua 教程的区别</span>
+  <strong>① 所有 Lua 代码都经过真实解释器验证。</strong>本站在本机编译了 <em>Lua 5.4.7</em> 解释器，每一段示例代码都<strong>实际运行过</strong>，输出的结果就是你在页面上看到的结果。—— 包括那些反直觉的行为（<code>#t</code> 对含 nil 的表结果不确定、<code>0</code> 是真值、闭包捕获的循环变量）。<br>
+  <strong>② 它讲框架，不只讲语法。</strong>Lua 语法一周就能学完，但<em>真正的难点是"怎么组织一个大型项目的 Lua 层"</em>——这一站有 5 页专门讲框架设计。<br>
+  <strong>③ 它讲工程化和踩坑。</strong>调试、性能、安全加密、版本管理、灰度回滚——<em>这些才是上线项目天天面对的问题</em>。
+</div>
+
+<h2 id="why">一、为什么游戏公司都在用 Lua</h2>
+
+<p>先给一个最直接的事实：<strong>国内绝大多数手游项目的逻辑层，都是用 Lua 写的。</strong>这不是因为 Lua 语言有多好，而是因为<em>它解决了一个 C# 解决不了的问题——热更新</em>。</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>需求</th><th>C# 原生</th><th>Lua</th></tr></thead>
+  <tbody>
+    <tr><td><strong>改一行战斗公式要重新发包？</strong></td><td><span class="mk mk--no">要</span>（iOS 还要重新审核）</td><td><span class="mk mk--yes">不要</span>，推送脚本即可</td></tr>
+    <tr><td><strong>紧急修复线上 bug</strong></td><td>几小时到几天</td><td><strong>几分钟</strong></td></tr>
+    <tr><td><strong>做活动、调数值</strong></td><td>每次都要发版</td><td>策划自己改配置</td></tr>
+    <tr><td><strong>性能</strong></td><td><span class="mk mk--yes">最快</span></td><td><span class="mk mk--warn">慢 3~10 倍</span>（但逻辑层通常够用）</td></tr>
+    <tr><td><strong>上手难度</strong></td><td>中</td><td><span class="mk mk--yes">极低</span>（一周能写业务）</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">一句话总结定位</span>
+  <strong>Lua 不是为了写"更好的代码"，而是为了让代码能"活着改"。</strong><br>
+  所以行业里的常见分工是：<em>引擎层、渲染、物理、核心战斗数值用 C#；玩法逻辑、UI、活动、配置用 Lua。</em><br>
+  这个分工不是绝对的，但它是经过大量项目验证的<strong>成本最优解</strong>。
+</div>
+
+<h2 id="phases">二、七阶段路线图</h2>
+
+<p>下面这张表是本站的<strong>导航中枢</strong>。建议截图存下来，每完成一项就打勾。</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>阶段</th><th>目标</th><th>时间</th><th>页面</th><th>过关标准</th></tr></thead>
+  <tbody>
+    <tr><td><strong>阶段 0</strong><br>准备</td><td>环境搭好、跑通第一段脚本</td><td>半天</td><td>02</td><td>能用命令行运行 .lua 文件并看到输出</td></tr>
+    <tr><td><strong>阶段 1</strong><br>Lua 语言</td><td>掌握 Lua 到能写业务逻辑</td><td>1~1.5 周</td><td>03–08</td><td>能说清元表、闭包、协程的原理与用途</td></tr>
+    <tr><td><strong>阶段 2</strong><br>热更原理</td><td>理解热更新到底怎么实现的</td><td>1 周</td><td>09–12</td><td>能画出资源热更的完整流程图</td></tr>
+    <tr><td><strong>阶段 3</strong><br>框架设计</td><td>能读懂并修改现有框架</td><td>2~3 周</td><td>13–17</td><td>能说出每层的职责与依赖方向</td></tr>
+    <tr><td><strong>阶段 4</strong><br>工程实践</td><td>掌握调试、性能、安全</td><td>2 周</td><td>18–21</td><td>能用 Profiler 定位到具体 Lua 函数</td></tr>
+    <tr><td><strong>阶段 5</strong><br>实战</td><td>从零搭一个完整框架</td><td>3~4 周</td><td>23</td><td>有一个能跑通完整热更流程的项目</td></tr>
+    <tr><td><strong>阶段 6</strong><br>面试</td><td>把知识组织成能讲出来的答案</td><td>1 周</td><td>22、24</td><td>能讲清 xLua 的通信原理与性能优化</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">关于时间估算</span>
+  上面的时间是<strong>每天投入 3~4 小时</strong>的节奏。业余学习（每天 1 小时）请自行乘 3。<br>
+  <strong>最快的路径是：</strong>阶段 1 快速过（Lua 语法真的简单），<em>把时间花在阶段 2 和 3</em>——那才是真正区分"会 Lua"和"能做热更"的地方。
+</div>
+
+<h2 id="howto">三、怎么用这份路线</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">三种使用方式</span>
+  <strong>① 从头刷（推荐给完全没接触过 Lua 的人）</strong><br>按页面顺序读，每页的<em>动手任务全部做完</em>再往下走。<br><br>
+  <strong>② 查漏补缺（推荐给用过 Lua 但没搭过框架的人）</strong><br>直接跳到 13–17 页（框架设计）。但请先做每页的"过关标准"自测——<em>能写业务逻辑，和能设计框架，中间差着好几层</em>。<br><br>
+  <strong>③ 当参考手册（推荐给在职开发者）</strong><br>用顶部搜索框（按 <span class="mono">/</span> 聚焦）查具体问题。24 页是 API 速查。
+</div>
+
+<h2 id="keystones">四、重点页面</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">标 ★ 的页面是核心，不要跳过</span>
+  <strong>04 table 与元表</strong>——Lua 的一切魔法都建立在元表上，不懂元表就看不懂任何框架源码。<br>
+  <strong>08 性能优化</strong>——Lua 性能问题<em>不会报错</em>，只会让帧率慢慢掉下去。<br>
+  <strong>10 xLua 基础</strong>——C# 与 Lua 的边界是<strong>性能黑洞</strong>，理解它才能写出高效代码。<br>
+  <strong>13 框架总体设计</strong>——这一页决定了你后面 4 页能不能看懂。<br>
+  <strong>17 热更与版本管理</strong>——<em>线上出问题时，决定你能否全身而退</em>。
+</div>
+
+<h2 id="reality">五、几句实话</h2>
+
+<div class="callout callout--warn">
+  <span class="callout__title">在开始之前</span>
+  <strong>① Lua 语法简单不等于 Lua 框架简单。</strong>语法一周能学完，但<em>能设计好一套热更框架的人，在团队里是稀缺的</em>。<br>
+  <strong>② 热更新的"热"是有代价的。</strong>它带来灵活性的同时，也带来<em>类型不安全、性能损耗、调试困难</em>三个问题。这一站会讲怎么把代价控制到可接受。<br>
+  <strong>③ 不要为了热更而热更。</strong>如果项目不需要频繁更新（比如单机买断制游戏），<em>用 Lua 反而增加复杂度</em>。<br>
+  <strong>④ 语法细节会忘，但原理不会。</strong>元表、闭包、协程、C# 与 Lua 的边界——<em>把这四件事理解透，其余都是查手册的事</em>。
+</div>
+
+<nav class="page-nav">
+  <a class="next" href="01-role.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">01 为什么用 Lua 热更</div>
+  </a>
+</nav>

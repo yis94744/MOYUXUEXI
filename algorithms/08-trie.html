@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>08 字典树 Trie 与敏感词过滤 ★ — 游戏算法与系统设计｜从数据结构到完整系统，覆盖游戏开发全部核心算法</title>
+<meta name="description" content="Trie 结构、AC 自动机、敏感词、技能 ID 前缀匹配">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">游戏算法与系统设计
+        <span>从数据结构到完整系统，覆盖游戏开发全部核心算法</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>08 · 字典树 Trie 与敏感词过滤 ★★</h1>
+
+<p class="lead">Trie（前缀树）在游戏里有三个必须用它的场景：<strong>敏感词过滤</strong>（聊天/昵称/公会名）、<strong>输入提示</strong>（搜索框自动补全）、<strong>ID 前缀归类</strong>。它的核心价值是——<em>查询复杂度只与文本长度相关，与词库大小无关</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（07）的堆是"取最值"的最佳结构。这一页的 Trie 是"前缀匹配"的最佳结构。<br>
+  <strong>关键衔接</strong>：Trie 本质是<em>树结构（06）</em>，每个节点代表一个字符。<br>
+  <strong>验证方式</strong>：本页实现了 <strong>Trie 和 AC 自动机两种方案</strong>，并在真实场景下实测了性能。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="06-tree-basic.html#trees-in-games" data-brief="游戏里的九种树、BST 退化"><span class="prereq__title">树结构</span><span class="prereq__page">06-tree-basic</span></a>
+          <a class="prereq__item" href="05-hash.html#load" data-brief="负载因子、浮点不能做 key、索引优化"><span class="prereq__title">哈希表</span><span class="prereq__page">05-hash</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="problem">一、先看暴力法的代价</h2>
+
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  字典树 Trie 与 AC 自动机：敏感词过滤 ★★★
+-- ============================================================
+--  Trie（前缀树）在游戏里的三大用途：
+--    1. 敏感词过滤（聊天、昵称、公会名）—— 必须做
+--    2. 输入提示 / 自动补全（搜索框）
+--    3. 技能 ID / 道具 ID 的前缀归类
+--
+--  这一份实现完整的 Trie + AC 自动机（Aho-Corasick）。
+
+print("=== 1. 朴素敏感词过滤：暴力匹配的代价 ===")
+
+local function naiveFilter(text, words)
+  local result = text
+  for _, word in ipairs(words) do
+    -- 逐个词做全文查找并替换
+    local start = 1
+    while true do
+      local s, e = string.find(result, word, start, true)  -- true = 纯文本查找
+      if not s then break end
+      result = result:sub(1, s - 1) .. string.rep("*", #word) .. result:sub(e + 1)
+      start = s + #word
+    end
+  end
+  return result
+end
+
+local dirtyWords = { "垃圾", "笨蛋", "傻瓜", "垃圾游戏", "笨蛋玩家" }
+local testText = "你是个笨蛋，这垃圾游戏真难玩，笨蛋玩家真多"
+
+local t1 = os.clock()
+local naiveResult = naiveFilter(testText, dirtyWords)
+local naiveTime = os.clock() - t1
+
+print("  原文: " .. testText)
+print("  过滤: " .. naiveResult)
+print(string.format("  【问题】每个词都要全文扫描一遍；词库上万时，一次过滤要几十毫秒"))
+
+print()
+print("=== 2. Trie：一次扫描完成所有匹配 ===")
+-- 核心思想：把所有敏感词构建成一棵树，用文本去树上走
+
+local Trie = {}
+Trie.__index = Trie
+
+function Trie.new()
+  return setmetatable({
+    root = {},          -- 根节点（空表）
+    wordCount = 0,
+  }, Trie)
+end
+
+-- 插入一个词
+function Trie:insert(word)
+  local node = self.root
+  for i = 1, #word do
+    local ch = word:sub(i, i)
+    if not node[ch] then
+      node[ch] = {}     -- 创建子节点
+    end
+    node = node[ch]
+  end
+  node.isEnd = true     -- 标记词尾
+  node.word = word      -- 记录完整词（方便后续处理）
+  self.wordCount = self.wordCount + 1
+end
+
+-- 批量插入
+function Trie:insertAll(words)
+  for _, w in ipairs(words) do
+    self:insert(w)
+  end
+end
+
+-- 【核心】从指定位置开始匹配，返回最长匹配长度（0 表示没匹配）
+function Trie:matchAt(text, startPos)
+  local node = self.root
+  local longest = 0
+  local i = startPos
+
+  while i &lt;= #text do
+    local ch = text:sub(i, i)
+    node = node[ch]
+    if not node then break end        -- 走不下去了
+
+    if node.isEnd then
+      longest = i - startPos + 1      -- 记录最长匹配
+    end
+    i = i + 1
+  end
+
+  return longest
+end
+
+-- 过滤（用 * 替换）
+function Trie:filter(text)
+  local result = {}
+  local i = 1
+
+  while i &lt;= #text do
+    local len = self:matchAt(text, i)
+    if len &gt; 0 then
+      -- 命中：替换为等长星号，跳过整个词
+      result[#result + 1] = string.rep("*", len)
+      i = i + len
+    else
+      result[#result + 1] = text:sub(i, i)
+      i = i + 1
+    end
+  end
+
+  return table.concat(result)
+end
+
+-- 只检测是否包含（不替换，更快）
+function Trie:contains(text)
+  local i = 1
+  while i &lt;= #text do
+    if self:matchAt(text, i) &gt; 0 then return true end
+    i = i + 1
+  end
+  return false
+end
+
+-- 返回所有命中的词
+function Trie:findAll(text)
+  local found = {}
+  local i = 1
+  while i &lt;= #text do
+    local node = self.root
+    local j = i
+    while j &lt;= #text do
+      local ch = text:sub(j, j)
+      node = node[ch]
+      if not node then break end
+      if node.isEnd then
+        found[#found + 1] = { word = node.word, pos = i }
+      end
+      j = j + 1
+    end
+    i = i + 1
+  end
+  return found
+end
+
+-- 构建 Trie
+local trie = Trie.new()
+local t2 = os.clock()
+trie:insertAll(dirtyWords)
+local buildTime = os.clock() - t2
+
+local t3 = os.clock()
+local trieResult = trie:filter(testText)
+local trieTime = os.clock() - t3
+
+print()
+print("  构建 Trie: 「 .. trie.wordCount .. 」 个词，耗时 「 .. string.format(」%.6f「, buildTime) .. 」 秒")
+print("  原文: " .. testText)
+print("  过滤: " .. trieResult)
+print(string.format("  单次过滤耗时: %.6f 秒", trieTime))
+
+-- 【重要】两者结果【不一致】，这是真实存在的语义差异
+print("  结果与暴力法一致: " .. tostring(naiveResult == trieResult))
+print()
+print("  【为什么会不同】")
+print("    词库里有「垃圾」和「垃圾游戏」两个词。")
+print("    暴力法：先替换「垃圾」-&gt; 变成「****游戏」，之后「垃圾游戏」再也匹配不到")
+print("    Trie  ：最长匹配优先 -&gt; 直接命中「垃圾游戏」整体替换")
+print()
+print("    可见输出的差异正是这个原因：")
+print("      暴力法: \"这******游戏真难玩\"   （只替换了「垃圾」）")
+print("      Trie  : \"这************真难玩\" （替换了整个「垃圾游戏」）")
+print()
+print("  【结论】实际项目中，Trie 的「最长匹配」才是期望行为——")
+print("          否则「垃圾游戏」会被替换成「****游戏」，剩余部分仍然可见。")
+print("          这是 Trie 相比暴力法的【正确性优势】，不只是性能优势。")
+print("  【关键】Trie 只需【一次扫描】，与词库大小无关")
+
+print()
+print("=== 3. 性能对比：词库越大，Trie 优势越明显 ===")
+-- 生成大词库
+local bigWords = {}
+for i = 1, 2000 do
+  bigWords[i] = "敏感词" .. i        -- 生成长度 5~8 的词
+end
+bigWords[2001] = "测试"
+
+local bigTrie = Trie.new()
+bigTrie:insertAll(bigWords)
+
+local longText = string.rep("这是一段普通的聊天内容，不包含任何敏感信息。", 20)
+
+-- Trie 过滤
+local t4 = os.clock()
+for i = 1, 100 do bigTrie:filter(longText) end
+local bigTrieTime = os.clock() - t4
+
+print(string.format("  词库: %d 个词", #bigWords))
+print(string.format("  文本长度: %d 字符", #longText))
+print(string.format("  Trie 过滤 100 次: %.4f 秒", bigTrieTime))
+print(string.format("  单次: %.4f 秒", bigTrieTime / 100))
+print()
+print("  【结论】Trie 的复杂度是 O(文本长度)，与词库大小无关。")
+print("          暴力法是 O(词数 x 文本长度)，词库上万时会慢几百倍。")
+
+print()
+print("=== 4. AC 自动机：Trie + 失败指针 ===")
+-- Trie 有个问题：每个位置都要从头尝试匹配。
+-- AC 自动机给每个节点加「失败指针」，
+-- 匹配失败时跳到最长公共后缀继续，实现真正的 O(n)。
+
+local ACMatcher = {}
+ACMatcher.__index = ACMatcher
+
+function ACMatcher.new()
+  return setmetatable({
+    root = {},
+    nodes = {},      -- 所有节点列表（用于构建失败指针）
+  }, ACMatcher)
+end
+
+function ACMatcher:insertAll(words)
+  for _, w in ipairs(words) do
+    self:insert(w)
+  end
+end
+
+function ACMatcher:insert(word)
+  local node = self.root
+  for i = 1, #word do
+    local ch = word:sub(i, i)
+    if not node[ch] then
+      node[ch] = { ch = ch, depth = (node.depth or 0) + 1, fail = nil }
+      self.nodes[#self.nodes + 1] = node[ch]
+    end
+    node = node[ch]
+  end
+  node.isEnd = true
+  node.word = word
+end
+
+-- 构建失败指针（BFS）
+function ACMatcher:build()
+  local queue = {}
+  local head = 1
+
+  -- 第一层节点的 fail 指向根
+  for ch, child in pairs(self.root) do
+    if type(child) == "table" and child.ch then
+      child.fail = self.root
+      queue[#queue + 1] = child
+    end
+  end
+
+  -- BFS 逐层构建
+  while head &lt;= #queue do
+    local current = queue[head]
+    head = head + 1
+
+    for ch, child in pairs(current) do
+      if type(child) == "table" and child.ch and child.ch == ch then
+        -- 找 child 的 fail：从 current.fail 开始找相同字符的子节点
+        local f = current.fail
+        while f and not f[ch] do
+          f = f.fail
+        end
+        child.fail = (f and f[ch]) or self.root
+
+        -- 合并终止标记（重要：让后缀匹配也能被识别）
+        if child.fail.isEnd then
+          child.isEnd = true
+          child.word = child.word or child.fail.word
+        end
+
+        queue[#queue + 1] = child
+      end
+    end
+  end
+end
+
+-- AC 匹配：一次遍历找出所有命中
+function ACMatcher:search(text)
+  local result = {}
+  local node = self.root
+
+  for i = 1, #text do
+    local ch = text:sub(i, i)
+
+    -- 沿着失败指针回溯，直到找到匹配或回到根
+    while node ~= self.root and not node[ch] do
+      node = node.fail
+    end
+
+    node = node[ch] or self.root
+
+    -- 检查当前节点及其失败链上是否有词结尾
+    local temp = node
+    while temp ~= self.root do
+      if temp.isEnd then
+        result[#result + 1] = {
+          word = temp.word,
+          pos = i - #temp.word + 1,
+        }
+      end
+      temp = temp.fail
+    end
+  end
+
+  return result
+end
+
+local ac = ACMatcher.new()
+ac:insertAll(dirtyWords)
+ac:build()
+
+print("  构建完成，节点数: " .. #ac.nodes)
+local acResult = ac:search(testText)
+print("  匹配结果:")
+for _, r in ipairs(acResult) do
+  print(string.format("    位置 %d: %s", r.pos, r.word))
+end
+
+print()
+print("=== 5. AC 自动机 vs Trie 性能对比 ===")
+local acBig = ACMatcher.new()
+acBig:insertAll(bigWords)
+acBig:build()
+
+local t5 = os.clock()
+for i = 1, 100 do acBig:search(longText) end
+local acTime = os.clock() - t5
+
+print(string.format("  Trie（逐位置尝试）: %.4f 秒 / 100 次", bigTrieTime))
+print(string.format("  AC 自动机（一趟扫描）: %.4f 秒 / 100 次", acTime))
+if acTime &gt; 0 then
+  print(string.format("  AC 快 %.1f 倍", bigTrieTime / acTime))
+end
+print()
+print("  【为什么 AC 更快】")
+print("    Trie：每个位置都要从根重新走一遍")
+print("    AC  ：失败时通过失败指针跳转，不回到根")
+print("    文本长度为 n、词库总长为 m 时：")
+print("      Trie 最坏 O(n x 最长词长)")
+print("      AC    严格 O(n + 命中数)")
+
+print()
+print("=== 6. 实战中的工程考量 ===")
+local notes = {
+  "【词库预处理】上线前把所有敏感词构建成一棵 Trie，序列化成二进制，运行时直接加载",
+  "【分级词库】把词分成「禁止」「替换」「提示」三级，不同级别不同处理",
+  "【中文处理】按 UTF-8 字符切分，不要按字节；Lua 用 utf8.len / utf8.codes",
+  "【变体绕过】用户会用「垃*圾」「垃 圾」「la圾」绕过，需要做归一化预处理",
+  "【同音字】需要额外的拼音映射表（音近字替换）",
+  "【性能预算】聊天过滤应该在 1 毫秒内完成，超过就要考虑异步或降级",
+  "【不要在前端做全量过滤】客户端只做基础过滤，真正的审核放服务端",
+}
+
+for i, note in ipairs(notes) do
+  print(string.format("  %d. %s", i, note))
+end
+
+print()
+print("=== 7. UTF-8 中文处理的正确姿势 ===")
+-- Lua 5.3+ 提供 utf8 库
+local sample = "垃圾" 
+print(string.format("  字符串 '%s' 字节长度: %d, 字符数: %d", sample, #sample, utf8.len(sample)))
+print("  【重要】string.sub 按字节切，处理中文必须用 utf8 库")
+print("  按字节切会导致乱码：")
+
+local badCut = sample:sub(1, 3)     -- 切了一半的中文字
+print("    错误切法（3 字节）: 「 .. badCut .. 」（乱码）")
+
+-- 正确的按字符遍历
+print("  正确做法（utf8.codes 遍历）:")
+for pos, code in utf8.codes(sample) do
+  print(string.format("    位置 %d: U+%X", pos, code))
+end</code></pre>
+
+<div class="callout callout--danger">
+  <span class="callout__title">实测发现了一个重要的语义差异</span>
+  暴力法和 Trie 的过滤结果<strong>不一致</strong>——但这不是 bug，是<em>语义差异</em>：<br><br>
+  词库里有「垃圾」和「垃圾游戏」两个词：<br>
+  • <strong>暴力法</strong>：先替换「垃圾」→ 变成「****游戏」，之后「垃圾游戏」再也匹配不到<br>
+  • <strong>Trie</strong>：最长匹配优先 → 直接命中「垃圾游戏」整体替换<br><br>
+  <strong>实际输出对比</strong>：<br>
+  • 暴力法：<code>这******游戏真难玩</code>（只替换了「垃圾」）<br>
+  • Trie：<code>这************真难玩</code>（替换了整个「垃圾游戏」）<br><br>
+  <strong>结论：Trie 的"最长匹配"才是正确行为。</strong>否则「垃圾游戏」会被替换成「****游戏」，<em>剩余部分仍然可见</em>。<br>
+  这是 Trie 相比暴力法的<strong>正确性优势</strong>，不只是性能优势。
+</div>
+
+<h2 id="ac">二、AC 自动机：Trie 的进化版</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">Trie 的瓶颈在哪里</span>
+  Trie 虽然比暴力法快得多，但仍有一个浪费：<em>每个位置都要从根节点重新开始尝试匹配</em>。<br><br>
+  <strong>AC 自动机（Aho-Corasick）</strong>给每个节点加了一个<strong>失败指针（fail pointer）</strong>：<br>
+  当匹配失败时，<em>跳到"最长公共后缀"对应的节点继续</em>，而不是回到根。<br><br>
+  <strong>复杂度对比</strong>（文本长度 n，最长的词长度 m）：<br>
+  • 暴力法：<code>O(n x 词数)</code><br>
+  • Trie：<code>O(n x m)</code> 最坏情况<br>
+  • <strong>AC 自动机：<code>O(n + 命中数)</code></strong>——<em>严格线性，一次扫描搞定</em>
+</div>
+
+<h2 id="utf8">三、UTF-8 中文处理：一个必踩的坑</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">string.sub 按字节切，会让中文乱码</span>
+  Lua 的 <code>string.sub</code> 是<strong>按字节</strong>操作的，而一个中文字符占 3 个字节（UTF-8）。<br><br>
+  <code>"垃圾":sub(1, 3)</code> —— 看起来是取第一个字符，实际上<em>只取了"垃"的 3 个字节中的一部分</em>，结果是乱码。<br><br>
+  <strong>正确做法</strong>：Lua 5.3+ 提供了 <code>utf8</code> 库：<br>
+  • <code>utf8.len(s)</code> —— 字符数（不是字节数）<br>
+  • <code>utf8.codes(s)</code> —— 按字符遍历<br>
+  • <code>utf8.offset(s, n)</code> —— 取第 n 个字符的字节位置<br><br>
+  <em>做敏感词过滤必须用 utf8 库，否则中文词永远匹配不对。</em>
+</div>
+
+<h2 id="engineering">四、工程实践要点</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>问题</th><th>做法</th></tr></thead>
+  <tbody>
+    <tr><td><strong>词库预处理</strong></td><td>上线前构建好 Trie，序列化成二进制，运行时直接加载（<em>省掉构建时间</em>）</td></tr>
+    <tr><td><strong>分级词库</strong></td><td>分「禁止」「替换」「提示」三级，不同级别不同处理</td></tr>
+    <tr><td><strong>变体绕过</strong></td><td>用户会用「垃*圾」「垃 圾」绕过，需要先做<strong>归一化</strong>（去符号、去空格、全半角统一）</td></tr>
+    <tr><td><strong>同音字</strong></td><td>「拉鸡」这类需要额外的拼音映射表，<em>复杂度大增</em></td></tr>
+    <tr><td><strong>性能预算</strong></td><td>聊天过滤应在 1 毫秒内完成，超过要考虑异步或降级</td></tr>
+    <tr><td><strong>客户端 vs 服务端</strong></td><td>客户端只做基础过滤（<em>防不了外挂改内存</em>），<strong>真正的审核放服务端</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="tasks">五、本章动手任务</h2>
+
+<div class="tasks" data-page="08">
+  <div class="task"><input type="checkbox" id="t-08-1"><label for="t-08-1"><strong>实现 Trie</strong>：不看示例写出 insert / matchAt / filter 三个方法，并测试最长匹配行为。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-2"><label for="t-08-2"><strong>实现 AC 自动机</strong>：加失败指针，用 BFS 构建，验证匹配结果与 Trie 一致。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-3"><label for="t-08-3"><strong>测性能曲线</strong>：词库从 100 增加到 10000，分别测暴力法、Trie、AC 的耗时，画出增长曲线。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-4"><label for="t-08-4"><strong>处理中文</strong>：用 <code>utf8</code> 库改造你的实现，验证中文敏感词能被正确匹配。<em>先用 string.sub 制造一次乱码，理解问题所在。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-08-5"><label for="t-08-5"><strong>做变体归一化</strong>：实现"去掉所有非字母数字字符 + 全角转半角"，测试「垃*圾」能否被识别。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-6"><label for="t-08-6"><strong>回答面试题</strong>：① Trie 的复杂度是多少？② AC 自动机比 Trie 强在哪？③ 敏感词过滤有哪些绕过手段，怎么防？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能手写 Trie 的插入与匹配；<br>
+    ② <strong>能解释为什么 Trie 的最长匹配是正确行为，而暴力法会漏掉长词</strong>；<br>
+    ③ 知道 AC 自动机的失败指针原理，以及它为什么能做到 O(n)；<br>
+    ④ 知道中文必须用 utf8 库处理，以及按字节切会导致什么；<br>
+    ⑤ 能说出至少三种敏感词绕过手段与对应的防御措施。<br><br>
+    <em>第 ④ 条看起来是细节，但在处理中文游戏时它是必修课。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="07-heap-priority.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">07 堆与优先队列 ★</div>
+  </a>
+  <a class="next" href="09-union-find.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">09 并查集与图论基础</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

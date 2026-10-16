@@ -1,0 +1,138 @@
+<h1>20 · 群体行为与 Boids</h1>
+
+<p class="lead">一群鸟、一群鱼、一群士兵——它们<strong>没有中央指挥</strong>，却能整齐地一起移动。这一页讲<em>用三条简单规则实现逼真的群体行为</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="three-rules">一、Boids 的三条规则 ★★★</h2>
+
+<p>1987 年 Craig Reynolds 发现：<strong>三条简单规则就能产生逼真的群体行为</strong>。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>规则</th><th>含义</th><th>效果</th></tr></thead>
+  <tbody>
+    <tr><td><strong>分离（Separation）</strong></td><td>避免和邻居靠太近</td><td><em>不会挤成一团</em></td></tr>
+    <tr><td><strong>对齐（Alignment）</strong></td><td>朝邻居的平均方向</td><td><strong>方向一致</strong></td></tr>
+    <tr><td><strong>聚合（Cohesion）</strong></td><td>朝邻居的中心移动</td><td><strong>不会散开</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">为什么这三条规则如此有效</span>
+  <strong>关键在于"邻居"——每个个体只看附近的一小群</strong>：<br>
+  · 不需要中央指挥<br>
+  · 不需要全局信息<br>
+  · 每个个体只做简单计算<br><br>
+  <strong>结果却是</strong>：整个群体表现出<em>流畅、自然、有生命感</em>的移动。<br><br>
+  <strong>这就是"涌现"（Emergence）</strong>：<em>复杂行为从简单规则中自发产生。</em><br><br>
+  <strong>加权的艺术</strong>：三个力通常不平均——<br>
+  · 分离权重最高（<em>避免碰撞最重要</em>）<br>
+  · 对齐和聚合权重较低<br>
+  <em>具体权重需要调，这是"手感"的一部分。</em>
+</div>
+
+<h2 id="performance">二、性能：Boids 的致命问题</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">O(n²) 是 Boids 的默认代价</span>
+  <strong>朴素实现</strong>：<em>每个个体都要和其他所有个体比较</em>。<br>
+  · 100 个个体 = 10000 次距离计算（<em>还行</em>）<br>
+  · 1000 个个体 = <strong>100 万次</strong>（<em>必卡</em>）<br>
+  · 5000 个个体 = 2500 万次（<em>不可接受</em>）<br><br>
+  <strong>解法：空间划分（页 12）</strong><br>
+  · 把空间划成网格<br>
+  · 每个个体只看<strong>周围 9 个格子</strong>里的邻居<br>
+  · 复杂度从 O(n²) 降到 O(n)<br><br>
+  <strong>关键陷阱</strong>：<em>格子大小必须 ≥ 感知半径</em>。<br>
+  如果格子太小，"3×3 邻格"覆盖不到所有邻居——<strong>会出现静默的错误行为</strong>（<em>群体散开、互相穿透</em>）。<br>
+  <strong>规则</strong>：格子大小设为感知半径的 1~2 倍。<br>
+  <em>这个问题在页 12 有详细实测（cell=5 时只找到 33/167 个碰撞）。</em>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">其他优化手段</span>
+  <strong>① 限制邻居数量</strong><br>
+  · 只统计最近的 5~10 个邻居就够<br>
+  · <em>不需要全部邻居</em><br><br>
+  <strong>② 降低更新频率</strong><br>
+  · 群体方向每 3~5 帧更新一次<br>
+  · <em>玩家看不出来</em><br><br>
+  <strong>③ 分层</strong><br>
+  · 把群体分成几个小队<br>
+  · 队内用 Boids，队间用简单规则<br><br>
+  <strong>④ 简化计算</strong><br>
+  · 用 <code>sqrMagnitude</code> 代替距离（<em>避免开方</em>）<br>
+  · 预计算<br><br>
+  <em>这些手段组合起来，能让 1000+ 个体跑在移动端。</em>
+</div>
+
+<h2 id="applications">三、游戏里的群体行为应用</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>场景</th><th>用哪几条规则</th><th>备注</th></tr></thead>
+  <tbody>
+    <tr><td><strong>鸟群 / 鱼群</strong></td><td>三条全用</td><td>装饰性，可大量</td></tr>
+    <tr><td><strong>RTS 单位移动</strong></td><td>分离为主</td><td><strong>还需要避障</strong></td></tr>
+    <tr><td><strong>丧尸围城</strong></td><td>分离 + 聚合</td><td><em>不能挤成一坨</em></td></tr>
+    <tr><td><strong>人群疏散</strong></td><td>分离 + 目标</td><td>基础是分离</td></tr>
+    <tr><td><strong>子弹幕</strong></td><td>分离（可选）</td><td><em>通常不需要，会破坏图案</em></td></tr>
+    <tr><td><strong>星云 / 粒子</strong></td><td>简化版</td><td>用 GPU 更好</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">什么时候不该用 Boids</span>
+  <strong>Boids 不是万能的</strong>：<br><br>
+  <strong>① 需要精确队形时</strong><br>
+  Boids 是"松散聚集"，<em>无法保证严格的队形</em>。<br>
+  <strong>要用</strong>：编队算法（<em>预先定义相对位置</em>）。<br><br>
+  <strong>② 需要精确寻路时</strong><br>
+  Boids 不考虑障碍物。<br>
+  <strong>要用</strong>：流场寻路（<em>页 11</em>）+ Boids 做局部避让。<br><br>
+  <strong>③ 数量极少时</strong><br>
+  3 个个体的"群体"没有意义。<em>直接每个单独控制就好。</em><br><br>
+  <strong>④ 弹幕游戏</strong><br>
+  Boids 的随机性会<em>破坏精心设计的弹幕图案</em>。<br><br>
+  <em>判断标准：玩家需要的是"看起来自然"还是"精确可控"？</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="20">
+  <div class="task"><input type="checkbox" id="t-20-1"><label for="t-20-1"><strong>实现三条规则</strong>：分别实现分离、对齐、聚合，单独观察每一条的效果。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-2"><label for="t-20-2"><strong>调权重</strong>：改变三个力的权重，观察群体行为的差异。<em>这是"手感"训练。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-20-3"><label for="t-20-3"><strong>加空间划分</strong>：用页 12 的网格优化邻居查询，测 1000 个个体的性能差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-4"><label for="t-20-4"><strong>复现陷阱</strong>：故意把格子设得小于感知半径，观察行为的异常。<em>这是页 12 那个静默 bug 的群体版。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-20-5"><label for="t-20-5"><strong>加边界处理</strong>：让个体在接近边界时转向（<em>而不是穿出去</em>）。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-6"><label for="t-20-6"><strong>回答面试题</strong>：① Boids 的三条规则是什么？② 朴素实现为什么是 O(n²)？③ 什么情况不该用 Boids？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出 Boids 的三条规则及各自效果</strong>；<br>
+    ② <strong>知道朴素实现是 O(n²)，必须用空间划分优化</strong>；<br>
+    ③ <strong>知道格子大小必须 ≥ 感知半径（否则静默出错）</strong>；<br>
+    ④ 能说出四种性能优化手段；<br>
+    ⑤ 能判断什么时候不该用 Boids（需要精确队形/寻路时）。<br>
+    <br>
+    <em>第 ② 和 第 ③ 条最关键——前者是性能，后者是正确性。第 ③ 条那个陷阱特别隐蔽。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="19-goap-planner.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">19 GOAP 与规划型 AI</div>
+  </a>
+  <a class="next" href="21-reddot.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">21 红点系统 ★★★</div>
+  </a>
+</nav>

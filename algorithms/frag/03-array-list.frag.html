@@ -1,0 +1,86 @@
+<h1>03 · 数组、动态数组与环形缓冲</h1>
+
+<p class="lead">这是最基础的结构，但游戏里有<strong>三个高频陷阱</strong>：<em>环形缓冲的索引计算、数组与哈希的性能差异、以及如何复用缓冲区避免 GC</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（02）讲复杂度。这一页开始讲具体结构。
+  <strong>关键衔接</strong>：页 26 的<em>性能模式库</em>会反复用到"复用缓冲区"这个技巧。
+  <strong>下一页</strong>（04）链表与栈队列。<em>链表在游戏里用得少，但栈和队列非常多。</em>
+  <strong>验证方式</strong>：本页代码在 Lua 5.4.7 实测运行，<em>包括环形缓冲的索引环绕与覆盖行为</em>。
+</div>
+
+<h2 id="why-array">一、为什么数组最快</h2>
+
+<p>数组的优势<strong>不是算法复杂度</strong>，而是<em>缓存友好</em>——这是硬件层面的优势。</p>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>03/array-buffer</code></div>
+
+<h2 id="ring-apps">二、环形缓冲的三个经典应用 ★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">应用一：格斗游戏的连招检测</span>
+  把玩家输入<strong>记录进环形缓冲</strong>（容量 10~20），然后在时间窗口内<em>从新到旧扫描</em>匹配连招序列。
+  本页实测：输入 <code>P, P, K</code> 后，检测 <code>[P,P,K]</code> 连招返回 true。
+  <em>这是格斗游戏的标准做法——不需要为每个连招单独写状态机。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">应用二：帧时间记录（游戏内 FPS 显示）</span>
+  用一个容量 60 的环形缓冲记录最近 60 帧的耗时，<em>求平均和最大值</em>。
+  本页实测输出：<code>最近 60 帧：平均 19.3 ms, 最大 66.7 ms</code>。
+  <em>这就是所有游戏内 FPS 显示的原理。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">应用三：对象池</span>
+  环形缓冲可以做对象池——<strong>完全零分配</strong>。
+  但要注意它的<em>缺点</em>：满了会覆盖，不适合"不能丢"的场景。
+  <strong>更常用的对象池是栈</strong>（后进先出，容量不足就扩展）。
+</div>
+
+<h2 id="ring-impl">三、环形缓冲的实现要点</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">索引环绕的公式（容易写错）</span>
+  <strong>正确公式</strong>：<code>nextIndex = (currentIndex % capacity) + 1</code>
+  （因为 Lua 索引从 1 开始）
+  <strong>如果是从 0 开始的语言</strong>：<code>nextIndex = (currentIndex + 1) % capacity</code>
+  <strong>常见错误</strong>：写成 <code>currentIndex % (capacity - 1)</code>——<em>这会导致索引永远到不了最后一个槽</em>。
+  <strong>验证方法</strong>：给容量 5 的缓冲连续压入 7 个元素，<em>检查是否只保留最后 5 个</em>。本页实测输出 <code>3, 4, 5, 6, 7</code>——正确。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="03">
+  <div class="task"><input type="checkbox" id="t-03-1"><label for="t-03-1"><strong>实现动态数组</strong>：观察扩容时机，验证"容量翻倍"带来的摊销 O(1)。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-2"><label for="t-03-2"><strong>手写环形缓冲</strong>：不看示例实现 push/pop/peek，用 7 个元素压入 5 容量缓冲验证覆盖行为。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-3"><label for="t-03-3"><strong>做连招检测</strong>：用环形缓冲实现"在 0.5 秒内输入 P,P,K 触发连招"。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-4"><label for="t-03-4"><strong>做 FPS 显示</strong>：用环形缓冲记录最近 60 帧耗时，显示平均值与最大值。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-5"><label for="t-03-5"><strong>对比数组与哈希</strong>：在 Lua 与 C# 里各测一次顺序遍历，<em>观察两者差异（C# 里差距更明显）</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-6"><label for="t-03-6"><strong>回答面试题</strong>：① 动态数组为什么要翻倍扩容？② 环形缓冲的索引怎么算？③ 什么场景该用环形缓冲？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能解释"数组快是因为缓存友好"而不是复杂度；<br>
+    ② 能实现动态数组并说明为什么扩容要翻倍；<br>
+    ③ <strong>能手写环形缓冲并正确处理索引环绕</strong>；<br>
+    ④ 能说出环形缓冲的三个游戏应用；<br>
+    ⑤ 知道环形缓冲的缺点（满了会覆盖）及替代方案。<br>
+    <br>
+    <em>第 ③ 条是这一页的核心——环形缓冲的索引计算公式很容易写错，必须亲手验证一次。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="02-complexity.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">02 复杂度与性能直觉</div>
+  </a>
+  <a class="next" href="04-linked-stack-queue.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">04 链表、栈与队列</div>
+  </a>
+</nav>

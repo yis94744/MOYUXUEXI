@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03 C# 基础与类型系统 — C# + Unity 路线｜从零基础到独立完成商业级项目</title>
+<meta name="description" content="值类型与引用类型、装箱、struct/class 选型、字符串、集合、类型转换、可空类型">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C# + Unity 路线
+        <span>从零基础到独立完成商业级项目</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+
+      <h1>03 · C# 基础与类型系统</h1>
+      <p class="lead">这一页是整个路线的<strong>地基</strong>。你可能觉得"类型系统"听起来很学术，但实际情况是：<em>你在 Unity 里遇到的每一个诡异 bug——改了位置没反应、传参不生效、每帧掉帧——根因都在这里</em>。</p>
+
+      <div class="callout callout--note">
+        <span class="callout__title">阶段目标</span>
+        约 <strong>2 周</strong>，50 小时。结束时你能：说清值类型与引用类型的全部差异、解释什么是装箱以及它在哪发生、知道什么时候该用 struct、能看懂 <code>List&lt;T&gt;</code> 和 <code>Dictionary&lt;K,V&gt;</code> 的源码实现。
+      </div>
+
+      
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="03-cs-basic.html#value-ref" data-brief="赋值时拷贝内容还是拷贝地址，这决定了对象会不会被共享"><span class="prereq__title">值类型与引用类型</span><span class="prereq__page">03-cs-basic</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="value-ref">一、值类型 vs 引用类型 ★</h2>
+      <p>这是 C# 里<strong>唯一一个必须彻底搞懂、且无法靠经验绕过去</strong>的概念。搞错它，代码会以"看起来完全正确但行为不对"的方式失败。</p>
+
+      <h3 id="def">一句话定义</h3>
+
+      <ul>
+        <li><strong>值类型</strong>：变量里直接装着数据本身。赋值 = <em>把内容复制一份</em>。</li>
+        <li><strong>引用类型</strong>：变量里装着"东西在哪"的地址。赋值 = <em>把地址复制一份</em>，两个变量指向同一个对象。</li>
+      </ul>
+
+      <div class="cmp">
+        <div class="cmp__head">
+          <span>类别</span>
+          <span>包含哪些</span>
+          <span>赋值行为</span>
+        </div>
+        <div class="cmp__row">
+          <span><span class="mk mk--yes">值类型</span></span>
+          <span><code>struct</code>、<code>enum</code>、所有数值类型、<code>bool</code>、<code>char</code>、<code>DateTime</code></span>
+          <span>拷贝内容</span>
+        </div>
+        <div class="cmp__row">
+          <span><span class="mk mk--warn">值类型（Unity）</span></span>
+          <span><code>Vector2/3</code>、<code>Quaternion</code>、<code>Color</code>、<code>Rect</code>、<code>Bounds</code>、<code>Matrix4x4</code>、<code>RaycastHit</code></span>
+          <span>拷贝内容</span>
+        </div>
+        <div class="cmp__row">
+          <span><span class="mk mk--no">引用类型</span></span>
+          <span><code>class</code>、<code>interface</code>、<code>delegate</code>、<code>string</code>、<code>object</code>、数组</span>
+          <span>拷贝引用</span>
+        </div>
+        <div class="cmp__row">
+          <span><span class="mk mk--no">引用类型（Unity）</span></span>
+          <span><code>GameObject</code>、<code>Transform</code>、<code>MonoBehaviour</code>、<code>ScriptableObject</code>、<code>Material</code>、<code>Texture2D</code></span>
+          <span>拷贝引用</span>
+        </div>
+      </div>
+
+      <h3 id="verify">代码验证：差异到底在哪</h3>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using System.Collections.Generic;
+
+public class ValueVsReference : MonoBehaviour
+{
+    private void Start()
+    {
+        // ============ 值类型：赋值即拷贝 ============
+        Vector3 a = new Vector3(1f, 0f, 0f);
+        Vector3 b = a;              // 拷贝了三个 float，a 和 b 从此无关
+        b.x = 999f;
+
+        Debug.Log("a.x = " + a.x);  // 1     &lt;- a 完全不受影响
+        Debug.Log("b.x = " + b.x);  // 999
+
+        // ============ 引用类型：赋值即共享 ============
+        var list1 = new List&lt;int&gt; { 1, 2, 3 };
+        var list2 = list1;          // 两者指向同一个 List 对象
+        list2.Add(4);
+
+        Debug.Log("list1.Count = " + list1.Count);  // 4  &lt;- list1 也变了！
+
+        // 想真正复制一份，必须显式新建
+        var list3 = new List&lt;int&gt;(list1);   // 拷贝构造函数
+        list3.Add(5);
+        Debug.Log("list1.Count = " + list1.Count);  // 4  &lt;- 这次没变
+
+        // ============ Unity 特有：Transform 是引用类型 ============
+        Transform t1 = transform;
+        Transform t2 = transform;
+        Debug.Log("同一实例？ " + ReferenceEquals(t1, t2));   // True
+    }
+}</code></pre>
+
+      <div class="callout callout--warn">
+        <span class="callout__title">"值类型在栈上"是不准确的说法</span>
+        准确表述是：值类型<strong>内联存储在它所属的位置</strong>——是方法局部变量 → 在栈上；<strong>是类的字段 → 就在堆上</strong>，跟对象连在一起；是数组元素 → 就在数组里连续排列。<br>
+        所以"值类型一定快"也是错的：一个 96 字节的 struct 每次传参都要复制 96 字节，<em>比传一个 8 字节的引用慢得多</em>。
+      </div>
+
+      <h3 id="cs1612">CS1612：返回 struct 的属性不能直接改成员</h3>
+      <p>这是 Unity 新手<strong>遇到的第一个编译错误</strong>，几乎人手一次。</p>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">CS1612 的错误信息</span>
+        <code>Cannot modify the return value of 'Transform.position' because it is not a variable</code><br>中文：无法修改 "Transform.position" 的返回值，因为它不是变量。
+      </div>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+public class PositionTrap : MonoBehaviour
+{
+    private void Start()
+    {
+        // 编译错误 CS1612
+        // transform.position.x = 5f;
+
+        // 为什么？position 是「属性」，get 访问器返回的是一个 Vector3 副本。
+        // 你改副本，原对象纹丝不动。编译器直接禁止这种写法。
+
+        // ============ 写法一：取出 -&gt; 改 -&gt; 写回 ============
+        Vector3 p = transform.position;
+        p.x = 5f;
+        transform.position = p;
+
+        // ============ 写法二：用内置 API（推荐）============
+        // 只需一次 native 调用，比"读-改-写"三次调用更省
+        transform.Translate(5f, 0f, 0f, Space.World);
+
+        // ============ 写法三：SetPositionAndRotation（Unity 2022.1+）============
+        transform.SetPositionAndRotation(new Vector3(5f, 0f, 0f), Quaternion.identity);
+    }
+}</code></pre>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">比 CS1612 更可怕的静默错误</span>
+        下面这段代码<strong>能编译、能运行、但不产生任何效果</strong>：<br>
+        <code>var p = transform.position; p.x = 5f;</code> —— 少了最后一句 <code>transform.position = p;</code><br>
+        编译器不警告，运行时不报错，只是"位置没变"。<em>遇到"代码明明执行了却没生效"时，第一个怀疑对象就是它。</em>
+      </div>
+
+      <h2 id="boxing">二、装箱与拆箱 ★</h2>
+      <p>把值类型塞进 <code>object</code>，运行时会<strong>在堆上新建一个"箱子"</strong>把值装进去。这是 Unity 里 <a class="kp-ref" href="07-cs-memory.html#sources" title="GC 分配十大来源">GC 压力</a>的头号来源之一，而且大多数时候是<em>隐式</em>发生的——你看不见它。</p>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
+
+public class BoxingDemo : MonoBehaviour
+{
+    private void Start()
+    {
+        int hp = 100;
+
+        // ============ 显式装箱 ============
+        object boxed = hp;        // 堆上分配一个箱子
+        int back = (int)boxed;    // 拆箱：类型检查 + 取值
+
+        // ============ 隐式装箱（更危险，因为看不见）============
+        // 1) 字符串拼接涉及 object 参数重载
+        Debug.Log("HP = " + hp);
+
+        // 2) 非泛型容器
+        var arrayList = new ArrayList();
+        arrayList.Add(hp);                  // 装箱
+        arrayList.Add(Vector3.zero);        // Vector3 也装箱（12 字节）
+
+        // 3) params object[] 参数
+        string s = string.Format("{0}", hp);   // 装箱
+        Debug.LogFormat("HP = {0}", hp);       // 装箱（params object[] 无法避免）
+
+        Debug.Log(s + back);
+    }
+}
+
+// ============================================================
+//  正确做法：全程用泛型
+// ============================================================
+public class NoBoxingDemo : MonoBehaviour
+{
+    private readonly List&lt;int&gt; _numbers = new List&lt;int&gt;();          // 零装箱
+    private readonly List&lt;Vector3&gt; _points = new List&lt;Vector3&gt;();  // 零装箱
+
+    private void Start()
+    {
+        for (int i = 0; i &lt; 100; i++)
+        {
+            _numbers.Add(i);         // 泛型容器：值类型按原样存进内部数组
+            _points.Add(new Vector3(i, 0f, 0f));
+        }
+
+        // 显式 ToString()，避免经过 object 中转
+        Debug.Log("数量 = " + _numbers.Count.ToString());
+    }
+}</code></pre>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">哪些情况其实不装箱（避免过度焦虑）</span>
+        <code>List&lt;int&gt;</code>、<code>Dictionary&lt;string, Vector3&gt;</code> 等<strong>泛型容器不装箱</strong>——泛型参数在运行时会为值类型生成专用代码。<br>
+        <code>Dictionary&lt;枚举, T&gt;</code> 在 Unity 2018.3+ 的 .NET 4.x 下<strong>也不装箱</strong>（编译器生成了专用的 EqualityComparer）。<br>
+        <strong>但 <code>string.Format("{0}", hp)</code> 确实会装箱</strong>（签名是 <code>params object[]</code>）。<br>
+        <em>结论：不要凭记忆猜，直接用 Profiler 看 GC Alloc 列。这是唯一可靠的方法。</em>
+      </div>
+
+      <h2 id="choose">三、struct 与 class 的选型</h2>
+
+      <div class="cmp">
+        <div class="cmp__head">
+          <span></span>
+          <span>用 struct</span>
+          <span>该用 class</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>体积</strong></span>
+          <span>≤ 16 字节（约 4 个 int）</span>
+          <span>大于 24 字节</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>语义</strong></span>
+          <span>是"值"：坐标、颜色、范围</span>
+          <span>是"东西"：玩家、敌人、管理器</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>变异性</strong></span>
+          <span>声明为 readonly struct</span>
+          <span>需要修改内部状态</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>继承</strong></span>
+          <span>不需要继承</span>
+          <span>需要继承或多态</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>null</strong></span>
+          <span>不需要 null 语义</span>
+          <span>需要用 null 表示"不存在"</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>集合</strong></span>
+          <span>需要数组连续存储（缓存友好）</span>
+          <span>会被装箱或放进非泛型容器</span>
+        </div>
+      </div>
+
+      <h3 id="struct-impl">完整实例：战斗伤害系统</h3>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  伤害信息用 readonly struct —— 12 字节的精致体积
+// ============================================================
+public readonly struct DamageInfo
+{
+    public readonly float Amount;      // 4 字节
+    public readonly int AttackerId;    // 4 字节 —— 用 int 而不是 GameObject 引用
+                                       //         避免意外持有对象导致无法回收
+    public readonly byte DamageType;   // 1 字节
+    public readonly byte Flags;        // 1 字节（bit0 = 暴击，bit1 = 格挡）
+
+    public DamageInfo(float amount, int attackerId, byte damageType, byte flags)
+    {
+        Amount = amount;
+        AttackerId = attackerId;
+        DamageType = damageType;
+        Flags = flags;
+    }
+
+    public bool IsCritical { get { return (Flags &amp; 1) != 0; } }
+    public bool IsBlocked  { get { return (Flags &amp; 2) != 0; } }
+}
+
+// ============================================================
+//  接收方
+// ============================================================
+public class DamageReceiver : MonoBehaviour
+{
+    [SerializeField] private float _maxHp = 100f;
+    private float _hp;
+
+    private void Awake() { _hp = _maxHp; }
+
+    // struct 按值或 in 传入：调用方拿到的是快照
+    public void TakeDamage(in DamageInfo info)
+    {
+        float final = info.IsCritical ? info.Amount * 1.5f : info.Amount;
+        if (info.IsBlocked) final *= 0.5f;
+
+        _hp -= final;
+        _hp = Mathf.Max(0f, _hp);
+
+        Debug.Log(name + " 受到 " + final.ToString("F1") + " 点伤害，剩余 " + _hp.ToString("F1"));
+    }
+}</code></pre>
+
+      <h3 id="size">实测各种 Unity struct 的体积</h3>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// 用 Marshal.SizeOf 实测各 struct 的体积
+public class StructSize : MonoBehaviour
+{
+    private void Start()
+    {
+        Log&lt;Vector2&gt;("Vector2");
+        Log&lt;Vector3&gt;("Vector3");
+        Log&lt;Quaternion&gt;("Quaternion");
+        Log&lt;Color&gt;("Color");
+        Log&lt;Bounds&gt;("Bounds");
+        Log&lt;Matrix4x4&gt;("Matrix4x4");
+        Log&lt;RaycastHit&gt;("RaycastHit");
+    }
+
+    private static void Log&lt;T&gt;(string label)
+    {
+        int size = System.Runtime.InteropServices.Marshal.SizeOf&lt;T&gt;();
+        Debug.Log(label.PadRight(12) + ": " + size + " 字节");
+    }
+
+    // ---------- 预期结果 ----------
+    // Vector2      : 8
+    // Vector3      : 12    &lt;- 小，随便传
+    // Quaternion   : 16
+    // Color        : 16
+    // Bounds       : 24    &lt;- 开始值得用 in
+    // Matrix4x4    : 64    &lt;- 热路径必须用 in 或 ref
+    // RaycastHit   : 40+   &lt;- 热路径配合 NonAlloc 数组使用
+}</code></pre>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">为什么 struct 数组比 class 数组快 2–5 倍</span>
+        这不是玄学，而是 <strong>CPU 缓存行（cache line）</strong>的物理限制。一次内存访问会加载 64 字节：<br>
+        <strong>struct 数组</strong>：64 字节能拿到 4 个 16 字节的结构体，后续 3 次访问全部命中缓存。<br>
+        <strong>class 数组</strong>：64 字节只装了 16 个指针。真实数据散落在堆的各处，每次解引用都可能是新的内存访问。<br>
+        这就是 Unity 的 <strong>DOTS / ECS</strong> 架构的核心思想。
+      </div>
+
+      <h2 id="string">四、字符串与不可变性</h2>
+      <p><code>string</code> 是引用类型，但<strong>表现得像值类型</strong>——因为它是<em>不可变</em>的。每次"修改"字符串，实际上都是<strong>创建一个新对象</strong>。这是 Unity 里 GC 的头号来源。</p>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+public class StringDemo : MonoBehaviour
+{
+    private void Start()
+    {
+        // ============ 不可变的含义 ============
+        string a = "hello";
+        string b = a;
+        b += " world";      // 不是"修改 a"，而是新建了 "hello world"
+
+        Debug.Log(a);       // hello      &lt;- a 完全没变
+        Debug.Log(b);       // hello world
+        Debug.Log(ReferenceEquals(a, b));   // False
+
+        // ============ 循环拼接是 GC 灾难 ============
+        string result = "";
+        for (int i = 0; i &lt; 100; i++)
+        {
+            result += i.ToString();   // 每轮新建一个字符串，前一个立刻变垃圾
+        }
+        Debug.Log(result);
+
+        // ============ 正确做法：StringBuilder ============
+        var sb = new System.Text.StringBuilder(64);
+        sb.Clear();
+        for (int i = 0; i &lt; 100; i++)
+        {
+            sb.Append(i);             // 直接写入内部缓冲区，零分配
+        }
+        Debug.Log("sb = " + sb.ToString());   // 只有最后 ToString 分配一次
+    }
+}</code></pre>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">UTF-16 与代理对：中文字符串截断的坑</span>
+        <code>string.Length</code> 返回的是 <strong>UTF-16 码元数量</strong>，不是"字符数"。<br>
+        大多数中文在 BMP 内占 <strong>1 个 char</strong>，但 emoji、部分生僻字占 <strong>2 个 char</strong>（代理对）。<br>
+        <code>"😀".Length</code> 等于 <strong>2</strong>。做文本截断时直接 <code>Substring</code> 可能把代理对切成两半导致乱码，要用 <code>StringInfo</code> 按文本元素截断。
+      </div>
+
+      <h2 id="collections">五、集合选型</h2>
+      <p>选对容器，性能差 10 倍以上；选错容器，代码也能跑，只是会越跑越"沉"。</p>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>容器</th><th>索引</th><th>查找</th><th>插入</th><th>删除</th><th>内存</th><th>典型用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>T[]</code></td><td>O(1)</td><td>O(n)</td><td>—</td><td>—</td><td>最省</td><td>定长、热路径、零 GC</td></tr>
+          <tr><td><code>List&lt;T&gt;</code></td><td>O(1)</td><td>O(n)</td><td>尾部 O(1)*</td><td>O(n)</td><td>省</td><td>动态列表、绝大多数场景</td></tr>
+          <tr><td><code>Dictionary&lt;K,V&gt;</code></td><td>—</td><td><strong>O(1)</strong>*</td><td>O(1)*</td><td>O(1)*</td><td>中</td><td>键值查找</td></tr>
+          <tr><td><code>HashSet&lt;T&gt;</code></td><td>—</td><td><strong>O(1)</strong>*</td><td>O(1)*</td><td>O(1)*</td><td>中</td><td>去重、集合运算</td></tr>
+          <tr><td><code>Queue&lt;T&gt;</code></td><td>—</td><td>O(n)</td><td>O(1)</td><td>O(1)</td><td>省</td><td>先进先出</td></tr>
+          <tr><td><code>Stack&lt;T&gt;</code></td><td>—</td><td>O(n)</td><td>O(1)</td><td>O(1)</td><td>省</td><td>后进先出</td></tr>
+          <tr><td><code>SortedDictionary</code></td><td>—</td><td>O(log n)</td><td>O(log n)</td><td>O(log n)</td><td>大</td><td>需要有序遍历</td></tr>
+          <tr><td><code>LinkedList&lt;T&gt;</code></td><td>O(n)</td><td>O(n)</td><td>节点 O(1)</td><td>节点 O(1)</td><td>大</td><td>中间频繁插删（Unity 少用）</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p class="faint">* 均摊复杂度：单次操作偶尔会更慢（扩容、rehash）。</p>
+
+      <h3 id="dict-trap">Dictionary 的两个大坑</h3>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using System.Collections.Generic;
+
+public class DictionaryTraps : MonoBehaviour
+{
+    private readonly Dictionary&lt;int, Enemy&gt; _enemies = new Dictionary&lt;int, Enemy&gt;();
+    private readonly List&lt;int&gt; _toRemove = new List&lt;int&gt;(16);
+
+    private void Start()
+    {
+        // ============ 坑 1：遍历中删除 ============
+        // foreach (var kv in _enemies)
+        //     if (kv.Value == null) _enemies.Remove(kv.Key);   // 抛异常
+
+        // 正确：先收集，再删除
+        _toRemove.Clear();
+        foreach (var kv in _enemies)
+        {
+            if (kv.Value == null) _toRemove.Add(kv.Key);
+        }
+        for (int i = 0; i &lt; _toRemove.Count; i++) _enemies.Remove(_toRemove[i]);
+
+        // ============ 坑 2：用 Vector3 做键 ============
+        var bad = new Dictionary&lt;Vector3, int&gt;();
+        bad[new Vector3(0.1f + 0.2f, 0f, 0f)] = 1;
+
+        // 浮点误差导致查不到！
+        bool found = bad.TryGetValue(new Vector3(0.3f, 0f, 0f), out int v);
+        Debug.Log("Vector3 键查到了吗？ " + found);   // False
+        // 因为 0.1f + 0.2f = 0.30000001f，不等于 0.3f
+
+        // 正确：网格坐标用 Vector2Int / Vector3Int
+        var good = new Dictionary&lt;Vector2Int, int&gt;();
+        good[new Vector2Int(1, 2)] = 100;
+        Debug.Log("Vector2Int 键: " + good[new Vector2Int(1, 2)]);   // 100
+    }
+}
+
+public class Enemy : MonoBehaviour { }</code></pre>
+
+      <div class="callout callout--warn">
+        <span class="callout__title">Dictionary 的遍历顺序是不确定的</span>
+        你可能会发现"添加顺序和遍历顺序正好一样"——<strong>这是巧合，不是保证</strong>。<br>
+        一旦发生扩容（rehash）、或者删除后再添加，顺序就会改变。不同 .NET 版本、不同平台也可能不同。<br>
+        需要确定顺序时：用 <code>SortedDictionary</code>，或额外维护一个 <code>List&lt;K&gt;</code> 记录插入顺序。
+      </div>
+
+      <h2 id="tasks">六、本章动手任务</h2>
+
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="t-03-1">
+          <label for="t-03-1"><strong>亲手复现 CS1612</strong>：写下 <code>transform.position.x = 5f;</code>，看编译器报什么，然后改成正确写法。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-03-2">
+          <label for="t-03-2"><strong>用 Profiler 看装箱</strong>：写一个循环把 <code>int</code> 装箱 10000 次，用 Profiler 的 GC Alloc 列观察分配量，然后改成泛型版本对比。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-03-3">
+          <label for="t-03-3"><strong>实测 struct 体积</strong>：用 <code>Marshal.SizeOf</code> 打印 <code>Vector3</code>、<code>Quaternion</code>、<code>Matrix4x4</code> 的大小，验证 12/16/64 字节。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-03-4">
+          <label for="t-03-4"><strong>修复字符串循环</strong>：写一个循环用 <code>+=</code> 拼接 1000 个字符串，然后用 <code>StringBuilder</code> 重写，对比两者耗时。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-03-5">
+          <label for="t-03-5"><strong>字典踩坑实验</strong>：用 <code>Vector3</code> 做键，存入 <code>(0.1f+0.2f, 0, 0)</code>，尝试用 <code>(0.3f, 0, 0)</code> 查，观察失败。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-03-6">
+          <label for="t-03-6"><strong>回答三个面试题</strong>：① 值类型和引用类型的区别？② 什么是装箱，什么时候发生？③ <code>struct</code> 和 <code>class</code> 怎么选？<em>写下来，不要说"我知道"。</em></label>
+        </li>
+      </ul>
+
+      <div class="milestone">
+        <p class="mb0">
+          <strong>本章过关标准</strong>：<br>① 能不看资料说清值/引用类型在赋值、传参、修改三种场景下的行为差异；<br>② 能解释 CS1612 的成因，并说出至少两种正确写法；<br>③ 能指出至少 5 个 Unity 中会隐式装箱的场景；<br>④ 能说出 <code>Matrix4x4</code> 和 <code>Vector3</code> 分别多大，以及为什么这个大；<br>⑤ 知道为什么不能用 <code>Vector3</code> 做字典键。<br><br><em>如果第 ① 条你还需要查资料，不要往下走——它是后面所有内容的地基。</em>
+        </p>
+      </div>
+
+      <nav class="page-nav">
+        <a href="../lua/02-setup.html">
+          <div class="dir">← 开始</div>
+          <div class="title">02 环境搭建与第一个项目</div>
+        </a>
+        <a class="next" href="04-cs-oop.html">
+          <div class="dir">C# 语言线 →</div>
+          <div class="title">04 面向对象与接口</div>
+        </a>
+      </nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<h1>20 · UI 与音频</h1>
+
+<p class="lead">UMG 和 MetaSound<strong>是 UE 的 UI 与音频方案</strong>。<em>它们上手不难，但有几个容易踩的性能坑</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="umg">一、UMG 的关键实践</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>概念</th><th>作用</th><th>注意</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Widget</strong></td><td><em>界面元素</em></td><td>分 UserWidget 和底层控件</td></tr>
+    <tr><td><strong>Widget Blueprint</strong></td><td><strong>可视化编辑</strong></td><td><em>主流方式</em></td></tr>
+    <tr><td><strong>Slate</strong></td><td><em>C++ 层 UI 框架</em></td><td>性能更好</td></tr>
+    <tr><td><strong>Invalidation Box</strong></td><td><strong>避免每帧重绘</strong></td><td><span class="mk mk--yes">必用</span></td></tr>
+    <tr><td><strong>Retainer Box</strong></td><td><em>缓存渲染结果</em></td><td>静态内容用</td></tr>
+    <tr><td><strong>Widget Switcher</strong></td><td><em>切换显示</em></td><td><em>比隐藏/显示好</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">UMG 最大的性能陷阱：每帧重绘 ★★</span>
+  <strong>问题</strong>：<em>UMG 默认每帧都重新计算布局和重绘</em>——<strong>哪怕界面完全没变</strong>。<br><br><strong>表现</strong>：<br>· <em>HUD 复杂时帧率明显下降</em><br>· <em>UI 越多越卡</em><br><br><strong>解决方案</strong>：<br>① <strong>Invalidation Box</strong>——<em>包住不常变的界面部分</em><br>② <strong>Retainer Box</strong>——<em>缓存成纹理</em><br>③ <em>用 Widget Switcher 而不是 SetVisibility</em>（<em>折叠的控件不参与布局</em>）<br>④ <strong>拆分 Widget</strong>——<em>动态部分单独成 Widget</em><br><br><strong>实践原则</strong>：<em>只有真正需要每帧更新的部分（比如血条、倒计时）才让它每帧重绘，其他都包进 Invalidation Box。</em>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">不要在 Tick 里频繁创建 Widget</span>
+  <strong>常见错误</strong>：<br><code>// 每帧创建一个提示</code><br><code>CreateWidget&lt;UMyWidget&gt;(...);</code><br><em>创建 Widget 是"昂贵操作"</em>——<strong>会有明显的 GC 和布局开销</strong>。<br><br><strong>正确做法</strong>：<br>· <em>提前创建好，用的时候显示/隐藏</em><br>· <strong>或者用对象池复用</strong>（<em>算法站页 26</em>）<br>· <em>列表类 UI 只创建可见的部分</em>（<em>虚拟列表</em>）<br><br><strong>典型场景</strong>：<em>聊天框、伤害数字、任务提示</em>——<strong>这些高频出现的 UI 必须有池化方案。</strong>
+</div>
+
+<h2 id="audio">二、MetaSound 与音频</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>组件</th><th>作用</th><th>性能</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Sound Cue</strong></td><td><em>传统音频逻辑</em></td><td>轻</td></tr>
+    <tr><td><strong>MetaSound</strong></td><td><strong>程序化音频</strong></td><td><em>比 Cue 重</em></td></tr>
+    <tr><td><strong>Sound Class</strong></td><td><strong>音量分组</strong></td><td>必用</td></tr>
+    <tr><td><strong>Sound Mix</strong></td><td><em>动态音量调整</em></td><td>轻</td></tr>
+    <tr><td><strong>Attenuation</strong></td><td><em>3D 衰减</em></td><td>轻</td></tr>
+    <tr><td><strong>Concurrency</strong></td><td><strong>限制同时播放数</strong></td><td><span class="mk mk--yes">重要</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">音频最容易被忽略的两件事</span>
+  <strong>① Concurrency（并发限制）</strong><br><em>如果不限制，100 个敌人同时开枪会有 100 个音效</em>——<strong>音频线程爆炸</strong>。<br><br><strong>设置</strong>：<em>同类型音效最多同时播 4~8 个</em>，超出的<em>截断最旧的</em>。<br><br><strong>② Sound Class 音量分组</strong><br><em>让玩家能分开调 BGM / 音效 / 语音</em>——<strong>这是玩家的基本预期</strong>。<br><br><strong>结构</strong>：<br><code>Master</code><br><code>├── BGM</code><br><code>├── SFX</code><br><code>├── Voice</code><br><code>└── UI</code><br><br><em>没有这个结构的话，后期要加音量设置会非常麻烦。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="20">
+  <div class="task"><input type="checkbox" id="t-20-1"><label for="t-20-1"><strong>做 Invalidation Box 测试</strong>：一个复杂 UI 分别加/不加 Invalidation Box，对比帧率。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-2"><label for="t-20-2"><strong>用对象池做伤害数字</strong>：实现一个伤害数字的池化系统，验证没有频繁创建。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-3"><label for="t-20-3"><strong>配置 Sound Class</strong>：建立 BGM/SFX/Voice 的音量分组。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-4"><label for="t-20-4"><strong>设 Concurrency</strong>：给枪声设置并发限制，观察效果。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-5"><label for="t-20-5"><strong>用 Widget Switcher</strong>：对比 SetVisibility 和 Widget Switcher 的性能差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-6"><label for="t-20-6"><strong>回答面试题</strong>：① UMG 最大的性能陷阱？② 为什么不要每帧创建 Widget？③ 音频的 Concurrency 解决什么？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出 UMG 的六个概念；<br>
+    ② <strong>知道"每帧重绘"是 UMG 最大的性能陷阱</strong>；<br>
+    ③ <strong>知道用 Invalidation Box 和对象池优化 UI</strong>；<br>
+    ④ 能说出音频系统的六个组件；<br>
+    ⑤ <strong>知道 Concurrency 和 Sound Class 的重要性</strong>。<br>
+    <br>
+    <em>第 ② 条最实用——**它能让你的 HUD 从"掉 20 帧"变成"不掉帧"**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="19-ue-network.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">19 网络与多人游戏 ★★★</div>
+  </a>
+  <a class="next" href="21-ue-editor.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">21 编辑器扩展与插件</div>
+  </a>
+</nav>

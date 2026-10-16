@@ -1,0 +1,189 @@
+{
+  "title": "Lua 热更新路线",
+  "subtitle": "从零基础到独立搭建可上线的热更框架",
+  "key": "lua",
+  "pages": [
+    {
+      "file": "index.html",
+      "num": "",
+      "group": "开始",
+      "title": "路线总览",
+      "desc": "Lua 热更新完整学习地图、七阶段路线、每阶段验收标准"
+    },
+    {
+      "file": "01-role.html",
+      "num": "01",
+      "group": "开始",
+      "title": "为什么用 Lua 热更",
+      "desc": "热更新的本质、四种方案对比、Lua 在游戏行业的真实地位"
+    },
+    {
+      "file": "02-setup.html",
+      "num": "02",
+      "group": "开始",
+      "title": "环境搭建",
+      "desc": "Lua 解释器安装、VSCode 调试、xLua 接入 Unity"
+    },
+    {
+      "file": "kp-index.html",
+      "num": "",
+      "group": "开始",
+      "title": "知识点索引",
+      "desc": "全站知识点的总目录，按分类浏览与快速跳转"
+    },
+    {
+      "file": "03-lua-basic.html",
+      "num": "03",
+      "group": "Lua 语言线",
+      "title": "基础语法与类型",
+      "desc": "八种类型、变量作用域、运算符、字符串、控制流"
+    },
+    {
+      "file": "04-lua-table.html",
+      "num": "04",
+      "group": "Lua 语言线",
+      "title": "table 与元表 ★",
+      "desc": "table 的本质、数组与字典、元表元方法、面向对象实现"
+    },
+    {
+      "file": "05-lua-function.html",
+      "num": "05",
+      "group": "Lua 语言线",
+      "title": "函数与闭包",
+      "desc": "多返回值、可变参数、闭包、尾调用、函数式编程"
+    },
+    {
+      "file": "06-lua-oop.html",
+      "num": "06",
+      "group": "Lua 语言线",
+      "title": "面向对象与继承",
+      "desc": "class 实现、继承链、多态、组合、常见框架写法"
+    },
+    {
+      "file": "07-lua-advanced.html",
+      "num": "07",
+      "group": "Lua 语言线",
+      "title": "高级特性",
+      "desc": "协程、错误处理、垃圾回收、弱表、环境与模块"
+    },
+    {
+      "file": "08-lua-perf.html",
+      "num": "08",
+      "group": "Lua 语言线",
+      "title": "性能优化 ★",
+      "desc": "GC 调优、table 预分配、字符串拼接、局部变量、常见陷阱"
+    },
+    {
+      "file": "09-hotupdate-basics.html",
+      "num": "09",
+      "group": "热更新原理",
+      "title": "热更新原理",
+      "desc": "资源热更与代码热更、AB 包、版本管理、增量更新"
+    },
+    {
+      "file": "10-xlua-basics.html",
+      "num": "10",
+      "group": "热更新原理",
+      "title": "xLua 基础 ★",
+      "desc": "C# 调 Lua、Lua 调 C#、类型映射、性能与 GC"
+    },
+    {
+      "file": "11-xlua-advanced.html",
+      "num": "11",
+      "group": "热更新原理",
+      "title": "xLua 进阶",
+      "desc": "热补丁、生成代码、配置优化、常见问题排查"
+    },
+    {
+      "file": "12-tolua.html",
+      "num": "12",
+      "group": "热更新原理",
+      "title": "ToLua 与其它方案",
+      "desc": "ToLua、SLua、Puerts、HybridCLR 对比与选型"
+    },
+    {
+      "file": "13-framework-design.html",
+      "num": "13",
+      "group": "框架设计",
+      "title": "框架总体设计 ★",
+      "desc": "分层架构、模块划分、启动流程、生命周期管理"
+    },
+    {
+      "file": "14-framework-modules.html",
+      "num": "14",
+      "group": "框架设计",
+      "title": "核心模块实现",
+      "desc": "事件系统、UI 管理、资源加载、网络层、配置表"
+    },
+    {
+      "file": "15-framework-oop.html",
+      "num": "15",
+      "group": "框架设计",
+      "title": "面向对象框架",
+      "desc": "Class 系统、继承、组件化、对象池、单例管理"
+    },
+    {
+      "file": "16-framework-ui.html",
+      "num": "16",
+      "group": "框架设计",
+      "title": "UI 框架",
+      "desc": "界面栈、绑定系统、红点、多语言、动效接入"
+    },
+    {
+      "file": "17-framework-hot-patch.html",
+      "num": "17",
+      "group": "框架设计",
+      "title": "热更与版本管理",
+      "desc": "打包流程、版本号规则、灰度更新、回滚方案"
+    },
+    {
+      "file": "18-debug.html",
+      "num": "18",
+      "group": "工程实践",
+      "title": "调试与排错",
+      "desc": "断点调试、日志系统、内存泄漏定位、崩溃分析"
+    },
+    {
+      "file": "19-perf-practice.html",
+      "num": "19",
+      "group": "工程实践",
+      "title": "性能实战",
+      "desc": "Lua 与 C# 交互优化、GC 控制、Profiler 使用"
+    },
+    {
+      "file": "20-engineering.html",
+      "num": "20",
+      "group": "工程实践",
+      "title": "工程化",
+      "desc": "代码规范、静态检查、单元测试、CI 集成"
+    },
+    {
+      "file": "21-security.html",
+      "num": "21",
+      "group": "工程实践",
+      "title": "安全与加密",
+      "desc": "Lua 字节码加密、AB 包加密、防破解、协议加密"
+    },
+    {
+      "file": "22-interview.html",
+      "num": "22",
+      "group": "面试与实战",
+      "title": "面试题库",
+      "desc": "Lua 语法、xLua 原理、框架设计、性能优化高频题"
+    },
+    {
+      "file": "23-projects.html",
+      "num": "23",
+      "group": "面试与实战",
+      "title": "实战项目",
+      "desc": "从零搭一个完整的热更框架，含验收标准"
+    },
+    {
+      "file": "24-reference.html",
+      "num": "24",
+      "group": "面试与实战",
+      "title": "API 速查",
+      "desc": "Lua 标准库真实签名 + xLua API 速查"
+    }
+  ]
+}

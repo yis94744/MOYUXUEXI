@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>17 渲染与画面优化 — C# + Unity 路线｜从零基础到独立完成商业级项目</title>
+<meta name="description" content="管线选择、Draw Call 与合批规则、光照与阴影、后处理、LOD、移动端画质取舍">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C# + Unity 路线
+        <span>从零基础到独立完成商业级项目</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>17 · 渲染与画面优化</h1>
+
+<p class="lead">渲染优化有一条<strong>明确的优先级链</strong>——从 Draw Call 到 Overdraw，再到分辨率与阴影。<em>优化错了顺序，会花大力气却收效甚微</em>。这一页给出可执行的优先级表。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（16）讲资源管理。图集、纹理压缩这些<em>既属于资源也属于渲染</em>——两页在这一点上交叉。<br>
+  <strong>关键衔接</strong>：页 10 讲的<em>渲染管线与合批</em>是这一页的理论基础；页 14 讲的 <em>Canvas 重建</em>是 UI 侧的 Overdraw 优化。<br>
+  <strong>下一页</strong>（18）Job System 与 DOTS。<em>当渲染优化做完了还是不够，就要考虑数据导向设计了。</em><br>
+  <strong>难度提示</strong>：这一页<strong>概念不难但需要工具辅助</strong>——不会用 Frame Debugger 就做不好渲染优化。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="10-graphics.html#pipeline" data-brief="应用/几何/像素/后处理四阶段，性能瓶颈各在哪里"><span class="prereq__title">渲染管线</span><span class="prereq__page">10-graphics</span></a>
+          <a class="prereq__item" href="10-graphics.html#batching" data-brief="静态/动态/SRP Batcher/GPU Instancing，合批失败的常见原因"><span class="prereq__title">Draw Call 与合批</span><span class="prereq__page">10-graphics</span></a>
+          <a class="prereq__item" href="10-graphics.html#urp" data-brief="Built-in/URP/HDRP 的选型，迁移成本与判断方法"><span class="prereq__title">URP 渲染管线</span><span class="prereq__page">10-graphics</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="priority">一、优化优先级链</h2>
+
+<p>渲染优化<strong>必须按优先级做</strong>。下面这张表按"收益/难度"排序——<em>从下往上做的都是浪费</em>。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  渲染优化：从 Draw Call 到 Overdraw
+// ============================================================
+//  渲染优化有明确的优先级。按收益从高到低：
+//    1. 减少 Draw Call（合批）
+//    2. 减少 Overdraw（半透明、粒子）
+//    3. 降低分辨率与阴影质量
+//    4. 简化 Shader
+//    5. LOD 与剔除
+
+public class RenderOptimize : MonoBehaviour
+{
+    [SerializeField] private Renderer[] _renderers;
+    [SerializeField] private MaterialPropertyBlock _mpb;
+
+    private void Awake()
+    {
+        if (_mpb == null) _mpb = new MaterialPropertyBlock();
+    }
+
+    // ============================================================
+    //  技巧 1：MaterialPropertyBlock —— 改颜色不破坏合批
+    // ============================================================
+    private void SetColorByPropertyBlock(Renderer r, Color c)
+    {
+        // 【关键】用 MPB 不会克隆材质，因此【不破坏 SRP Batcher 之外的合批】
+        // 但注意：MPB 会打断 SRP Batcher（URP 下的主力合批方式）
+        r.GetPropertyBlock(_mpb);
+        _mpb.SetColor("_BaseColor", c);          // URP 用 _BaseColor
+        _mpb.SetColor("_Color", c);              // Built-in 用 _Color
+        r.SetPropertyBlock(_mpb);
+    }
+
+    // ============================================================
+    //  技巧 2：关闭不必要的阴影
+    // ============================================================
+    private void OptimizeShadows()
+    {
+        foreach (var r in _renderers)
+        {
+            // 小物件、地面装饰的阴影收益很低，但开销不小
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.receiveShadows = false;
+        }
+    }
+
+    // ============================================================
+    //  技巧 3：用 isVisible 跳过不可见物体的逻辑
+    // ============================================================
+    private void Update()
+    {
+        foreach (var r in _renderers)
+        {
+            // isVisible 表示"被任何相机看到"
+            // 不可见的物体可以跳过昂贵的逻辑（动画更新、特效计算）
+            if (!r.isVisible) continue;
+
+            // 只对可见物体做重活
+        }
+    }
+
+    // ============================================================
+    //  技巧 4：控制 Overdraw
+    // ============================================================
+    // Overdraw = 同一个像素被绘制多次。
+    //   常见来源：全屏半透明 UI、粒子特效、地面贴花
+    //   移动端上，Overdraw 是 GPU 的主要瓶颈之一
+    //
+    // 优化手段：
+    //   · 减少全屏半透明层数（背景 + 前景遮罩 + 特效 = 3 层 Overdraw）
+    //   · 粒子数量与尺寸要克制（大颗粒粒子杀死 GPU）
+    //   · 用不透明材质代替半透明（能不透明就不透明）
+    //   · UI 拆 Canvas（见页 14），减少重建与重绘
+
+    // ============================================================
+    //  技巧 5：相机剔除设置
+    // ============================================================
+    private void OptimizeCamera(Camera cam)
+    {
+        // farClipPlane：能小就小。过大影响深度精度（Z-Fighting）
+        cam.farClipPlane = 200f;
+
+        // nearClipPlane：不要太小。太小会严重影响深度精度
+        cam.nearClipPlane = 0.3f;
+
+        // cullingMask：只渲染需要的层
+        cam.cullingMask = ~0;
+
+        // 关闭不需要的功能
+        cam.allowHDR = false;         // 移动端通常关掉
+        cam.allowMSAA = false;        // 移动端通常关掉
+
+        // useOcclusionCulling：遮挡剔除（需要烘焙）
+        cam.useOcclusionCulling = true;
+    }
+}
+
+// ============================================================
+//  渲染性能优化优先级表
+// ============================================================
+//  优先级   手段                     收益      难度
+//  ----------------------------------------------------------
+//    1    减少 Draw Call（合批）      极高      中
+//    2    减少 Overdraw              高        中
+//    3    降低阴影质量/距离           高        低
+//    4    纹理压缩（ASTC/DXT）        高        低
+//    5    关闭不必要的后处理           高        低
+//    6    LOD Group                  中        中
+//    7    遮挡剔除（烘焙）            中        高
+//    8    简化 Shader                中        高
+//    9    GPU Instancing             中        中
+//
+//  【第一条永远是】先用 Frame Debugger 和 Profiler 定位瓶颈，
+//                不要盲目优化。
+
+// ============================================================
+//  画质与性能的取舍（移动端）
+// ============================================================
+public class MobileQualityTiers : MonoBehaviour
+{
+    // 按机型分级（低配 / 中配 / 高配）
+    public void ApplyTier(int tier)
+    {
+        switch (tier)
+        {
+            case 0:   // 低配
+                QualitySettings.shadows = ShadowQuality.Disable;
+                QualitySettings.shadowDistance = 0f;
+                QualitySettings.antiAliasing = 0;
+                Application.targetFrameRate = 30;
+                break;
+
+            case 1:   // 中配
+                QualitySettings.shadows = ShadowQuality.HardOnly;
+                QualitySettings.shadowDistance = 30f;
+                QualitySettings.antiAliasing = 0;
+                Application.targetFrameRate = 60;
+                break;
+
+            case 2:   // 高配
+                QualitySettings.shadows = ShadowQuality.All;
+                QualitySettings.shadowDistance = 60f;
+                QualitySettings.antiAliasing = 2;
+                Application.targetFrameRate = 60;
+                break;
+        }
+    }
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>优先级</th><th>手段</th><th>收益</th><th>难度</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1</strong></td><td>减少 Draw Call（合批）</td><td><span class="mk mk--yes">极高</span></td><td>中</td></tr>
+    <tr><td><strong>2</strong></td><td>减少 Overdraw</td><td><span class="mk mk--yes">高</span></td><td>中</td></tr>
+    <tr><td><strong>3</strong></td><td>降低阴影质量/距离</td><td><span class="mk mk--yes">高</span></td><td>低</td></tr>
+    <tr><td><strong>4</strong></td><td>纹理压缩（ASTC/DXT）</td><td><span class="mk mk--yes">高</span></td><td>低</td></tr>
+    <tr><td><strong>5</strong></td><td>关闭不必要的后处理</td><td><span class="mk mk--yes">高</span></td><td>低</td></tr>
+    <tr><td><strong>6</strong></td><td>LOD Group</td><td><span class="mk mk--warn">中</span></td><td>中</td></tr>
+    <tr><td><strong>7</strong></td><td>遮挡剔除（烘焙）</td><td><span class="mk mk--warn">中</span></td><td>高</td></tr>
+    <tr><td><strong>8</strong></td><td>简化 Shader</td><td><span class="mk mk--warn">中</span></td><td>高</td></tr>
+    <tr><td><strong>9</strong></td><td>GPU Instancing</td><td><span class="mk mk--warn">中</span></td><td>中</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">第一条永远是：先测量</span>
+  <strong>不要凭感觉优化。</strong>渲染问题分两种，用错工具会找错方向：<br>
+  · <strong>CPU 瓶颈</strong>（Draw Call 太多）→ 看 Profiler 的 <code>Camera.Render</code> 耗时<br>
+  · <strong>GPU 瓶颈</strong>（Overdraw 严重）→ 看 Profiler 的 GPU 模块，或用 <code>Frame Debugger</code><br><br>
+  <em>把 GPU 问题当 CPU 问题优化，会白忙一场。</em>
+</div>
+
+<h2 id="mpb">二、MaterialPropertyBlock 的取舍</h2>
+
+<div class="callout callout--warn">
+  <span class="callout__title">MPB 不是万能的</span>
+  <strong>MaterialPropertyBlock 的价值</strong>：改个别物体的颜色时<em>不克隆材质</em>。<br><br>
+  <strong>但它会打断 SRP Batcher</strong>——这是 URP 下的主力合批方式（见页 10）。<br><br>
+  <strong>所以：</strong><br>
+  · <strong>Built-in 管线</strong>：MPB 通常有正面收益<br>
+  · <strong>URP/HDRP</strong>：如果原本能走 SRP Batcher，用 MPB 反而可能变慢<br><br>
+  <em>结论：用 Frame Debugger 验证效果，别凭印象。</em>
+</div>
+
+<h2 id="tiers">三、画质分级策略</h2>
+
+<p>移动端必须做<strong>机型分级</strong>——因为设备性能差异可以到 10 倍。<em>让高端机跑满画质、低端机保证流畅。</em></p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>档位</th><th>阴影</th><th>抗锯齿</th><th>目标帧率</th></tr></thead>
+  <tbody>
+    <tr><td><strong>低配</strong></td><td>关闭</td><td>0</td><td>30</td></tr>
+    <tr><td><strong>中配</strong></td><td>HardOnly，30 米</td><td>0</td><td>60</td></tr>
+    <tr><td><strong>高配</strong></td><td>All，60 米</td><td>2x</td><td>60</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">分级的判断依据</span>
+  不要只用机型名判断（<em>同款机型不同地区版本差异很大</em>）。<br>
+  更可靠的做法：<br>
+  · <strong>首次启动跑一个基准测试</strong>（渲染 100 个三角形测帧率）<br>
+  · <strong>结合内存与 GPU 型号</strong>综合判断<br>
+  · <strong>允许玩家手动调整</strong>——这是最稳妥的兜底
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="17">
+  <div class="task"><input type="checkbox" id="t-17-1"><label for="t-17-1"><strong>用 Frame Debugger 数 Draw Call</strong>：放 20 个相同立方体，观察 Draw Call 数量；改一个的材质，再看变化。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-2"><label for="t-17-2"><strong>验证 MPB 与 SRP Batcher</strong>：在 URP 下分别用 <code>material</code> 和 <code>MaterialPropertyBlock</code> 改颜色，用 Frame Debugger 对比合批情况。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-3"><label for="t-17-3"><strong>测 Overdraw</strong>：在 Scene 视图打开 Overdraw 可视化，找出你项目里 Overdraw 最高的区域。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-4"><label for="t-17-4"><strong>做画质分级</strong>：实现三档设置，在不同性能的设备上测试帧率。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-5"><label for="t-17-5"><strong>优化一个真实场景</strong>：按优先级表逐项优化，<em>每做一项就测一次帧率</em>，记录每项的收益。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-6"><label for="t-17-6"><strong>回答面试题</strong>：① 渲染优化的优先级顺序？② MPB 会打断什么合批？③ 怎么区分 CPU 瓶颈和 GPU 瓶颈？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能背出渲染优化的优先级链</strong>（Draw Call → Overdraw → 阴影 → 纹理 → 后处理）；<br>
+    ② 知道 MPB 的价值与副作用（打断 SRP Batcher）；<br>
+    ③ 能区分 CPU 瓶颈与 GPU 瓶颈，并知道用哪个工具；<br>
+    ④ 能设计机型分级策略；<br>
+    ⑤ 有一次真实的渲染优化经历，并能说出优化前后的数字。<br>
+    <br>
+    <em>第 ⑤ 条是面试中最重要的——面试官更关心"你怎么定位到问题"，而不是"你知道哪些优化手段"。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="16-unity-assets.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">16 资源管理与热更新</div>
+  </a>
+  <a class="next" href="18-unity-ecs.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">18 Job System 与 DOTS</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

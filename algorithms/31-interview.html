@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>31 面试题库 — 游戏算法与系统设计｜从数据结构到完整系统，覆盖游戏开发全部核心算法</title>
+<meta name="description" content="算法题、系统设计题、手写实现题、复杂度分析">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">游戏算法与系统设计
+        <span>从数据结构到完整系统，覆盖游戏开发全部核心算法</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>31 · 面试题库 ★★</h1>
+
+<p class="lead">这一页把<strong>所有知识点变成可检验的问题</strong>。每道题都标注了<em>出处页面</em>——<strong>答不上来就是回去复习的信号</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="basics">一、数据结构基础（页 02-09）</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>题目</th><th>答案要点</th><th>出处</th></tr></thead>
+  <tbody>
+    <tr><td>游戏每帧的预算是多少？</td><td><strong>16.7ms（60帧），单系统 1~2ms</strong></td><td>02</td></tr>
+    <tr><td>三个最常见的性能杀手？</td><td>嵌套循环、队列头删、循环内拼串</td><td>02</td></tr>
+    <tr><td>环形缓冲的索引怎么算？</td><td><code>(i % cap) + 1</code></td><td>03</td></tr>
+    <tr><td>动态数组为什么要翻倍扩容？</td><td><strong>摊销 O(1)</strong></td><td>03</td></tr>
+    <tr><td>游戏里为什么少用链表？</td><td><strong>缓存不友好 + GC 压力</strong></td><td>04</td></tr>
+    <tr><td>负载因子是什么？</td><td>元素数/容量，<em>超过 0.75 要扩容</em></td><td>05</td></tr>
+    <tr><td>浮点能做哈希 key 吗？</td><td><strong>不能，要量化成整数</strong></td><td>05</td></tr>
+    <tr><td>BST 什么时候退化？</td><td><strong>有序插入时退化成链表</strong></td><td>06</td></tr>
+    <tr><td>建堆为什么是 O(n)？</td><td><em>大部分节点在底层，下沉层数少</em></td><td>07</td></tr>
+    <tr><td>Top-K 为什么要用小顶堆？</td><td><strong>堆顶是"K 个里最小的"，方便淘汰</strong></td><td>07</td></tr>
+    <tr><td>敏感词过滤用什么？</td><td><strong>Trie 或 AC 自动机</strong></td><td>08</td></tr>
+    <tr><td>并查集的两个优化？</td><td>路径压缩 + 按秩合并</td><td>09</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">最容易答错的三道</span>
+  <strong>① "游戏每帧预算是多少？"</strong><br><em>16.7ms 是总预算，但单个系统应该控制在 1~2ms</em>。<br>答"16.7ms"不够——面试官会追问"那你的系统占多少"。<br><br><strong>② "浮点能做哈希 key 吗？"</strong><br><em>不能。因为 <code>0.1 + 0.2 ~= 0.3</code>。</em><br><strong>要量化成整数</strong>：<code>math.floor(x * 100)</code>。<br>这是游戏开发中一个真实且常见的坑。<br><br><strong>③ "Top-K 为什么用小顶堆？"</strong><br><em>因为我们要快速淘汰"K 个里最小的"</em>——小顶堆的堆顶正好就是它。<br>如果用大顶堆，你无法快速找到"当前 K 个里最小的那个"。
+</div>
+
+<h2 id="core">二、核心算法（页 10-15）</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>题目</th><th>答案要点</th><th>出处</th></tr></thead>
+  <tbody>
+    <tr><td>BFS 和 DFS 的区别？</td><td><strong>BFS 用队列、DFS 用栈</strong></td><td>10</td></tr>
+    <tr><td>找最短路径用什么？</td><td><strong>BFS（无权图）</strong></td><td>10</td></tr>
+    <tr><td>拓扑排序能检测什么？</td><td><strong>循环依赖（结果数 < 节点数）</strong></td><td>10</td></tr>
+    <tr><td>A* 的 f/g/h 是什么？</td><td>g=已走，h=估计，f=g+h</td><td>11</td></tr>
+    <tr><td>启发函数什么时候会失效？</td><td><strong>h 高估真实代价时</strong></td><td>11</td></tr>
+    <tr><td>大量单位寻路怎么优化？</td><td><strong>流场寻路</strong></td><td>11</td></tr>
+    <tr><td>A* 为什么要设搜索上限？</td><td><em>"无路径"时会遍历全图</em></td><td>11</td></tr>
+    <tr><td>空间网格有什么陷阱？</td><td><strong>格子 &lt; 半径时会静默漏检</strong></td><td>12</td></tr>
+    <tr><td>什么排序又快又稳定？</td><td><strong>归并排序</strong></td><td>13</td></tr>
+    <tr><td>Top-K 为什么不用全排序？</td><td><strong>O(n log K) vs O(n log n)</strong></td><td>13</td></tr>
+    <tr><td>找第 K 名用什么？</td><td><strong>快速选择 O(n)</strong></td><td>13</td></tr>
+    <tr><td>二分查找有哪些坑？</td><td>边界、循环条件、有序前提</td><td>14</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">这一组是"加分项"</span>
+  <strong>空间网格的陷阱是这一组最有价值的知识点</strong>：<br>· 格子小于查询半径时，<em>3×3 邻格覆盖不到所有潜在碰撞</em><br>· 实测：格子=5 时只找到 <strong>33/167</strong> 个碰撞<br>· <strong>看起来"更快"，其实是漏检了</strong><br>· 规则：<em>格子大小 ≥ 查询半径，建议用 2× 半径</em><br><br><strong>能主动说出这个陷阱，说明你真的实测过</strong>——而不是只会背"A* 是启发式搜索"。
+</div>
+
+<h2 id="systems">三、AI 与系统设计（页 16-25）</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>题目</th><th>答案要点</th><th>出处</th></tr></thead>
+  <tbody>
+    <tr><td>状态机什么时候不够用？</td><td><strong>状态数 &gt; 10 时（转移爆炸）</strong></td><td>16</td></tr>
+    <tr><td>行为树的六种节点？</td><td>Sequence/Selector/Parallel/Decorator/Leaf/Composite</td><td>17</td></tr>
+    <tr><td>行为树和状态机的区别？</td><td><strong>树形 vs 平面、可复用 vs 难复用</strong></td><td>17</td></tr>
+    <tr><td>红点为什么用脏标记？</td><td><strong>避免每帧遍历整棵树</strong></td><td>21</td></tr>
+    <tr><td>任务进度为什么要事件驱动？</td><td><strong>轮询是 O(任务数) 每帧</strong></td><td>22</td></tr>
+    <tr><td>技能系统怎么做数据驱动？</td><td><strong>拆成原子效果的组合</strong></td><td>23</td></tr>
+    <tr><td>控制类 Buff 要注意什么？</td><td><strong>必须设叠加上限</strong></td><td>23</td></tr>
+    <tr><td>权重随机的正确理解？</td><td><strong>权重是相对值，不是绝对概率</strong></td><td>24</td></tr>
+    <tr><td>定时器为什么用堆？</td><td><strong>每帧只需检查堆顶</strong></td><td>25</td></tr>
+    <tr><td>定时器泄漏怎么防？</td><td><strong>绑定 owner + cancelAll</strong></td><td>25</td></tr>
+    <tr><td>缓存必须解决什么？</td><td><strong>失效、上限、淘汰</strong></td><td>27</td></tr>
+    <tr><td>LRU 怎么实现 O(1)？</td><td><strong>哈希表 + 双向链表</strong></td><td>27</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三个"反常识"的答案，答对了很加分</span>
+  <strong>① "控制类 Buff 要注意什么？"</strong><br><em>必须设叠加上限。</em><br>经典事故：<strong>眩晕可以无限叠加，玩家被永久控制</strong>。<br><em>能说出这个事故的人，通常真的做过战斗系统。</em><br><br><strong>② "缓存必须解决什么？"</strong><br><em>失效、上限、淘汰——三个都要有。</em><br><strong>"没有上限的缓存 = 内存泄漏"</strong>——这句话值得记住。<br><br><strong>③ "LRU 怎么实现 O(1)？"</strong><br><em>哈希表（O(1) 查找）+ 双向链表（O(1) 移动）。</em><br><strong>为什么必须双向</strong>：<em>单向链表无法 O(1) 删除已知节点</em>。
+</div>
+
+<h2 id="perf">四、性能与工程（页 26-30）</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>题目</th><th>答案要点</th><th>出处</th></tr></thead>
+  <tbody>
+    <tr><td>性能优化第一名是什么？</td><td><strong>先测量，再优化</strong></td><td>26</td></tr>
+    <tr><td>空间换时间有哪些例子？</td><td>索引、缓存、预计算、查表</td><td>26</td></tr>
+    <tr><td>位运算真的更快吗？</td><td><strong>不是——价值在省空间</strong></td><td>28</td></tr>
+    <tr><td>存档的第一原则？</td><td><strong>不丢数据（向后兼容）</strong></td><td>29</td></tr>
+    <tr><td>存档怎么防写坏？</td><td><strong>原子写入 + 备份</strong></td><td>29</td></tr>
+    <tr><td>怎么让 AI 的 bug 好查？</td><td><strong>状态可视化 + 时间线录制</strong></td><td>30</td></tr>
+    <tr><td>关闭日志输出就够了吗？</td><td><strong>不够，要用条件包住整个调用</strong></td><td>30</td></tr>
+    <tr><td>什么情况不该加缓存？</td><td><em>计算便宜 / 只调一次 / 结果每次不同</em></td><td>27</td></tr>
+    <tr><td>什么时候不该用位运算？</td><td><em>状态少 / 团队不熟 / 不需序列化</em></td><td>28</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">怎么知道自己到了 L4</span>
+  <strong>标志是"能主动说出反例和适用边界"</strong>。<br><br>比如被问"怎么优化性能"：<br>· <strong>L2</strong>："用对象池、减少 GC"<br>· <strong>L4</strong>："<em>先测量。我见过对象池反而更慢的情况——小对象的分配成本很低，而池的管理有开销。所以我先用 Profiler 确认 GC 是瓶颈，再决定要不要池化。</em>"<br><br><strong>区别在于：L4 知道"什么时候不适用"。</strong><br><em>这需要真的做过、真的踩过坑。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="31">
+  <div class="task"><input type="checkbox" id="t-31-1"><label for="t-31-1"><strong>逐题自测</strong>：合上资料，把上面的题口头答一遍，标记自己到哪一级。</label></div>
+  <div class="task"><input type="checkbox" id="t-31-2"><label for="t-31-2"><strong>录音回放</strong>：录下自己的回答，回放听——<em>你会发现自己讲得比想象中乱</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-31-3"><label for="t-31-3"><strong>准备三个故事</strong>：性能优化、疑难 bug、架构设计。每个都要能量化。</label></div>
+  <div class="task"><input type="checkbox" id="t-31-4"><label for="t-31-4"><strong>补短板</strong>：把低于 L3 的题，回到对应页面重读。</label></div>
+  <div class="task"><input type="checkbox" id="t-31-5"><label for="t-31-5"><strong>练习讲边界</strong>：每道题都补一句"什么情况不适用"。</label></div>
+  <div class="task"><input type="checkbox" id="t-31-6"><label for="t-31-6"><strong>回答开放题</strong>：① 你觉得哪个知识点最重要？② 你踩过最深的坑是什么？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>数据结构基础题全部能到 L3</strong>（页 02-09）；<br>
+    ② <strong>核心算法题至少 80% 能到 L3</strong>（页 10-15）；<br>
+    ③ 能答出空间网格的陷阱、控制类 Buff 的叠加上限；<br>
+    ④ <strong>有至少三个能量化讲出来的技术故事</strong>；<br>
+    ⑤ 能主动说出至少三个"什么时候不该用"的场景。<br>
+    <br>
+    <em>第 ⑤ 条最难也最能加分——它证明你不是在背答案，而是真的理解。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="30-debug-tools.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">30 调试工具与可视化</div>
+  </a>
+  <a class="next" href="32-projects.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">32 实战项目</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

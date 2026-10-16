@@ -1,0 +1,90 @@
+<h1>30 · 调试工具与可视化</h1>
+
+<p class="lead">这一页讲<strong>怎么让"看不见的东西"变得可见</strong>。好的调试工具能把排查时间从几小时降到几分钟——<em>它们本身就是生产力</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="tools">一、五个必备的调试工具</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>工具</th><th>解决什么</th><th>实现难度</th></tr></thead>
+  <tbody>
+    <tr><td><strong>状态可视化</strong></td><td>AI 在想什么？</td><td><em>低</em></td></tr>
+    <tr><td><strong>性能 HUD</strong></td><td>现在多少帧？</td><td><em>低</em></td></tr>
+    <tr><td><strong>画线工具</strong></td><td>路径/范围/视线</td><td>低</td></tr>
+    <tr><td><strong>日志分级</strong></td><td>哪里出错了？</td><td>低</td></tr>
+    <tr><td><strong>时间线录制</strong></td><td><strong>刚才发生了什么？</strong></td><td><span class="mk mk--no">高</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">为什么"时间线录制"最难也最有用</span>
+  <strong>问题</strong>：AI 出现了奇怪行为，但<em>你看的那一刻已经过去了</em>。<br><br><strong>普通日志的问题</strong>：<em>只能看到"现在"，看不到"刚才"</em>。<br><br><strong>时间线录制的做法</strong>：<br>· 每帧记录关键数据（<em>状态、目标、位置</em>）到环形缓冲<br>· 出问题时<em>回放最近 10 秒</em><br>· 用时间轴滑动查看<br><br><strong>关键技术</strong>：<em>环形缓冲（页 03）</em>——固定容量，自动覆盖旧数据。<br><strong>这正是环形缓冲最经典的应用场景之一。</strong>
+</div>
+
+<h2 id="visualization">二、状态可视化：让 AI 暴露想法 ★★★</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">为什么 AI 需要可视化</span>
+  <strong>AI 的 bug 特别难查</strong>，因为：<br>· 你<em>看不到</em> AI 的决策过程<br>· 行为可能是"对的但看起来怪"<br>· 问题往往<em>偶发</em>（依赖具体情境）<br><br><strong>可视化能解决什么</strong>：<br>· <strong>显示当前状态</strong>——<em>它现在处于行为树的哪个节点？</em><br>· <strong>显示目标</strong>——<em>它在追谁？</em><br>· <strong>显示感知范围</strong>——<em>它能看到多大范围？</em><br>· <strong>显示路径</strong>——<em>它打算怎么走？</em><br><br><strong>实现方式</strong>：用 Gizmos / DrawLine 画出来，只在 Development Build 里开启。<br><em>一个 10 分钟做出来的可视化，可能省下你 10 小时的排查。</em>
+</div>
+
+<h2 id="logging">三、日志分级与开关</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>级别</th><th>用途</th><th>生产环境</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Error</strong></td><td>真正的错误</td><td><span class="mk mk--yes">保留</span></td></tr>
+    <tr><td><strong>Warn</strong></td><td>可疑但不致命</td><td><span class="mk mk--yes">保留</span></td></tr>
+    <tr><td><strong>Info</strong></td><td>关键流程（登录、加载）</td><td><em>可保留</em></td></tr>
+    <tr><td><strong>Debug</strong></td><td>开发期调试</td><td><span class="mk mk--no">关闭</span></td></tr>
+    <tr><td><strong>Verbose</strong></td><td>超详细（每帧）</td><td><span class="mk mk--no">关闭</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">日志本身的性能代价</span>
+  <strong>字符串拼接 + 输出是有成本的</strong>：<br><code>Debug.Log("位置: " .. x .. "," .. y .. "," .. z)</code><br>· 每次调用<em>都要拼接字符串</em>（产生垃圾）<br>· 每帧调用会<em>明显拖慢帧率</em><br><br><strong>关键问题</strong>：<em>关闭日志输出，但字符串拼接仍然执行了</em>！<br><code>if DEBUG_MODE then log("...") end</code> ← <em>这样才对</em><br><br><strong>正确做法</strong>：<br>① <strong>用条件判断包住整个调用</strong>，包括参数拼接<br>② <strong>生产环境用编译期移除</strong>（<em>而不是运行时判断</em>）<br>③ <strong>分模块开关</strong>（<em>只开需要的模块</em>）<br><br><em>这一条在页 19（性能实战）会再次出现——日志是 Update 里最常见的隐藏 GC 来源。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="30">
+  <div class="task"><input type="checkbox" id="t-30-1"><label for="t-30-1"><strong>做性能 HUD</strong>：用环形缓冲记录最近 60 帧，显示平均/最大帧时间。</label></div>
+  <div class="task"><input type="checkbox" id="t-30-2"><label for="t-30-2"><strong>做状态可视化</strong>：给你的 AI 画出状态、目标、感知范围。</label></div>
+  <div class="task"><input type="checkbox" id="t-30-3"><label for="t-30-3"><strong>做时间线</strong>：用环形缓冲记录最近 10 秒的关键数据，支持回放。</label></div>
+  <div class="task"><input type="checkbox" id="t-30-4"><label for="t-30-4"><strong>做分级日志</strong>：实现五级日志 + 分模块开关。</label></div>
+  <div class="task"><input type="checkbox" id="t-30-5"><label for="t-30-5"><strong>验证日志开销</strong>：测"条件判断包住日志"与"只关输出"的性能差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-30-6"><label for="t-30-6"><strong>回答面试题</strong>：① AI 的 bug 为什么难查？② 时间线录制怎么实现？③ 关闭日志输出就够了吗？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出五个必备的调试工具；<br>
+    ② <strong>知道时间线录制用环形缓冲实现</strong>；<br>
+    ③ <strong>能给 AI 做状态可视化</strong>；<br>
+    ④ 知道日志的五级分类；<br>
+    ⑤ <strong>知道"关闭输出"不等于"关闭开销"，要用条件判断包住整个调用</strong>。<br>
+    <br>
+    <em>第 ⑤ 条最实用——它是 Update 里最常见的隐藏性能问题。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="29-serialize.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">29 存档与序列化</div>
+  </a>
+  <a class="next" href="31-interview.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">31 面试题库 ★★</div>
+  </a>
+</nav>

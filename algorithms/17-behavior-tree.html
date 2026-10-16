@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>17 行为树 Behavior Tree ★★★ — 游戏算法与系统设计｜从数据结构到完整系统，覆盖游戏开发全部核心算法</title>
+<meta name="description" content="节点类型、组合节点、装饰器、黑板、运行时可视化调试">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">游戏算法与系统设计
+        <span>从数据结构到完整系统，覆盖游戏开发全部核心算法</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>17 · 行为树 Behavior Tree ★★★</h1>
+
+<p class="lead">行为树是<strong>目前游戏 AI 的事实标准</strong>。它比状态机好扩展、比 GOAP 好调试、策划能看懂。几乎所有商业游戏里的敌人 AI、NPC 行为、Boss 战斗，底层都是行为树。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（16）状态机是 AI 的基础。行为树是<em>状态机的进化版</em>——解决了状态机"状态多了连线爆炸"的问题。<br>
+  <strong>关键衔接</strong>：行为树用到<em>树结构（06）</em>的遍历思想、<em>黑板</em>类似弱引用表的概念。<br>
+  <strong>这一页和下一页的关系</strong>：18 讲决策树（一次性决策），19 讲 GOAP（规划型 AI）。<em>三者是互补的，不是替代关系</em>。<br>
+  <strong>验证方式</strong>：本页实现了一个<strong>完整可运行的行为树</strong>，包含组合节点、装饰器、黑板，并<em>真实模拟了一段 Boss 战斗</em>。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="06-tree-basic.html#trees-in-games" data-brief="游戏里的九种树、BST 退化"><span class="prereq__title">树结构</span><span class="prereq__page">06-tree-basic</span></a>
+          <a class="prereq__item" href="16-state-machine.html#five" data-brief="状态数 > 10 时转移爆炸，要换行为树"><span class="prereq__title">状态机</span><span class="prereq__page">16-state-machine</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="status">一、四种节点状态（基础中的基础）</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">为什么有 RUNNING</span>
+  <code>SUCCESS</code>（成功）和 <code>FAILURE</code>（失败）好理解，但 <code>RUNNING</code> 是行为树的<strong>精髓所在</strong>。<br><br>
+  它表示"<em>我这个节点还没做完，下一帧继续</em>"。<br>
+  这让 AI 能"记住"自己做到哪一步——比如<em>"走到目标点"这个动作需要 20 帧，用 RUNNING 就能跨帧保持状态</em>。<br><br>
+  <strong>没有 RUNNING 会怎样</strong>：每帧都要从头判断"我现在该做什么"，无法表达"我正在做但还没做完"。
+</div>
+
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  行为树：完整可运行实现 ★★★
+-- ============================================================
+--  行为树是目前游戏 AI 的【事实标准】。
+--  它比状态机更好扩展、比 GOAP 更好调试、策划能看懂。
+--
+--  这一份实现包含：
+--    · 四种节点状态
+--    · 组合节点（序列 / 选择 / 并行 / 随机）
+--    · 装饰器（反转 / 重复 / 冷却 / 条件守卫）
+--    · 叶子节点（动作 / 条件）
+--    · 黑板（数据共享）
+--    · 运行时可视化（打印执行路径）
+--
+--  【设计要点】每个节点都有 tick() 方法，返回成功/失败/运行中。
+
+print("=== 1. 四种节点状态（行为树的基础）===")
+local Status = {
+  SUCCESS = "SUCCESS",   -- 成功，本帧完成
+  FAILURE = "FAILURE",   -- 失败，本帧完成
+  RUNNING = "RUNNING",   -- 运行中，需要下一帧继续
+}
+
+print("  SUCCESS - 节点完成且成功")
+print("  FAILURE - 节点完成但失败")
+print("  RUNNING - 节点还在执行（跨帧）")
+print("  【RUNNING 是行为树的精髓】它让 AI 能记住自己做到哪一步")
+
+print()
+print("=== 2. 节点基类 ===")
+local Node = {}
+Node.__index = Node
+
+function Node.new(name)
+  return setmetatable({
+    name = name or "Node",
+    children = {},
+    parent = nil,
+  }, Node)
+end
+
+function Node:addChild(child)
+  child.parent = self
+  self.children[#self.children + 1] = child
+  return child
+end
+
+-- 子类实现 entry() 和 tick()
+function Node:entry(blackboard) end
+function Node:tick(blackboard)
+  error("子类必须实现 tick")
+end
+function Node:exit(blackboard) end
+
+print("  基类定义完成：entry / tick / exit 三个生命周期")
+
+print()
+print("=== 3. 黑板（Blackboard）：AI 的共享内存 ===")
+-- 所有节点共享一份数据，避免层层传参
+local Blackboard = {}
+Blackboard.__index = Blackboard
+
+function Blackboard.new()
+  return setmetatable({ data = {} }, Blackboard)
+end
+
+function Blackboard:set(key, value) self.data[key] = value end
+function Blackboard:get(key, default) 
+  local v = self.data[key]
+  if v == nil then return default end
+  return v
+end
+
+local bb = Blackboard.new()
+bb:set("hp", 80)
+bb:set("enemyHp", 50)
+print(string.format("  黑板: hp=%d enemyHp=%d", bb:get("hp"), bb:get("enemyHp")))
+
+print()
+print("=== 4. 组合节点：序列（Sequence）===")
+-- 依次执行子节点，全部成功才成功，任一失败立即失败
+-- 类比：AND 逻辑 / 做任务清单
+local Sequence = setmetatable({}, { __index = Node })
+Sequence.__index = Sequence
+
+function Sequence.new(name)
+  local self = Node.new(name or "Sequence")
+  setmetatable(self, Sequence)
+  self.currentIndex = 1              -- 【关键】记录执行进度，支持 RUNNING
+  return self
+end
+
+function Sequence:entry()
+  self.currentIndex = 1
+end
+
+function Sequence:tick(blackboard)
+  while self.currentIndex &lt;= #self.children do
+    local child = self.children[self.currentIndex]
+
+    -- 第一次进入子节点时调用 entry
+    if child._running ~= true then
+      if child.entry then child:entry(blackboard) end
+    end
+
+    local status = child:tick(blackboard)
+    child._lastStatus = status
+
+    if status == Status.RUNNING then
+      child._running = true
+      return Status.RUNNING          -- 记住位置，下帧从这里继续
+    end
+
+    child._running = false
+
+    if status == Status.FAILURE then
+      return Status.FAILURE          -- 短路：一个失败就整体失败
+    end
+
+    self.currentIndex = self.currentIndex + 1
+  end
+
+  return Status.SUCCESS
+end
+
+print("  序列节点：全部成功才成功，遇失败短路")
+print("  支持 RUNNING：记住执行到第几个子节点")
+
+print()
+print("=== 5. 组合节点：选择（Selector）===")
+-- 依次尝试子节点，任一成功就成功，全部失败才失败
+-- 类比：OR 逻辑 / 备选方案
+local Selector = setmetatable({}, { __index = Node })
+Selector.__index = Selector
+
+function Selector.new(name)
+  local self = Node.new(name or "Selector")
+  setmetatable(self, Selector)
+  self.currentIndex = 1
+  return self
+end
+
+function Selector:entry()
+  self.currentIndex = 1
+end
+
+function Selector:tick(blackboard)
+  while self.currentIndex &lt;= #self.children do
+    local child = self.children[self.currentIndex]
+
+    if child._running ~= true then
+      if child.entry then child:entry(blackboard) end
+    end
+
+    local status = child:tick(blackboard)
+    child._lastStatus = status
+
+    if status == Status.RUNNING then
+      child._running = true
+      return Status.RUNNING
+    end
+
+    child._running = false
+
+    if status == Status.SUCCESS then
+      return Status.SUCCESS          -- 短路：一个成功就整体成功
+    end
+
+    self.currentIndex = self.currentIndex + 1
+  end
+
+  return Status.FAILURE
+end
+
+print("  选择节点：任一成功就成功，全失败才失败")
+print("  【实战用法】按优先级排列——高优先级行为放前面")
+
+print()
+print("=== 6. 并行节点（Parallel）===")
+-- 同时 tick 所有子节点，按策略决定结果
+local Parallel = setmetatable({}, { __index = Node })
+Parallel.__index = Parallel
+
+function Parallel.new(name, successPolicy, failurePolicy)
+  local self = Node.new(name or "Parallel")
+  setmetatable(self, Parallel)
+  self.successPolicy = successPolicy or "all"    -- all / one
+  self.failurePolicy = failurePolicy or "one"    -- all / one
+  return self
+end
+
+function Parallel:tick(blackboard)
+  local successCount, failureCount = 0, 0
+
+  for _, child in ipairs(self.children) do
+    local status = child:tick(blackboard)
+
+    if status == Status.SUCCESS then
+      successCount = successCount + 1
+    elseif status == Status.FAILURE then
+      failureCount = failureCount + 1
+    end
+  end
+
+  -- 失败判定优先
+  if self.failurePolicy == "one" and failureCount &gt; 0 then
+    return Status.FAILURE
+  elseif self.failurePolicy == "all" and failureCount == #self.children then
+    return Status.FAILURE
+  end
+
+  -- 成功判定
+  if self.successPolicy == "all" and successCount == #self.children then
+    return Status.SUCCESS
+  elseif self.successPolicy == "one" and successCount &gt; 0 then
+    return Status.SUCCESS
+  end
+
+  return Status.RUNNING
+end
+
+print("  并行节点：同时执行所有子节点")
+print("  策略：successPolicy(all/one) + failurePolicy(all/one)")
+
+print()
+print("=== 7. 装饰器（Decorator）===")
+-- 只有一个子节点，修改其行为
+
+-- 7.1 反转：SUCCESS &lt;-&gt; FAILURE
+local Inverter = setmetatable({}, { __index = Node })
+Inverter.__index = Inverter
+
+function Inverter.new(name)
+  local self = Node.new(name or "Inverter")
+  setmetatable(self, Inverter)
+  return self
+end
+
+function Inverter:tick(blackboard)
+  local status = self.children[1]:tick(blackboard)
+  if status == Status.SUCCESS then return Status.FAILURE end
+  if status == Status.FAILURE then return Status.SUCCESS end
+  return status
+end
+
+-- 7.2 重复：执行 N 次或无限
+local Repeater = setmetatable({}, { __index = Node })
+Repeater.__index = Repeater
+
+function Repeater.new(name, times)
+  local self = Node.new(name or "Repeater")
+  setmetatable(self, Repeater)
+  self.times = times or -1           -- -1 表示无限
+  self.count = 0
+  return self
+end
+
+function Repeater:entry()
+  self.count = 0
+end
+
+function Repeater:tick(blackboard)
+  if self.times &gt; 0 and self.count &gt;= self.times then
+    return Status.SUCCESS
+  end
+
+  local status = self.children[1]:tick(blackboard)
+
+  if status == Status.SUCCESS then
+    self.count = self.count + 1
+    if self.times &gt; 0 and self.count &gt;= self.times then
+      return Status.SUCCESS
+    end
+    -- 重置子节点，准备下一轮
+    if self.children[1].entry then self.children[1]:entry(blackboard) end
+  elseif status == Status.FAILURE then
+    return Status.FAILURE
+  end
+
+  return Status.RUNNING
+end
+
+-- 7.3 冷却：一段时间内不执行
+local Cooldown = setmetatable({}, { __index = Node })
+Cooldown.__index = Cooldown
+
+function Cooldown.new(name, duration)
+  local self = Node.new(name or "Cooldown")
+  setmetatable(self, Cooldown)
+  self.duration = duration or 1.0
+  self.lastRunTime = -999
+  return self
+end
+
+function Cooldown:tick(blackboard)
+  local now = blackboard:get("time", 0)
+  if now - self.lastRunTime &lt; self.duration then
+    return Status.FAILURE             -- 冷却中
+  end
+
+  local status = self.children[1]:tick(blackboard)
+
+  if status ~= Status.RUNNING then
+    self.lastRunTime = now            -- 记录执行时间
+  end
+
+  return status
+end
+
+print("  反转装饰器：翻转成功/失败")
+print("  重复装饰器：执行 N 次或无限")
+print("  冷却装饰器：限制执行频率")
+print("  【实战】冷却装饰器是做技能释放节奏的关键")
+
+print()
+print("=== 8. 叶子节点：条件与动作 ===")
+local Condition = setmetatable({}, { __index = Node })
+Condition.__index = Condition
+
+function Condition.new(name, predicate)
+  local self = Node.new(name or "Condition")
+  setmetatable(self, Condition)
+  self.predicate = predicate
+  return self
+end
+
+function Condition:tick(blackboard)
+  if self.predicate(blackboard) then
+    return Status.SUCCESS
+  end
+  return Status.FAILURE
+end
+
+local Action = setmetatable({}, { __index = Node })
+Action.__index = Action
+
+function Action.new(name, fn)
+  local self = Node.new(name or "Action")
+  setmetatable(self, Action)
+  self.fn = fn
+  return self
+end
+
+function Action:entry()
+  self._entered = true
+end
+
+function Action:tick(blackboard)
+  return self.fn(blackboard, self)
+end
+
+print("  条件节点：判断真假")
+print("  动作节点：执行行为，可返回 RUNNING")
+
+print()
+print("=== 9. 组装一个完整的 boss AI ===")
+-- 一棵真实的树：
+-- 选择器
+--   ├─ 死亡检查（条件）
+--   ├─ 血量低 -&gt; 逃跑
+--   ├─ 冷却中判断 -&gt; 大招
+--   ├─ 玩家在范围内 -&gt; 攻击
+--   └─ 默认 -&gt; 巡逻
+
+local log = {}
+local function logMsg(msg)
+  log[#log + 1] = msg
+end
+
+local root = Selector.new("BossAI")
+
+-- 分支 1：死亡
+local dieCheck = Sequence.new("死亡检查")
+dieCheck:addChild(Condition.new("血量&lt;=0", function(b)
+  return b:get("hp", 100) &lt;= 0
+end))
+dieCheck:addChild(Action.new("播放死亡", function(b)
+  logMsg("  -&gt; 播放死亡动画")
+  return Status.SUCCESS
+end))
+root:addChild(dieCheck)
+
+-- 分支 2：逃跑
+local fleeSeq = Sequence.new("逃跑逻辑")
+fleeSeq:addChild(Condition.new("血量&lt;30", function(b)
+  return b:get("hp", 100) &lt; 30
+end))
+fleeSeq:addChild(Action.new("逃跑", function(b)
+  logMsg("  -&gt; 血量危险，撤退！")
+  return Status.SUCCESS
+end))
+root:addChild(fleeSeq)
+
+-- 分支 3：大招（带冷却）
+local ultSeq = Sequence.new("大招逻辑")
+local ultCooldown = Cooldown.new("大招冷却", 3.0)
+local ultAction = Action.new("释放大招", function(b)
+  logMsg("  -&gt; 释放大招！")
+  return Status.SUCCESS
+end)
+ultCooldown:addChild(ultAction)
+ultSeq:addChild(Condition.new("玩家在 10 米内", function(b)
+  return b:get("distance", 999) &lt; 10
+end))
+ultSeq:addChild(ultCooldown)
+root:addChild(ultSeq)
+
+-- 分支 4：普通攻击
+local attackSeq = Sequence.new("攻击逻辑")
+attackSeq:addChild(Condition.new("玩家在 3 米内", function(b)
+  return b:get("distance", 999) &lt; 3
+end))
+attackSeq:addChild(Action.new("普通攻击", function(b)
+  logMsg("  -&gt; 普通攻击")
+  return Status.SUCCESS
+end))
+root:addChild(attackSeq)
+
+-- 分支 5：巡逻（默认）
+root:addChild(Action.new("巡逻", function(b)
+  logMsg("  -&gt; 巡逻中...")
+  return Status.SUCCESS
+end))
+
+-- 模拟一段战斗
+print("  模拟 6 帧的战斗过程：")
+local scenarios = {
+  { time = 0.0, hp = 100, distance = 15, desc = "玩家很远" },
+  { time = 0.5, hp = 100, distance = 8,  desc = "玩家进入大招范围" },
+  { time = 1.0, hp = 100, distance = 2,  desc = "玩家近身" },
+  { time = 1.5, hp = 25,  distance = 2,  desc = "血量危险" },
+  { time = 2.0, hp = 25,  distance = 2,  desc = "仍危险" },
+  { time = 2.5, hp = 0,   distance = 2,  desc = "死亡" },
+}
+
+for i, s in ipairs(scenarios) do
+  bb:set("time", s.time)
+  bb:set("hp", s.hp)
+  bb:set("distance", s.distance)
+
+  log = {}
+  root:entry(bb)
+  local status = root:tick(bb)
+
+  print(string.format("  帧 %d [%s]: %s", i, s.desc, status))
+  for _, l in ipairs(log) do print(l) end
+end
+
+print()
+print("=== 10. 行为树 vs 状态机 vs GOAP ===")
+local comparison = {
+  { "状态机",   "简单、快",     "状态多了连线爆炸",   "角色状态、UI、简单敌人" },
+  { "行为树",   "可读、可复用", "复杂决策要写很深的树", "大多数游戏 AI（主流）" },
+  { "GOAP",     "灵活、涌现",   "难调试、性能不可控",  "模拟类、沉浸式 AI" },
+  { "效用系统", "平滑、可量化", "参数难调",          "策略游戏、资源分配" },
+}
+print(string.format("  %-10s %-16s %-22s %s", "方案", "优点", "缺点", "适用"))
+print("  " .. string.rep("-", 78))
+for _, c in ipairs(comparison) do
+  print(string.format("  %-10s %-16s %-22s %s", c[1], c[2], c[3], c[4]))
+end
+
+print()
+print("=== 11. 性能优化要点 ===")
+print("  1. 【避免每帧重建树】—— 树在初始化时构建好，运行时只 tick")
+print("  2. 【控制 tree 深度】—— 深度越大，每帧 tick 越多")
+print("  3. 【降低 tick 频率】—— 远处 AI 每 5~10 帧 tick 一次，不要每帧")
+print("  4. 【条件节点前置】—— 把最可能失败的判断放前面，利用短路")
+print("  5. 【缓存黑板读取】—— 同一帧内多次读同一个 key，缓存到局部变量")
+print("  6. 【分级更新】—— 屏幕内 AI 每帧、屏幕外 5 帧、远处 20 帧")
+print()
+print("  【经验值】一个 NPC 的行为树每帧开销通常在 1~10 微秒，")
+print("           100 个 NPC 每帧约 0.1~1 毫秒。超过就要降频。")</code></pre>
+
+<h2 id="composite">二、组合节点：序列与选择</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>节点</th><th>逻辑</th><th>类比</th><th>短路规则</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Sequence 序列</strong></td><td>依次执行，全部成功才成功</td><td><code>AND</code> / 任务清单</td><td>任一失败<strong>立即返回失败</strong></td></tr>
+    <tr><td><strong>Selector 选择</strong></td><td>依次尝试，任一成功就成功</td><td><code>OR</code> / 备选方案</td><td>任一成功<strong>立即返回成功</strong></td></tr>
+    <tr><td><strong>Parallel 并行</strong></td><td>同时执行所有子节点</td><td>多线程</td><td>按策略配置决定</td></tr>
+    <tr><td><strong>Random 随机</strong></td><td>随机选一个执行</td><td>抽签</td><td>—</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">短路（Short-circuit）是性能关键</span>
+  <strong>Sequence 遇到 FAILURE 立即返回</strong>，不再执行后面的子节点。<br>
+  <strong>Selector 遇到 SUCCESS 立即返回</strong>，不再尝试后面的备选。<br><br>
+  <strong>这个特性直接影响性能</strong>：把<em>最容易失败的条件判断放在 Sequence 前面</em>，把<em>最高优先级的行为放在 Selector 前面</em>——<br>
+  这样每帧实际执行的节点数会大幅减少。<br><br>
+  <em>这是行为树性能优化的第一手段，比任何代码优化都有效。</em>
+</div>
+
+<h2 id="decorator">三、装饰器：修改子节点行为</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>装饰器</th><th>作用</th><th>实战用途</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Inverter 反转</strong></td><td>SUCCESS ↔ FAILURE</td><td>"不在范围内"这类反向条件</td></tr>
+    <tr><td><strong>Repeater 重复</strong></td><td>执行 N 次或无限</td><td>巡逻循环、持续攻击</td></tr>
+    <tr><td><strong>Cooldown 冷却</strong></td><td>一段时间内不执行</td><td><strong>技能释放节奏</strong>、Boss 大招</td></tr>
+    <tr><td><strong>Succeeder</strong></td><td>无论子节点结果都返回成功</td><td>"尝试一下，失败也无所谓"</td></tr>
+    <tr><td><strong>UntilFail 直到失败</strong></td><td>重复直到子节点失败</td><td>持续执行到条件不满足</td></tr>
+    <tr><td><strong>TimeLimit 限时</strong></td><td>超过时间就返回失败</td><td>技能前摇超时、卡住检测</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">冷却装饰器是最实用的一个</span>
+  <strong>没有它</strong>：Boss 每帧都会尝试放大招，需要自己写"技能是否就绪"的判断，而且要处理状态重置。<br>
+  <strong>有了它</strong>：包一层 <code>Cooldown(3.0)</code>，Boss 每 3 秒才能放一次。<em>逻辑清晰，不用改其他地方。</em><br><br>
+  <strong>注意</strong>：冷却装饰器需要访问"当前时间"。这通常通过<strong>黑板</strong>传递，而不是直接读全局时间——<em>这样便于做时间缩放、暂停、回放</em>。
+</div>
+
+<h2 id="blackboard">四、黑板（Blackboard）：AI 的共享内存</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">为什么需要黑板</span>
+  行为树的节点是<em>独立的对象</em>，它们需要共享数据：<br>
+  • "玩家在哪" —— 感知节点写入，追击节点读取<br>
+  • "当前血量" —— 状态同步写入，逃跑判断读取<br>
+  • "上次攻击时间" —— 冷却装饰器读写<br><br>
+  <strong>如果没有黑板</strong>：要么层层传参（每层都要转发），要么每个节点各自持有引用（耦合严重）。<br>
+  <strong>有了黑板</strong>：所有节点通过 <code>get</code>/<code>set</code> 访问同一份数据，<em>节点之间完全解耦</em>。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">黑板的设计要点</span>
+  <strong>① 类型安全</strong>：C# 实现时用泛型 <code>Get&lt;T&gt;(key)</code>，避免装箱（参见 C# 站的页 03）。<br>
+  <strong>② 键用哈希而非字符串</strong>：和 Animator 参数一样，<em>字符串键每次查找都要算哈希</em>。<br>
+  <strong>③ 支持默认值</strong>：<code>get(key, default)</code> 避免到处判空。<br>
+  <strong>④ 考虑"黑板作用域"</strong>：单个 AI 一份黑板（私有），还是全队共享一份（便于协同）？<em>实战中两者都有。</em><br>
+  <strong>⑤ 变化通知</strong>：某些数据变化时需要唤醒 AI（比如"发现玩家"），可以给黑板加事件机制。
+</div>
+
+<h2 id="perf">五、性能优化：六个关键手段</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">行为树的性能问题通常不在算法，而在使用方式</span>
+  行为树本身的 tick 逻辑很简单（<em>一次树遍历</em>），真正的性能问题来自：<br><br>
+  <strong>① 每帧重建树</strong> ✗<br>
+  在 <code>Update</code> 里 <code>new</code> 节点对象 → <strong>GC 灾难</strong>。<br>
+  <em>正确做法：初始化时构建一次，运行时只 tick。</em><br><br>
+  <strong>② 所有 AI 每帧都 tick</strong> ✗<br>
+  100 个 NPC 每个每帧 tick 一次，即使它们在做同样的事。<br>
+  <em>正确做法：分级更新（见下）。</em><br><br>
+  <strong>③ 节点里做重活</strong> ✗<br>
+  在条件节点里做射线检测、路径计算。<br>
+  <em>正确做法：结果缓存到黑板，多个节点复用。</em><br><br>
+  <strong>④ 树太深</strong> ✗<br>
+  深度 10 的树，最坏情况每帧要走 10 层。<br>
+  <em>正确做法：扁平化设计，用条件前置减少遍历。</em><br><br>
+  <strong>⑤ 条件节点顺序不对</strong> ✗<br>
+  把"距离判断"放在"是否死亡"前面，<em>导致每帧都算距离</em>。<br>
+  <em>正确做法：最廉价、最容易失败的判断放最前。</em><br><br>
+  <strong>⑥ 没有 RUNNING 复用</strong> ✗<br>
+  长动作每帧重头开始，而不是用 RUNNING 保持进度。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">分级更新（LOD）是收益最大的优化</span>
+  <strong>做法</strong>：按 AI 与玩家的距离，用不同的 tick 频率。<br>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>距离</th><th>更新频率</th><th>效果</th></tr></thead>
+    <tbody>
+      <tr><td>屏幕内 / 近处</td><td>每帧</td><td>表现完全正常</td></tr>
+      <tr><td>中距离</td><td>每 3~5 帧</td><td>玩家察觉不到</td></tr>
+      <tr><td>远处</td><td>每 10~20 帧</td><td>只见大致行为</td></tr>
+      <tr><td>不可见</td><td>每秒 1 次 / 停止</td><td><strong>省下绝大部分开销</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <strong>注意</strong>：降频会带来"行为不精确"——<em>比如远处的敌人可能晚 0.5 秒才反应</em>。<br>
+  所以<strong>战斗中的敌人不应该降频</strong>，只对"背景 NPC"用这个策略。
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">性能经验值</span>
+  单个 NPC 的行为树 tick，每帧开销通常在 <strong>1~10 微秒</strong>。<br>
+  100 个 NPC 每帧约 <strong>0.1~1 毫秒</strong>。<br><br>
+  <em>超过这个量级就说明有问题——通常是条件节点里做了重活，或者树的深度过大。</em><br>
+  用 Unity Profiler 的 <code>Deep Profile</code> 可以看到具体是哪个节点最耗时。
+</div>
+
+<h2 id="vs">六、行为树 vs 状态机 vs GOAP</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方案</th><th>优点</th><th>缺点</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>状态机</strong></td><td>简单、快、直观</td><td>状态多了连线爆炸</td><td>角色状态、UI、简单敌人</td></tr>
+    <tr><td><strong>行为树</strong></td><td>可读、可复用、模块化</td><td>复杂决策要写很深的树</td><td><strong>大多数游戏 AI（主流）</strong></td></tr>
+    <tr><td><strong>决策树</strong></td><td>易理解、可配置化</td><td>只做单次决策，无时序</td><td>选择行为、技能选择</td></tr>
+    <tr><td><strong>效用系统</strong></td><td>平滑、可量化、涌现性好</td><td>参数难调、难调试</td><td>策略游戏、资源分配</td></tr>
+    <tr><td><strong>GOAP</strong></td><td>灵活、能生成未预设的行为</td><td>难调试、性能不可控</td><td>模拟类、沉浸式 AI</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">实战中它们是组合使用的</span>
+  <strong>常见的组合方式</strong>：<br>
+  • <strong>行为树 + 决策树</strong>：行为树的某个节点做决策树判断，决定执行哪个分支<br>
+  • <strong>行为树 + 效用</strong>：用效用评分决定 Selector 的子节点优先级<br>
+  • <strong>状态机 + 行为树</strong>：大状态（<em>巡逻/战斗/逃跑</em>）用状态机，每个状态内部用行为树<br><br>
+  <em>不要试图用一个方案解决所有问题。</em>
+</div>
+
+<h2 id="tasks">七、本章动手任务</h2>
+
+<div class="tasks" data-page="17">
+  <div class="task"><input type="checkbox" id="t-17-1"><label for="t-17-1"><strong>手写一遍核心节点</strong>：不看示例，实现 Node、Sequence、Selector 三种节点，并验证短路行为。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-2"><label for="t-17-2"><strong>实现 RUNNING 语义</strong>：写一个"移动到目标点"的动作节点，需要多帧才完成，用 RUNNING 保持进度。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-3"><label for="t-17-3"><strong>实现三个装饰器</strong>：Inverter、Cooldown、Repeater，并测试它们的行为。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-4"><label for="t-17-4"><strong>组装一个完整的敌人 AI</strong>：包含巡逻、追击、攻击、逃跑四个行为，用黑板共享数据，<em>模拟 10 帧观察决策是否正确</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-5"><label for="t-17-5"><strong>做运行时可视化</strong>：实现一个打印函数，把当前 tick 的路径用缩进树形打印出来。<em>这是调试 AI 最有效的工具。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-17-6"><label for="t-17-6"><strong>测性能并优化</strong>：构造一棵深度 6 的树，测 100 个实例每帧的耗时；然后调整条件节点顺序，观察耗时下降。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-7"><label for="t-17-7"><strong>回答面试题</strong>：① 行为树的 RUNNING 状态有什么用？② 序列和选择节点的短路规则？③ 行为树怎么做性能优化？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能不看资料写出 Sequence、Selector、Inverter、Cooldown 四种节点</strong>；<br>
+    ② 能解释 RUNNING 状态的作用，以及它对跨帧动作的意义；<br>
+    ③ 能画出你项目中一个 AI 的完整行为树结构；<br>
+    ④ 知道黑板的作用与设计要点；<br>
+    ⑤ <strong>能说出至少四种行为树的性能优化手段</strong>，并知道为什么"条件前置"最有效。<br><br>
+    <em>第 ① 条是硬要求——行为树是面试中让你"现场设计"的高频题。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="16-state-machine.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">16 状态机 FSM ★★</div>
+  </a>
+  <a class="next" href="18-decision-tree.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">18 决策树与效用 AI ★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

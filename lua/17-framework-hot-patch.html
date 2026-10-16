@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>17 热更与版本管理 — Lua 热更新路线｜从零基础到独立搭建可上线的热更框架</title>
+<meta name="description" content="打包流程、版本号规则、灰度更新、回滚方案">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">Lua 热更新路线
+        <span>从零基础到独立搭建可上线的热更框架</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>17 · 热更与版本管理 ★★★</h1>
+
+<p class="lead">这是 Lua 站<strong>最实用的一页</strong>。前面讲了原理与框架，这一页讲<em>怎么把热更真正跑起来</em>——包括那些<strong>上线后才会遇到的真实问题</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="09-hotupdate-basics.html#require" data-brief="清 package.loaded + 重新 require，旧引用问题"><span class="prereq__title">热更新原理</span><span class="prereq__page">09-hotupdate-basics</span></a>
+          <a class="prereq__item" href="13-framework-design.html#module" data-brief="注册/初始化/逆序销毁"><span class="prereq__title">模块管理器</span><span class="prereq__page">13-framework-design</span></a>
+          <a class="prereq__item" href="09-hotupdate-basics.html#require" data-brief="package.loaded 缓存，热更要清缓存"><span class="prereq__title">require 与模块</span><span class="prereq__page">09-hotupdate-basics</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="version">一、版本管理的数据结构</h2>
+
+<p>版本管理<strong>看起来简单，但设计不好会埋下大坑</strong>。</p>
+
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  热更与版本管理：从原理到工程实现
+-- ============================================================
+--  这一页的重点不是"怎么热更「，而是」怎么保证热更不出事故「。
+
+print("=== 1. 清单文件的设计 ===")
+print()
+print("  清单是热更的核心 —— 它描述了「服务器上应该有哪些文件」。")
+print()
+
+-- 构建一个模拟的清单
+local function makeManifest(version, files)
+  return {
+    version = version,
+    generatedAt = os.time(),
+    files = files,
+  }
+end
+
+local function fileEntry(path, content)
+  -- 真实项目里用 MD5；这里用长度 + 简单哈希模拟
+  local hash = 0
+  for i = 1, #content do
+    hash = (hash * 31 + content:byte(i)) % 2147483647
+  end
+  return {
+    path = path,
+    size = #content,
+    hash = hash,
+  }
+end
+
+-- 服务器端清单（v2）
+local serverFiles = {
+  fileEntry("logic/battle.lua", "战斗逻辑 v2 - 修复了伤害计算"),
+  fileEntry("logic/skill.lua", "技能逻辑 v2 - 新增两个技能"),
+  fileEntry("ui/bag.lua", "背包界面 v2"),
+  fileEntry("config/item.lua", "道具配置 v2"),
+}
+
+-- 客户端本地清单（v1）
+local localFiles = {
+  fileEntry("logic/battle.lua", "战斗逻辑 v1 - 旧版本"),
+  fileEntry("ui/bag.lua", "背包界面 v1"),
+  fileEntry("config/item.lua", "道具配置 v1"),
+  fileEntry("logic/old.lua", "已删除的模块"),   -- 服务器已删
+}
+
+local function indexByPath(files)
+  local idx = {}
+  for _, f in ipairs(files) do idx[f.path] = f end
+  return idx
+end
+
+local serverIdx = indexByPath(serverFiles)
+local localIdx = indexByPath(localFiles)
+
+print("  服务器文件数:", #serverFiles)
+print("  本地文件数:", #localFiles)
+print()
+
+print("=== 2. 差异计算 ===")
+print()
+
+local function diff(localIdx, serverIdx)
+  local toDownload = {}   -- 新增或更新
+  local toDelete = {}     -- 服务器已删
+  local unchanged = {}
+
+  -- 找出需要下载的
+  for path, serverFile in pairs(serverIdx) do
+    local localFile = localIdx[path]
+
+    if not localFile then
+      toDownload[#toDownload + 1] = { path = path, reason = "新增" }
+    elseif localFile.hash ~= serverFile.hash then
+      toDownload[#toDownload + 1] = { path = path, reason = "更新" }
+    else
+      unchanged[#unchanged + 1] = path
+    end
+  end
+
+  -- 找出需要删除的
+  for path in pairs(localIdx) do
+    if not serverIdx[path] then
+      toDelete[#toDelete + 1] = path
+    end
+  end
+
+  -- 排序，让输出稳定
+  table.sort(toDownload, function(a, b) return a.path &lt; b.path end)
+  table.sort(toDelete)
+
+  return toDownload, toDelete, unchanged
+end
+
+local toDownload, toDelete, unchanged = diff(localIdx, serverIdx)
+
+print("  【需要下载】")
+for _, d in ipairs(toDownload) do
+  print(string.format("    %-24s (%s)", d.path, d.reason))
+end
+print()
+print("  【需要删除】")
+for _, d in ipairs(toDelete) do
+  print("    " .. d)
+end
+print()
+print("  【无需处理】")
+for _, u in ipairs(unchanged) do
+  print("    " .. u)
+end
+
+print()
+print("  【关键】增量更新只下载变化的文件")
+print(string.format("          本例：%d 个文件变化，%d 个不变 -&gt; 节省 %d%% 流量",
+  #toDownload, #unchanged, math.floor(#unchanged / #localFiles * 100)))
+
+print()
+print("=== 3. 原子切换（防止「半包可用」）★★★ ===")
+print()
+print("  问题：下载到一半退出，下次启动读到不完整文件")
+print()
+print("  解决方案：下载到临时目录，全部完成后再切换")
+print()
+
+local FileSystem = {
+  dirs = {},          -- 模拟文件系统：dirName -&gt; { files }
+}
+
+function FileSystem.mkdir(name)
+  FileSystem.dirs[name] = FileSystem.dirs[name] or {}
+  return FileSystem.dirs[name]
+end
+
+function FileSystem.write(dir, path, content)
+  FileSystem.mkdir(dir)
+  FileSystem.dirs[dir][path] = content
+end
+
+function FileSystem.exists(dir, path)
+  return FileSystem.dirs[dir] and FileSystem.dirs[dir][path] ~= nil
+end
+
+-- 热更管理器
+local HotUpdateManager = {}
+HotUpdateManager.__index = HotUpdateManager
+
+function HotUpdateManager.new()
+  return setmetatable({
+    currentVersion = "v1",       -- 当前生效的版本
+    stagingVersion = nil,        -- 正在下载的版本
+    activeDir = "scripts_v1",    -- 当前使用的目录
+    stagingDir = nil,            -- 临时目录
+    completedFiles = {},         -- 已完成的文件
+    totalFiles = 0,
+    versionHistory = {},    -- 历史版本列表（用于回滚）
+    log = {},
+  }, HotUpdateManager)
+end
+
+function HotUpdateManager:_log(msg)
+  self.log[#self.log + 1] = msg
+  print("    " .. msg)
+end
+
+-- 开始下载
+function HotUpdateManager:beginDownload(version, fileCount)
+  self.stagingVersion = version
+  self.stagingDir = "scripts_" .. version .. "_staging"
+  self.totalFiles = fileCount
+  self.completedFiles = {}
+
+  FileSystem.mkdir(self.stagingDir)   -- 创建临时目录
+  self:_log("开始下载 " .. version .. " 到 " .. self.stagingDir .. "（临时目录）")
+end
+
+-- 下载单个文件
+function HotUpdateManager:downloadFile(path, content)
+  FileSystem.write(self.stagingDir, path, content)
+  self.completedFiles[#self.completedFiles + 1] = path
+  self:_log(string.format("  下载 %s (%d/%d)", path, #self.completedFiles, self.totalFiles))
+end
+
+-- 校验（模拟 MD5 校验）
+function HotUpdateManager:verify()
+  if #self.completedFiles &lt; self.totalFiles then
+    self:_log(string.format("  校验失败：只完成 %d/%d 个文件",
+      #self.completedFiles, self.totalFiles))
+    return false
+  end
+  self:_log("校验通过：所有文件完整")
+  return true
+end
+
+-- 【关键】原子切换
+function HotUpdateManager:commit()
+  if not self:verify() then
+    self:_log("【拒绝切换】校验未通过，保持在旧版本")
+    return false
+  end
+
+  -- 保留旧版本目录（用于回滚）
+  local oldDir = self.activeDir
+  local oldVersion = self.currentVersion
+
+  -- 【关键】把当前版本压入历史列表
+  self.versionHistory[#self.versionHistory + 1] = {
+    dir = self.activeDir,
+    version = oldVersion,
+  }
+
+  -- 把 staging 目录重命名为正式目录（模拟原子重命名）
+  local finalDir = self.stagingDir:gsub("_staging$", "")
+  FileSystem.dirs[finalDir] = FileSystem.dirs[self.stagingDir]
+  FileSystem.dirs[self.stagingDir] = nil
+
+  -- 切换
+  self.activeDir = finalDir
+  self.currentVersion = self.stagingVersion
+  self.stagingDir = nil
+  self.stagingVersion = nil
+
+  self:_log("【切换成功】")
+  self:_log("  当前版本: " .. self.currentVersion)
+  self:_log("  使用目录: " .. self.activeDir .. "（由 staging 重命名而来）")
+  self:_log("  旧版本保留在: " .. oldDir .. "（可回滚）")
+
+  return true
+end
+
+-- 回滚
+-- 【设计】用历史版本列表，而不是扫描目录名（staging 与正式目录命名不同）
+function HotUpdateManager:rollback()
+  if #self.versionHistory == 0 then
+    self:_log("【无法回滚】没有历史版本")
+    return false
+  end
+
+  local prev = table.remove(self.versionHistory)
+
+  self:_log("【回滚】")
+  self:_log("  从 " .. self.activeDir .. " 切回 " .. prev.dir)
+  self.activeDir = prev.dir
+  self.currentVersion = prev.version
+  self:_log("  当前版本: " .. self.currentVersion)
+
+  return true
+end
+
+print("--- 正常流程 ---")
+local hm = HotUpdateManager.new()
+
+-- 先建立旧版本目录
+FileSystem.write("scripts_v1", "logic/battle.lua", "战斗逻辑 v1")
+FileSystem.write("scripts_v1", "ui/bag.lua", "背包界面 v1")
+
+hm:beginDownload("v2", 3)
+hm:downloadFile("logic/battle.lua", "战斗逻辑 v2")
+hm:downloadFile("logic/skill.lua", "技能逻辑 v1")
+hm:downloadFile("ui/bag.lua", "背包界面 v2")
+
+print()
+hm:commit()
+
+print()
+print("--- 测试回滚 ---")
+hm:rollback()
+print("  回滚后的目录:", hm.activeDir)
+print("  里面的文件:", FileSystem.dirs[hm.activeDir]["logic/battle.lua"])
+
+print()
+print("=== 4. 半包场景（未完成就退出）★★★ ===")
+print()
+
+local hm2 = HotUpdateManager.new()
+FileSystem.write("scripts_v1", "logic/battle.lua", "旧版本")
+hm2.activeDir = "scripts_v1"
+hm2.currentVersion = "v1"
+
+hm2:beginDownload("v3", 5)
+hm2:downloadFile("a.lua", "a")
+hm2:downloadFile("b.lua", "b")
+-- 玩家在这里退出了（只下载了 2/5）
+
+print()
+print("  模拟：玩家在下载到 2/5 时退出，然后重新启动")
+print("  重新启动后尝试切换：")
+hm2:commit()
+
+print()
+print("  【关键】因为校验不通过，拒绝切换")
+print("          玩家仍然使用旧版本 —— 游戏能正常启动")
+print("          下次启动会重新下载（断点续传）")
+
+print()
+print("=== 5. 版本强制校验（联机必需）★★★ ===")
+print()
+
+local function checkVersionCompat(clientVer, serverVer, protocolVer, minProtocol)
+  -- 规则 1：协议版本必须匹配
+  if protocolVer &lt; minProtocol then
+    return false, "协议版本过旧，必须更新客户端"
+  end
+
+  -- 规则 2：脚本版本可以不同，但差距不能太大
+  local cMajor = tonumber(clientVer:match("v(%d+)"))
+  local sMajor = tonumber(serverVer:match("v(%d+)"))
+
+  if sMajor - cMajor &gt; 2 then
+    return false, "客户端版本过旧，请更新"
+  end
+
+  return true, "版本兼容"
+end
+
+local testCases = {
+  { "v5", "v5", 10, 10, true },
+  { "v5", "v6", 10, 10, true },      -- 差一个小版本，OK
+  { "v3", "v6", 10, 10, false },     -- 差三个大版本，要求更新
+  { "v5", "v5",  8, 10, false },     -- 协议过旧
+}
+
+print(string.format("  %-12s %-12s %-10s %-10s %s", "客户端", "服务器", "协议", "最低协议", "结果"))
+print("  " .. string.rep("-", 72))
+
+for _, tc in ipairs(testCases) do
+  local ok, msg = checkVersionCompat(tc[1], tc[2], tc[3], tc[4])
+  print(string.format("  %-12s %-12s %-10d %-10d %s",
+    tc[1], tc[2], tc[3], tc[4], ok and "通过" or ("【拒绝】" .. msg)))
+end
+
+print()
+print("  【重要性】不做版本校验的后果：")
+print("    · 玩家 A 更新了，玩家 B 没更新 -&gt; 联机时协议不一致")
+print("    · 数据错乱、崩溃、甚至刷道具漏洞")
+
+print()
+print("=== 6. 上线检查清单 ===")
+print()
+print(string.format("  %-22s %-14s %s", "检查项", "重要性", "不做的后果"))
+print("  " .. string.rep("-", 76))
+
+local checklist = {
+  { "文件 MD5 校验",   "必须",   "热更后无法启动" },
+  { "原子切换",        "必须",   "卡加载界面" },
+  { "保留旧版本",      "必须",   "无法回滚" },
+  { "版本强制校验",    "必须",   "联机数据错乱" },
+  { "断点续传",        "重要",   "弱网玩家反复下载" },
+  { "灰度发布",        "重要",   "全量玩家受影响" },
+  { "错误率监控",      "重要",   "靠玩家反馈发现问题" },
+  { "一键停更开关",    "重要",   "无法紧急止损" },
+  { "增量更新",        "建议",   "浪费流量，玩家不满" },
+}
+
+for _, c in ipairs(checklist) do
+  print(string.format("  %-22s %-14s %s", c[1], c[2], c[3]))
+end
+
+print()
+print("=== 7. 四个真实问题的总结 ===")
+print()
+print("  【问题一】热更后卡在加载界面")
+print("    原因：下载不完整就用了新脚本（半包）")
+print("    解决：临时目录 + MD5 校验 + 原子切换")
+print()
+print("  【问题二】部分玩家没更新，联机出问题")
+print("    原因：热更不是强制的")
+print("    解决：登录时强制校验版本")
+print()
+print("  【问题三】热更把游戏更坏了")
+print("    原因：没有回滚机制")
+print("    解决：保留完整旧版本 + 服务器切换版本号 + 灰度发布")
+print()
+print("  【问题四】状态残留导致疑难 bug")
+print("    原因：热更重载模块，但旧状态还在")
+print("    解决：模块提供 reset() + 状态迁移 + 状态与逻辑分离")</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>概念</th><th>含义</th><th>示例</th></tr></thead>
+  <tbody>
+    <tr><td><strong>App 版本</strong></td><td>安装包的版本</td><td>1.2.0（改这个要重新发版）</td></tr>
+    <tr><td><strong>资源版本</strong></td><td>资源的版本号</td><td>20240115（可热更）</td></tr>
+    <tr><td><strong>脚本版本</strong></td><td>Lua 脚本的版本</td><td>可能包含多个脚本的哈希</td></tr>
+    <tr><td><strong>清单文件</strong></td><td>记录所有文件的版本</td><td><strong>热更的核心</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="real-problems">二、四个上线后才会遇到的问题 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">问题一：热更后玩家卡在加载界面</span>
+  <strong>原因</strong>：下载了一半的脚本，校验失败，但客户端已经<em>用新脚本启动了</em>。<br>
+  <strong>典型场景</strong>：玩家弱网下载到 80% 退出，下次启动读到不完整的文件。<br><br>
+  <strong>解决方案</strong>：<br>
+  ① <strong>下载到临时目录，全部完成后再切换</strong>（原子操作）<br>
+  ② <strong>每个文件都要 MD5 校验</strong><br>
+  ③ <strong>保留完整的旧版本</strong>，新版本有问题就切回去<br><br>
+  <em>这三个措施缺一个都可能出事故。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">问题二：部分玩家没更新，联机出问题</span>
+  <strong>原因</strong>：热更不是强制的，有的玩家更新了，有的没有。<br>
+  <strong>后果</strong>：两人联机时<em>协议不一致</em> → 数据错乱或崩溃。<br><br>
+  <strong>解决方案</strong>：<br>
+  ① <strong>登录时强制校验版本</strong>——版本不一致就要求更新<br>
+  ② <strong>协议版本独立</strong>——协议变了必须是强更<br>
+  ③ <strong>服务器同时支持新旧协议</strong>（过渡期）<br><br>
+  <em>这一条在页 24（API 速查）会再次出现——它属于"上线检查清单"的必备项。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">问题三：热更把游戏更坏了，怎么回滚</span>
+  <strong>这是最要命的场景</strong>——推了一个有 bug 的脚本，<em>所有玩家立刻受影响</em>。<br><br>
+  <strong>必须有回滚能力</strong>：<br>
+  ① <strong>保留上一版本的完整脚本</strong>（不要覆盖）<br>
+  ② <strong>服务器切换"当前版本号"即可回滚</strong>（秒级）<br>
+  ③ <strong>客户端下次启动自动拉回旧版本</strong><br><br>
+  <strong>更保险的做法</strong>：<br>
+  · <strong>灰度发布</strong>——先推 1% 玩家，观察 30 分钟<br>
+  · <strong>错误率监控</strong>——异常自动触发回滚<br>
+  · <strong>一键停更</strong>——紧急情况下暂停所有热更<br><br>
+  <em>我在 C# 站页 16 说过一句话：没有回滚方案的热更，等于把线上项目放在没有刹车的车上。这里再重复一次——因为它值得重复。</em>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">问题四：状态残留导致疑难 bug</span>
+  <strong>场景</strong>：热更后重载了某模块，但<em>它持有的旧状态还在</em>。<br>
+  <strong>表现</strong>：<br>
+  · 玩家数据错乱（用了旧缓存）<br>
+  · 界面显示旧数据<br>
+  · <em>诡异且难以复现</em><br><br>
+  <strong>解决方案</strong>（回顾页 15）：<br>
+  ① <strong>模块提供 <code>reset()</code></strong>，热更后统一调用<br>
+  ② <strong>热更时做状态迁移</strong>——保存旧状态，注入新模块<br>
+  ③ <strong>把状态与逻辑分离</strong>——模块只管逻辑，数据放在专门的 Data 层<br><br>
+  <em>方案 ③ 是最彻底的——它让模块变成"无状态的"，热更时不需要担心状态问题。这是成熟框架的普遍做法。</em>
+</div>
+
+<h2 id="checklist">三、上线检查清单</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>检查项</th><th>为什么</th><th>不做的后果</th></tr></thead>
+  <tbody>
+    <tr><td><strong>文件校验</strong></td><td>防止下载损坏</td><td>热更后无法启动</td></tr>
+    <tr><td><strong>原子切换</strong></td><td>防止半包可用</td><td>卡加载界面</td></tr>
+    <tr><td><strong>版本强制校验</strong></td><td>防止协议不一致</td><td>联机数据错乱</td></tr>
+    <tr><td><strong>完整回滚</strong></td><td>出问题能恢复</td><td><strong>线上事故无法止损</strong></td></tr>
+    <tr><td><strong>灰度发布</strong></td><td>小范围验证</td><td>全量玩家受影响</td></tr>
+    <tr><td><strong>错误上报</strong></td><td>及时发现问题</td><td>靠玩家反馈</td></tr>
+    <tr><td><strong>停更开关</strong></td><td>紧急暂停</td><td>持续推送错误版本</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">把这些变成工具</span>
+  <strong>不要指望"每次都记得检查"</strong>——人会忘。<br>
+  <strong>做法</strong>：把这些检查写成<strong>自动化脚本</strong>：<br>
+  · 打包后自动校验所有文件<br>
+  · 上传前自动生成清单<br>
+  · 发布后自动监控错误率<br><br>
+  <em>这回到 C# 站页 19 讲的原则：同一个错误犯过两次，就该写工具防止第三次。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="17">
+  <div class="task"><input type="checkbox" id="t-17-1"><label for="t-17-1"><strong>设计清单格式</strong>：用 JSON 描述所有文件（路径 + MD5 + 大小 + 版本），写一个解析与比对函数。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-2"><label for="t-17-2"><strong>实现差异计算</strong>：给定"本地清单"与"服务器清单"，输出需要下载/删除的文件列表。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-3"><label for="t-17-3"><strong>实现原子切换</strong>：下载到临时目录，校验通过后一次性切换（用目录重命名）。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-4"><label for="t-17-4"><strong>实现版本回滚</strong>：保留两个版本目录，实现"切回上一版本"的能力。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-5"><label for="t-17-5"><strong>做灰度开关</strong>：实现"只对 N% 玩家生效"的版本控制。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-6"><label for="t-17-6"><strong>写上线清单</strong>：列出你项目的热更上线检查项，做成可打印的表格。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-7"><label for="t-17-7"><strong>回答面试题</strong>：① 怎么防止"下载一半就用了新脚本"？② 联机时版本不一致怎么处理？③ 热更出问题怎么回滚？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能设计清单文件格式并实现差异比对</strong>；<br>
+    ② <strong>知道"原子切换"的必要性与实现方式</strong>；<br>
+    ③ <strong>能说出热更上线后会遇到的四个真实问题</strong>；<br>
+    ④ 知道版本强制校验的作用；<br>
+    ⑤ <strong>能列出完整的上线检查清单</strong>。<br>
+    <br>
+    <em>第 ③ 条是这一页的核心——这些不是理论问题，而是每个做过热更的项目都遇到过的事故。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="16-framework-ui.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">16 UI 框架 ★★★</div>
+  </a>
+  <a class="next" href="18-debug.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">18 调试与排错 ★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<h1>09 · 构建系统与工具链</h1>
+
+<p class="lead">这一页讲<strong>让 C++ 项目能编译、能协作、能发布</strong>的那些事。<em>Unreal 的构建系统很复杂，但理解了就不神秘</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="unreal-build">一、Unreal 的构建系统 ★★</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>组件</th><th>作用</th><th>语言</th></tr></thead>
+  <tbody>
+    <tr><td><strong>UnrealBuildTool (UBT)</strong></td><td><strong>决定怎么编译</strong></td><td><em>C#（.NET）</em></td></tr>
+    <tr><td><strong>.Build.cs</strong></td><td>声明模块依赖</td><td>C# 语法</td></tr>
+    <tr><td><strong>.Target.cs</strong></td><td>定义构建目标</td><td>C# 语法</td></tr>
+    <tr><td><strong>.uproject</strong></td><td>项目描述文件</td><td>JSON</td></tr>
+    <tr><td><strong>UnrealHeaderTool (UHT)</strong></td><td><strong>处理 UE 宏</strong></td><td>C++</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">最反直觉的一点：构建配置用 C# 写</span>
+  <strong>传统 C++ 项目用 CMake / Makefile</strong>，<em>Unreal 用 C#</em>。<br><br><strong>为什么</strong>：<br>· <em>UBT 本身就是 C# 程序（跑在 .NET 上）</em><br>· <em>用 C# 描述构建逻辑更灵活</em>（<em>有完整的编程能力</em>）<br>· <em>能跨平台</em><br><br><strong>这意味着</strong>：<em>改构建配置要懂一点 C#</em>——<strong>这是很多 Unity 转 UE 的人没想到的</strong>。<br><br><strong>实际影响</strong>：<em>当你需要"条件编译"或"自定义构建步骤"时，要写 C# 代码而不是 CMake 脚本。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">最常见的构建错误：模块依赖没声明</span>
+  <strong>症状</strong>：<br><code>unresolved external symbol</code><br>或<br><code>cannot open include file</code><br><br><strong>原因</strong>：<em>用了某个模块的类，但没在 .Build.cs 里声明。</em><br><br><strong>解法</strong>：<em>在 <code>PublicDependencyModuleNames</code> 或 <code>PrivateDependencyModuleNames</code> 里加模块名</em>：<br><code>PublicDependencyModuleNames.AddRange(new string[] {</code><br><code>&nbsp;&nbsp;"Core", "CoreUObject", "Engine", "InputCore",</code><br><code>&nbsp;&nbsp;"GameplayAbilities",   // 用了 GAS 就要加</code><br><code>&nbsp;&nbsp;"UMG"                   // 用了 UMG 就要加</code><br><code>});</code><br><br><strong>为什么容易忘</strong>：<em>IDE 的补全可能能找到头文件，但链接时会失败</em>——<strong>因为编译和链接是两个阶段（页 03）。</strong>
+</div>
+
+<h2 id="compile-speed">二、编译加速的五个手段</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>手段</th><th>效果</th><th>代价</th></tr></thead>
+  <tbody>
+    <tr><td><strong>前向声明</strong></td><td><span class="mk mk--yes">显著</span></td><td><em>需要改代码结构</em></td></tr>
+    <tr><td><strong>减少头文件包含</strong></td><td>显著</td><td>同上</td></tr>
+    <tr><td><strong>把实现放 .cpp</strong></td><td>中等</td><td><em>无法内联</em></td></tr>
+    <tr><td><strong>拆分模块</strong></td><td>中等</td><td><strong>需要设计</strong></td></tr>
+    <tr><td><strong>用 IWYU（Include What You Use）</strong></td><td>中等</td><td>需要工具支持</td></tr>
+    <tr><td><strong>增量编译</strong></td><td><strong>极大（日常）</strong></td><td><em>首次全量仍慢</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">Unreal 的编译为什么这么慢</span>
+  <strong>三个原因</strong>：<br>① <strong>每个头文件改动会触发大量重编译</strong>（<em>因为依赖链长</em>）<br>② <strong>UHT 要先处理宏</strong>（<em>额外的预处理阶段</em>）<br>③ <strong>模板实例化开销</strong>（<em>页 06</em>）<br><br><strong>实际影响</strong>：<br>· 改 <code>.cpp</code> → <em>通常几十秒</em><br>· 改 <code>.h</code> → <strong>可能几分钟到十几分钟</strong><br><br><strong>应对策略</strong>：<br>· <em>尽量把易变的逻辑放蓝图</em>（<em>不触发 C++ 编译</em>）<br>· <em>头文件只放必要的声明</em><br>· <em>珍惜每次编译——一次改完再编译</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="09">
+  <div class="task"><input type="checkbox" id="t-09-1"><label for="t-09-1"><strong>看 .Build.cs</strong>：打开你项目的 .Build.cs，理解每个模块的作用。</label></div>
+  <div class="task"><input type="checkbox" id="t-09-2"><label for="t-09-2"><strong>制造链接错误</strong>：用一个模块的类但不声明依赖，观察错误。</label></div>
+  <div class="task"><input type="checkbox" id="t-09-3"><label for="t-09-3"><strong>加模块依赖</strong>：声明依赖后重新编译，验证错误消失。</label></div>
+  <div class="task"><input type="checkbox" id="t-09-4"><label for="t-09-4"><strong>测编译时间</strong>：改一个 .cpp 和改一个 .h，分别测编译时间。<em>感受差异。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-09-5"><label for="t-09-5"><strong>用前向声明优化</strong>：找一个头文件，把不必要的 include 改成前向声明，测编译时间变化。</label></div>
+  <div class="task"><input type="checkbox" id="t-09-6"><label for="t-09-6"><strong>回答面试题</strong>：① UBT 用什么语言写？② 链接错误最常见的原因？③ 怎么加快 UE 编译？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道 UBT 是 C# 写的，构建配置用 C# 语法</strong>；<br>
+    ② <strong>知道 .Build.cs 的作用及最常见的错误</strong>；<br>
+    ③ 能说出编译加速的五个手段；<br>
+    ④ <strong>知道 UE 编译慢的三个原因</strong>；<br>
+    ⑤ 有一次"改头文件 vs 改源文件"的编译时间对比。<br>
+    <br>
+    <em>第 ① 和 第 ② 条最实用——**它们能解决你 80% 的构建问题**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="08-cpp-concurrency.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">08 并发与性能 ★★</div>
+  </a>
+  <a class="next" href="10-math.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">10 游戏数学基础 ★</div>
+  </a>
+</nav>

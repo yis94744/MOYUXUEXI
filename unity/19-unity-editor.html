@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>19 编辑器扩展与工具链 — C# + Unity 路线｜从零基础到独立完成商业级项目</title>
+<meta name="description" content="自定义 Inspector、EditorWindow、PropertyDrawer、AssetPostprocessor、构建脚本自动化">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C# + Unity 路线
+        <span>从零基础到独立完成商业级项目</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>19 · 编辑器扩展与工具链</h1>
+
+<p class="lead">这是<strong>Unity 引擎线的最后一页</strong>，也是最容易被忽略的一页。很多人觉得"编辑器扩展不是游戏开发"——但事实是：<em>它决定了团队的效率上限</em>，而且是<strong>深入理解 Unity 的最佳途径</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（18）讲 Job System 与 DOTS，那是<em>运行时性能</em>。这一页讲<strong>开发时效率</strong>。<br>
+  <strong>关键衔接</strong>：页 06 讲的<em>特性与反射</em>是编辑器扩展的基础；页 11 讲的 <em>ScriptableObject</em> 常与编辑器工具配合做配置表。<br>
+  <strong>下一页</strong>（20）进入通用能力线（架构与设计模式）。<em>引擎知识到这里就完整了。</em><br>
+  <strong>为什么值得学</strong>：<em>工具程序是被低估的方向</em>——门槛不高、需求稳定、而且做工具的人往往比写玩法的人更懂引擎。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="06-cs-modern.html#attribute" data-brief="给代码贴元数据标签，由框架或反射读取"><span class="prereq__title">特性 Attribute</span><span class="prereq__page">06-cs-modern</span></a>
+          <a class="prereq__item" href="06-cs-modern.html#reflection" data-brief="运行时检查类型；慢 100~1000 倍，IL2CPP 下泛型反射有限制"><span class="prereq__title">反射</span><span class="prereq__page">06-cs-modern</span></a>
+          <a class="prereq__item" href="11-unity-core.html#so" data-brief="数据与代码分离：配置表、事件通道、全局数据容器"><span class="prereq__title">ScriptableObject</span><span class="prereq__page">11-unity-core</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="why">一、为什么编辑器扩展值得学</h2>
+
+<p>编辑器扩展不是"锦上添花"，而是<strong>解决三个真实问题</strong>。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
+// ============================================================
+//  编辑器扩展：让工具提升团队效率
+// ============================================================
+//  为什么编辑器扩展值得学？
+//    1. 它能把"重复的手工操作"变成一键完成
+//    2. 它能防止策划/美术配错数据
+//    3. 【它是深入理解 Unity 的最佳途径】——因为你要操作编辑器本身
+
+// ============================================================
+//  1. 自定义 Inspector
+// ============================================================
+public class EnemyConfigInspectorTarget : MonoBehaviour
+{
+    [Range(1, 9999)] public int maxHp = 100;
+    [Range(0f, 100f)] public float moveSpeed = 3f;
+    [Range(0f, 100f)] public float attack = 10f;
+    public string displayName = "史莱姆";
+    public bool isBoss = false;
+    [TextArea(2, 5)] public string description;
+}
+
+#if UNITY_EDITOR
+[CustomEditor(typeof(EnemyConfigInspectorTarget))]
+public class EnemyConfigInspectorTargetEditor : Editor
+{
+    public override void OnInspectorGUI()
+    {
+        var t = (EnemyConfigInspectorTarget)target;
+
+        // 绘制默认的 Inspector
+        DrawDefaultInspector();
+
+        EditorGUILayout.Space(10);
+
+        // 加一个"常用操作"按钮
+        if (GUILayout.Button("恢复默认值"))
+        {
+            Undo.RecordObject(t, "Reset Enemy Config");
+            t.maxHp = 100;
+            t.moveSpeed = 3f;
+            t.attack = 10f;
+            t.displayName = "史莱姆";
+            EditorUtility.SetDirty(t);
+        }
+
+        // 加一个数据校验提示
+        if (t.attack &gt; t.maxHp)
+        {
+            EditorGUILayout.HelpBox("攻击力大于血量，这可能不合法", MessageType.Warning);
+        }
+
+        if (t.isBoss &amp;&amp; t.maxHp &lt; 1000)
+        {
+            EditorGUILayout.HelpBox("Boss 的血量通常应该更高", MessageType.Info);
+        }
+    }
+}
+#endif
+
+// ============================================================
+//  2. CustomPropertyDrawer：让字段显示得更直观
+// ============================================================
+[System.Serializable]
+public struct MinMaxRange
+{
+    public float min;
+    public float max;
+}
+
+#if UNITY_EDITOR
+[CustomPropertyDrawer(typeof(MinMaxRange))]
+public class MinMaxRangeDrawer : PropertyDrawer
+{
+    public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+    {
+        EditorGUI.BeginProperty(position, label, property);
+
+        var minProp = property.FindPropertyRelative("min");
+        var maxProp = property.FindPropertyRelative("max");
+
+        // 用一个 MinMaxSlider 代替两个输入框
+        float min = minProp.floatValue;
+        float max = maxProp.floatValue;
+        EditorGUI.MinMaxSlider(position, label, ref min, ref max, 0f, 100f);
+        minProp.floatValue = min;
+        maxProp.floatValue = max;
+
+        EditorGUI.EndProperty();
+    }
+}
+#endif
+
+// ============================================================
+//  3. EditorWindow：自制工具窗口
+// ============================================================
+#if UNITY_EDITOR
+public class BatchToolWindow : EditorWindow
+{
+    private int _count = 10;
+    private float _spacing = 2f;
+
+    [MenuItem("工具/批量生成物体 %#g")]      // %#g = Ctrl+Shift+G
+    public static void ShowWindow()
+    {
+        GetWindow&lt;BatchToolWindow&gt;("批量生成");
+    }
+
+    private void OnGUI()
+    {
+        GUILayout.Label("批量生成设置", EditorStyles.boldLabel);
+
+        _count = EditorGUILayout.IntSlider("数量", _count, 1, 100);
+        _spacing = EditorGUILayout.Slider("间隔", _spacing, 0.5f, 10f);
+
+        if (GUILayout.Button("生成"))
+        {
+            GenerateObjects();
+        }
+
+        if (GUILayout.Button("清理场景中的 Test_ 物体"))
+        {
+            CleanupTestObjects();
+        }
+    }
+
+    private void GenerateObjects()
+    {
+        for (int i = 0; i &lt; _count; i++)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = "Test_" + i;
+            go.transform.position = new Vector3(i * _spacing, 0f, 0f);
+
+            // 【重要】注册到 Undo 系统，支持 Ctrl+Z
+            Undo.RegisterCreatedObjectUndo(go, "Generate Objects");
+        }
+        Debug.Log("生成了 " + _count + " 个物体");
+    }
+
+    private void CleanupTestObjects()
+    {
+        var all = FindObjectsOfType&lt;GameObject&gt;();
+        int removed = 0;
+        foreach (var go in all)
+        {
+            if (go.name.StartsWith("Test_"))
+            {
+                Undo.DestroyObjectImmediate(go);
+                removed++;
+            }
+        }
+        Debug.Log("清理了 " + removed + " 个物体");
+    }
+}
+#endif
+
+// ============================================================
+//  4. 菜单项：给常用操作加快捷键
+// ============================================================
+#if UNITY_EDITOR
+public static class QuickMenu
+{
+    [MenuItem("工具/清空 PlayerPrefs")]
+    public static void ClearPrefs()
+    {
+        PlayerPrefs.DeleteAll();
+        Debug.Log("PlayerPrefs 已清空");
+    }
+
+    [MenuItem("工具/截图并保存到桌面")]
+    public static void Screenshot()
+    {
+        string path = System.IO.Path.Combine(
+            System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop),
+            "screenshot_" + System.DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png");
+        ScreenCapture.CaptureScreenshot(path);
+        Debug.Log("截图已保存: " + path);
+    }
+}
+#endif
+
+// ============================================================
+//  5. 资产导入处理器
+// ============================================================
+#if UNITY_EDITOR
+public class TextureImportPostprocessor : AssetPostprocessor
+{
+    // 匹配路径：所有在 Textures/UI 下的贴图
+    private void OnPreprocessTexture()
+    {
+        if (!assetPath.Contains("/Textures/UI/")) return;
+
+        var importer = (TextureImporter)assetImporter;
+
+        // 统一设置：UI 贴图用 Sprite 类型
+        importer.textureType = TextureImporterType.Sprite;
+        importer.spriteImportMode = SpriteImportMode.Single;
+
+        // 移动端用 ASTC 压缩
+        importer.textureCompression = TextureImporterCompression.CompressedHQ;
+
+        Debug.Log("自动处理 UI 贴图: " + assetPath);
+    }
+}
+#endif
+
+// ============================================================
+//  编辑器扩展的四个最佳实践
+// ============================================================
+//  1. 【必须用 Undo】任何修改都要能 Ctrl+Z，否则美术会恨你
+//  2. 【用 #if UNITY_EDITOR 包裹】编辑器代码不能进包体
+//  3. 【放在 Editor 目录】或加 asmdef，避免打包报错
+//  4. 【给快捷键】常用的操作加 MenuItem 快捷键，效率翻倍</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>问题</th><th>没有工具时</th><th>有工具时</th></tr></thead>
+  <tbody>
+    <tr><td><strong>重复操作</strong></td><td>手动点 100 次</td><td><strong>一键完成</strong></td></tr>
+    <tr><td><strong>配错数据</strong></td><td>运行时才发现</td><td><strong>编辑器里就拦住</strong></td></tr>
+    <tr><td><strong>团队效率</strong></td><td>每个人都踩同样的坑</td><td><strong>工具把经验固化</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">编辑器扩展的四个层次</span>
+  <strong>① 自定义 Inspector</strong>——让字段显示更清晰、加校验<br>
+  <strong>② PropertyDrawer</strong>——让某个类型显示得更直观<br>
+  <strong>③ EditorWindow</strong>——自制工具窗口，批量操作<br>
+  <strong>④ AssetPostprocessor</strong>——资源导入时自动处理<br><br>
+  <em>从 ① 开始做起，慢慢往 ④ 走。</em>
+</div>
+
+<h2 id="rules">二、四个必须遵守的规则</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">规则一：必须用 Undo</span>
+  <strong>任何修改都要能 Ctrl+Z。</strong><br>
+  用 <code>Undo.RecordObject</code> 记录修改前的状态，<code>Undo.RegisterCreatedObjectUndo</code> 登记新建对象。<br><br>
+  <em>不这么做的后果是：美术点错一次按钮，整个场景白改了。<strong>他们下次就不会用你的工具了。</strong></em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">规则二：编辑器代码不能进包体</span>
+  编辑器专用代码必须用 <code>#if UNITY_EDITOR</code> 包裹，或者放在 <code>Editor</code> 目录下。<br><br>
+  <em>否则打包时会报错——因为 <code>UnityEditor</code> 命名空间在运行时不存在。</em><br><br>
+  <strong>最常见的编译错误</strong>：<code>The type or namespace name UnityEditor could not be found</code>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">规则三：注意性能</span>
+  <code>OnInspectorGUI</code> 会<strong>每帧调用多次</strong>（鼠标移动、重绘都会触发）。<br>
+  · 不要在里做昂贵计算<br>
+  · 不要用 <code>FindObjectsOfType</code> 之类遍历场景的 API<br>
+  · 需要缓存的数据存到字段里
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">规则四：改完要 SetDirty</span>
+  修改字段后必须调 <code>EditorUtility.SetDirty(target)</code>，否则<strong>改动不会保存到磁盘</strong>。<br>
+  <em>表现是：改了、看起来生效了，但关掉 Unity 再打开就没了。</em>
+</div>
+
+<h2 id="toolchain">三、工具链的全局视角</h2>
+
+<p>编辑器扩展只是工具链的一环。完整的工程工具链还包括：</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>环节</th><th>工具</th><th>解决的问题</th></tr></thead>
+  <tbody>
+    <tr><td><strong>代码规范</strong></td><td>EditorConfig / 分析器</td><td>命名、格式统一</td></tr>
+    <tr><td><strong>配置表</strong></td><td>Excel → ScriptableObject / JSON</td><td>策划改数据不用找程序</td></tr>
+    <tr><td><strong>资源检查</strong></td><td>AssetPostprocessor / 自定义检查</td><td><em>贴图格式错、命名不规范</em></td></tr>
+    <tr><td><strong>打包</strong></td><td>BuildPipeline / 命令行构建</td><td>一键出包，可 CI 集成</td></tr>
+    <tr><td><strong>测试</strong></td><td>Unity Test Framework</td><td>关键逻辑自动化验证</td></tr>
+    <tr><td><strong>版本控制</strong></td><td>Git + LFS / UnityYAMLMerge</td><td>大文件与场景合并</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">工具的价值在于"固化经验"</span>
+  <strong>每个项目都会踩一些坑</strong>——贴图格式不对、资源命名混乱、场景里多余物件……<br>
+  <strong>没有工具时</strong>：每次都要靠人记住、靠 review 发现。<br>
+  <strong>有工具时</strong>：把这些检查写成脚本，<em>问题在提交前就被拦住</em>。<br><br>
+  <strong>判断标准很简单</strong>：<em>同一个错误如果犯过两次，就该写个工具防止第三次。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="19">
+  <div class="task"><input type="checkbox" id="t-19-1"><label for="t-19-1"><strong>写一个自定义 Inspector</strong>：给一个配置类加"恢复默认值"按钮和数值校验提示。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-2"><label for="t-19-2"><strong>写一个 PropertyDrawer</strong>：让 <code>MinMaxRange</code> 这类结构用一个滑块显示，而不是两个输入框。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-3"><label for="t-19-3"><strong>写一个 EditorWindow</strong>：做一个批量生成/清理物体的工具，<em>记得加 Undo 支持</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-4"><label for="t-19-4"><strong>写一个 AssetPostprocessor</strong>：自动给某个目录下的贴图设置统一的导入参数。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-5"><label for="t-19-5"><strong>加一个菜单快捷键</strong>：把常用操作做成菜单项，配上快捷键。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-6"><label for="t-19-6"><strong>做一次打包脚本</strong>：用 <code>BuildPipeline</code> 写一个命令行可调用的打包函数。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-7"><label for="t-19-7"><strong>回答面试题</strong>：① 自定义 Inspector 怎么实现？② 为什么必须用 Undo？③ 编辑器代码怎么不进包体？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出编辑器扩展的四个层次及各自用途；<br>
+    ② <strong>能写一个带 Undo 支持的自定义 Inspector</strong>；<br>
+    ③ 知道编辑器代码必须用 <code>#if UNITY_EDITOR</code> 包裹的原因；<br>
+    ④ 能列举完整工程工具链的六个环节；<br>
+    ⑤ 有一次"把重复劳动变成工具"的经历。<br>
+    <br>
+    <em>第 ⑤ 条是这一页的真正价值——工具能力是区分"执行者"和"效率提升者"的分界线。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="18-unity-ecs.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">18 Job System 与 DOTS</div>
+  </a>
+  <a class="next" href="20-patterns.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">20 架构与设计模式</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

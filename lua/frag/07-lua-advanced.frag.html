@@ -1,0 +1,152 @@
+<h1>07 · 高级特性</h1>
+
+<p class="lead">这一页讲 Lua 的<strong>四件"高级但常用"的事</strong>：<em>协程、错误处理、垃圾回收、环境沙箱</em>。它们不是语法糖，而是<em>框架设计的核心工具</em>——你在 xLua、各种 Lua 框架里都会看到它们。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（06）讲的元表是 Lua 的"地基"。这一页讲的是<em>建立在地基之上的高级能力</em>。<br>
+  <strong>关键衔接</strong>：协程是<strong>状态机</strong>的另一种实现方式（对比算法站的页 16）；弱表是<strong>缓存</strong>的实现手段（见算法站页 27）。<br>
+  <strong>下一页</strong>（08）性能优化——<em>这一页的所有特性都有性能代价，下一页会量化它</em>。<br>
+  <strong>验证方式</strong>：本页所有代码在 <em>Lua 5.4.7</em> 实测运行，输出结果是真实的。
+</div>
+
+<h2 id="coroutine">一、协程：Lua 的并发原语 ★</h2>
+
+<p>协程<strong>不是线程</strong>，而是<em>可以暂停与恢复的函数</em>。它的价值在于——<strong>用同步的写法表达异步的逻辑</strong>。</p>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>07/advanced</code></div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>函数</th><th>作用</th><th>返回值</th></tr></thead>
+  <tbody>
+    <tr><td><code>coroutine.create</code></td><td>创建协程</td><td>协程对象</td></tr>
+    <tr><td><code>coroutine.resume</code></td><td>启动/恢复</td><td><strong>true/false, 返回值</strong></td></tr>
+    <tr><td><code>coroutine.yield</code></td><td>暂停并交出值</td><td>—</td></tr>
+    <tr><td><code>coroutine.status</code></td><td>查询状态</td><td><code>suspended</code>/<code>running</code>/<code>dead</code></td></tr>
+    <tr><td><code>coroutine.wrap</code></td><td>包装成函数</td><td><strong>直接调用，出错会抛出</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">resume 不会抛异常，wrap 会</span>
+  <strong><code>coroutine.resume(co)</code></strong> 返回 <code>false, errmsg</code>——<em>错误被捕获，不会中断调用方</em>。<br>
+  <strong><code>coroutine.wrap(f)</code></strong> 返回一个函数，调用它时<em>如果协程内部出错，错误会直接抛出</em>。<br><br>
+  <strong>怎么选</strong>：<br>
+  · 需要处理错误 → 用 <code>resume</code>（能拿到错误信息）<br>
+  · 写迭代器、确信不会出错 → 用 <code>wrap</code>（代码更简洁）
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">协程最实用的场景：写迭代器</span>
+  看本页代码里的两个例子：<br>
+  <strong>① 无限序列</strong>（斐波那契）——协程可以<em>暂停在任意位置</em>，天然适合生成无限序列。<br>
+  <strong>② 树的递归遍历</strong>——用递归写逻辑，用协程<em>把递归结果变成线性序列</em>。<br><br>
+  <em>对比一下：如果不用协程，这两个都要自己维护状态变量。协程把"状态"变成了"代码位置"。</em>
+</div>
+
+<h2 id="error">二、错误处理</h2>
+
+<p>Lua 的错误处理有<strong>两种风格</strong>，混用会导致灾难。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>风格</th><th>写法</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>抛异常</strong></td><td><code>error()</code> + <code>pcall</code></td><td><em>真正的意外</em></td></tr>
+    <tr><td><strong>返回 nil+msg</strong></td><td><code>return nil, "错误"</code></td><td><strong>预期内的失败</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">error 的第二个参数（level）</span>
+  <strong>默认 level = 1</strong>：错误信息里包含<em>调用 error 的那一行</em>。<br>
+  <strong>level = 2</strong>：错误信息指向<em>调用当前函数的那一行</em>——<strong>写工具函数时应该用这个</strong>。<br>
+  <strong>level = 0</strong>：不添加位置信息，错误信息就是纯文本。<br><br>
+  <strong>为什么 level = 2 更合适</strong>：如果你写的 <code>validateNumber(n)</code> 内部 <code>error("参数非法")</code>，用默认 level 会报错在 <code>validateNumber</code> 内部——<em>但真正的问题是调用方传了错参数</em>。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">xpcall 能拿到堆栈，pcall 不能</span>
+  <strong><code>pcall(f)</code></strong> 只给你错误消息，<em>看不到调用栈</em>。<br>
+  <strong><code>xpcall(f, handler)</code></strong> 让你在 handler 里<em>用 <code>debug.traceback</code> 获取完整堆栈</em>。<br><br>
+  <strong>实战建议</strong>：<em>框架的顶层调用应该用 xpcall + debug.traceback</em>——出问题时能看到完整调用链，而不是一行孤立的错误信息。<br>
+  Lua 5.2+ 的 xpcall 还支持<strong>给函数传参</strong>，避免用闭包包装。<br><br>
+  <strong>最佳实践</strong>：<em>预期内的失败（文件不存在、参数非法）用 <code>return nil, msg</code>；真正的意外（数组越界、类型错误）才用 error。</em>
+</div>
+
+<h2 id="gc">三、垃圾回收与弱表 ★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">弱表：不阻止对象被回收的容器</span>
+  <strong><code>__mode = "v"</code></strong>：值是弱引用——<em>值不被其他地方引用时，这个条目自动消失</em>。<br>
+  <strong><code>__mode = "k"</code></strong>：键是弱引用——<em>键对象被回收时，整个条目消失</em>。<br>
+  <strong><code>__mode = "kv"</code></strong>：两者都是弱引用。<br><br>
+  <strong>最实用的场景</strong>：给对象挂"附加数据"而不阻止它被回收。<br>
+  例如：<code>local extraData = setmetatable({}, {__mode = "k"})</code><br>
+  <code>extraData[someEntity] = {...}</code><br>
+  <em>当 someEntity 被回收时，对应的附加数据自动清理</em>——不需要手动管理。<br><br>
+  <strong>这正是"缓存"的一种实现</strong>（见算法站页 27）。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">collectgarbage 不要频繁调用</span>
+  <strong><code>collectgarbage("collect")</code></strong> 会触发一次完整的 GC 循环，<em>是同步阻塞的</em>。<br>
+  在游戏的帧循环里调用它，会造成明显卡顿。<br><br>
+  <strong>什么时候可以调</strong>：<br>
+  · 加载界面（玩家不在意这点延迟）<br>
+  · 场景切换时<br>
+  · 内存告警时的兜底<br><br>
+  <strong>什么时候不要调</strong>：<em>Update 里、战斗过程中、任何帧率敏感的位置。</em>
+</div>
+
+<h2 id="sandbox">四、环境与沙箱</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">_ENV 与沙箱</span>
+  <strong>Lua 5.2+ 用 <code>_ENV</code> 取代了旧版的 <code>setfenv</code>。</strong><br>
+  每个函数都有一个 <code>_ENV</code> 上值，<em>所有全局变量访问实际是在访问 <code>_ENV</code> 的字段</em>。<br><br>
+  <strong>沙箱的用途</strong>：<br>
+  · 让配置脚本只能访问<em>白名单内的 API</em><br>
+  · 热更脚本的安全加载（防止恶意代码）<br>
+  · 玩家自定义脚本（UGC）<br><br>
+  <strong>做法</strong>：<code>load(code, name, "t", customEnv)</code> —— 第四个参数指定环境表。<br>
+  <em>这样脚本里的 <code>print</code>、<code>os.execute</code> 等都会去 customEnv 里找，找不到就是 nil。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="07">
+  <div class="task"><input type="checkbox" id="t-07-1"><label for="t-07-1"><strong>手写协程迭代器</strong>：不看示例，用 <code>coroutine.wrap</code> 写一个遍历树的迭代器。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-2"><label for="t-07-2"><strong>验证 error level</strong>：分别用 level 1/2/0 抛错，对比错误信息的位置差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-3"><label for="t-07-3"><strong>用 xpcall 抓堆栈</strong>：写一个 <code>xpcall</code> + <code>debug.traceback</code> 的错误处理函数，看完整调用链。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-4"><label for="t-07-4"><strong>做弱表缓存</strong>：用 <code>__mode = "k"</code> 给对象挂附加数据，验证对象被回收后条目自动消失。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-5"><label for="t-07-5"><strong>测 collectgarbage 的开销</strong>：在循环里调 <code>collectgarbage("count")</code>，测量耗时。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-6"><label for="t-07-6"><strong>做一个沙箱</strong>：用 <code>load</code> 的第四个参数限制脚本能访问的 API，验证 <code>os.execute</code> 不可用。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-7"><label for="t-07-7"><strong>回答面试题</strong>：① 协程和线程的区别？② error 的 level 参数作用？③ 弱表的用途？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能用协程写一个迭代器</strong>；<br>
+    ② 知道 <code>resume</code> 与 <code>wrap</code> 的错误处理差异；<br>
+    ③ <strong>能解释 error 的 level 参数，并知道什么时候该用 2</strong>；<br>
+    ④ 知道弱表的用途（不阻止对象回收的附加数据）；<br>
+    ⑤ 能用 <code>_ENV</code> 做一个限制 API 的沙箱。<br>
+    <br>
+    <em>第 ① 和第 ④ 条在框架源码里非常常见——看懂它们才能看懂 xLua 等框架的实现。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="06-lua-oop.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">06 面向对象与继承</div>
+  </a>
+  <a class="next" href="08-lua-perf.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">08 性能优化 ★</div>
+  </a>
+</nav>

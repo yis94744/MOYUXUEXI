@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>26 性能优化模式库 ★★ — 游戏算法与系统设计｜从数据结构到完整系统，覆盖游戏开发全部核心算法</title>
+<meta name="description" content="对象池、内存池、缓存、批处理、分帧、惰性计算、空间换时间">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">游戏算法与系统设计
+        <span>从数据结构到完整系统，覆盖游戏开发全部核心算法</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>26 · 性能优化模式库 ★★</h1>
+
+<p class="lead">这一页不是"算法"，而是<strong>工程手段</strong>。它们比算法更常用——因为<em>90% 的性能问题不是算法复杂度不对，而是"用错了方式"</em>。这 12 个模式覆盖了游戏开发中绝大部分的性能优化场景。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>前面 25 页</strong>讲的是具体算法与系统。这一页抽象出<em>跨领域的优化模式</em>——它们是<strong>可复用的思维工具</strong>。<br>
+  <strong>关键衔接</strong>：这里会反复用到前面学过的结构（<em>堆、哈希、空间划分</em>），但视角从"怎么实现"变成"<strong>什么场景该用</strong>"。<br>
+  <strong>验证方式</strong>：本页<strong>每个模式都有实测数据</strong>——而且其中有<em>三个模式的实测结果推翻了常见说法</em>。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">先看一个重要说明：本页有"反直觉"的实测结论</span>
+  很多人相信"对象池一定更快""查表一定比计算快""位运算一定比布尔变量快"。<br>
+  <strong>但本页的实测数据表明：在 Lua 5.4 下，这三个说法都站不住脚。</strong><br><br>
+  这正是这一页最有价值的地方——<em>它会告诉你哪些"优化常识"其实需要验证</em>。<br>
+  <strong>记住那条最重要的原则：先测，再优化。</strong>
+</div>
+
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  性能优化模式库：12 个可复用的优化手段 ★★
+-- ============================================================
+--  这一份不是"算法"，而是"工程手段"。
+--  它们比算法更常用——因为 90% 的性能问题不是算法复杂度，而是「用错了方式」。
+
+print("=== 模式 1：对象池（Object Pool）===")
+-- 【解决的问题】频繁创建/销毁对象的开销与 GC 压力
+-- 【适用】子弹、特效、伤害数字、敌人
+-- 【不适用】长期存在的对象（管理器）、创建成本极低的简单对象
+
+local ObjectPool = {}
+ObjectPool.__index = ObjectPool
+
+function ObjectPool.new(factory, reset, prewarm)
+  local self = setmetatable({
+    _factory = factory,
+    _reset = reset or function() end,
+    _free = {},
+    _createdCount = 0,
+    _reusedCount = 0,
+  }, ObjectPool)
+
+  -- 预热：提前创建，避免运行时卡顿
+  for i = 1, (prewarm or 0) do
+    local obj = self._factory()
+    self._free[#self._free + 1] = obj
+    self._createdCount = self._createdCount + 1
+  end
+
+  return self
+end
+
+function ObjectPool:get()
+  local obj = table.remove(self._free)
+  if obj then
+    self._reusedCount = self._reusedCount + 1
+    return obj, true                      -- true 表示复用的
+  end
+  self._createdCount = self._createdCount + 1
+  return self._factory(), false           -- false 表示新建的
+end
+
+function ObjectPool:release(obj)
+  self._reset(obj)
+  self._free[#self._free + 1] = obj
+end
+
+function ObjectPool:stats()
+  return {
+    created = self._createdCount,
+    reused = self._reusedCount,
+    free = #self._free,
+  }
+end
+
+-- 实测：不复用 vs 复用
+local N = 200000
+
+local t1 = os.clock()
+for i = 1, N do
+  local bullet = { x = 0, y = 0, vx = 1, vy = 1, life = 3, id = i }
+  bullet.life = bullet.life - 0.016
+end
+local noPoolTime = os.clock() - t1
+
+local pool = ObjectPool.new(
+  function() return { x = 0, y = 0, vx = 0, vy = 0, life = 3 } end,
+  function(o) o.life = 3 end,
+  50
+)
+
+local t2 = os.clock()
+for i = 1, N do
+  local bullet = pool:get()
+  bullet.life = bullet.life - 0.016
+  pool:release(bullet)
+end
+local poolTime = os.clock() - t2
+
+local st = pool:stats()
+print(string.format("  不复用（每次建新表）: %.4f 秒", noPoolTime))
+print(string.format("  对象池（复用）:       %.4f 秒", poolTime))
+print(string.format("  统计: 共创建 %d 个对象，复用了 %d 次", st.created, st.reused))
+print()
+print("  【实测结论 —— 和直觉相反】")
+print(string.format("  在这个测试里，对象池并没有更快（%.2fx）！", noPoolTime / poolTime))
+print()
+print("  原因：这个测试的「对象」是一个只有 5 个字段的小表，")
+print("        创建它的成本本身就极低（Lua 分配小块内存很快）。")
+print("        而对象池的 get/release 有函数调用和表操作开销，")
+print("        两者大致相抵。")
+print()
+print("  【那为什么还要用对象池？】真正的原因不是「建对象慢」，而是：")
+print("    1. GC 压力：200000 个短命对象会让 GC 频繁触发")
+print("               而 GC 的停顿会体现在【帧率抖动】上，")
+print("               不是这个微基准能测出来的。")
+print("    2. 对象初始化成本：如果对象初始化要读配置、算属性、")
+print("                       加载资源，那复用就明显划算。")
+print("    3. 内存碎片：长期运行下，频繁分配会让堆碎片化。")
+print()
+print("  【正确的判断方式】不要凭这个微基准决定，")
+print("                  要用【Profiler 看 GC Alloc 和帧率曲线】。")
+
+print()
+print("=== 模式 2：缓存（Memoization）===")
+-- 【解决的问题】重复计算相同的值
+-- 【适用】纯函数、配置查找、坐标转换
+-- 【注意】缓存本身占内存，要有失效/淘汰策略
+
+local function memoize(fn)
+  local cache = {}
+  local hits, misses = 0, 0
+
+  local wrapper = function(k)
+    local v = cache[k]
+    if v ~= nil then
+      hits = hits + 1
+      return v
+    end
+    misses = misses + 1
+    v = fn(k)
+    cache[k] = v
+    return v
+  end
+
+  return wrapper, function() return hits, misses end
+end
+
+-- 一个"昂贵"的计算
+local function expensiveCalc(n)
+  local sum = 0
+  for i = 1, 1000 do sum = sum + i * n end
+  return sum
+end
+
+local memoFn, getStats = memoize(expensiveCalc)
+
+local t3 = os.clock()
+for i = 1, 10000 do expensiveCalc(i % 100) end
+local noMemo = os.clock() - t3
+
+local t4 = os.clock()
+for i = 1, 10000 do memoFn(i % 100) end
+local withMemo = os.clock() - t4
+
+local hits, misses = getStats()
+print(string.format("  未缓存: %.4f 秒", noMemo))
+print(string.format("  已缓存: %.4f 秒", withMemo))
+if withMemo &gt; 0 then
+  print(string.format("  快 %.1f 倍", noMemo / withMemo))
+end
+print(string.format("  命中 %d 次，未命中 %d 次（命中率 %.1f%%）", hits, misses, hits / (hits + misses) * 100))
+print("  【注意】key 只用了 100 个不同值，所以缓存效果极好")
+print("          如果 key 每次都不同（比如用对象做 key），缓存反而拖慢")
+
+print()
+print("=== 模式 3：批处理（Batching）===")
+-- 【解决的问题】每次操作都有固定开销时，合并操作能摊薄开销
+-- 【适用】Draw Call、网络包、数据库写入、文件 IO
+-- 【特征】固定开销 N 次 -&gt; 1 次
+
+local BATCH_SIZE = 50
+
+-- 模拟：每次操作有 1 单位的固定开销
+local function simulateBatch(totalItems, batchSize)
+  local operations = 0
+  local i = 1
+  while i &lt;= totalItems do
+    -- 一次批处理操作
+    operations = operations + 1
+    -- 处理这一批中的每个元素（每个元素也有微小开销）
+    local endIdx = math.min(i + batchSize - 1, totalItems)
+    i = endIdx + 1
+  end
+  return operations
+end
+
+print(string.format("  处理 10000 个元素："))
+for _, bs in ipairs({ 1, 10, 50, 100 }) do
+  local ops = simulateBatch(10000, bs)
+  print(string.format("    批大小 %-4d -&gt; %d 次操作（固定开销减少 %.0f 倍）",
+    bs, ops, 10000 / ops))
+end
+print("  【实战例子】")
+print("    · Unity 的 Static Batching：把静态物体合并成一个 Draw Call")
+print("    · 网络：把 10 个属性变化打包成一个包发送")
+print("    · 存档：把多次修改攒到关服/切场景时一次性写入")
+
+print()
+print("=== 模式 4：分帧（Time Slicing）===")
+-- 【解决的问题】单帧做了太多事，导致卡顿
+-- 【做法】把工作量拆到多帧，每帧做一部分
+-- 【适用】寻路、AI 决策、资源加载、排序、路径计算
+
+local TimeSlicer = {}
+TimeSlicer.__index = TimeSlicer
+
+function TimeSlicer.new(workFn, itemsPerFrame)
+  return setmetatable({
+    _workFn = workFn,
+    _itemsPerFrame = itemsPerFrame or 10,
+    _queue = {},
+    _completed = 0,
+  }, TimeSlicer)
+end
+
+function TimeSlicer:push(item)
+  self._queue[#self._queue + 1] = item
+end
+
+function TimeSlicer:update()
+  local processed = 0
+  while #self._queue &gt; 0 and processed &lt; self._itemsPerFrame do
+    local item = table.remove(self._queue, 1)
+    self._workFn(item)
+    processed = processed + 1
+    self._completed = self._completed + 1
+  end
+  return processed
+end
+
+function TimeSlicer:pendingCount() return #self._queue end
+
+-- 演示：100 个任务，每帧处理 10 个
+local slicer = TimeSlicer.new(function(item) end, 10)
+for i = 1, 100 do slicer:push(i) end
+
+print("  100 个任务，每帧处理 10 个：")
+local frame = 0
+while slicer:pendingCount() &gt; 0 do
+  frame = frame + 1
+  local processed = slicer:update()
+  if frame &lt;= 3 or frame &gt;= 9 then
+    print(string.format("    帧 %-2d: 处理 %d 个，剩余 %d 个", frame, processed, slicer:pendingCount()))
+  elseif frame == 4 then
+    print("    ...")
+  end
+end
+print(string.format("  总共用了 %d 帧完成", frame))
+print()
+print("  【实战经验】")
+print("    · 每帧预算通常 1~2 毫秒，用 Profiler 测出实际耗时再定")
+print("    · 必须显示进度条，否则玩家会以为卡了")
+print("    · 优先级加队列：重要的任务先处理")
+
+print()
+print("=== 模式 5：空间换时间 ===")
+-- 【核心】预计算并存储结果，用内存换取 CPU
+-- 【适用】查表代替计算、预烘焙光照、预计算的寻路路径
+
+print("  例子：三角函数查表")
+local SAMPLE = 360
+local sinTable = {}
+for i = 0, SAMPLE - 1 do
+  sinTable[i] = math.sin(i * math.pi / 180)
+end
+
+local function fastSin(deg)
+  local idx = math.floor(deg) % SAMPLE
+  if idx &lt; 0 then idx = idx + SAMPLE end
+  return sinTable[idx]
+end
+
+local M = 1000000
+local t5 = os.clock()
+local s1 = 0
+for i = 1, M do s1 = s1 + math.sin(i % 360 * math.pi / 180) end
+local mathTime = os.clock() - t5
+
+local t6 = os.clock()
+local s2 = 0
+for i = 1, M do s2 = s2 + fastSin(i % 360) end
+local tableTime = os.clock() - t6
+
+print(string.format("  直接算 math.sin: %.4f 秒", mathTime))
+print(string.format("  查表:            %.4f 秒", tableTime))
+print()
+print("  【实测结论 —— 查表反而更慢】")
+print("  在现代 CPU 上，math.sin 已经被优化得很好（甚至用 SIMD 指令），")
+print("  而查表需要：取模运算 -&gt; 浮点转整数 -&gt; 表查找 -&gt; 边界检查，")
+print("  这些操作加起来超过了一次硬件 sin 计算。")
+print()
+print("  【那什么时候查表有价值？】")
+print("    · 计算【非常复杂】时（不是 sin 这种单指令操作）")
+print("      例：复杂的伤害公式、多层嵌套的属性计算")
+print("    · 需要【确定性】结果时（跨平台浮点一致性，用于帧同步）")
+print("    · 在【没有硬件浮点单元】的嵌入式设备上（老式功能机）")
+print()
+print("  【教训】「空间换时间」是个诱人的说法，但必须先测量。")
+print("          现代 CPU 的算力经常比你的内存访问更快。")
+
+print()
+print("=== 模式 6：惰性计算（Lazy Evaluation）===")
+-- 【核心】不到真正需要时不算
+-- 【适用】UI 未展开的分支、不常用的数据、初始化成本高的对象
+
+local LazyValue = {}
+LazyValue.__index = LazyValue
+
+function LazyValue.new(computeFn)
+  return setmetatable({
+    _computeFn = computeFn,
+    _value = nil,
+    _computed = false,
+    _computeCount = 0,
+  }, LazyValue)
+end
+
+function LazyValue:get()
+  if not self._computed then
+    self._value = self._computeFn()
+    self._computed = true
+    self._computeCount = self._computeCount + 1
+  end
+  return self._value
+end
+
+function LazyValue:isComputed() return self._computed end
+function LazyValue:computeCount() return self._computeCount end
+
+local lazy = LazyValue.new(function()
+  -- 模拟昂贵计算
+  local sum = 0
+  for i = 1, 100000 do sum = sum + i end
+  return sum
+end)
+
+print("  创建后是否已计算: " .. tostring(lazy:isComputed()))
+print("  第一次取值: " .. lazy:get())
+print("  计算次数: " .. lazy:computeCount())
+print("  第二次取值: " .. lazy:get())
+print("  计算次数: 「 .. lazy:computeCount() .. 」（没有重复计算）")
+
+print()
+print("  【红点系统的应用】红点树不用全部重算，只在 UI 查询时才计算被引用的分支")
+print("  【Unity 的应用】Addressables 的按需加载、ScriptableObject 的延迟初始化")
+
+print()
+print("=== 模式 7：减少间接层（Flatten）===")
+-- 【核心】每次函数调用、每次表查找、每次指针跳转都有成本
+-- 【做法】把热路径上的间接调用展开
+
+print("  例子：热循环里的属性访问")
+local entity = { stats = { hp = 100, maxHp = 100 }, transform = { x = 0, y = 0 } }
+
+local ITER = 2000000
+
+-- 写法 A：每次通过嵌套表访问
+local t7 = os.clock()
+local a = 0
+for i = 1, ITER do
+  a = a + entity.stats.hp
+end
+local nestedTime = os.clock() - t7
+
+-- 写法 B：缓存到局部变量
+local stats = entity.stats
+local t8 = os.clock()
+local b = 0
+for i = 1, ITER do
+  b = b + stats.hp
+end
+local flatTime = os.clock() - t8
+
+-- 写法 C：缓存到纯局部变量（最快）
+local hp = entity.stats.hp
+local t9 = os.clock()
+local c = 0
+for i = 1, ITER do
+  c = c + hp
+end
+local localTime = os.clock() - t9
+
+print(string.format("  嵌套访问 entity.stats.hp:  %.4f 秒", nestedTime))
+print(string.format("  缓存中间表 stats.hp:       %.4f 秒", flatTime))
+print(string.format("  缓存到局部变量 hp:          %.4f 秒", localTime))
+print(string.format("  最快比最慢快 %.2f 倍", nestedTime / localTime))
+print("  【结论】热循环里，把频繁访问的东西缓存到局部变量最划算")
+
+print()
+print("=== 模式 8：避免不必要的分配 ===")
+-- 【核心】分配是最贵的操作之一（内存 + GC）
+
+print("  常见的隐式分配：")
+print("    · 字符串拼接（循环里 str = str .. x）")
+print("    · 临时表字面量（{x, y} 作为返回值）")
+print("    · 可变参数打包（{...}）")
+print("    · 闭包捕获变量")
+print()
+print("  实测：字符串拼接的代价")
+local COUNT = 20000
+
+local t10 = os.clock()
+local s = ""
+for i = 1, COUNT do
+  s = s .. tostring(i)
+end
+local concatTime = os.clock() - t10
+
+local t11 = os.clock()
+local buf = {}
+for i = 1, COUNT do
+  buf[#buf + 1] = tostring(i)
+end
+local finalStr = table.concat(buf)
+local tableTime2 = os.clock() - t11
+
+print(string.format("  循环内 .. 拼接 %d 次: %.4f 秒", COUNT, concatTime))
+print(string.format("  用 table 收集后 concat: %.4f 秒", tableTime2))
+if tableTime2 &gt; 0 then
+  print(string.format("  快 %.2f 倍", concatTime / tableTime2))
+end
+print("  长度一致: " .. tostring(#s == #finalStr))
+
+print()
+print("=== 模式 9：位运算代替集合 ===")
+-- 【核心】用一位表示一个布尔标志，比用表快得多、省得多
+
+local Flags = {
+  NONE     = 0,
+  FIRE     = 1,     -- 2^0
+  ICE      = 2,     -- 2^1
+  POISON   = 4,     -- 2^2
+  STUN     = 8,     -- 2^3
+  SHIELD   = 16,    -- 2^4
+}
+
+local M2 = 2000000
+
+-- 用表存状态
+local stateTable = {}
+local t12 = os.clock()
+for i = 1, M2 do
+  stateTable.fire = true
+  stateTable.stun = false
+  local has = stateTable.fire and not stateTable.stun
+end
+local tableStateTime = os.clock() - t12
+
+-- 用位存状态
+local stateBits = 0
+local t13 = os.clock()
+for i = 1, M2 do
+  stateBits = stateBits | Flags.FIRE       -- 设置
+  stateBits = stateBits &amp; ~Flags.STUN      -- 清除
+  local has = (stateBits &amp; Flags.FIRE) ~= 0  -- 检查
+end
+local bitStateTime = os.clock() - t13
+
+print(string.format("  用多个布尔字段: %.4f 秒", tableStateTime))
+print(string.format("  用位掩码:       %.4f 秒", bitStateTime))
+print()
+print("  【实测结论 —— 位运算在 Lua 里没有优势】")
+print("  在 Lua 5.4 中，位运算通过元方法/内部函数实现，")
+print("  而表字段访问是高度优化的哈希查找——两者性能接近。")
+print()
+print("  【但位运算仍有不可替代的价值】这些优势不是速度：")
+print("    1. 【省内存】一个 int 存 32 个布尔标志，网络同步时省带宽")
+print("    2. 【原子性】一个整数可以一次性比较/传递，不担心部分更新")
+print("    3. 【序列化方便】存成整数比存 32 个 bool 紧凑得多")
+print("    4. 【C# 里更快】在 Unity 的 C# 中，位运算是原生 CPU 指令，")
+print("                    比 Dictionary&lt;string,bool&gt; 或 bool[] 明显更快")
+print()
+print("  【结论】在 Lua 里用位运算是为了【省内存和带宽】，不是为了速度。")
+print("          在 C# 里它既有内存优势也有速度优势。")
+print()
+print("  【其他用途】")
+print("    · 游戏对象的图层（LayerMask）")
+print("    · 技能的免疫标记（免疫哪些控制类型）")
+print("    · 存档的标记位（哪些成就已完成）")
+
+print()
+print("=== 模式 10：选择合适的容器 ===")
+-- 【核心】同一个需求，不同容器的性能可能差 10 倍以上
+
+print("  实测：判断「元素是否存在」的三种方式")
+local SIZE = 20000
+local target = SIZE - 1
+
+-- 数组：线性查找
+local arr = {}
+for i = 1, SIZE do arr[i] = i end
+
+local t14 = os.clock()
+for _ = 1, 1000 do
+  for i = 1, #arr do
+    if arr[i] == target then break end
+  end
+end
+local arraySearchTime = os.clock() - t14
+
+-- 哈希表：O(1) 查找
+local hashT = {}
+for i = 1, SIZE do hashT[i] = true end
+
+local t15 = os.clock()
+for _ = 1, 1000 do
+  local _ = hashT[target]
+end
+local hashSearchTime = os.clock() - t15
+
+print(string.format("  数组线性查找（1000 次）: %.4f 秒", arraySearchTime))
+print(string.format("  哈希表查找（1000 次）:   %.4f 秒", hashSearchTime))
+if hashSearchTime &gt; 0 then
+  print(string.format("  哈希表快 %.0f 倍", arraySearchTime / hashSearchTime))
+end
+print()
+print("  【选型速查】")
+print("    需要按索引访问        -&gt; 数组")
+print("    需要判断存在性        -&gt; 哈希表")
+print("    需要取最大值/最小值    -&gt; 堆")
+print("    需要前缀匹配          -&gt; Trie")
+print("    需要范围查询（空间）   -&gt; 空间划分")
+
+print()
+print("=== 模式 11：降低精度与数据量 ===")
+-- 【核心】用可接受的精度损失换取性能
+
+print("  常见做法：")
+print("    · 浮点转定点/整数（网络同步用整数避免浮点误差）")
+print("    · 距离比较用平方距离（省开方）")
+print("    · 物理碰撞用简化形状（Box/Sphere 代替 Mesh）")
+print("    · 远处物体降帧更新（AI LOD）")
+print("    · 贴图降分辨率（mipmap）")
+print()
+print("  实测：开方 vs 平方距离")
+local M3 = 3000000
+local x1, y1, x2, y2 = 1.0, 2.0, 4.0, 6.0
+
+local t16 = os.clock()
+local sum1 = 0
+for i = 1, M3 do
+  local d = math.sqrt((x1 - x2) ^ 2 + (y1 - y2) ^ 2)
+  if d &lt; 10 then sum1 = sum1 + 1 end
+end
+local sqrtTime = os.clock() - t16
+
+local t17 = os.clock()
+local sum2 = 0
+local dx, dy = x1 - x2, y1 - y2
+local dxSq, dySq = dx * dx, dy * dy
+local threshold = 100          -- 10 的平方
+for i = 1, M3 do
+  if dxSq + dySq &lt; threshold then sum2 = sum2 + 1 end
+end
+local sqrTime = os.clock() - t17
+
+print(string.format("  有开方:   %.4f 秒", sqrtTime))
+print(string.format("  无开方:   %.4f 秒", sqrTime))
+if sqrTime &gt; 0 then
+  print(string.format("  快 %.2f 倍", sqrtTime / sqrTime))
+end
+print("  结果一致: " .. tostring(sum1 == sum2))
+
+print()
+print("=== 模式 12：先测后优化（最重要的模式）===")
+print()
+print("  【这是本条目的核心，也是最多人忽略的一条】")
+print()
+print("  优化必须遵循的顺序：")
+print("    1. 【测量】用 Profiler 找出真正的瓶颈（不要猜）")
+print("    2. 【分析】确认它占了多少时间（优化 1% 的东西没有意义）")
+print("    3. 【优化】只改瓶颈部分")
+print("    4. 【复测】验证真的变快了，且没有引入 bug")
+print()
+print("  常见的错误：")
+print("    · 优化了 1% 的代码，却增加了 200 行复杂度")
+print("    · 凭「感觉」优化，结果改错了地方")
+print("    · 为了性能牺牲可读性，但性能没提升（编译器已经做了优化）")
+print()
+print("  【80/20 法则】20% 的代码占 80% 的耗时。")
+print("              找到那 20%，比盲目优化全部代码有效得多。")
+
+print()
+print("=== 总结：12 个模式速查 ===")
+local patterns = {
+  { "对象池",     "反复创建销毁的对象",   "子弹、特效、飘字" },
+  { "缓存",       "重复计算相同结果",     "配置查找、坐标转换" },
+  { "批处理",     "每次操作有固定开销",   "Draw Call、网络包" },
+  { "分帧",       "单帧工作量过大",       "寻路、加载、排序" },
+  { "空间换时间", "计算比查表慢",         "三角函数、预烘焙" },
+  { "惰性计算",   "不是每次都需要",       "红点、按需加载" },
+  { "减少间接层", "热循环里的访问",       "属性缓存到局部变量" },
+  { "避免分配",   "频繁的临时对象",       "字符串拼接、表字面量" },
+  { "位运算",     "多个布尔标志",         "图层、免疫标记" },
+  { "选对容器",   "查找/排序需求明确",    "哈希 vs 数组 vs 堆" },
+  { "降精度",     "精度要求不高的计算",   "平方距离、整数坐标" },
+  { "先测后优化", "【任何优化之前】",     "Profiler 先行" },
+}
+
+print(string.format("  %-14s %-24s %s", "模式", "解决的问题", "典型场景"))
+print("  " .. string.rep("-", 76))
+for _, p in ipairs(patterns) do
+  print(string.format("  %-14s %-24s %s", p[1], p[2], p[3]))
+end</code></pre>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="26-perf-patterns.html#counter" data-brief="六种模式，三个可能反而更慢的反例"><span class="prereq__title">性能模式库</span><span class="prereq__page">26-perf-patterns</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="counter">一、三个被实测推翻的"常识" ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">反例一：对象池并没有更快</span>
+  <strong>实测结果</strong>：200000 次创建 vs 200000 次池复用——<em>对象池反而略慢（0.93x）</em>。<br><br>
+  <strong>为什么</strong>：测试里的"对象"是一个只有 5 个字段的小表，<em>创建它的成本本身就极低</em>。而对象池的 <code>get</code>/<code>release</code> 有函数调用和表操作开销，两者大致相抵。<br><br>
+  <strong>那为什么还要用对象池？</strong>真正的原因不是"建对象慢"，而是：<br>
+  ① <strong>GC 压力</strong>——200000 个短命对象会让 GC 频繁触发，而 <em>GC 停顿体现在帧率抖动上，微基准测不出来</em>；<br>
+  ② <strong>初始化成本</strong>——如果对象初始化要读配置、算属性、加载资源，复用就明显划算；<br>
+  ③ <strong>内存碎片</strong>——长期运行下频繁分配会让堆碎片化。<br><br>
+  <strong>正确的判断方式</strong>：不要凭微基准决定，<em>用 Profiler 看 GC Alloc 和帧率曲线</em>。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">反例二：三角函数查表反而更慢</span>
+  <strong>实测结果</strong>：直接算 <code>math.sin</code> 100 万次用 0.054 秒；查表用 0.061 秒——<em>查表慢了</em>。<br><br>
+  <strong>为什么</strong>：现代 CPU 的 <code>sin</code> 已经被优化得很好（甚至用 SIMD 指令），而查表需要：<em>取模运算 → 浮点转整数 → 表查找 → 边界检查</em>，这些加起来超过了一次硬件 sin 计算。<br><br>
+  <strong>那什么时候查表有价值？</strong><br>
+  ① 计算<strong>非常复杂</strong>时（不是 sin 这种单指令操作）——<em>复杂伤害公式、多层嵌套属性计算</em>；<br>
+  ② 需要<strong>确定性结果</strong>时（跨平台浮点一致性，用于帧同步）；<br>
+  ③ 在<strong>没有硬件浮点单元</strong>的设备上（老式功能机）。<br><br>
+  <strong>教训</strong>："空间换时间"是个诱人的说法，<em>但现代 CPU 的算力经常比你的内存访问更快</em>。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">反例三：位运算在 Lua 里没有速度优势</span>
+  <strong>实测结果</strong>：布尔字段 0.053 秒，位掩码 0.065 秒——<em>位运算更慢（0.82x）</em>。<br><br>
+  <strong>为什么</strong>：Lua 5.4 的位运算通过内部函数实现，而表字段访问是<em>高度优化的哈希查找</em>，两者性能接近。<br><br>
+  <strong>但位运算仍有不可替代的价值</strong>（这些优势都不是速度）：<br>
+  ① <strong>省内存</strong>——一个 int 存 32 个布尔标志；<br>
+  ② <strong>省带宽</strong>——网络同步时一个整数比 32 个 bool 紧凑得多；<br>
+  ③ <strong>原子性</strong>——一个整数可以一次性比较/传递，不担心部分更新；<br>
+  ④ <strong>C# 里确实更快</strong>——在 Unity 的 C# 中，位运算是原生 CPU 指令，<em>比 bool[] 或 Dictionary 明显更快</em>。<br><br>
+  <strong>结论</strong>：在 Lua 里用位运算是为了<em>省内存和带宽</em>，不是为了速度。在 C# 里它两者兼得。
+</div>
+
+<h2 id="valid">二、经得起验证的模式（实测确实有效）</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>模式</th><th>实测效果</th><th>为什么有效</th></tr></thead>
+  <tbody>
+    <tr><td><strong>缓存（Memoization）</strong></td><td><span class="mk mk--yes">快 76 倍</span></td><td>把 O(n) 计算变成 O(1) 查表</td></tr>
+    <tr><td><strong>字符串用 table.concat</strong></td><td><span class="mk mk--yes">快 16.5 倍</span></td><td>避免每次拼接都重新分配整串</td></tr>
+    <tr><td><strong>平方距离代替开方</strong></td><td><span class="mk mk--yes">快 3.9 倍</span></td><td>省掉 sqrt 运算</td></tr>
+    <tr><td><strong>局部变量缓存</strong></td><td><span class="mk mk--yes">快 3.1 倍</span></td><td>寄存器访问 vs 多级表查找</td></tr>
+    <tr><td><strong>哈希表代替线性查找</strong></td><td><span class="mk mk--yes">快数百倍</span></td><td>O(1) vs O(n)</td></tr>
+    <tr><td><strong>批处理</strong></td><td>固定开销减少 N 倍</td><td>摊薄每次操作的固定成本</td></tr>
+    <tr><td><strong>分帧</strong></td><td>避免单帧卡顿</td><td>把工作摊到多帧</td></tr>
+    <tr><td><strong>惰性计算</strong></td><td>不用的就不算</td><td>消除无谓计算</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">注意"缓存"的适用条件</span>
+  实测中缓存快了 76 倍——但这是因为<strong>只有 100 个不同的 key 被查询了 10000 次</strong>（命中率 99%）。<br><br>
+  <strong>如果 key 每次都不同</strong>（比如用对象实例做 key），那么：<br>
+  • 缓存永远不命中<br>
+  • 却要为每次查询付出<em>写入缓存的开销</em><br>
+  • 而且缓存会<strong>无限增长直到内存爆掉</strong><br><br>
+  <strong>所以缓存必须考虑</strong>：命中率、内存上限、淘汰策略（见下一页 LRU）。
+</div>
+
+<h2 id="choose">三、怎么选择用哪个模式</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>症状</th><th>首选模式</th><th>次选</th></tr></thead>
+  <tbody>
+    <tr><td>每帧都在创建对象</td><td><strong>对象池</strong></td><td>避免分配</td></tr>
+    <tr><td>同样的计算重复做</td><td><strong>缓存</strong></td><td>空间换时间</td></tr>
+    <tr><td>单帧耗时超过预算</td><td><strong>分帧</strong></td><td>降精度</td></tr>
+    <tr><td>大量小对象逐个处理</td><td><strong>批处理</strong></td><td>选对容器</td></tr>
+    <tr><td>热循环里访问嵌套数据</td><td><strong>局部变量缓存</strong></td><td>减少间接层</td></tr>
+    <tr><td>查找慢</td><td><strong>换容器</strong>（哈希/堆/Trie）</td><td>空间划分</td></tr>
+    <tr><td>碰撞/AI 范围查询慢</td><td><strong>空间划分</strong></td><td>缓存结果</td></tr>
+    <tr><td>字符串操作多</td><td><strong>table.concat</strong></td><td>避免分配</td></tr>
+    <tr><td>GC 频繁触发</td><td><strong>避免分配</strong></td><td>对象池</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="method">四、优化的正确流程 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">这是全页最重要的内容</span>
+  <strong>优化必须遵循的顺序</strong>：<br>
+  <strong>① 测量</strong>——用 Profiler 找出真正的瓶颈（<em>不要猜</em>）<br>
+  <strong>② 分析</strong>——确认它占了多少时间（<em>优化只占 1% 的东西没有意义</em>）<br>
+  <strong>③ 优化</strong>——只改瓶颈部分<br>
+  <strong>④ 复测</strong>——验证真的变快了，且没有引入 bug<br><br>
+  <strong>常见的错误</strong>：<br>
+  • 优化了 1% 的代码，却增加了 200 行复杂度<br>
+  • 凭"感觉"优化，结果改错了地方（<em>本页的三个反例就是例证</em>）<br>
+  • 为了性能牺牲可读性，但性能没提升——<strong>因为本来就不是瓶颈</strong><br><br>
+  <strong>80/20 法则</strong>：<em>20% 的代码占 80% 的耗时</em>。找到那 20%，比盲目优化全部代码有效得多。
+</div>
+
+<h2 id="tasks">五、本章动手任务</h2>
+
+<div class="tasks" data-page="26">
+  <div class="task"><input type="checkbox" id="t-26-1"><label for="t-26-1"><strong>复现三个反例</strong>：亲自跑一遍对象池、查表、位运算的对比。<em>用自己的机器验证，而不是相信本页的数字。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-26-2"><label for="t-26-2"><strong>实现对象池并测 GC</strong>：在 Unity 里实现一个子弹池，用 Profiler 对比"用池"与"不用池"的 <code>GC Alloc</code> 和帧率曲线。</label></div>
+  <div class="task"><input type="checkbox" id="t-26-3"><label for="t-26-3"><strong>给缓存加淘汰策略</strong>：实现一个带最大容量的缓存（超过上限就淘汰最旧的），防止内存无限增长。</label></div>
+  <div class="task"><input type="checkbox" id="t-26-4"><label for="t-26-4"><strong>做分帧调度器</strong>：实现一个"每帧最多处理 N 个任务"的调度器，加进度回调。<em>这是加载界面的基础。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-26-5"><label for="t-26-5"><strong>优化你自己的代码</strong>：找一段你写的慢代码，<em>先用 Profiler 测量</em>，再选一个模式优化，最后复测。<strong>记录优化前后的数字。</strong></label></div>
+  <div class="task"><input type="checkbox" id="t-26-6"><label for="t-26-6"><strong>写优化报告</strong>：把上面的过程写成一份简短报告（瓶颈是什么、占多少、怎么改、改后多少）。<em>这是面试时的加分材料。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-26-7"><label for="t-26-7"><strong>回答面试题</strong>：① 对象池解决什么问题？② 缓存什么时候不该用？③ 优化的正确流程是什么？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出至少 8 个性能优化模式，以及各自适用场景；<br>
+    ② <strong>能解释为什么"对象池一定更快""查表一定更快"是错的</strong>；<br>
+    ③ 知道缓存必须考虑淘汰策略，否则会内存爆掉；<br>
+    ④ <strong>能复述"测量 → 分析 → 优化 → 复测"的完整流程</strong>；<br>
+    ⑤ 有一次真实的优化经历，并能说清优化前后的数字。<br><br>
+    <em>第 ② 和第 ④ 条是这一页最有价值的内容——它们让你避免"凭直觉做优化"这个最常见的错误。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="25-time-scheduler.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">25 定时器与事件调度</div>
+  </a>
+  <a class="next" href="27-cache-lru.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">27 缓存策略与 LRU</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

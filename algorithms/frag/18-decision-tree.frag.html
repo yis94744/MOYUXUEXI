@@ -1,0 +1,130 @@
+<h1>18 · 决策树与效用 AI ★</h1>
+
+<p class="lead">行为树解决的是<strong>"怎么执行"</strong>，决策树解决的是<strong>"做什么"</strong>。这两者经常被混淆，但它们是<em>互补的</em>——而<strong>效用系统（Utility AI）</strong>又是决策树的平滑版本。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（17）行为树讲"行为怎么组织与执行"。这一页讲<em>"在多个行为之间怎么选"</em>。<br>
+  <strong>关键衔接</strong>：决策树本质是<em>树结构（06）</em>的应用；效用系统大量使用<em>数学曲线</em>（参见 C# 站的页 09 插值）。<br>
+  <strong>下一页</strong>（19）GOAP——它比决策树更灵活，<em>能自动组合出未预设的行为序列</em>。<br>
+  <strong>验证方式</strong>：本页代码在 <em>Lua 5.4.7</em> 实测运行，输出结果是真实的。
+</div>
+
+<h2 id="basic">一、从硬编码到数据化</h2>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>18/decision-tree</code></div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">数据化的最大价值：策划能改</span>
+  硬编码的 <code>if-else</code> 只有一个问题，但它是致命的——<strong>策划改不了</strong>。<br><br>
+  每一次"把血量阈值从 30 改成 35"，都要走<em>需求 → 开发 → 提测 → 发版</em>的完整流程。<br>
+  而数据化之后，策划<em>在 Excel 里改个数字、重新导出配置</em>就完成了。<br><br>
+  <strong>数据结构设计</strong>：<br>
+  <code>{ type = "condition", key = "hp", op = "&lt;", value = 30, trueNode = {...}, falseNode = {...} }</code><br>
+  <em>这样一份 JSON 就能描述整棵决策树。</em>
+</div>
+
+<h2 id="utility">二、效用系统：用评分代替硬判断 ★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">决策树的根本问题：硬边界</span>
+  看本页的实测对比（4 个敌人、无药水，血量从 100 降到 0）：<br>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>血量</th><th>决策树</th><th>效用系统</th></tr></thead>
+    <tbody>
+      <tr><td>100 ~ 40</td><td>使用群攻技能</td><td>使用群攻技能</td></tr>
+      <tr><td><strong>30</strong></td><td><strong>使用群攻技能</strong>（突变点）</td><td><strong>逃跑</strong>（平滑过渡）</td></tr>
+      <tr><td>20 及以下</td><td>逃跑</td><td>逃跑</td></tr>
+    </tbody>
+  </table>
+  </div>
+  决策树在血量 30 处<strong>突然改变行为</strong>——31 打、29 跑。<br>
+  而效用系统的分数是<em>连续变化</em>的，行为切换发生在"两个分数交叉"的时刻，看起来更自然。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">五种常用效用曲线</span>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>曲线</th><th>形状</th><th>用途</th></tr></thead>
+    <tbody>
+      <tr><td><code>linear</code></td><td>均匀上升</td><td>通用的"越多越好"</td></tr>
+      <tr><td><code>inverseLinear</code></td><td>均匀下降</td><td>"越低越想要"（逃跑、喝药）</td></tr>
+      <tr><td><code>quadratic</code></td><td>低值区更敏感</td><td>强调极端情况</td></tr>
+      <tr><td><code>smoothstep</code></td><td>两端平缓、中间陡</td><td><strong>最自然的手感</strong></td></tr>
+      <tr><td><code>threshold</code></td><td>超过阈值立即满分</td><td>"至少要有 3 个敌人"</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <strong>组合方式</strong>：多个维度加权求和。例如"逃跑"的分数 = <em>血量权重 x 血量因子 + 敌人数权重 x 敌人因子</em>。
+</div>
+
+<h2 id="fuzzy">三、模糊逻辑：处理"有点危险"</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">传统逻辑 vs 模糊逻辑</span>
+  <strong>传统逻辑</strong>：<code>hp &lt; 30</code> 是"危险"，否则是"安全"——<strong>非黑即白</strong>。<br>
+  <strong>模糊逻辑</strong>：血量 40 时，<em>危险度 0.4、安全度 0.6</em>——<strong>同时是两者</strong>。<br><br>
+  <strong>实测数据</strong>（用 smoothstep 模拟隶属度）：<br>
+  • hp = 25 → 危险度 1.00，安全度 0.00<br>
+  • hp = 40 → 危险度 0.40，安全度 0.60<br>
+  • hp = 60 → 危险度 0.00，安全度 1.00<br><br>
+  <strong>用途</strong>：需要"渐变式"行为过渡的 AI——<em>潜行游戏里敌人的警觉度、恐怖游戏的紧张感、赛车 AI 的激进程度</em>。
+</div>
+
+<h2 id="compare">四、三者对比与选型</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方案</th><th>决策方式</th><th>优点</th><th>缺点</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>决策树</strong></td><td>条件判断（硬边界）</td><td>清晰、可配置、易调试</td><td>边界突变、规则多时树很深</td><td>技能选择、UI 状态、明确规则</td></tr>
+    <tr><td><strong>效用系统</strong></td><td>评分取最高</td><td>平滑、可量化、易扩展</td><td>参数难调、难调试</td><td>NPC 日常、策略 AI</td></tr>
+    <tr><td><strong>模糊逻辑</strong></td><td>隶属度 + 规则</td><td>最自然、能表达模糊概念</td><td>最复杂、最难调</td><td>需要细腻情绪表现的 AI</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">实战中的组合方式</span>
+  <strong>最常见的做法是混合使用</strong>：<br>
+  • <strong>决策树判断"要不要做"</strong>——比如"现在该不该进入战斗状态"<br>
+  • <strong>效用系统决定"做哪个"</strong>——进入战斗后，用评分选具体技能<br>
+  • <strong>行为树执行"怎么做"</strong>——选中的技能用行为树的子节点来执行<br><br>
+  <em>三层各司其职，比用单一方案硬套要清晰得多。</em>
+</div>
+
+<h2 id="tasks">五、本章动手任务</h2>
+
+<div class="tasks" data-page="18">
+  <div class="task"><input type="checkbox" id="t-18-1"><label for="t-18-1"><strong>实现数据化决策树</strong>：把一棵 <code>if-else</code> 树改造成可配置的节点结构，并加一个"打印决策路径"的功能。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-2"><label for="t-18-2"><strong>导出成 JSON</strong>：设计一个 JSON 格式描述决策树，写一个加载器把它构建成运行时结构。<em>这是实战中最有价值的一步。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-18-3"><label for="t-18-3"><strong>实现五种效用曲线</strong>：不看示例写出 linear / inverseLinear / quadratic / smoothstep / threshold。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-4"><label for="t-18-4"><strong>调参实验</strong>：给效用 AI 的行为调不同权重，观察"血量从 100 降到 0"时的行为切换点变化。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-5"><label for="t-18-5"><strong>做分数可视化</strong>：在决策时打印所有行为的分数排名。<em>这是调试效用 AI 唯一可行的方法。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-18-6"><label for="t-18-6"><strong>回答面试题</strong>：① 决策树和效用系统有什么区别？② 效用曲线怎么设计？③ 什么场景下决策树比效用更好？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能设计一个可配置的决策树数据结构，并说明它的价值；<br>
+    ② <strong>能解释决策树的"硬边界"问题，以及效用系统如何解决它</strong>；<br>
+    ③ 能写出至少四种效用曲线；<br>
+    ④ 知道效用 AI 调试要靠"分数可视化"，而不是靠猜；<br>
+    ⑤ 能说出决策树 / 效用 / 行为树三者如何组合使用。<br><br>
+    <em>第 ② 条是这一页的核心——理解"突变 vs 平滑"是选择方案的关键依据。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="17-behavior-tree.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">17 行为树 Behavior Tree ★★★</div>
+  </a>
+  <a class="next" href="19-goap-planner.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">19 GOAP 与规划型 AI</div>
+  </a>
+</nav>

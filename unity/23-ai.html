@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>23 AI 辅助开发与 AI NPC — C# + Unity 路线｜从零基础到独立完成商业级项目</title>
+<meta name="description" content="AI 编程助手真实效果与风险、AI 美术管线、版权红线、LLM 驱动 NPC 架构与安全">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C# + Unity 路线
+        <span>从零基础到独立完成商业级项目</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>23 · AI 辅助开发与 AI NPC</h1>
+
+<p class="lead">这一页讲<strong>两件不同但都叫"AI"的事</strong>：一是<em>用 AI 辅助你自己的开发</em>，二是<em>在游戏里做 AI NPC</em>。前者改变你的工作效率，后者改变游戏的可能性。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>前面 22 页</strong>讲的是"怎么做游戏"。这一页讲<em>"AI 时代怎么做游戏"</em>——这是所有开发者都绕不开的变化。
+  <strong>关键衔接</strong>：页 08 的<em>异步编程</em>是接入网络 API 的基础；页 20 的<em>分层架构</em>决定了 AI NPC 能不能干净地接入。
+  <strong>下一页</strong>（24）实战项目集。<em>把学到的全部串起来。</em>
+  <strong>诚实提醒</strong>：AI 辅助开发<strong>确实提升了效率，但没有降低门槛</strong>——它只是把门槛从"会写"移到了"会判断"。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="22-network-eng.html#sync" data-brief="两种同步方案的原理、适用类型与实现难度"><span class="prereq__title">帧同步 vs 状态同步</span><span class="prereq__page">22-network-eng</span></a>
+          <a class="prereq__item" href="08-cs-async.html#async" data-brief="await 后是否在主线程取决于等待对象，线程池上不能调 Unity API"><span class="prereq__title">async/await 与线程</span><span class="prereq__page">08-cs-async</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="workflow">一、AI 辅助开发的真实效果</h2>
+
+<p>先说结论：<strong>AI 在"有明确输入的样板代码"上非常强，在"需要判断的设计决策"上很弱。</strong></p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>任务类型</th><th>AI 效果</th><th>原因</th></tr></thead>
+  <tbody>
+    <tr><td>样板代码（属性、DTO、配置类）</td><td><span class="mk mk--yes">很好</span></td><td>模式固定</td></tr>
+    <tr><td>API 用法查询</td><td><span class="mk mk--warn">中等</span></td><td><em>可能给出过时 API</em></td></tr>
+    <tr><td>算法实现</td><td><span class="mk mk--yes">好</span></td><td>经典问题有标准答案</td></tr>
+    <tr><td>性能优化</td><td><span class="mk mk--no">差</span></td><td><strong>需要实际测量</strong></td></tr>
+    <tr><td>架构设计</td><td><span class="mk mk--no">差</span></td><td>需要理解业务上下文</td></tr>
+    <tr><td>调试难查的 bug</td><td><span class="mk mk--warn">中等</span></td><td>能给方向，但要自己验证</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">AI 的最大风险：看似正确的错误</span>
+  <strong>AI 最危险的不是"不知道怎么答"，而是"自信地给出错误答案"。</strong><br>
+  常见的有：<br>
+  · 用了<em>已经过时的 Unity API</em>（比如 Unity 6 里 <code>velocity</code> 改名 <code>linearVelocity</code>）<br>
+  · 给出<em>在当前 Unity 版本不支持的 C# 语法</em>（比如 C# 10 的 <code>record struct</code>）<br>
+  · <em>参数顺序或类型错误</em>（尤其是不常用的 API）<br><br>
+  <strong>防御方法</strong>：<em>把 AI 给的代码直接扔进编译器。</em>编译器是唯一不会骗你的裁判——这也是本站所有代码都用编译器验证的原因。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">怎么用 AI 才能真正提效</span>
+  <strong>① 让它写"有明确模式"的代码</strong>：DTO、配置解析、重复的样板逻辑。<br>
+  <strong>② 用它做"知识查询"但必须验证</strong>：问 API 用法后，<em>去官方文档或程序集里核对</em>。<br>
+  <strong>③ 用它做 code review 的第二双眼睛</strong>：让它找空引用、资源泄漏、边界条件。<br>
+  <strong>④ 不要让它做性能决策</strong>：<em>性能只能靠测量</em>。<br>
+  <strong>⑤ 不要让它设计架构</strong>：它不了解你的业务、团队、时间约束。
+</div>
+
+<h2 id="npc">二、AI NPC 的架构</h2>
+
+<p>把 LLM 接进游戏做 NPC，是<strong>技术上可行、工程上要小心</strong>的事。核心是<em>四步循环</em>：</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>步骤</th><th>做什么</th><th>关键约束</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1. 感知</strong></td><td>收集上下文（玩家位置、对话历史）</td><td>数据量要控制</td></tr>
+    <tr><td><strong>2. 决策</strong></td><td>调 LLM 生成行为或对话</td><td><strong>延迟 1~3 秒</strong></td></tr>
+    <tr><td><strong>3. 过滤</strong></td><td>安全审核、格式校验</td><td><em>必须做，否则会输出不当内容</em></td></tr>
+    <tr><td><strong>4. 执行</strong></td><td>映射到游戏行为</td><td><strong>只能执行白名单内的行为</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">AI NPC 的四个工程问题</span>
+  <strong>① 延迟</strong>：LLM 响应通常 1~3 秒。<em>玩家等不了这么久</em>。<br>
+  <strong>解决</strong>：预生成部分回复、用本地小模型做初步响应、异步生成 + 打字机效果。<br><br>
+  <strong>② 成本</strong>：每次调用都要钱。<em>一个活跃 NPC 频道可能每天几万次调用。</em><br>
+  <strong>解决</strong>：缓存常见问答、限制调用频率、只在关键节点调用。<br><br>
+  <strong>③ 安全</strong>：LLM 可能输出不当内容或"越狱"行为。<br>
+  <strong>解决</strong>：<em>输出必须过审核 + 执行必须走白名单</em>。绝不能让 LLM 直接产生游戏行为指令。<br><br>
+  <strong>④ 一致性</strong>：NPC 会"忘记"之前说过的话。<br>
+  <strong>解决</strong>：维护对话摘要 + 关键信息表，作为每次请求的上下文。
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">适用与不适用场景</span>
+  <strong>适合</strong>：<br>
+  · 模拟经营 / 沙盒游戏的 NPC 对话<br>
+  · 侦探游戏的动态线索<br>
+  · 玩家自定义的剧情<br>
+  · <em>非实时性要求高的场景</em><br><br>
+  <strong>不适合</strong>：<br>
+  · <strong>竞技游戏的对抗 AI</strong>（延迟和确定性都不满足）<br>
+  · 需要精确数值平衡的战斗<br>
+  · 大规模 NPC（成本爆炸）<br><br>
+  <em>结论：LLM 适合"表达"，不适合"对抗"。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="23">
+  <div class="task"><input type="checkbox" id="t-23-1"><label for="t-23-1"><strong>验证 AI 给的 API</strong>：让 AI 写一段 Unity 代码，逐条核对 API 是否存在、是否过时。<em>感受一下"看似正确"的风险。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-23-2"><label for="t-23-2"><strong>用编译器当裁判</strong>：把 AI 生成的代码扔进编译器，统计错误率。</label></div>
+  <div class="task"><input type="checkbox" id="t-23-3"><label for="t-23-3"><strong>设计 AI NPC 的 Prompt</strong>：给一个 NPC 写角色设定 + 输出格式约束 + 安全规则。</label></div>
+  <div class="task"><input type="checkbox" id="t-23-4"><label for="t-23-4"><strong>做输出过滤</strong>：实现一个解析器，把 LLM 的输出映射到白名单内的游戏行为。</label></div>
+  <div class="task"><input type="checkbox" id="t-23-5"><label for="t-23-5"><strong>测延迟</strong>：实际调一次 API，测量往返延迟，设计一个"玩家能接受"的交互方式。</label></div>
+  <div class="task"><input type="checkbox" id="t-23-6"><label for="t-23-6"><strong>回答面试题</strong>：① AI 辅助开发有哪些局限？② AI NPC 的延迟问题怎么解决？③ 怎么防止 LLM 输出不当内容？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出 AI 在六类任务上的真实效果差异；<br>
+    ② <strong>知道 AI 的最大风险是"看似正确的错误"，以及用编译器验证的方法</strong>；<br>
+    ③ 能阐述 AI NPC 的四步循环；<br>
+    ④ <strong>能说出 AI NPC 的四个工程问题及解决思路</strong>；<br>
+    ⑤ 能判断什么场景适合用 LLM，什么场景不适合。<br>
+    <br>
+    <em>第 ② 和第 ⑤ 条是这一页最有价值的内容——它们让你既不迷信 AI，也不排斥 AI。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="22-network-eng.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">22 网络、工程化与发布</div>
+  </a>
+  <a class="next" href="24-projects.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">24 实战项目集</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

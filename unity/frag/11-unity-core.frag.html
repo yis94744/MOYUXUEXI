@@ -1,0 +1,790 @@
+<h1>11 · Unity 核心机制</h1>
+
+<p class="lead">C# 语言线（03-08）教的是"怎么写代码"，数学线（09-10）教的是"游戏世界怎么运转"。从这一页开始，你进入<strong>Unity 引擎本身</strong>。这一页是引擎线的地基——<em>生命周期、组件架构、查找 API、预制体、ScriptableObject</em>，后面所有引擎内容都建立在它们之上。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（10）讲渲染管线，那是"画面怎么来的"。这一页讲<strong>"引擎什么时候调用你的代码"</strong>。<br>
+  <strong>关键衔接</strong>：页 03 学的 <a class="kp-ref" href="03-cs-basic.html#value-ref" title="值类型与引用类型">值类型</a>在这里有了新用途——<code>transform.position</code> 返回的是 struct，所以不能直接改它的字段（<a class="kp-ref" href="03-cs-basic.html#cs1612" title="CS1612 属性返回值">CS1612</a>）。<br>
+  <strong>下一页</strong>（12）物理系统。<code>OnCollisionEnter</code> 就是这一页讲的生命周期回调之一。<br>
+  <strong>难度提示</strong>：这一页内容多但不难，<em>关键是动手把每个回调都打一遍日志</em>，用输出顺序记住它。
+</div>
+
+<h2 id="lifecycle">一、生命周期：Unity 什么时候调用你的代码 ★</h2>
+
+<p>生命周期是<strong>Unity 最基础也最容易搞错的知识点</strong>。面试必问，实战必须懂——<em>把初始化写在错误的位置，就会产生"有时候能跑有时候不行"的诡异 bug</em>。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  生命周期完整顺序 —— 用输出顺序记住它
+// ============================================================
+public class LifecycleDemo : MonoBehaviour
+{
+    [SerializeField] private int _value = 10;
+
+    // ---------- 1. Awake ----------
+    // 物体被实例化时调用，即使脚本 enabled = false 也会调用
+    // 用途：初始化引用、缓存组件
+    private void Awake()
+    {
+        Debug.Log("1. Awake");
+    }
+
+    // ---------- 2. OnEnable ----------
+    // 每次 enabled 变为 true 时调用（可能多次）
+    // 用途：订阅事件、注册回调
+    private void OnEnable()
+    {
+        Debug.Log("2. OnEnable");
+    }
+
+    // ---------- 3. Start ----------
+    // 第一次 Update 之前调用，且只在 enabled 时调用
+    // 用途：依赖其他对象 Awake 完成的初始化
+    private void Start()
+    {
+        Debug.Log("3. Start");
+    }
+
+    // ---------- 4. FixedUpdate ----------
+    // 固定时间步（默认 0.02s = 50 次/秒），与帧率无关
+    // 用途：所有物理相关操作
+    private void FixedUpdate()
+    {
+        // 不要在这里读 Input.GetKeyDown —— 会丢输入
+    }
+
+    // ---------- 5. Update ----------
+    // 每帧一次，帧率相关
+    private void Update()
+    {
+        // 用途：输入检测、非物理逻辑、计时器
+    }
+
+    // ---------- 6. LateUpdate ----------
+    // 所有 Update 之后调用
+    // 用途：相机跟随（保证目标已经移动完）
+    private void LateUpdate()
+    {
+    }
+
+    // ---------- 7. OnDisable ----------
+    // 每次 enabled 变为 false 时调用
+    // 用途：取消订阅（见页 05）
+    private void OnDisable()
+    {
+        Debug.Log("7. OnDisable");
+    }
+
+    // ---------- 8. OnDestroy ----------
+    // 对象被销毁时调用
+    private void OnDestroy()
+    {
+        Debug.Log("8. OnDestroy");
+    }
+
+    // ============================================================
+    //  条件性回调：需要满足特定条件才触发
+    // ============================================================
+
+    // 物理碰撞（需要 Collider + 至少一方有 Rigidbody）
+    private void OnCollisionEnter(Collision collision) { }
+    private void OnCollisionStay(Collision collision) { }
+    private void OnCollisionExit(Collision collision) { }
+
+    // 触发器（需要 Collider.isTrigger = true）
+    private void OnTriggerEnter(Collider other) { }
+    private void OnTriggerStay(Collider other) { }
+    private void OnTriggerExit(Collider other) { }
+
+    // 鼠标事件（需要 Collider）
+    private void OnMouseDown() { }
+    private void OnMouseEnter() { }
+    private void OnMouseUp() { }
+
+    // 物体进入/离开相机可见范围
+    private void OnBecameVisible() { }
+    private void OnBecameInvisible() { }
+
+    // 粒子碰撞
+    private void OnParticleCollision(GameObject other) { }
+
+    // 渲染前（用于性能优化）
+    private void OnWillRenderObject() { }
+}</code></pre>
+
+<h3 id="order">执行顺序详解</h3>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>顺序</th><th>回调</th><th>调用时机</th><th>典型用途</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><code>Awake</code></td><td>物体实例化时，<strong>即使脚本禁用也会调用</strong></td><td>初始化引用、缓存组件</td></tr>
+    <tr><td>2</td><td><code>OnEnable</code></td><td><code>enabled</code> 变 true 时（<em>可能多次</em>）</td><td><strong>订阅事件</strong></td></tr>
+    <tr><td>3</td><td><code>Start</code></td><td>第一次 Update 前，<strong>只在 enabled 时调用</strong></td><td>依赖其他对象的初始化</td></tr>
+    <tr><td>4</td><td><code>FixedUpdate</code></td><td>固定时间步（默认 0.02s）</td><td><strong>所有物理操作</strong></td></tr>
+    <tr><td>5</td><td><code>Update</code></td><td>每帧一次</td><td>输入检测、非物理逻辑</td></tr>
+    <tr><td>6</td><td><code>LateUpdate</code></td><td>所有 Update 之后</td><td><strong>相机跟随</strong></td></tr>
+    <tr><td>7</td><td><code>OnDisable</code></td><td><code>enabled</code> 变 false 时</td><td><strong>取消订阅</strong></td></tr>
+    <tr><td>8</td><td><code>OnDestroy</code></td><td>对象被销毁时</td><td>清理资源</td></tr>
+  </tbody>
+</table>
+</div>
+
+<pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  Update / FixedUpdate / LateUpdate 的正确选择
+// ============================================================
+public class UpdateOrderDemo : MonoBehaviour
+{
+    [SerializeField] private Transform _target;
+    [SerializeField] private float _smoothTime = 0.2f;
+
+    private Vector3 _velocity;
+
+    // ============================================================
+    //  FixedUpdate：物理相关
+    // ============================================================
+    // 为什么物理必须放这里？
+    // 物理引擎内部也是按固定时间步计算的。
+    // 如果在 Update 里施力，帧率波动会导致物理结果不一致。
+    private void FixedUpdate()
+    {
+        // 用 Time.fixedDeltaTime，不是 Time.deltaTime
+        float dt = Time.fixedDeltaTime;
+
+        // 这里适合：Rigidbody 操作、物理重计算
+        Debug.Log(dt);
+    }
+
+    // ============================================================
+    //  Update：每帧逻辑
+    // ============================================================
+    private void Update()
+    {
+        // 输入检测必须放 Update。
+        // FixedUpdate 每帧可能执行 0 次或多次，
+        // 会漏掉 GetKeyDown 这种「只在一帧为真」的输入。
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            Debug.Log("跳跃输入");
+        }
+    }
+
+    // ============================================================
+    //  LateUpdate：所有 Update 之后
+    // ============================================================
+    private void LateUpdate()
+    {
+        // 相机跟随必须放这里。
+        // 如果放 Update，相机可能在玩家移动【之前】更新，
+        // 画面永远慢一帧，表现为抖动。
+        if (_target == null) return;
+
+        Vector3 desired = _target.position + new Vector3(0f, 3f, -5f);
+        transform.position = Vector3.SmoothDamp(
+            transform.position, desired, ref _velocity, _smoothTime);
+    }
+}
+
+// ============================================================
+//  执行顺序验证
+// ============================================================
+public class OrderProof : MonoBehaviour
+{
+    [SerializeField] private string _label = "A";
+
+    private void Awake()    { Debug.Log(_label + " Awake"); }
+    private void OnEnable() { Debug.Log(_label + " OnEnable"); }
+    private void Start()    { Debug.Log(_label + " Start"); }
+}
+
+// 实测结论：
+//   1. 所有物体的 Awake 先执行（【物体之间顺序不确定】）
+//   2. 所有物体的 OnEnable
+//   3. 所有物体的 Start（在第一次 Update 之前）
+//   4. FixedUpdate（一帧可能 0 次或多次）
+//   5. Update（每帧一次）
+//   6. LateUpdate（每帧一次）
+//   7. 渲染
+//
+// 【重要】不要在 Awake 里访问别的对象的字段 ——
+// 那个对象可能还没执行 Awake。跨对象初始化放 Start。</code></pre>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三条必须记住的规则</span>
+  <strong>① Awake 和 Start 的区别：</strong><code>Awake</code> 无论脚本是否启用都会调用，<code>Start</code> 只在启用时调用。更关键的是<strong>时机</strong>：所有物体的 Awake 会先执行完，才开始执行 Start。<em>所以跨对象的初始化要放 Start</em>。<br>
+  <strong>② 物体之间的 Awake 顺序是不确定的。</strong>不要在 Awake 里访问别的对象的字段——那个对象可能还没初始化。<br>
+  <strong>③ 输入检测必须放 Update，物理必须放 FixedUpdate。</strong>把 <code>GetKeyDown</code> 放 FixedUpdate 会<em>丢输入</em>（FixedUpdate 一帧可能执行 0 次）；把物理施力放 Update 会<em>导致物理结果不一致</em>（帧率波动影响受力时间）。
+</div>
+
+<h2 id="find">二、查找 API 与性能 ★</h2>
+
+<p>这一节的内容<strong>直接决定你的项目会不会卡</strong>。新手最常见的性能问题是——<em>在 Update 里调用查找 API</em>。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using System.Collections.Generic;
+
+// 为单文件编译补上被引用的类型（实际项目里用你自己的类型）
+public class Enemy : MonoBehaviour { }
+
+// ============================================================
+//  查找 API 的性能对照 —— 从慢到快
+// ============================================================
+public class FindPerformance : MonoBehaviour
+{
+    private Camera _cam;
+    private Transform _player;
+
+    private void Awake()
+    {
+        // 最快：Inspector 引用，或 Awake 里查一次缓存起来
+        _cam = Camera.main;
+    }
+
+    // ============================================================
+    //  最慢的一类：每帧调用就是性能杀手
+    // ============================================================
+    private void WorstPractice()
+    {
+        // GameObject.Find：遍历场景所有物体按名字匹配
+        GameObject go = GameObject.Find("Player");
+
+        // FindObjectOfType：遍历所有该类型对象
+        // Unity 2023.1+ 已标记过时，推荐用 FindFirstObjectByType
+        var demo = FindObjectOfType&lt;Enemy&gt;();
+
+        // 带标签查找
+        GameObject tagged = GameObject.FindWithTag("Player");
+
+        Debug.Log(go + " " + demo + " " + tagged);
+    }
+
+    // ============================================================
+    //  Unity 2021.3+ 的新查找 API（更明确、更快）
+    // ============================================================
+    private void NewFindApi()
+    {
+        // 返回第一个匹配对象（有确定的顺序保证）
+        Enemy a = FindFirstObjectByType&lt;Enemy&gt;();
+
+        // 返回任意一个（【没有排序开销，最快】）
+        Enemy b = FindAnyObjectByType&lt;Enemy&gt;();
+
+        // 返回全部，必须指定排序模式
+        Enemy[] all = FindObjectsByType&lt;Enemy&gt;(
+            FindObjectsSortMode.None);          // None 更快
+
+        Enemy[] sorted = FindObjectsByType&lt;Enemy&gt;(
+            FindObjectsSortMode.InstanceID);    // 按 InstanceID 排序
+
+        Debug.Log(a + " " + b + " " + all.Length + " " + sorted.Length);
+    }
+
+    // ============================================================
+    //  组件查找的性能对照
+    // ============================================================
+    private void ComponentLookup()
+    {
+        // TryGetComponent：不存在时不分配、不抛异常（推荐）
+        if (TryGetComponent(out Collider col))
+        {
+            Debug.Log(col.name);
+        }
+
+        // GetComponent&lt;T&gt;()：不存在时会构造错误字符串（有分配）
+        // 只在确定存在时使用
+        Rigidbody rb = GetComponent&lt;Rigidbody&gt;();
+        if (rb != null) rb.mass = 1f;
+
+        // GetComponentInChildren：会遍历子物体，开销更大
+        // 第二个参数 includeInactive 默认为 false
+        Animator anim = GetComponentInChildren&lt;Animator&gt;();
+        Animator animAll = GetComponentInChildren&lt;Animator&gt;(true);
+
+        // GetComponents 有 List 重载：复用同一个 List 就零分配
+        var buffer = new List&lt;Collider&gt;(8);
+        GetComponents(buffer);
+
+        Debug.Log(anim + " " + animAll + " " + buffer.Count);
+    }
+}
+
+// ============================================================
+//  性能量级参考（相对值，实际取决于场景复杂度）
+// ============================================================
+//  缓存字段访问          1
+//  TryGetComponent        ~10        （有缓存命中时）
+//  GetComponentInChildren ~100        （子物体少时）
+//  Camera.main            ~1000       （内部是 FindGameObjectWithTag）
+//  GameObject.Find        ~5000       （遍历全场景）
+//  FindObjectOfType       ~10000      （遍历全场景 + 类型检查）
+//
+//  结论：凡是每帧调用的查找，全部移到 Awake/Start 里缓存。</code></pre>
+
+<div class="callout callout--warn">
+  <span class="callout__title">不要因噎废食</span>
+  看到性能对照表，很多人会想把所有查找都提前缓存。<strong>但那样会拖慢启动、增加代码复杂度。</strong><br>
+  <strong>正确的策略</strong>：<br>
+  ① <strong>热路径</strong>（每帧执行的代码）里的查找<em>必须缓存</em>；<br>
+  ② <strong>冷路径</strong>（初始化、事件响应、关卡加载）里的查找<em>随便用</em>，可读性更重要；<br>
+  ③ 优先用 <code>[SerializeField]</code> 在 Inspector 里连线，<em>比任何运行时查找都快</em>。
+</div>
+
+<h2 id="prefab">三、预制体与对象池 ★</h2>
+
+<pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using System.Collections.Generic;
+
+// ============================================================
+//  Instantiate / Destroy 的真实成本与对象池
+// ============================================================
+public class PrefabPool : MonoBehaviour
+{
+    [SerializeField] private GameObject _bulletPrefab;
+    [SerializeField] private int _prewarmCount = 20;
+
+    private readonly Queue&lt;GameObject&gt; _pool = new Queue&lt;GameObject&gt;();
+
+    private void Awake()
+    {
+        // 预热：提前创建，避免游戏进行中的卡顿
+        for (int i = 0; i &lt; _prewarmCount; i++)
+        {
+            GameObject go = Instantiate(_bulletPrefab, transform);
+            go.SetActive(false);
+            _pool.Enqueue(go);
+        }
+    }
+
+    // ---------- 从池中取 ----------
+    public GameObject Get(Vector3 position, Quaternion rotation)
+    {
+        GameObject go;
+
+        if (_pool.Count &gt; 0)
+        {
+            go = _pool.Dequeue();
+            go.transform.SetPositionAndRotation(position, rotation);
+            go.SetActive(true);
+        }
+        else
+        {
+            // 池空了才新建（说明预热数量不够）
+            go = Instantiate(_bulletPrefab, position, rotation, transform);
+        }
+
+        return go;
+    }
+
+    // ---------- 归还到池 ----------
+    public void Release(GameObject go)
+    {
+        if (go == null) return;
+
+        go.SetActive(false);
+        go.transform.SetParent(transform, false);
+        _pool.Enqueue(go);
+    }
+
+    public int AvailableCount { get { return _pool.Count; } }
+}
+
+// ============================================================
+//  使用对象池的子弹
+// ============================================================
+public class PooledBullet : MonoBehaviour
+{
+    [SerializeField] private float _speed = 20f;
+    [SerializeField] private float _lifeTime = 3f;
+
+    private float _timer;
+    private PrefabPool _pool;
+    private bool _inUse;
+
+    // 由池在取出时调用
+    public void Launch(PrefabPool pool)
+    {
+        _pool = pool;
+        _timer = 0f;
+        _inUse = true;
+    }
+
+    private void Update()
+    {
+        if (!_inUse) return;
+
+        transform.position += transform.forward * (_speed * Time.deltaTime);
+
+        _timer += Time.deltaTime;
+        if (_timer &gt;= _lifeTime) Recycle();
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (!_inUse) return;
+        Recycle();
+    }
+
+    private void Recycle()
+    {
+        _inUse = false;
+        _timer = 0f;
+        if (_pool != null) _pool.Release(gameObject);
+    }
+}
+
+// ============================================================
+//  成本参考与选型结论
+// ============================================================
+//  Instantiate 一个简单预制体：约 0.05 ~ 0.5 ms
+//    包含：分配内存、复制组件、调用 Awake/OnEnable、注册进场景
+//  Destroy：不是立即的，帧末统一处理
+//    【重要】Destroy 后同一帧内对象仍然存在，判断要小心
+//
+//  选型结论：
+//    每秒几十个 Create/Destroy  —— 不用池，没问题
+//    每秒几百个（子弹/特效/飘字）—— 【必须用池】
+//    关卡加载时批量创建        —— 分帧创建 + 加载界面
+
+// ============================================================
+//  不用池的轻量替代方案
+// ============================================================
+public class NoPoolAlternative : MonoBehaviour
+{
+    // 方案 1：Renderer.enabled 代替 SetActive
+    // 只是停止渲染，脚本逻辑继续运行
+    public void HideWithRenderer(Renderer r)
+    {
+        r.enabled = false;
+    }
+
+    // 方案 2：CanvasGroup 控制 UI 显隐（比 SetActive 轻）
+    public void HideUi(CanvasGroup g)
+    {
+        g.alpha = 0f;
+        g.blocksRaycasts = false;
+        g.interactable = false;
+    }
+}</code></pre>
+
+<div class="callout callout--danger">
+  <span class="callout__title">Destroy 不是立即生效的</span>
+  <code>Destroy(obj)</code> 只是<strong>标记</strong>对象要销毁，真正销毁发生在<em>当前帧的末尾</em>。<br>
+  这意味着：<strong>Destroy 之后在同一帧内，对象依然存在</strong>，它的 Update 可能还会执行一次。<br>
+  <strong>由此产生的 bug</strong>：销毁对象后立刻遍历列表，<em>仍然能拿到已标记销毁的对象</em>。<br>
+  <strong>解决办法</strong>：① 销毁的同时从列表里移除；② 用 <code>if (obj != null)</code> 判断（Unity 重载了 ==，能识别已标记销毁的对象）；③ 需要立即销毁用 <code>DestroyImmediate</code>——<em>但它只能在编辑器下用</em>。
+</div>
+
+<h2 id="fakenull">四、假 null：Unity 最隐蔽的陷阱 ★★★</h2>
+
+<p>这是我见过的<strong>最难排查的一类 bug</strong>——因为它不报错，只是<em>行为不符合预期</em>。而且面试时能答上来的人很少。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  Unity 的「假 null」—— MonoBehaviour 最隐蔽的陷阱
+// ============================================================
+public class FakeNullDemo : MonoBehaviour
+{
+    [SerializeField] private Light _light;
+
+    private void Start()
+    {
+        Destroy(_light);
+
+        // ---------- 同一个帧内的三种判断，结果不同 ----------
+        Debug.Log(_light == null);                  // True（Unity 重载了 ==）
+        Debug.Log((object)_light == null);          // False（真实引用还在）
+        Debug.Log(ReferenceEquals(_light, null));   // False
+    }
+}
+
+// ============================================================
+//  为什么会有这个现象
+// ============================================================
+// C# 托管对象与 C++ 原生对象是分开的两份。
+// Destroy 立即销毁的是 C++ 部分，C# 包装对象还在内存里。
+// UnityEngine.Object 重载了 == 运算符，
+// 会同时检查「托管引用是否为 null」和「原生对象是否已销毁」。
+//
+// 所以 _light == null 返回 true，但底层引用并不为 null。
+
+// ============================================================
+//  由此产生的三个 bug
+// ============================================================
+public class FakeNullBugs : MonoBehaviour
+{
+    private Light _light;
+    private IInteractable _target;
+    private Transform _other;
+
+    public interface IInteractable { void Interact(); }
+
+    // ---------- Bug 1：用 ?. 会绕过 Unity 的重载 ----------
+    private void Bug1()
+    {
+        // 危险：?. 用的是真实引用判断，不走 Unity 的 == 重载
+        // _light?.intensity = 1f;   // 已销毁仍会进入 -&gt; MissingReferenceException
+
+        // 正确：显式判断，这会调用 Unity 重载的 ==
+        if (_light != null) _light.intensity = 1f;
+
+        // Unity 2020+ 也可用隐式 bool 转换
+        if (_light) _light.intensity = 1f;
+    }
+
+    // ---------- Bug 2：存进接口类型就失去保护 ----------
+    private void Bug2()
+    {
+        // 如果 _target 指向已销毁的 MonoBehaviour，
+        // _target != null 永远为 true（接口类型不走 Unity 重载）
+        if (_target != null)
+        {
+            // _target.Interact();   // 可能抛 MissingReferenceException
+        }
+    }
+
+    // ---------- Bug 3：OnDestroy 里访问别的对象 ----------
+    private void OnDestroy()
+    {
+        // 场景卸载时其他对象可能已被销毁，
+        // 而且 OnDestroy 的执行顺序也是不确定的
+        if (_other != null)
+        {
+            Debug.Log(_other.name);
+        }
+    }
+}
+
+// ============================================================
+//  正确做法总结
+// ============================================================
+//  1. 判断销毁状态：用 obj != null 或 if (obj)，不要用 ?. 和 ??
+//  2. 接口引用：额外用 as MonoBehaviour 转换后再判断
+//  3. 事件订阅：在 OnDisable 里成对取消（见页 05）
+//  4. 协程延迟操作：每轮检查宿主是否还在（见页 08）
+
+public static class SafeUnityAccess
+{
+    // 同时处理 Unity 假 null 与普通引用
+    public static bool IsAlive(Object obj)
+    {
+        return obj != null;
+    }
+
+    public static bool IsAlive&lt;T&gt;(T obj) where T : class
+    {
+        if (obj == null) return false;
+        if (obj is Object uo) return uo != null;
+        return true;
+    }
+}</code></pre>
+
+<div class="callout callout--danger">
+  <span class="callout__title">四种判断写法，只有两种是对的</span>
+  <strong>正确</strong>：<code>if (obj != null)</code> —— 走 Unity 重载的 == 运算符。<br>
+  <strong>正确</strong>：<code>if (obj)</code> —— Unity 2020+ 支持隐式 bool 转换。<br>
+  <strong>错误</strong>：<code>obj?.Method()</code> —— <code>?</code> 用的是真实引用判断，<em>会绕过重载</em>。<br>
+  <strong>错误</strong>：<code>obj ?? fallback</code> —— 同样绕过重载。<br>
+  <strong>接口类型的额外陷阱</strong>：把 MonoBehaviour 存进接口变量后，<code>!= null</code> <em>也会失去保护</em>——因为接口类型不走 Unity 的重载。
+</div>
+
+<h2 id="so">五、ScriptableObject：数据与代码分离 ★</h2>
+
+<p>ScriptableObject（简称 SO）是 <strong>Unity 架构设计的核心工具</strong>。它解决一个根本问题：<em>数据应该放在哪里</em>。</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方案</th><th>数据存在哪</th><th>优点</th><th>缺点</th></tr></thead>
+  <tbody>
+    <tr><td><strong>硬编码在脚本里</strong></td><td>代码常量</td><td>简单直接</td><td>改数值要改代码、无法给策划调</td></tr>
+    <tr><td><strong>挂在 MonoBehaviour 上</strong></td><td>场景 / 预制体</td><td>能在 Inspector 调</td><td><em>多个对象各存一份、无法共享</em></td></tr>
+    <tr><td><strong>ScriptableObject</strong></td><td>独立资产文件</td><td><strong>可共享、可复用、改一处全生效</strong></td><td>不能存运行时状态</td></tr>
+    <tr><td><strong>JSON / CSV</strong></td><td>外部文件</td><td>策划可用 Excel 编辑</td><td>需要解析、无类型安全</td></tr>
+  </tbody>
+</table>
+</div>
+
+<pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  ScriptableObject：数据与代码分离
+// ============================================================
+// 右键菜单可以直接创建资产文件
+[CreateAssetMenu(fileName = "EnemyConfig", menuName = "游戏/敌人配置", order = 1)]
+public class EnemyConfig : ScriptableObject
+{
+    [Header("基础属性")]
+    public string Id = "enemy_001";
+    public string DisplayName = "史莱姆";
+
+    [Header("战斗数据")]
+    [Range(1, 9999)] public int MaxHp = 100;
+    [Range(0f, 100f)] public float MoveSpeed = 3f;
+    [Range(0f, 100f)] public float Attack = 10f;
+
+    [Header("掉落")]
+    public ItemDrop[] Drops;
+
+    [System.Serializable]
+    public struct ItemDrop
+    {
+        public string ItemId;
+        [Range(0f, 1f)] public float Probability;
+        [Min(1)] public int MinCount;
+        [Min(1)] public int MaxCount;
+    }
+
+    // 运行时逻辑也可以放在 SO 里：
+    // 不依赖场景、可复用、能被多个对象共享
+    public int RollDropCount(int index, int seed)
+    {
+        if (Drops == null || index &lt; 0 || index &gt;= Drops.Length) return 0;
+
+        ItemDrop d = Drops[index];
+        var rng = new System.Random(seed + index);
+        if (rng.NextDouble() &gt; d.Probability) return 0;
+        return rng.Next(d.MinCount, d.MaxCount + 1);
+    }
+
+    // 编辑器里改数据时自动纠正（只在编辑器下执行）
+    private void OnValidate()
+    {
+        MaxHp = Mathf.Max(1, MaxHp);
+
+        if (Drops != null)
+        {
+            for (int i = 0; i &lt; Drops.Length; i++)
+            {
+                if (Drops[i].MaxCount &lt; Drops[i].MinCount)
+                    Drops[i].MaxCount = Drops[i].MinCount;
+            }
+        }
+    }
+}
+
+// ============================================================
+//  ScriptableObject 的第二个用途：事件通道
+// ============================================================
+// 它能在模块之间传递事件，而不需要单例或静态变量
+[CreateAssetMenu(fileName = "IntEvent", menuName = "游戏/事件/整数事件")]
+public class IntEventChannel : ScriptableObject
+{
+    public event System.Action&lt;int&gt; Raised;
+
+    public void Raise(int value)
+    {
+        Raised?.Invoke(value);
+    }
+}
+
+// 订阅方：完全不认识发布者是谁
+public class ScoreListener : MonoBehaviour
+{
+    [SerializeField] private IntEventChannel _onScoreChanged;
+
+    private void OnEnable()
+    {
+        // 【注意】SO 里的 C# 事件在退出播放模式时不会自动清理，
+        // 必须成对订阅/取消订阅，否则编辑器里会累积订阅者。
+        if (_onScoreChanged != null) _onScoreChanged.Raised += OnScore;
+    }
+
+    private void OnDisable()
+    {
+        if (_onScoreChanged != null) _onScoreChanged.Raised -= OnScore;
+    }
+
+    private void OnScore(int value)
+    {
+        Debug.Log("分数变为 " + value);
+    }
+}
+
+// ============================================================
+//  使用方：把配置挂到组件上
+// ============================================================
+public class Enemy : MonoBehaviour
+{
+    [SerializeField] private EnemyConfig _config;
+
+    private int _hp;
+
+    private void Awake()
+    {
+        if (_config == null)
+        {
+            Debug.LogError("Enemy 缺少配置：" + name);
+            enabled = false;
+            return;
+        }
+
+        // 运行时数据用自己的字段。
+        // 【不要直接改 SO 的字段】—— 那会污染资产文件，
+        // 在编辑器里改完不撤销，下次运行还是改过的值。
+        _hp = _config.MaxHp;
+    }
+
+    public void TakeDamage(int amount)
+    {
+        _hp -= amount;
+        if (_hp &lt;= 0) Die();
+    }
+
+    private void Die() { }
+}
+
+// ============================================================
+//  ScriptableObject 的四个适用场景
+// ============================================================
+//  1. 配置表：敌人属性、武器数据、关卡参数
+//  2. 共享状态：全局设置、玩家存档数据容器
+//  3. 事件通道：跨模块通信，不用单例
+//  4. 运行时数据集合体（Runtime Set）：动态注册/注销对象
+//
+//  【不适合】需要频繁读写并在运行时产生大量实例的数据 ——
+//  那是普通 class 的工作。</code></pre>
+
+<div class="callout callout--danger">
+  <span class="callout__title">SO 的两个大坑</span>
+  <strong>① 不要直接改 SO 的字段。</strong>SO 是<em>资产文件</em>，运行时改它会在编辑器里<strong>永久保存</strong>——下次运行时数据还是改过的值。<em>正确做法：运行时用普通字段，从 SO 读取初始值。</em><br>
+  <strong>② SO 里的 C# 事件不会自动清理。</strong>退出播放模式时订阅列表<em>仍然保留</em>，下次运行时会出现<strong>重复订阅</strong>（同一个回调被调用两次）。<em>必须成对订阅 / 取消订阅。</em>
+</div>
+
+<h2 id="tasks">六、本章动手任务</h2>
+
+<div class="tasks" data-page="11">
+  <div class="task"><input type="checkbox" id="t-11-1"><label for="t-11-1"><strong>打印完整生命周期</strong>：把 LifecycleDemo 挂到物体上，运行并观察 Console 输出顺序。然后 <code>SetActive(false)</code> 再 <code>SetActive(true)</code>，看哪些回调再次触发。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-2"><label for="t-11-2"><strong>验证 Awake 顺序不确定</strong>：创建三个物体各挂一个打印脚本，反复运行，观察输出顺序是否每次都一样。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-3"><label for="t-11-3"><strong>体验 LateUpdate</strong>：写一个相机跟随，分别在 Update 和 LateUpdate 里实现，对比画面是否抖动。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-4"><label for="t-11-4"><strong>复现假 null</strong>：销毁一个组件后，分别用 <code>== null</code>、<code>?.Method()</code>、<code>ReferenceEquals</code> 判断，观察结果差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-5"><label for="t-11-5"><strong>做对象池</strong>：实现一个子弹对象池，用 Profiler 对比"用池"与"不用池"时的 GC Alloc 与帧率。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-6"><label for="t-11-6"><strong>做配置表</strong>：用 ScriptableObject 做一份敌人配置，创建三个不同配置的资产，让一个敌人生成脚本随机读取。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-7"><label for="t-11-7"><strong>回答面试题</strong>：① Awake 和 Start 的区别？② 输入为什么不能放 FixedUpdate？③ 什么是假 null，怎么正确判断？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能默写生命周期八个回调的顺序，并说出各自的典型用途；<br>
+    ② 能解释为什么输入放 Update、物理放 FixedUpdate、相机放 LateUpdate；<br>
+    ③ 知道 <code>Camera.main</code>、<code>GameObject.Find</code>、<code>FindObjectOfType</code> 的性能量级；<br>
+    ④ <strong>能解释假 null 的成因，并说出四种判断写法中哪两种是对的</strong>；<br>
+    ⑤ 能说出 ScriptableObject 的四个适用场景和两个大坑。<br><br>
+    <em>第 ④ 条是这一页最重要的内容——它在面试中出现频率极高，而且是实战中真正会导致难查 bug 的知识点。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="10-graphics.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">10 渲染管线与 Shader</div>
+  </a>
+  <a class="next" href="12-unity-physics.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">12 物理系统</div>
+  </a>
+</nav>

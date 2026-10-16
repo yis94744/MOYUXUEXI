@@ -1,0 +1,115 @@
+<h1>C++ + Unreal 路线</h1>
+
+<p class="lead">这条路线有<strong>两个门槛</strong>：C++ 语言本身，以及 Unreal 的庞大框架。<em>很多人卡在第一关就放弃了</em>。所以这条路线按<strong>两段式</strong>设计——先用 9 页把 C++ 打好，再用 19 页攻 Unreal。</p>
+
+<h2 id="two-phases">这条路线的两段式设计</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>阶段</th><th>页数</th><th>目标</th><th>结束时的状态</th></tr></thead>
+  <tbody>
+    <tr><td><strong>第一段：C++ 语言</strong></td><td>9 页（01-09）</td><td>掌握现代 C++</td><td><em>能独立写 C++ 程序</em></td></tr>
+    <tr><td><strong>第二段：Unreal 引擎</strong></td><td>19 页（10-27）</td><td>掌握 UE 框架</td><td><strong>能开发 UE 项目</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">C++ 的门槛比 C# 高多少</span>
+  <strong>C# 转 C++ 的困难点</strong>（按难度排序）：<br>
+  ① <strong>内存管理</strong>——没有 GC，要理解 RAII 和智能指针（<em>页 04</em>）<br>
+  ② <strong>编译模型</strong>——头文件、声明与定义分离、链接错误（<em>页 03、09</em>）<br>
+  ③ <strong>未定义行为</strong>——越界不报错，直接崩或者更糟（<em>页 04</em>）<br>
+  ④ <strong>模板与元编程</strong>——编译错误信息极长（<em>页 06</em>）<br>
+  ⑤ <strong>多态的实现方式</strong>——虚函数表、值语义（<em>页 05</em>）<br><br>
+  <strong>但好消息是</strong>：<em>Unreal 帮你封装了大部分内存管理</em>（<code>UObject</code> 有 GC）。<br>
+  你只需要理解<strong>为什么</strong>那些规则存在，而不是手动管理每一块内存。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">如果你已经会 C++</span>
+  <strong>可以直接跳到页 10（游戏数学）或页 12（Unreal C++）</strong>。<br>
+  但建议<em>快速扫一遍页 03-09</em>——因为我写的是"游戏开发视角"的 C++，<em>侧重点和一般教程不同</em>：<br>
+  · 页 03 讲的是"编译模型"，因为<strong>Unreal 的编译错误是最常见的痛点</strong><br>
+  · 页 08 讲的是"并发与性能"，因为<strong>3A 游戏必须榨干多核</strong><br>
+  · 页 09 讲"构建系统"，因为<strong>UE 的构建流程复杂</strong><br><br>
+  <em>这些是"游戏里的 C++"，不是"教科书里的 C++"。</em>
+</div>
+
+<h2 id="roadmap">完整路线图</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>编号</th><th>标题</th><th>核心内容</th></tr></thead>
+  <tbody>
+    <tr><td><strong>01</strong></td><td>岗位与行业现实</td><td><em>引擎程序、Gameplay 程序的分工</em></td></tr>
+    <tr><td><strong>02</strong></td><td>环境搭建与第一个项目</td><td>VS + UE5 配置</td></tr>
+    <tr><td><strong>03</strong></td><td>C++ 基础与编译模型</td><td><strong>头文件、声明定义、链接错误</strong></td></tr>
+    <tr><td><strong>04</strong></td><td>指针、内存与 RAII</td><td><strong>智能指针、循环引用、UB</strong></td></tr>
+    <tr><td><strong>05</strong></td><td>面向对象与多态</td><td><em>虚函数表、值语义</em></td></tr>
+    <tr><td><strong>06</strong></td><td>模板与泛型编程</td><td>模板实例化、SFINAE</td></tr>
+    <tr><td><strong>07</strong></td><td>现代 C++（11/14/17/20）</td><td><em>move、lambda、auto、concept</em></td></tr>
+    <tr><td><strong>08</strong></td><td>并发与性能</td><td><strong>线程、原子、内存序</strong></td></tr>
+    <tr><td><strong>09</strong></td><td>构建系统与工具链</td><td>CMake、模块化、链接</td></tr>
+    <tr><td><strong>10</strong></td><td>游戏数学基础</td><td><em>向量、矩阵、四元数</em></td></tr>
+    <tr><td><strong>11</strong></td><td>图形学与渲染管线</td><td><strong>渲染阶段、坐标空间</strong></td></tr>
+    <tr><td><strong>12</strong></td><td>Unreal C++ 与宏系统</td><td><strong>UCLASS/UPROPERTY/UFUNCTION</strong></td></tr>
+    <tr><td><strong>13</strong></td><td>Gameplay Framework</td><td><em>Actor/Pawn/Controller/GameMode</em></td></tr>
+    <tr><td><strong>14</strong></td><td>蓝图与 C++ 协作</td><td><em>什么时候用哪个</em></td></tr>
+    <tr><td><strong>15</strong></td><td>GAS 技能系统</td><td>GameplayAbilitySystem</td></tr>
+    <tr><td><strong>16</strong></td><td>动画系统</td><td>AnimBP、状态机、IK</td></tr>
+    <tr><td><strong>17</strong></td><td>渲染与画面</td><td>材质、Lumen、Nanite</td></tr>
+    <tr><td><strong>18</strong></td><td>Niagara 与物理</td><td>特效、Chaos 物理</td></tr>
+    <tr><td><strong>19</strong></td><td>网络与多人游戏</td><td><strong>复制、RPC、预测</strong></td></tr>
+    <tr><td><strong>20</strong></td><td>UI 与音频</td><td>UMG、MetaSound</td></tr>
+    <tr><td><strong>21</strong></td><td>编辑器扩展与插件</td><td><em>自定义工具</em></td></tr>
+    <tr><td><strong>22</strong></td><td>架构与设计模式</td><td><em>Subsystem、组件化</em></td></tr>
+    <tr><td><strong>23</strong></td><td>性能优化实战</td><td><strong>Insights、CPU/GPU 分析</strong></td></tr>
+    <tr><td><strong>24</strong></td><td>工程化与发布</td><td>打包、平台、CI</td></tr>
+    <tr><td><strong>25</strong></td><td>AI 辅助开发</td><td><em>AI 与 UE 的结合</em></td></tr>
+    <tr><td><strong>26</strong></td><td>实战项目集</td><td><strong>五个项目</strong></td></tr>
+    <tr><td><strong>27</strong></td><td>面试、作品集与资源</td><td><em>求职准备</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">怎么用这条路线</span>
+  <strong>每个知识点页都有四部分</strong>：<br>
+  ① <strong>这一页在路线中的位置</strong>——前后衔接<br>
+  ② <strong>正文</strong>——原理 + 对比表 + 代码<br>
+  ③ <strong>动手任务</strong>——必须实际做<br>
+  ④ <strong>过关标准</strong>——自检清单<br><br>
+  <strong>最重要的建议</strong>：<em>Unreal 的东西必须上手做。</em><br>
+  光是读文档，你永远不会知道 <code>UCLASS</code> 的宏展开后长什么样。<br>
+  <strong>本站所有 C++ 代码都用 MSVC C++17 实际编译验证过。</strong>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="index">
+  <div class="task"><input type="checkbox" id="t-index-1"><label for="t-index-1"><strong>评估起点</strong>：你会 C++ 吗？用过 Unreal 吗？<em>决定从哪页开始。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-index-2"><label for="t-index-2"><strong>装好环境</strong>：按页 02 装好 VS + UE5。</label></div>
+  <div class="task"><input type="checkbox" id="t-index-3"><label for="t-index-3"><strong>跑通第一个项目</strong>：创建一个 C++ 项目，编译并运行。</label></div>
+  <div class="task"><input type="checkbox" id="t-index-4"><label for="t-index-4"><strong>定个目标</strong>：是想转引擎方向，还是做 Gameplay？<em>目标不同，重点不同。</em></label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 知道这条路线的两段式结构；<br>
+    ② <strong>理解 C++ 比 C# 难在哪三个地方</strong>；<br>
+    ③ 知道 28 页的整体脉络；<br>
+    ④ 装好了开发环境；<br>
+    ⑤ 明确了自己的学习目标。<br>
+    <br>
+    <em>这一页只是入场——**关键是页 03 和页 12**，那两页是真正的门槛。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a class="next" href="01-role.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">01 岗位与行业现实</div>
+  </a>
+</nav>

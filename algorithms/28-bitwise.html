@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>28 位运算与数据压缩 — 游戏算法与系统设计｜从数据结构到完整系统，覆盖游戏开发全部核心算法</title>
+<meta name="description" content="位掩码、位域、标志位、序列化压缩、浮点量化、变长编码">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">游戏算法与系统设计
+        <span>从数据结构到完整系统，覆盖游戏开发全部核心算法</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>28 · 位运算与数据压缩</h1>
+
+<p class="lead">位运算<strong>看起来"底层"，但游戏里用得比你想的多</strong>：状态标记、网络协议、存档压缩、碰撞层。<em>这一页讲实用场景，不是刷题技巧</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="27-cache-lru.html#policies" data-brief="四种淘汰策略，LRU 要哈希表+双向链表"><span class="prereq__title">缓存与 LRU</span><span class="prereq__page">27-cache-lru</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="value">一、位运算的真实价值 ★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">一个需要澄清的常见说法</span>
+  <strong>常见说法</strong>："位运算比普通运算快，所以用位运算优化性能。"<br>
+  <strong>实测结果</strong>：<em>在现代 CPU 上，位运算和整数加减的速度几乎一样</em>——都是单指令。<br>
+  <strong>用位运算替代加减乘除，几乎没有性能收益。</strong><br><br>
+  <strong>那位运算的价值在哪</strong>：<br>
+  ① <strong>节省内存</strong>——32 个布尔值用 1 个整数存（<em>而不是 32 个 bool</em>）<br>
+  ② <strong>节省带宽</strong>——网络协议里一个字节存 8 个标志位<br>
+  ③ <strong>批量操作</strong>——一次位运算同时处理 32 个标志<br>
+  ④ <strong>紧凑存储</strong>——存档、序列化<br>
+  ⑤ <strong>掩码匹配</strong>——碰撞层、权限判断<br><br>
+  <em>结论：用位运算是因为"省空间"，不是"省时间"。</em><br>
+  <strong>这和"位运算更快"的常见说法不同——但那才是实测的事实。</strong>
+</div>
+
+<h2 id="scenarios">二、五个游戏里的实用场景</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>场景</th><th>位运算用法</th><th>收益</th></tr></thead>
+  <tbody>
+    <tr><td><strong>状态标记</strong></td><td><code>flags | FLAG_STUNNED</code></td><td><strong>32 个状态 1 个整数</strong></td></tr>
+    <tr><td><strong>碰撞层</strong></td><td><code>layer &amp; mask ~= 0</code></td><td>一次判断多个层</td></tr>
+    <tr><td><strong>网络协议</strong></td><td><code>byte = a | (b &lt;&lt; 4)</code></td><td><em>省带宽</em></td></tr>
+    <tr><td><strong>权限位</strong></td><td><code>perm | perm2</code></td><td>紧凑表示</td></tr>
+    <tr><td><strong>存档压缩</strong></td><td><code>pack/unpack</code></td><td>减小存档体积</td></tr>
+    <tr><td><strong>哈希函数</strong></td><td><code>h = h * 33 + b</code></td><td>快速散列</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">状态标记：最实用的场景</span>
+  <strong>用 32 个布尔字段 vs 用 1 个整数</strong>：<br>
+  <code>-- 方案 A：多个 bool</code><br>
+  <code>self.isStunned = false</code><br>
+  <code>self.isSilenced = false</code><br>
+  <code>self.isRooted = false</code><br>
+  <code>-- ... 32 个字段</code><br><br>
+  <code>-- 方案 B：位标记</code><br>
+  <code>local FLAG_STUNNED  = 1</code><br>
+  <code>local FLAG_SILENCED = 2</code><br>
+  <code>local FLAG_ROOTED   = 4</code><br>
+  <code>self.flags = 0</code><br><br>
+  <strong>检查</strong>：<code>if self.flags &amp; FLAG_STUNNED ~= 0 then</code><br>
+  <strong>添加</strong>：<code>self.flags = self.flags | FLAG_STUNNED</code><br>
+  <strong>移除</strong>：<code>self.flags = self.flags &amp; ~FLAG_STUNNED</code><br>
+  <strong>切换</strong>：<code>self.flags = self.flags ~ FLAG_STUNNED</code><br><br>
+  <strong>优势</strong>：<br>
+  · 一次网络同步传一个整数，而不是 32 个布尔值<br>
+  · 存档空间大幅减小<br>
+  · <em>一次位运算能同时判断多个状态</em><br><br>
+  <strong>劣势</strong>：<em>可读性差</em>——必须查常量表才知道对应的位是什么。<br>
+  <strong>建议</strong>：<em>只在"状态确实多"或"需要序列化"时用</em>。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">Lua 的位运算：必须用版本正确的语法</span>
+  <strong>Lua 5.3 之前</strong>：没有原生位运算，要用 <code>bit</code> 库。<br>
+  <strong>Lua 5.3+</strong>：<em>内置位运算符</em>：<br>
+  <code>&amp;</code>（与）、<code>|</code>（或）、<code>~</code>（异或/取反）、<code>&lt;&lt;</code>、<code>&gt;&gt;</code><br><br>
+  <strong>注意 Lua 的几个特殊之处</strong>：<br>
+  ① <code>~</code> 既是<em>二元异或</em>也是<em>一元取反</em>（<em>看操作数个数</em>）<br>
+  ② 位运算会把浮点数<strong>转成整数</strong>（<em>小数部分被截断</em>）<br>
+  ③ LuaJIT 需要 <code>bit</code> 库，<em>语法不同</em>！<br><br>
+  <strong>跨版本兼容</strong>：<em>如果项目可能用 LuaJIT，需要写兼容层</em>。<br>
+  <strong>实测确认</strong>：本页代码在 Lua 5.4.7 下验证通过。
+</div>
+
+<h2 id="when-not">三、什么时候不该用位运算</h2>
+
+<div class="callout callout--warn">
+  <span class="callout__title">三个不该用的信号</span>
+  <strong>① 状态只有 2~3 个</strong><br>
+  用两个 <code>bool</code> 就够了——<em>位运算徒增复杂度</em>，看不出任何收益。<br><br>
+  <strong>② 团队不熟悉位运算</strong><br>
+  <em>可读性的代价可能超过收益</em>。<br>
+  一个看不懂的 bug 花费的时间，远超省下的那点内存。<br><br>
+  <strong>③ 不需要序列化或网络传输</strong><br>
+  内存优化只有在"真的紧张"时才有意义。<br>
+  <em>PC 游戏有 16GB 内存，不需要为 32 个布尔值斤斤计较。</em><br><br>
+  <strong>判断标准</strong>：<em>如果不能明确说出"省下了多少"，就别用。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="28">
+  <div class="task"><input type="checkbox" id="t-28-1"><label for="t-28-1"><strong>实现状态标记</strong>：用位运算管理 8 个状态，实现添加/移除/检查/切换。</label></div>
+  <div class="task"><input type="checkbox" id="t-28-2"><label for="t-28-2"><strong>对比可读性</strong>：同样的功能用 bool 字段再实现一遍，对比代码可读性。</label></div>
+  <div class="task"><input type="checkbox" id="t-28-3"><label for="t-28-3"><strong>验证位运算不快</strong>：写一个测试，对比位运算和普通加减的速度。<em>亲自验证"位运算更快"这个说法。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-28-4"><label for="t-28-4"><strong>做网络压缩</strong>：把 4 个 4 位数值打包进一个 16 位整数，测体积节省。</label></div>
+  <div class="task"><input type="checkbox" id="t-28-5"><label for="t-28-5"><strong>检查 Lua 版本</strong>：确认你的 Lua 版本是否支持原生位运算（5.3+）。</label></div>
+  <div class="task"><input type="checkbox" id="t-28-6"><label for="t-28-6"><strong>回答面试题</strong>：① 位运算真的更快吗？② 位运算的价值在哪？③ 什么时候不该用位运算？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道位运算的价值在"省空间"而不是"省时间"</strong>；<br>
+    ② 能实现位标记的四种操作（检查、添加、移除、切换）；<br>
+    ③ <strong>知道 Lua 5.3+ 才有原生位运算，LuaJIT 语法不同</strong>；<br>
+    ④ 能说出六个游戏里的位运算场景；<br>
+    ⑤ 知道三个"不该用位运算"的信号。<br>
+    <br>
+    <em>第 ① 条是这一页最有价值的内容——它纠正了一个广泛流传的错误认知。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="27-cache-lru.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">27 缓存策略与 LRU</div>
+  </a>
+  <a class="next" href="29-serialize.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">29 存档与序列化</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

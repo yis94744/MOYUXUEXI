@@ -1,0 +1,424 @@
+<h1>14 · UI 系统</h1>
+
+<p class="lead">UI 是玩家<strong>接触最多的东西</strong>，也是性能问题最容易被忽视的地方——因为它不报错，只是<em>悄悄吃掉帧率</em>。这一页讲 UGUI 的两大核心：<strong>多分辨率适配</strong>（锚点）与<strong>性能优化</strong>（Canvas 重建）。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（13）动画系统讲的是"角色怎么动"。这一页讲"界面怎么显示"——两者经常配合（<em>动画事件触发 UI 效果</em>）。<br>
+  <strong>关键衔接</strong>：页 11 讲的<a class="kp-ref" href="11-unity-core.html#lifecycle" title="生命周期与执行顺序">生命周期</a>在 UI 里同样重要——<code>OnEnable</code> 订阅事件、<code>OnDisable</code> 取消订阅的模式，在 UI 面板的开关上用得最多。<br>
+  <strong>下一页</strong>（15）输入与音频。UI 的按钮点击本质上是输入系统的一部分，两页会衔接。<br>
+  <strong>难度提示</strong>：锚点的概念<em>需要动手试</em>——光看表格记不住，一定要在编辑器里拖着看效果。
+</div>
+
+<h2 id="ugui">一、RectTransform 与锚点 ★</h2>
+
+<p>锚点是 UGUI 最核心也最容易搞错的概念。<strong>理解它只需要三个参数</strong>：<code>anchorMin</code>、<code>anchorMax</code>、<code>pivot</code>。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  RectTransform 与锚点：多分辨率适配的核心
+// ============================================================
+// 这是 UGUI 最容易搞错的部分。核心概念只有三个：
+//   anchorMin / anchorMax  —— 锚点（相对父物体的比例，0~1）
+//   pivot                  —— 轴心（自身旋转/缩放的中心，0~1）
+//   anchoredPosition       —— 相对锚点的偏移
+//
+// 记住：anchoredPosition 是相对「锚点区域」的偏移，不是相对父物体中心。
+public class UguiAnchor : MonoBehaviour
+{
+    [SerializeField] private RectTransform _panel;
+    [SerializeField] private RectTransform _icon;
+
+    private void Start()
+    {
+        // ============================================================
+        //  四种常见布局的正确设置方式
+        // ============================================================
+
+        // ---------- 1. 铺满父容器（背景、遮罩）----------
+        SetStretch(_panel);
+
+        // ---------- 2. 固定大小居中（弹窗、图标）----------
+        SetCenterFixed(_icon, new Vector2(200f, 200f));
+
+        // ---------- 3. 贴在某个角（关闭按钮、头像）----------
+        SetTopRight(_icon, new Vector2(-20f, -20f), new Vector2(48f, 48f));
+
+        // ---------- 4. 横向拉伸 + 固定高度（血条、进度条）----------
+        SetHorizontalStretch(_panel, 300f, 20f, -30f);
+
+        // ---------- 5. 按比例定位（血条跟随 3D 物体）----------
+        // 下面这个在 Update 里调用
+    }
+
+    // ============================================================
+    //  通用设置方法
+    // ============================================================
+
+    /// 铺满父容器
+    public static void SetStretch(RectTransform rt, float padding = 0f)
+    {
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.offsetMin = new Vector2(padding, padding);          // left, bottom
+        rt.offsetMax = new Vector2(-padding, -padding);        // -right, -top
+    }
+
+    /// 固定大小并居中
+    public static void SetCenterFixed(RectTransform rt, Vector2 size)
+    {
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = Vector2.zero;
+        rt.sizeDelta = size;
+    }
+
+    /// 贴右上角（offset 用负值表示向内偏移）
+    public static void SetTopRight(RectTransform rt, Vector2 offset, Vector2 size)
+    {
+        rt.anchorMin = new Vector2(1f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot = new Vector2(1f, 1f);      // 轴心也放右上角，缩放时才不会跑偏
+        rt.anchoredPosition = offset;
+        rt.sizeDelta = size;
+    }
+
+    /// 横向拉伸、固定高度、贴底部
+    public static void SetHorizontalStretch(RectTransform rt, float height,
+                                            float bottomOffset, float sideMargin)
+    {
+        rt.anchorMin = new Vector2(0f, 0f);
+        rt.anchorMax = new Vector2(1f, 0f);
+        rt.pivot = new Vector2(0.5f, 0f);
+
+        // 左右留边距
+        rt.offsetMin = new Vector2(sideMargin, bottomOffset);
+        rt.offsetMax = new Vector2(-sideMargin, bottomOffset + height);
+    }
+
+    // ============================================================
+    //  世界坐标转 UI 坐标（血条、伤害数字跟随）
+    // ============================================================
+    private Camera _cam;
+
+    private void LateUpdate()
+    {
+        FollowWorldTarget();
+    }
+
+    private void FollowWorldTarget()
+    {
+        if (_cam == null) _cam = Camera.main;
+
+        Vector3 worldPos = _icon.position;   // 这里应该是要跟随的 3D 物体位置
+
+        // 世界坐标 -&gt; 屏幕坐标
+        Vector3 screenPos = _cam.WorldToScreenPoint(worldPos);
+
+        // 在相机背后：隐藏 UI（否则会显示在屏幕另一侧的错误位置）
+        if (screenPos.z &lt; 0f)
+        {
+            _icon.gameObject.SetActive(false);
+            return;
+        }
+        _icon.gameObject.SetActive(true);
+
+        // 屏幕坐标 -&gt; UI 局部坐标
+        // 必须用屏幕坐标而不是世界坐标，这是最常见的错误
+        RectTransform canvasRect = _icon.GetComponentInParent&lt;Canvas&gt;().transform as RectTransform;
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                canvasRect, screenPos, _cam, out Vector2 localPoint))
+        {
+            _icon.anchoredPosition = localPoint;
+        }
+    }
+}
+
+// ============================================================
+//  锚点速查表
+// ============================================================
+//  需求                       anchorMin     anchorMax     pivot
+//  铺满                        (0,0)         (1,1)        (0.5,0.5)
+//  居中固定                    (0.5,0.5)     (0.5,0.5)    (0.5,0.5)
+//  贴左上                      (0,1)         (0,1)        (0,1)
+//  贴右上                      (1,1)         (1,1)        (1,1)
+//  贴左下                      (0,0)         (0,0)        (0,0)
+//  贴右下                      (1,0)         (1,0)        (1,0)
+//  横向拉伸+贴底               (0,0)         (1,0)        (0.5,0)
+//  纵向拉伸+贴左               (0,0)         (0,1)        (0,0.5)
+//
+//  规律：
+//    anchorMin == anchorMax  -&gt; 锚点是一个「点」，sizeDelta 就是实际大小
+//    anchorMin != anchorMax  -&gt; 锚点是一个「区域」，sizeDelta 是相对区域的增量
+//    pivot 决定「旋转和缩放的中心」，也影响 anchoredPosition 的基准点</code></pre>
+
+<div class="callout callout--tip">
+  <span class="callout__title">锚点的核心规律（一句话记住）</span>
+  <strong><code>anchorMin == anchorMax</code> 时</strong>，锚点是一个<em>点</em>，<code>sizeDelta</code> 就是元素的<strong>实际大小</strong>。<br>
+  <strong><code>anchorMin != anchorMax</code> 时</strong>，锚点是一个<em>区域</em>，<code>sizeDelta</code> 是相对区域的<strong>增量</strong>（正值变大、负值变小）。<br><br>
+  <strong>另一个关键点</strong>：<code>pivot</code> 决定"旋转和缩放的中心"，也影响 <code>anchoredPosition</code> 的基准。<br>
+  <em>贴角元素一定要把 pivot 也设成对应的角</em>——否则做缩放动画时元素会"跑偏"。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">血条跟随 3D 物体：三个必须处理的细节</span>
+  <strong>① 用世界坐标转屏幕坐标，不要直接赋值世界坐标。</strong>UI 在 Canvas 坐标系里，3D 物体在世界坐标系里，<em>必须先转换</em>。<br>
+  <strong>② 相机背后的物体要隐藏。</strong><code>WorldToScreenPoint</code> 返回的 z &lt; 0 表示物体在相机背后，此时屏幕坐标是<em>镜像的</em>——不处理的话血条会出现在屏幕另一侧的错误位置。<br>
+  <strong>③ 放在 LateUpdate 里。</strong>要等 3D 物体这一帧移动完再更新 UI 位置，<em>否则血条会比物体慢一帧</em>（这正是页 11 讲的 LateUpdate 的用途）。
+</div>
+
+<h2 id="rebuild">二、Canvas 重建：UGUI 性能问题的根源 ★★★</h2>
+
+<p>这是 <strong>UI 性能优化的第一课</strong>，也是最容易被忽视的。很多项目"UI 一刷新就掉帧"，根因就在这里。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using UnityEngine.UI;
+
+// ============================================================
+//  Canvas 重建机制 —— UGUI 性能问题的根源
+// ============================================================
+// 【核心原理】
+// Canvas 把子元素合批成一个网格（Mesh）。
+// 当任何一个子元素发生变化（位置、颜色、文本内容），
+// 整个 Canvas 的网格都要重新生成 —— 这叫「重建（Rebuild）」。
+//
+// 后果：一个细节变化（比如分数跳动）会导致
+//       整个 Canvas 下几百个元素全部重新构建。
+//
+// 解决办法：【拆分 Canvas】
+//   把变化频繁的元素单独放在一个 Canvas 下，
+//   把静态元素放在另一个 Canvas 下。
+public class CanvasRebuildDemo : MonoBehaviour
+{
+    // ============================================================
+    //  错误示范：所有 UI 塞在一个 Canvas 里
+    // ============================================================
+    //  Hierarchy
+    //    Canvas (大)
+    //      ├─ 背包格子 x 100      （几乎不变）
+    //      ├─ 技能图标 x 20       （偶尔变）
+    //      ├─ 分数文本            （【每帧都在变】）
+    //      └─ 倒计时文本          （【每帧都在变】）
+    //
+    //  结果：分数一变，上面 120 个元素全部重建。
+    //        低端机上表现为「UI 一刷新就掉帧」。
+
+    // ============================================================
+    //  正确做法：按「变化频率」拆分 Canvas
+    // ============================================================
+    //  Hierarchy
+    //    Canvas_Static (静态层)
+    //      ├─ 背包格子 x 100
+    //      └─ 技能图标 x 20
+    //    Canvas_Dynamic (动态层)   &lt;- 单独的 Canvas 组件
+    //      ├─ 分数文本
+    //      └─ 倒计时文本
+    //
+    //  这样分数变化只重建 Canvas_Dynamic，静态层完全不受影响。
+
+    [SerializeField] private Canvas _staticCanvas;
+    [SerializeField] private Canvas _dynamicCanvas;
+
+    // ============================================================
+    //  优化 1：只在值变化时更新文本
+    // ============================================================
+    private Text _scoreText;      // 注意：实际项目推荐用 TMP_Text
+    private int _lastScore = int.MinValue;
+
+    public void UpdateScore(int score)
+    {
+        // 【关键】值没变就不更新。
+        // 直接每帧 text = score.ToString() 会导致每帧重建，
+        // 而且 ToString() 还会产生 GC 分配（见页 07）。
+        if (score == _lastScore) return;
+        _lastScore = score;
+
+        _scoreText.text = score.ToString();
+    }
+
+    // ============================================================
+    //  优化 2：用 CanvasGroup 控制显隐，而不是 SetActive
+    // ============================================================
+    // SetActive(false/true) 会导致 Canvas 布局重算 + 重建。
+    // CanvasGroup 只是改渲染参数，成本低得多。
+    public void HidePanel(CanvasGroup group)
+    {
+        group.alpha = 0f;
+        group.blocksRaycasts = false;   // 同时禁用点击
+        group.interactable = false;
+    }
+
+    public void ShowPanel(CanvasGroup group)
+    {
+        group.alpha = 1f;
+        group.blocksRaycasts = true;
+        group.interactable = true;
+    }
+
+    // ============================================================
+    //  优化 3：禁用不必要的 Raycast Target
+    // ============================================================
+    // Image / Text 默认勾选 Raycast Target，
+    // 意味着每次点击都要对所有 UI 元素做射线检测。
+    // 纯装饰性的图片和文本应该【取消勾选】。
+    public void DisableRaycastOnDecorations(Graphic[] decorations)
+    {
+        foreach (var g in decorations)
+        {
+            g.raycastTarget = false;
+        }
+    }
+
+    // ============================================================
+    //  优化 4：避免 LayoutGroup 的每帧重算
+    // ============================================================
+    // HorizontalLayoutGroup / VerticalLayoutGroup / ContentSizeFitter
+    // 会在子元素变化时触发【整棵布局树重算】，开销很大。
+    //
+    // 对策：
+    //   1. 动态列表用「手动定位」代替 LayoutGroup
+    //   2. 确实需要时，用 LayoutRebuilder 手动触发而不是每帧自动
+    public void ManualRebuild(RectTransform rt)
+    {
+        // 只在需要时手动重建，而不是让 LayoutGroup 自动每帧检查
+        LayoutRebuilder.ForceRebuildLayoutImmediate(rt);
+    }
+
+    // ============================================================
+    //  性能诊断：检测重建
+    // ============================================================
+    // 方法 1：Profiler -&gt; CPU -&gt; 搜索 Canvas.SendWillRenderCanvases
+    // 方法 2：在 Scene 视图右上角开启「Canvas Rebuild」可视化
+    //         （可以直观看到哪些 Canvas 在重建）
+    // 方法 3：Window -&gt; Analysis -&gt; Frame Debugger 看合批情况
+}
+
+// ============================================================
+//  拆 Canvas 的判断标准
+// ============================================================
+//  元素类型                    是否单独拆
+//  ----------------------------------------------------------
+//  每秒都在变的（分数、倒计时） 【必须拆】
+//  鼠标/触屏交互的（按钮悬停）   【建议拆】
+//  频繁增删的（背包格子、列表）  【建议拆】
+//  基本不变的（背景、边框）     不用拆
+//
+//  【注意】不要拆得太碎。
+//  每个 Canvas 都会打断合批，产生额外的 Draw Call。
+//  经验值：一个界面拆 2~4 个 Canvas 比较合理。
+//
+//  【补充】Unity 2020+ 的「Nested Canvas」：
+//  子 Canvas 有自己的网格，但会和父 Canvas 一起渲染。
+//  它比独立 Canvas 轻量，但仍能隔离重建。</code></pre>
+
+<div class="callout callout--danger">
+  <span class="callout__title">Canvas 重建的原理（必须理解）</span>
+  Canvas 会把所有子元素<strong>合批成一个网格（Mesh）</strong>。当<em>任何一个</em>子元素发生变化（位置、颜色、文本内容、启用状态），<strong>整个 Canvas 的网格都要重新生成</strong>。<br><br>
+  <strong>后果</strong>：一个分数文本每帧变化，会导致它所在 Canvas 下<em>几百个元素全部重建</em>。<br>
+  在低端机上，这表现为"UI 一刷新就掉帧"。<br><br>
+  <strong>解决办法：按"变化频率"拆分 Canvas</strong>——把频繁变化的元素单独放在一个 Canvas 下。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">拆 Canvas 的经验值</span>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>元素类型</th><th>是否单独拆</th><th>原因</th></tr></thead>
+    <tbody>
+      <tr><td>每秒都在变的（分数、倒计时）</td><td><strong>必须拆</strong></td><td>否则一直在重建静态元素</td></tr>
+      <tr><td>鼠标 / 触屏交互的（按钮悬停）</td><td><strong>建议拆</strong></td><td>悬停会触发重建</td></tr>
+      <tr><td>频繁增删的（背包格子、列表）</td><td><strong>建议拆</strong></td><td>增删会改变布局</td></tr>
+      <tr><td>基本不变的（背景、边框）</td><td>不用拆</td><td>不会触发重建</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <strong>但不要拆得太碎。</strong>每个 Canvas 都会<em>打断合批</em>，产生额外的 Draw Call。<br>
+  <strong>经验值：一个界面拆 2~4 个 Canvas 比较合理。</strong><br><br>
+  <strong>补充</strong>：Unity 2020+ 的<strong>嵌套 Canvas（Nested Canvas）</strong>有自己的网格，但会和父 Canvas 一起渲染。它比独立 Canvas 轻量，<em>但仍能隔离重建</em>——是拆分的更好选择。
+</div>
+
+<h2 id="optimize">三、UGUI 优化清单</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>#</th><th>优化项</th><th>做法</th><th>收益</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><strong>拆 Canvas</strong></td><td>按变化频率分组</td><td><span class="mk mk--yes">极高</span></td></tr>
+    <tr><td>2</td><td><strong>只在值变化时更新文本</strong></td><td>加值比较，避免每帧赋值</td><td><span class="mk mk--yes">高</span></td></tr>
+    <tr><td>3</td><td><strong>取消装饰元素的 Raycast Target</strong></td><td>纯装饰的 Image / Text 取消勾选</td><td><span class="mk mk--yes">高</span></td></tr>
+    <tr><td>4</td><td><strong>用 CanvasGroup 代替 SetActive</strong></td><td>控制 <code>alpha</code> / <code>blocksRaycasts</code></td><td><span class="mk mk--warn">中</span></td></tr>
+    <tr><td>5</td><td><strong>避免 LayoutGroup 每帧重算</strong></td><td>动态列表手动定位，或手动触发重建</td><td><span class="mk mk--warn">中</span></td></tr>
+    <tr><td>6</td><td><strong>图集（Atlas）</strong></td><td>小图合并成大图，减少 Draw Call</td><td><span class="mk mk--warn">中</span></td></tr>
+    <tr><td>7</td><td><strong>用 TMP 代替 Text</strong></td><td>TextMeshPro 更清晰、性能更好</td><td><span class="mk mk--warn">中</span></td></tr>
+    <tr><td>8</td><td><strong>Overdraw 优化</strong></td><td>减少全屏半透明图层叠加</td><td>低</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">Raycast Target 是最容易被忽略的优化</span>
+  <code>Image</code> 和 <code>Text</code> 默认都勾选 <strong>Raycast Target</strong>。这意味着<em>每次点击 / 触摸，UI 系统都要对该元素做一次射线检测</em>。<br><br>
+  <strong>一个复杂的界面可能有几百个 UI 元素</strong>，其中大部分是纯装饰（背景图、边框、图标、说明文字），<strong>它们根本不需要响应点击</strong>。<br><br>
+  <strong>做法</strong>：选中所有装饰性元素，取消 <code>Raycast Target</code> 勾选。<br>
+  <em>这是纯粹的配置工作，不写一行代码，收益却很直接。</em>
+</div>
+
+<h2 id="tmp">四、TextMeshPro 的注意事项</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">TMP 的 SetText 不解析格式说明符</span>
+  很多人以为 <code>SetText</code> 的数值重载会像 <code>string.Format</code> 那样支持格式串，<strong>但实际上不会</strong>。<br><br>
+  我反汇编了 <code>Unity.TextMeshPro.dll</code> 确认过：<code>SetText</code> 有 20 个重载（含 <code>string</code>、<code>StringBuilder</code>、<code>char[]</code>，以及 1 到 8 个 float 参数的版本）。<br>
+  但在处理 float 参数的实现里，<em>字符常量只有 <code>{</code>（123）和 <code>}</code>（125）</em>——<strong>没有冒号（58）</strong>。<br><br>
+  <strong>所以 <code>SetText("{0:F1}", 3.14159f)</code> 不会被识别为格式串</strong>，冒号后面的内容会被原样输出。<br><br>
+  <strong>正确做法</strong>：<br>
+  • 需要格式化就先用 <code>ToString("F1")</code> 转成字符串，再传给 <code>SetText</code>；<br>
+  • 或者直接用 <code>SetText(string)</code> 重载配合插值字符串（<em>但注意插值字符串会产生 GC 分配</em>）。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">TMP 的零分配更新方案</span>
+  如果文本每帧都在变（比如血量百分比），<code>ToString()</code> 会产生 GC 分配（见页 07）。<br>
+  <strong>三种更好的方案</strong>：<br>
+  <strong>① 值没变就不更新</strong>——最简单也最有效；<br>
+  <strong>② 用 <code>StringBuilder</code> + <code>SetText(StringBuilder)</code> 重载</strong>——复用同一个 Builder，零分配；<br>
+  <strong>③ 用图片代替文本</strong>——数字显示用图集（传统手游的常见做法）。
+</div>
+
+<h2 id="tasks">五、本章动手任务</h2>
+
+<div class="tasks" data-page="14">
+  <div class="task"><input type="checkbox" id="t-14-1"><label for="t-14-1"><strong>验证锚点规律</strong>：在编辑器里拖动一个 Image 的锚点，观察 <code>sizeDelta</code> 的变化。<em>重点对比 anchorMin == anchorMax 与不相等两种情况。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-14-2"><label for="t-14-2"><strong>做多分辨率适配</strong>：把一个界面分别按 16:9 和 9:16 预览（用 Game 视图的 Free Aspect 调），确保元素不会跑飞。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-3"><label for="t-14-3"><strong>观察 Canvas 重建</strong>：用 Profiler 搜索 <code>Canvas.SendWillRenderCanvases</code>，然后让一个文本每帧变化，观察这一项飙升。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-4"><label for="t-14-4"><strong>拆 Canvas 对比</strong>：把分数文本单独拆到一个子 Canvas，再跑一次 Profiler，记录耗时下降幅度。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-5"><label for="t-14-5"><strong>清理 Raycast Target</strong>：找一个复杂界面，写一个编辑器脚本批量取消装饰元素的 <code>raycastTarget</code>。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-6"><label for="t-14-6"><strong>做血条跟随</strong>：用 <code>WorldToScreenPoint</code> 加 <code>ScreenPointToLocalPointInRectangle</code> 实现血条跟随，<em>记得处理相机背后的情况</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-7"><label for="t-14-7"><strong>回答面试题</strong>：① Canvas 重建是什么？怎么优化？② UGUI 的多分辨率适配靠什么实现？③ 为什么血条要先转屏幕坐标？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能解释 <code>anchorMin</code> / <code>anchorMax</code> / <code>pivot</code> 三者的作用；<br>
+    ② 知道 <code>sizeDelta</code> 在"点锚点"和"区域锚点"下的不同含义；<br>
+    ③ <strong>能解释 Canvas 重建的原理，并说出拆 Canvas 的原则</strong>；<br>
+    ④ 知道 Raycast Target 为什么要关、CanvasGroup 为什么比 SetActive 好；<br>
+    ⑤ 能说出至少五项 UGUI 优化手段。<br><br>
+    <em>第 ③ 条是 UI 性能优化的核心——它在面试中的出现频率极高，也是很多项目的真实瓶颈所在。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="13-unity-anim.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">13 动画系统</div>
+  </a>
+  <a class="next" href="15-unity-input.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">15 输入与音频</div>
+  </a>
+</nav>

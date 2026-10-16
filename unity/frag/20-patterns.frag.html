@@ -1,0 +1,393 @@
+<h1>20 · 架构与设计模式</h1>
+
+<p class="lead">设计模式<strong>最大的误区</strong>是以为"用得多就是架构好"。真相恰恰相反——<em>绝大多数模式在你的项目里都用不上</em>。这一页只讲<strong>五个真正高频的模式</strong>，并告诉你<em>什么时候不该用</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>前面 19 页</strong>讲的都是"工具"——语言、引擎、优化。从这一页开始讲<strong>怎么组织这些工具</strong>。<br>
+  <strong>关键衔接</strong>：页 04 的<em>组合优于继承</em>是这一页的思想基础；页 05 的<em>事件与委托</em>是观察者模式的前提；页 11 的<em>对象池</em>在这里被抽象成通用管理器。<br>
+  <strong>下一页</strong>（21）性能优化实战——<em>架构决定了性能问题的天花板</em>。<br>
+  <strong>提醒</strong>：这一页<strong>不需要背 23 个设计模式</strong>。只需要掌握这五个，以及"什么时候不该用"的判断力。
+</div>
+
+<h2 id="five">一、五个真正会用的模式</h2>
+
+<p>下面这五个模式覆盖了游戏开发中<strong>90% 的架构需求</strong>。其余的模式<em>要么用不上，要么就是这五个的变体</em>。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using System.Collections.Generic;
+
+// ============================================================
+//  游戏架构与设计模式：五个真正会用的模式
+// ============================================================
+//  设计模式的误区：以为"用得多"就是"架构好"。
+//  真相是——【绝大多数模式在这个项目里都用不上】。
+//  下面这五个是真正高频的。
+
+// ============================================================
+//  1. 单例（Singleton）—— 用但要小心
+// ============================================================
+// 【适用】全局唯一且必须随时访问的系统：音频、存档、事件总线
+// 【不适用】业务逻辑模块 —— 那会让依赖关系失控
+
+public abstract class MonoSingleton&lt;T&gt; : MonoBehaviour where T : MonoSingleton&lt;T&gt;
+{
+    private static T _instance;
+    private static bool _applicationQuitting = false;
+
+    public static T Instance
+    {
+        get
+        {
+            // 【关键】应用退出时不要再创建新对象
+            if (_applicationQuitting) return null;
+
+            if (_instance != null) return _instance;
+
+            _instance = FindFirstObjectByType&lt;T&gt;();
+            if (_instance == null)
+            {
+                var go = new GameObject(typeof(T).Name);
+                _instance = go.AddComponent&lt;T&gt;();
+            }
+            return _instance;
+        }
+    }
+
+    protected virtual void Awake()
+    {
+        if (_instance != null &amp;&amp; _instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        _instance = (T)this;
+    }
+
+    protected virtual void OnDestroy()
+    {
+        // 【必须清理】否则会留下"假 null"（见页 11）
+        if (_instance == this) _instance = null;
+    }
+
+    protected virtual void OnApplicationQuit()
+    {
+        _applicationQuitting = true;
+    }
+}
+
+// 使用示例
+public class AudioManager : MonoSingleton&lt;AudioManager&gt;
+{
+    public void PlayBgm(string name) { }
+}
+
+// ============================================================
+//  2. 观察者 / 事件总线 —— 解耦的核心
+// ============================================================
+// 【适用】跨模块通信、UI 与逻辑解耦
+// 【注意】必须成对订阅/取消订阅（见页 05）
+
+public static class EventBus
+{
+    // 用字典支持多种事件类型
+    private static readonly Dictionary&lt;System.Type, System.Delegate&gt; _handlers
+        = new Dictionary&lt;System.Type, System.Delegate&gt;();
+
+    public static void Subscribe&lt;T&gt;(System.Action&lt;T&gt; handler) where T : struct
+    {
+        var type = typeof(T);
+        if (_handlers.TryGetValue(type, out var d))
+            _handlers[type] = System.Delegate.Combine(d, handler);
+        else
+            _handlers[type] = handler;
+    }
+
+    public static void Unsubscribe&lt;T&gt;(System.Action&lt;T&gt; handler) where T : struct
+    {
+        var type = typeof(T);
+        if (!_handlers.TryGetValue(type, out var d)) return;
+
+        var result = System.Delegate.Remove(d, handler);
+        if (result == null) _handlers.Remove(type);   // 【关键】空了就移除，避免内存滞留
+        else _handlers[type] = result;
+    }
+
+    public static void Publish&lt;T&gt;(T evt) where T : struct
+    {
+        if (_handlers.TryGetValue(typeof(T), out var d) &amp;&amp; d is System.Action&lt;T&gt; action)
+        {
+            action.Invoke(evt);
+        }
+    }
+
+    // 场景切换时清理（防止残留订阅）
+    public static void Clear() { _handlers.Clear(); }
+}
+
+// 事件定义（用 struct 避免 GC，见页 07）
+public struct PlayerDamagedEvent
+{
+    public int Amount;
+    public int RemainingHp;
+}
+
+public struct ScoreChangedEvent
+{
+    public int NewScore;
+}
+
+// 使用示例
+public class EventDemo : MonoBehaviour
+{
+    private void OnEnable()
+    {
+        EventBus.Subscribe&lt;PlayerDamagedEvent&gt;(OnDamaged);
+    }
+
+    private void OnDisable()
+    {
+        EventBus.Unsubscribe&lt;PlayerDamagedEvent&gt;(OnDamaged);   // 必须取消
+    }
+
+    private void OnDamaged(PlayerDamagedEvent e)
+    {
+        Debug.Log($"受伤 {e.Amount}，剩余 {e.RemainingHp}");
+    }
+
+    private void Test()
+    {
+        EventBus.Publish(new PlayerDamagedEvent { Amount = 10, RemainingHp = 90 });
+    }
+}
+
+// ============================================================
+//  3. 状态机 —— 见页 16（算法站）
+// ============================================================
+// 这里给一个最小的枚举式状态机，说明它在架构里的位置
+
+public enum GameState { Loading, MainMenu, Playing, Paused, GameOver }
+
+public class GameStateMachine : MonoBehaviour
+{
+    public GameState Current { get; private set; } = GameState.Loading;
+
+    // 状态变化事件（让 UI 等模块响应）
+    public event System.Action&lt;GameState, GameState&gt; StateChanged;
+
+    public void ChangeState(GameState next)
+    {
+        if (Current == next) return;         // 【去重】
+
+        var prev = Current;
+        OnExit(prev);
+        Current = next;
+        OnEnter(next);
+
+        StateChanged?.Invoke(prev, next);
+    }
+
+    private void OnEnter(GameState s)
+    {
+        switch (s)
+        {
+            case GameState.Playing: Time.timeScale = 1f; break;
+            case GameState.Paused:  Time.timeScale = 0f; break;   // 暂停用 timeScale
+        }
+    }
+
+    private void OnExit(GameState s)
+    {
+        // 状态退出时清理（见算法站页 16）
+    }
+}
+
+// ============================================================
+//  4. 对象池 —— 见页 11
+// ============================================================
+// 这里展示"通用对象池管理器"，比页 11 的版本更适合项目使用
+
+public class PoolManager : MonoSingleton&lt;PoolManager&gt;
+{
+    private readonly Dictionary&lt;GameObject, Queue&lt;GameObject&gt;&gt; _pools
+        = new Dictionary&lt;GameObject, Queue&lt;GameObject&gt;&gt;();
+
+    public GameObject Spawn(GameObject prefab, Vector3 pos, Quaternion rot)
+    {
+        if (!_pools.TryGetValue(prefab, out var queue))
+        {
+            queue = new Queue&lt;GameObject&gt;();
+            _pools[prefab] = queue;
+        }
+
+        GameObject go;
+        if (queue.Count &gt; 0)
+        {
+            go = queue.Dequeue();
+            go.transform.SetPositionAndRotation(pos, rot);
+            go.SetActive(true);
+        }
+        else
+        {
+            go = Instantiate(prefab, pos, rot, transform);
+        }
+        return go;
+    }
+
+    public void Despawn(GameObject prefab, GameObject instance)
+    {
+        if (instance == null) return;
+        instance.SetActive(false);
+        instance.transform.SetParent(transform, false);
+        _pools[prefab].Enqueue(instance);
+    }
+}
+
+// ============================================================
+//  5. 命令模式 —— 用于回放、撤销、网络同步
+// ============================================================
+// 【适用】需要记录/重放操作的系统（录像、撤销、帧同步）
+
+public interface ICommand
+{
+    void Execute();
+    void Undo();
+}
+
+public class MoveCommand : ICommand
+{
+    private readonly Transform _target;
+    private readonly Vector3 _delta;
+    private Vector3 _previous;
+
+    public MoveCommand(Transform target, Vector3 delta)
+    {
+        _target = target;
+        _delta = delta;
+    }
+
+    public void Execute()
+    {
+        _previous = _target.position;
+        _target.position += _delta;
+    }
+
+    public void Undo()
+    {
+        _target.position = _previous;
+    }
+}
+
+public class CommandInvoker
+{
+    private readonly Stack&lt;ICommand&gt; _history = new Stack&lt;ICommand&gt;();
+
+    public void Execute(ICommand cmd)
+    {
+        cmd.Execute();
+        _history.Push(cmd);
+    }
+
+    public void Undo()
+    {
+        if (_history.Count == 0) return;
+        _history.Pop().Undo();
+    }
+}
+
+// ============================================================
+//  什么该用模式、什么不该
+// ============================================================
+//  【该用】
+//    · 单例：音频、存档、事件总线（全局唯一且必须随时访问）
+//    · 观察者：UI 与逻辑解耦、跨模块通信
+//    · 状态机：游戏流程、角色状态、UI 界面
+//    · 对象池：频繁创建销毁的对象
+//    · 命令：需要回放/撤销/同步的操作
+//
+//  【不该用】
+//    · 只有两个类的"工厂模式" —— 直接 new 就行
+//    · 为一个按钮写的"策略模式" —— 直接 if 就行
+//    · 只有一层继承的"抽象工厂" —— 过度设计
+//    · 【任何"以后可能会用"的模式】—— 到时候再说
+//
+//  【判断标准】
+//    如果去掉这个模式，代码更短、更好懂，那就去掉它。</code></pre>
+
+<h2 id="when-not">二、什么时候不该用模式</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">模式滥用的四个信号</span>
+  <strong>① 只有两个类的"工厂"</strong>：直接 <code>new</code> 就行，多一层工厂只是多一层看不懂。<br><br>
+  <strong>② 为一个按钮写的"策略模式"</strong>：直接 <code>if</code> 就行。<br><br>
+  <strong>③ 只有一层继承的"抽象工厂"</strong>：这是典型的过度设计。<br><br>
+  <strong>④ "以后可能会用"的任何模式</strong>：等到真的要用时再重构。<em>过早抽象比不抽象更糟——因为你抽象错了方向。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">唯一的判断标准</span>
+  <strong>如果去掉这个模式，代码更短、更好懂，那就去掉它。</strong><br><br>
+  设计模式的目的是<em>降低复杂度</em>。如果一个模式让代码变复杂了，那它<strong>用错了</strong>——不是它不好，是场景不对。<br><br>
+  <em>记住：模式是"发现"的，不是"套用"的。你写代码写到最后发现"这不就是观察者模式吗"，而不是一开始就想"我要用观察者模式"。</em>
+</div>
+
+<h2 id="dependency">三、依赖方向：架构的本质</h2>
+
+<p>所有架构问题的本质都是<strong>依赖方向</strong>。<em>依赖关系决定了改一处会不会牵连全局。</em></p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>架构</th><th>依赖方向</th><th>后果</th></tr></thead>
+  <tbody>
+    <tr><td><strong>面条式</strong></td><td>互相引用</td><td><span class="mk mk--no">改一处崩三处</span></td></tr>
+    <tr><td><strong>分层</strong></td><td>上层依赖下层</td><td>改底层影响上层</td></tr>
+    <tr><td><strong>依赖倒置</strong></td><td><strong>都依赖抽象</strong></td><td><span class="mk mk--yes">可替换、可测试</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">游戏项目的分层建议</span>
+  <strong>典型的分层</strong>：<br>
+  <code>表现层</code>（UI、特效、动画）<br>
+  <code>逻辑层</code>（战斗、背包、任务）<br>
+  <code>数据层</code>（配置、存档、网络）<br>
+  <code>基础设施</code>（资源、音频、输入）<br><br>
+  <strong>规则</strong>：<em>上层可以依赖下层，下层不能依赖上层。</em><br>
+  比如"战斗逻辑"不应该直接引用"UI 血条"——应该<em>发事件</em>，让 UI 自己订阅（观察者模式）。<br><br>
+  <strong>检验方法</strong>：试着单独编译"逻辑层"，如果必须带着 UI 一起编译，说明依赖方向错了。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="20">
+  <div class="task"><input type="checkbox" id="t-20-1"><label for="t-20-1"><strong>实现事件总线</strong>：写一个基于 <code>Dictionary&lt;Type, Delegate&gt;</code> 的全局事件系统，支持 struct 事件（避免装箱）。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-2"><label for="t-20-2"><strong>验证订阅泄漏</strong>：故意在 <code>OnDisable</code> 里不取消订阅，用 Memory Profiler 观察对象数量只增不减。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-3"><label for="t-20-3"><strong>重构一个紧耦合模块</strong>：找一个直接引用 UI 的逻辑类，改成发事件，看代码如何解耦。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-4"><label for="t-20-4"><strong>检查依赖方向</strong>：画出你项目的模块依赖图，找出"下层依赖上层"的地方。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-5"><label for="t-20-5"><strong>识别过度设计</strong>：找一处"为了扩展性而加的抽象"，评估它是否真的有必要。<em>如果只有一种实现，那抽象就是多余的。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-20-6"><label for="t-20-6"><strong>回答面试题</strong>：① 单例有什么问题？② 观察者模式怎么避免内存泄漏？③ 什么时候不该用设计模式？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出五个高频模式的适用场景与代价；<br>
+    ② <strong>能实现一个类型安全的全局事件总线</strong>；<br>
+    ③ 知道单例的"假 null"和静态状态残留问题；<br>
+    ④ <strong>能识别"过度设计"的四个信号</strong>；<br>
+    ⑤ 能用"依赖方向"分析一个模块的架构是否合理。<br>
+    <br>
+    <em>第 ④ 条是这一页最有价值的内容——它让你避免"为了架构而架构"这个新手常见错误。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="19-unity-editor.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">19 编辑器扩展与工具链</div>
+  </a>
+  <a class="next" href="21-perf.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">21 性能优化实战</div>
+  </a>
+</nav>

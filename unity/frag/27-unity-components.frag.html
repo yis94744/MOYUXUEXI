@@ -1,0 +1,348 @@
+
+      <h1>27 · Unity 组件使用技巧</h1>
+      <p class="lead">上一页（26）讲的是"进阶 API"——那些少人知道但很实用的方法。这一页换个角度：<strong>把 Unity 最常用的组件放在一起，讲清楚每个参数的真正含义、默认值的坑、以及什么场景该选哪个组件。</strong><em>所有属性名都从真实程序集核对过。</em></p>
+
+      <div class="callout callout--note">
+        <span class="callout__title">这一页和 API 速查的区别</span>
+        <strong>API 速查页</strong>解决的是"这个方法叫什么、参数是什么"——它是<em>参考手册</em>。<br>
+        <strong>这一页</strong>解决的是"该不该用这个组件、参数怎么调、有什么坑"——它是<em>经验总结</em>。<br>
+        <strong>和上一页的关系</strong>：26 页讲"用哪些 API 能避免性能问题"，这一页讲"用哪些参数能避免功能问题"。<em>两者配合使用。</em>
+      </div>
+
+      <h2 id="rigidbody">一、Rigidbody —— 物理刚体</h2>
+      <p>Rigidbody 有三十多个属性，但<strong>日常真正要调的只有下面这八个</strong>。如果你之前只改过 mass，那这一节会让你少走很多弯路。</p>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>属性</th><th>默认值</th><th>什么时候该改</th></tr></thead>
+        <tbody>
+          <tr><td><code>mass</code></td><td>1</td><td>影响碰撞时的动量交换。<em>质量比决定谁被撞飞</em></td></tr>
+          <tr><td><code>drag</code></td><td>0</td><td>线性阻力。做"空气阻力"或"水中减速"时调大</td></tr>
+          <tr><td><code>angularDrag</code></td><td>0.05</td><td>角阻力。物体旋转停不下来时调大</td></tr>
+          <tr><td><code>useGravity</code></td><td>true</td><td>飞行单位、漂浮物要关掉</td></tr>
+          <tr><td><code>isKinematic</code></td><td>false</td><td><strong>开启后完全由代码控制</strong>，不受物理力影响但仍有碰撞</td></tr>
+          <tr><td><code>interpolation</code></td><td>None</td><td><strong>几乎一定要改</strong>。设为 Interpolate 消除视觉抖动</td></tr>
+          <tr><td><code>collisionDetectionMode</code></td><td>Discrete</td><td>高速物体穿透时改成 <strong>Continuous</strong></td></tr>
+          <tr><td><code>constraints</code></td><td>None</td><td>2D 游戏锁 Z 轴；防翻倒锁旋转</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">Rigidbody 的三个经典坑</span>
+        <strong>① 不要同时用 <code>transform.position</code> 和物理。</strong>直接改 position 会<em>绕过物理引擎</em>，导致穿墙、抖动、碰撞失效。正确做法是用 <code>velocity</code> 或 <code>MovePosition()</code>。<br>
+        <strong>② <code>isKinematic</code> 与 <code>velocity</code> 不兼容。</strong>设为 Kinematic 后 velocity 就不再驱动移动了，<em>必须改用 <code>MovePosition</code></em>。<br>
+        <strong>③ 子物体的 Collider 会算进父 Rigidbody。</strong>给角色挂多个碰撞体（头、身体、腿）时，<em>它们是同一个刚体的一部分，不需要每个都加 Rigidbody</em>。
+      </div>
+      <p>还有个容易被忽略的问题：<strong>什么时候该用 <code>velocity</code>，什么时候该用 <code>AddForce</code>？</strong></p>
+
+      <ul>
+        <li><code>velocity</code>：<strong>直接设定速度</strong>。响应即时、完全可控，适合角色移动。<em>但会覆盖物理计算出的速度，失去部分物理感。</em></li>
+        <li><code>AddForce</code>：<strong>施加力</strong>。物体逐渐加速，有惯性和质量感，适合爆炸冲击、被击退。<em>但难以精确控制最终位置。</em></li>
+        <li><strong>实践建议</strong>：需要"手感"的地方用 velocity，需要"物理感"的地方用 AddForce。<em>混用要小心——它们会互相干扰。</em></li>
+      </ul>
+
+      <h2 id="character">二、角色控制：三种方案对比</h2>
+      <p>这是新手最容易选错的地方。<strong>三条路各有代价，选错了会一路痛苦。</strong></p>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>方案</th><th>适用场景</th><th>优点</th><th>代价</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Rigidbody + AddForce</strong></td><td>物理感强的对象（滚球、载具）</td><td>真实的物理交互</td><td>难精确控制，手感难调</td></tr>
+          <tr><td><strong>Rigidbody + velocity</strong></td><td>需要物理交互又要手感</td><td>可控且能参与物理</td><td>要自己处理斜坡与台阶</td></tr>
+          <tr><td><strong>CharacterController</strong></td><td>FPS / 第三人称动作</td><td>内置斜坡、台阶、<strong>isGrounded</strong></td><td>不参与物理，<em>不会被推动</em></td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  CharacterController：角色控制的标准方案
+// ============================================================
+public class CharacterMotor : MonoBehaviour
+{
+    [SerializeField] private float _speed = 5f;
+    [SerializeField] private float _jumpHeight = 1.2f;
+    [SerializeField] private float _gravity = -20f;
+
+    private CharacterController _cc;
+    private Vector3 _velocity;
+
+    private void Awake()
+    {
+        _cc = GetComponent&lt;CharacterController&gt;();
+    }
+
+    private void Update()
+    {
+        // ---------- 接地检测 ----------
+        // isGrounded 是 CharacterController 最实用的属性
+        bool grounded = _cc.isGrounded;
+
+        if (grounded &amp;&amp; _velocity.y &lt; 0f)
+        {
+            _velocity.y = -2f;   // 轻微下压，保证贴合地面
+        }
+
+        // ---------- 水平移动 ----------
+        float h = Input.GetAxisRaw("Horizontal");
+        float v = Input.GetAxisRaw("Vertical");
+        Vector3 dir = new Vector3(h, 0f, v);
+        if (dir.sqrMagnitude &gt; 1f) dir.Normalize();   // 斜向不加速
+
+        // ---------- 跳跃 ----------
+        if (grounded &amp;&amp; Input.GetButtonDown("Jump"))
+        {
+            // 由高度反推初速度：v = sqrt(2 * g * h)
+            _velocity.y = Mathf.Sqrt(_jumpHeight * -2f * _gravity);
+        }
+
+        _velocity.y += _gravity * Time.deltaTime;
+
+        // Move 的参数是「这一帧要移动多少」，不是速度
+        Vector3 motion = dir * _speed + Vector3.up * _velocity.y;
+        _cc.Move(motion * Time.deltaTime);
+    }
+
+    // ---------- 被撞飞：CharacterController 需要手动实现 ----------
+    public void ApplyKnockback(Vector3 impulse)
+    {
+        _velocity += impulse;
+    }
+}</code></pre>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">CharacterController 的三个关键参数</span>
+        <code>slopeLimit</code>：能爬的<strong>最大坡度</strong>（默认 45 度）。<em>爬不上坡先调这个。</em><br>
+        <code>stepOffset</code>：能自动迈上的<strong>台阶高度</strong>（默认 0.3 米）。<em>走楼梯卡顿就调这个。</em><br>
+        <code>skinWidth</code>：<strong>不要随便改</strong>。默认是半径的 10%，改小容易卡进几何体，改大会让角色悬空。<br>
+        <strong>关于跳跃公式</strong>：<code>v = sqrt(2 * g * h)</code>。<em>用高度反推初速度比直接调数值可靠得多</em>——改重力时跳跃高度自动保持。
+      </div>
+
+      <h2 id="animator">三、Animator 优化与实用 API</h2>
+      <p>Animator 是 CPU 大户，尤其是场景里角色多的时候。<strong>下面这些设置能带来数量级的性能差异</strong>——但很多人不知道。</p>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>技巧</th><th>做法</th><th>收益</th></tr></thead>
+        <tbody>
+          <tr><td><strong>哈希缓存参数</strong></td><td><code>Animator.StringToHash("Speed")</code></td><td>避免每帧对字符串做哈希</td></tr>
+          <tr><td><strong>屏幕外停止更新</strong></td><td><code>cullingMode = CullCompletely</code></td><td>屏幕外不更新，<strong>省大量 CPU</strong></td></tr>
+          <tr><td><strong>关闭根运动</strong></td><td><code>applyRootMotion = false</code></td><td>由代码控制位移时必关</td></tr>
+          <tr><td><strong>用 Trigger 而非 Bool</strong></td><td>单次动作（攻击、跳跃）</td><td>避免状态残留导致动作卡住</td></tr>
+          <tr><td><strong>只同步变化的参数</strong></td><td>加值变化判断</td><td><em>省掉大量无谓的 Set 调用</em></td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  Animator：性能优化与实用 API
+// ============================================================
+public class AnimatorOptimized : MonoBehaviour
+{
+    // 静态只读：哈希只在类加载时计算一次
+    private static readonly int SpeedHash = Animator.StringToHash("Speed");
+    private static readonly int GroundedHash = Animator.StringToHash("Grounded");
+    private static readonly int JumpHash = Animator.StringToHash("Jump");
+    private static readonly int AttackHash = Animator.StringToHash("Attack");
+
+    private Animator _animator;
+    private float _lastSpeed = float.NaN;      // NaN 保证首帧一定会同步
+
+    private void Awake()
+    {
+        _animator = GetComponent&lt;Animator&gt;();
+
+        // 屏幕外完全停止更新动画 —— 大量角色时收益极大
+        _animator.cullingMode = AnimatorCullingMode.CullCompletely;
+
+        // 位移由代码控制时，必须关闭根运动
+        _animator.applyRootMotion = false;
+    }
+
+    // ---------- 只在值变化时才同步（避免每帧无谓调用）----------
+    public void SyncSpeed(float speed)
+    {
+        if (Mathf.Approximately(speed, _lastSpeed)) return;
+        _lastSpeed = speed;
+
+        // 带阻尼的平滑过渡：第 3 个参数是过渡时间
+        _animator.SetFloat(SpeedHash, speed, 0.1f, Time.deltaTime);
+    }
+
+    public void SetGrounded(bool grounded)
+    {
+        _animator.SetBool(GroundedHash, grounded);
+    }
+
+    // ---------- 单次动作：Trigger 会自动复位 ----------
+    // 关键：播放一个动作前先重置另一个，避免触发器堆积
+    public void PlayJump()
+    {
+        _animator.ResetTrigger(AttackHash);
+        _animator.SetTrigger(JumpHash);
+    }
+
+    public void PlayAttack()
+    {
+        _animator.ResetTrigger(JumpHash);
+        _animator.SetTrigger(AttackHash);
+    }
+
+    // ---------- 不经过状态机直接播放（适合一次性特效动画）----------
+    public void CrossFadeTo(string stateName, float duration = 0.1f, int layer = 0)
+    {
+        _animator.CrossFade(stateName, duration, layer);
+    }
+
+    // ---------- 查询当前状态 ----------
+    public bool IsPlaying(string stateName, int layer = 0)
+    {
+        AnimatorStateInfo info = _animator.GetCurrentAnimatorStateInfo(layer);
+        return info.IsName(stateName);
+    }
+
+    public float NormalizedTime(int layer = 0)
+    {
+        // 归一化播放进度：0 = 开头，1 = 结束
+        return _animator.GetCurrentAnimatorStateInfo(layer).normalizedTime;
+    }
+
+    // ---------- 判断是否在过渡中（做连招判断时很有用）----------
+    public bool IsInTransition(int layer = 0)
+    {
+        return _animator.IsInTransition(layer);
+    }
+}</code></pre>
+
+      <div class="callout callout--warn">
+        <span class="callout__title">两个关于 SetFloat 的重要细节</span>
+        <strong>① 带阻尼的重载会持续插值。</strong><code>SetFloat(hash, value, dampTime, deltaTime)</code> 让参数平滑过渡，但它<em>每帧都在计算</em>。只对真正需要的参数用（比如移动速度），<strong>布尔和 Trigger 不需要</strong>。<br>
+        <strong>② 每帧无条件 SetFloat 是浪费。</strong>如果值没变，这次调用纯属开销。<br>
+        <em>加一个 <code>Mathf.Approximately</code> 判断就能省下来</em>——上面的示例代码里就是这么做的。
+      </div>
+
+      <h2 id="audio">四、AudioSource 参数速查</h2>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>属性</th><th>范围</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>volume</code></td><td>0 ~ 1</td><td>线性音量</td></tr>
+          <tr><td><code>pitch</code></td><td>0.1 ~ 3</td><td><strong>1 是原速</strong>；0.95~1.05 用于制造变化</td></tr>
+          <tr><td><code>loop</code></td><td>bool</td><td>循环播放</td></tr>
+          <tr><td><code>playOnAwake</code></td><td>bool</td><td>BGM 常用；<strong>音效要关掉</strong></td></tr>
+          <tr><td><code>spatialBlend</code></td><td>0 ~ 1</td><td><strong>0 = 2D，1 = 3D</strong>；中间值是混合</td></tr>
+          <tr><td><code>rolloffMode</code></td><td>枚举</td><td>3D 衰减曲线，<strong>Linear 最可控</strong></td></tr>
+          <tr><td><code>minDistance</code></td><td>米</td><td>此距离内保持最大音量，常用 1~3</td></tr>
+          <tr><td><code>maxDistance</code></td><td>米</td><td>超出后不再衰减，常用 20~40</td></tr>
+          <tr><td><code>priority</code></td><td>0 ~ 256</td><td><strong>0 是最高优先级</strong>（很多人搞反）</td></tr>
+          <tr><td><code>dopplerLevel</code></td><td>0 ~ 5</td><td><strong>设为 0 关闭多普勒效应</strong></td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">两个反直觉的设计</span>
+        <strong>① priority 数字越小优先级越高。</strong>0 是最高，256 是最低。<em>BGM 应设成较低优先级（如 128），重要音效设 0</em>。<br>
+        <strong>② dopplerLevel 默认是 1，会产生多普勒效应。</strong>高速移动的物体（子弹、飞车）会因此出现<em>怪异的音调变化</em>。绝大多数游戏应该<strong>直接设为 0</strong>。
+      </div>
+
+      <h2 id="camera">五、Camera 参数要点</h2>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>属性</th><th>说明</th><th>常用值</th></tr></thead>
+        <tbody>
+          <tr><td><code>fieldOfView</code></td><td>透视相机的<strong>垂直</strong>视野角</td><td>FPS 常用 60~90（<em>不是 45</em>）</td></tr>
+          <tr><td><code>orthographicSize</code></td><td>正交相机的<strong>半高</strong>（不是半宽！）</td><td>2D 游戏按画面需求调</td></tr>
+          <tr><td><code>nearClipPlane</code></td><td>近裁剪面</td><td>太小导致 Z-Fighting，0.3 是常见值</td></tr>
+          <tr><td><code>farClipPlane</code></td><td>远裁剪面</td><td><em>能小就小</em>，过大会降低深度精度</td></tr>
+          <tr><td><code>clearFlags</code></td><td>背景处理</td><td>3D 用 Skybox；UI 相机用 Depth Only</td></tr>
+          <tr><td><code>cullingMask</code></td><td>只渲染哪些层</td><td>UI 相机排除场景层可省性能</td></tr>
+          <tr><td><code>depth</code></td><td>渲染顺序</td><td><em>数字大的后渲染</em>，UI 相机要更大</td></tr>
+          <tr><td><code>targetTexture</code></td><td>渲染到贴图</td><td>小地图、监控画面</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--warn">
+        <span class="callout__title"><code>orthographicSize</code> 是半高，不是半宽</span>
+        这是 2D 开发最常见的误解。<code>orthographicSize = 5</code> 表示<strong>屏幕垂直方向显示 10 个世界单位</strong>（上下各 5）。<br>
+        <strong>水平方向</strong>显示多少取决于宽高比：<code>宽 = 2 x orthographicSize x aspect</code>。<br>
+        <em>所以竖屏和横屏下，同样的 orthographicSize 看到的横向范围完全不同</em>——做多分辨率适配时必须考虑这一点。
+      </div>
+
+      <h2 id="renderer">六、Renderer 与材质</h2>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>属性</th><th>用途</th><th>注意</th></tr></thead>
+        <tbody>
+          <tr><td><code>enabled</code></td><td>开关渲染</td><td><em>比 SetActive 轻量</em>，组件逻辑仍在运行</td></tr>
+          <tr><td><code>castShadows</code></td><td>是否投射阴影</td><td>关掉能<strong>显著省性能</strong></td></tr>
+          <tr><td><code>receiveShadows</code></td><td>是否接收阴影</td><td>地面保留，小物件关掉</td></tr>
+          <tr><td><code>material</code></td><td>材质实例</td><td><strong>访问会克隆材质</strong>！</td></tr>
+          <tr><td><code>sharedMaterial</code></td><td>共享材质</td><td><em>只读用这个，不会克隆</em></td></tr>
+          <tr><td><code>materials</code></td><td>多材质数组</td><td><strong>每次访问都创建新数组</strong></td></tr>
+          <tr><td><code>isVisible</code></td><td>是否被任何相机看到</td><td>可用来<em>跳过不可见物体的逻辑</em></td></tr>
+          <tr><td><code>lightProbeUsage</code></td><td>光照探针</td><td>静态小物件可关掉</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--danger">
+        <span class="callout__title"><code>renderer.material</code> 会克隆材质——这是隐形性能杀手</span>
+        <strong>访问 <code>renderer.material</code> 会为该 Renderer 创建一个材质实例。</strong>后果是：<br>① 每个物体一份材质，<strong>彻底破坏合批</strong>；<br>② 每份材质都占内存；<br>③ 这个克隆<em>不会自动销毁</em>。<br>
+        <strong>三条规则</strong>：<br>① 只读属性用 <code>sharedMaterial</code>；<br>② 要改个别物体的颜色，用 <code>MaterialPropertyBlock</code>（<em>但注意它会打断 SRP Batcher</em>，见页 10）；<br>③ 确实需要独立材质时，在 <code>Awake</code> 里拿一次存起来，<em>不要在 Update 里访问</em>。
+      </div>
+
+      <h2 id="tasks">七、本章动手任务</h2>
+
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="t-27-1">
+          <label for="t-27-1"><strong>验证材质克隆</strong>：写代码访问 <code>renderer.material</code>，用 Profiler 的 Memory 模块观察材质数量增长；改成 <code>sharedMaterial</code> 再对比。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-27-2">
+          <label for="t-27-2"><strong>体验 interpolation</strong>：让一个 Rigidbody 运动，interpolation 设为 None 观察抖动，改成 Interpolate 再跑一次。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-27-3">
+          <label for="t-27-3"><strong>做角色控制器</strong>：用 CharacterController 实现移动与跳跃，调 <code>slopeLimit</code> 和 <code>stepOffset</code> 让它能爬坡、上楼梯。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-27-4">
+          <label for="t-27-4"><strong>优化 Animator</strong>：给多个角色的 Animator 设 <code>CullCompletely</code>，用 Profiler 对比 CPU 占用变化。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-27-5">
+          <label for="t-27-5"><strong>修掉多普勒效应</strong>：找一个高速移动物体的音效，把 <code>dopplerLevel</code> 设为 0，对比听感。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-27-6">
+          <label for="t-27-6"><strong>回答面试题</strong>：① material 和 sharedMaterial 有什么区别？② orthographicSize 是什么含义？③ Rigidbody 的 isKinematic 开启后还能用 velocity 吗？</label>
+        </li>
+      </ul>
+
+      <div class="milestone">
+        <p class="mb0">
+          <strong>本章过关标准</strong>：<br>① 能说出 Rigidbody 的关键属性及其影响，并知道 velocity 与 AddForce 的取舍；<br>② 能对比角色控制的三种方案并说明各自代价；<br>③ 知道 Animator 的哈希缓存与 cullingMode 优化；<br>④ <strong>能解释 material 与 sharedMaterial 的区别及克隆后果</strong>；<br>⑤ 知道 orthographicSize 是半高、priority 数字越小越优先、dopplerLevel 通常该设 0。<br><br><em>这一页的属性名都从真实程序集核对过，可以直接照着写。</em>
+        </p>
+      </div>
+
+      <nav class="page-nav">
+        <a href="26-advanced-api.html">
+          <div class="dir">← 实践与参考</div>
+          <div class="title">26 进阶 API 与性能陷阱</div>
+        </a>
+        <a class="next" href="api-reference.html">
+          <div class="dir">参考 →</div>
+          <div class="title"> Unity API 速查</div>
+        </a>
+      </nav>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>路线总览 — C# + Unity 路线｜从零基础到独立完成商业级项目</title>
+<meta name="description" content="C# + Unity 完整学习地图、七阶段路线、每阶段验收标准、怎么用这份指南">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C# + Unity 路线
+        <span>从零基础到独立完成商业级项目</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+
+      <h1>C# + Unity 学习路线</h1>
+      <p class="lead">这是一份<strong>自成体系</strong>的 C# + Unity 路线：从"没写过代码"一直走到"能独立完成可玩、可上架、能通过面试的项目"。它不假设你有任何编程基础，也不回避行业里那些<strong>没人愿意明说的现实</strong>。</p>
+      <p class="lead">全站 <strong>26 页</strong>，按 <strong>"语言 → 数学 → 引擎 → 通用能力 → 实战"</strong> 的顺序组织。每一页都给出<strong>可验证的过关标准</strong>——不是"了解"、"熟悉"这类没法检验的词，而是"能写出什么、能跑出什么效果、能通过什么测试"。</p>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">这份路线和其他教程的区别</span>
+        <strong>① 它会告诉你"什么时候不该用"。</strong>比如对象池不是万能的、DOTS 不是所有项目都该上、ScriptableObject 也有它的代价。<br>
+        <strong>② 它把性能问题提到很前面。</strong>GC 分配、Draw Call 合批、内存布局这些内容，多数教程留到后期才讲，但那时候你的架构已经烂了。<br>
+        <strong>③ 它承认行业的残酷面。</strong>页 01 和页 25 里都有大量"劝退向"的真实数据，因为<em>知道风险才能做对选择</em>。
+      </div>
+
+      <h2 id="why">一、为什么选 Unity + C#</h2>
+      <p>先说结论：<strong>如果你的目标是"尽快做出能玩的游戏"或者"进入国内游戏行业就业"，Unity + C# 是当前最优解。</strong>这不是因为它技术最强（Unreal 在画面上限更高），而是因为它的<strong>投入产出比最高</strong>。</p>
+
+      <div class="cmp">
+        <div class="cmp__head">
+          <span>维度</span>
+          <span>Unity + C#</span>
+          <span>对比 Unreal + C++</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>语言门槛</strong></span>
+          <span><span class="mk mk--yes">低</span> C# 没有指针、手动内存管理、模板元编程</span>
+          <span><span class="mk mk--no">高</span> C++ 心智负担重，编译慢</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>上手速度</strong></span>
+          <span><span class="mk mk--yes">天级</span> 装好就能做出东西</span>
+          <span><span class="mk mk--warn">周级</span> 配置和框架概念多</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>画面上限</strong></span>
+          <span><span class="mk mk--warn">中高</span> URP 够做手游和大部分独立游戏</span>
+          <span><span class="mk mk--yes">极高</span> Nanite/Lumen 是次世代标准</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>国内岗位</strong></span>
+          <span><span class="mk mk--yes">最多</span> 手游是产业主流</span>
+          <span><span class="mk mk--no">较少</span> 集中在少数 3A 团队</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>薪资上限</strong></span>
+          <span>中高</span>
+          <span><span class="mk mk--yes">高</span> 技术壁垒带来溢价</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>学习资料</strong></span>
+          <span><span class="mk mk--yes">最多</span> 中文资源极其丰富</span>
+          <span>中等，英文为主</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>迭代体验</strong></span>
+          <span><span class="mk mk--yes">好</span> 热重载快</span>
+          <span><span class="mk mk--no">差</span> C++ 改动要重编译</span>
+        </div>
+      </div>
+
+      <div class="callout callout--note">
+        <span class="callout__title">但它们不是竞争关系</span>
+        两个引擎<strong>底层概念是相通的</strong>：坐标系、渲染管线、物理、动画状态机、网络同步——换个引擎只是换 API。<br>
+        所以：<strong>先深入一个，再学另一个，第二门会快得多。</strong><br>
+        如果你已经确定要走 Unreal 路线，本站的大部分"通用能力"章节（数学、图形学、模式、性能、网络）依然适用——去看配套的 <em>C++ + Unreal 路线</em>。
+      </div>
+
+      <h2 id="phases">二、七阶段路线图</h2>
+      <p>下面这张表是本站的<strong>导航中枢</strong>。每一阶段都有：<em>目标、时间投入、对应的页面、过关标准</em>。建议把这张表截图存下来，每完成一项就打个勾。</p>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>阶段</th><th>目标</th><th>时间</th><th>页面</th><th>过关标准</th></tr></thead>
+        <tbody>
+          <tr><td><strong>阶段 0</strong><br>准备</td><td>环境搭好、跑通第一个项目</td><td>1 天</td><td>02</td><td>能做出键盘控制的小场景，会看 Console 报错</td></tr>
+          <tr><td><strong>阶段 1</strong><br>语言</td><td>掌握 C# 到能读懂框架源码</td><td>1.5–2 月</td><td>03–08</td><td>能说清值/引用类型、GC 来源、协程原理</td></tr>
+          <tr><td><strong>阶段 2</strong><br>数学</td><td>看懂坐标变换与渲染管线</td><td>3–4 周</td><td>09、10</td><td>能手算四元数旋转、读懂一个 Shader</td></tr>
+          <tr><td><strong>阶段 3</strong><br>引擎核心</td><td>独立完成一个完整小游戏</td><td>1.5–2 月</td><td>11–16</td><td>能解释每个回调为什么写在那里</td></tr>
+          <tr><td><strong>阶段 4</strong><br>引擎深入</td><td>掌握渲染、资源、工具链</td><td>2 月</td><td>17–19</td><td>能用 Profiler 定位并优化一个真实瓶颈</td></tr>
+          <tr><td><strong>阶段 5</strong><br>通用能力</td><td>架构、性能、网络、工程化</td><td>2–3 月</td><td>20–22</td><td>能独立设计一个可扩展的模块</td></tr>
+          <tr><td><strong>阶段 6</strong><br>实战</td><td>作品集 + 面试准备</td><td>2–3 月</td><td>23–25</td><td>有 2–3 个能讲清设计取舍的项目</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--warn">
+        <span class="callout__title">关于时间估算的诚实说明</span>
+        上面的时间是<strong>每天投入 3–4 小时的节奏</strong>。如果你是业余学习（每天 1 小时），把时间乘 3。<br>
+        <strong>不要试图压缩阶段 1 和 3。</strong>很多人急着做"大项目"，跳过语言和引擎基础，结果写出来的东西无法维护，遇到 bug 只会到处改试探——<em>这是最高效的浪费时间方式</em>。<br>
+        <strong>也不要无限期停留在学习。</strong>阶段 3 结束时你就该有一个完整的游戏了，哪怕很小。
+      </div>
+
+      <h2 id="howto">三、怎么用这份路线</h2>
+
+      <div class="kp">
+        <div class="kp__head">三种使用方式</div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>① 从头刷（推荐给完全新手）</strong><br>按页面顺序读，每页的<em>动手任务全部做完</em>再往下走。不要跳过任务——看懂和能写出来，中间的差距就是"能不能找到工作"。</p></div>
+        </div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>② 查漏补缺（推荐给有基础的人）</strong><br>直接看你薄弱的部分。但<em>请务必先做每页的"过关标准"自测</em>——很多人以为自己会了，一做才发现说不清楚。</p></div>
+        </div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>③ 当参考手册（推荐给在职开发者）</strong><br>用顶部搜索框（按 <span class="mono">/</span> 聚焦）查具体问题。每页的"常见错误"和"性能陷阱"部分，都是<em>踩过坑总结出来的</em>。</p></div>
+        </div>
+      </div>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">关于页面底部的复选框</span>
+        每页的"动手任务"是可以勾选的，进度保存在你浏览器的 <span class="mono">localStorage</span> 里。顶部的进度条会实时显示本页完成度。<br>
+        进度是<strong>按站点独立存储</strong>的（本站的进度不会和 Unreal 站混淆）。
+      </div>
+
+      <h2 id="routes">四、两种典型路径</h2>
+      <p>不是所有人都需要走完全部 26 页。下面是最常见的两条路径：</p>
+
+      <div class="kp">
+        <div class="kp__head">路径 A：求职导向（国内手游公司）</div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>重点投入</strong>：03–08（C# 深入）、11–16（引擎核心）、20–22（架构与性能）、24（项目集）、25（面试）</p><p><strong>可以略过</strong>：10（Shader 只需看懂，不必会写）、18（DOTS 除非岗位明确要求）、23（AI 部分了解即可）</p><p><strong>核心产出</strong>：2 个完整项目 + 能讲清 GC / 生命周期 / 合批 三大高频考题</p></div>
+        </div>
+      </div>
+
+      <div class="kp">
+        <div class="kp__head">路径 B：独立开发导向</div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>重点投入</strong>：03–05（语言够用即可）、11–16（引擎核心，要熟练）、17（画面优化）、24（项目集）</p><p><strong>可以略过</strong>：07（GC 深入可后补）、18（DOTS）、22（网络除非做多人）</p><p><strong>核心产出</strong>：一个<em>能上架、能跑在真机上、有人愿意玩</em>的完整游戏</p><p><strong>额外提醒</strong>：独立开发的难点从来不是技术，是<em>做完</em>。先做小的，做一个能通关的。</p></div>
+        </div>
+      </div>
+
+      <h2 id="reality">五、几句实话</h2>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">在开始之前，你需要知道这些</span>
+        <strong>① 学完不等于能找到工作。</strong>行业里"会 Unity"的人很多，稀缺的是<em>能定位性能瓶颈、能设计可维护架构</em>的人。本站的重点在后半段，但前半段是你必须跨过的门槛。<br>
+        <strong>② AI 没有降低门槛，只是改变了门槛的位置。</strong>写样板代码变快了，但"判断 AI 给的方案对不对"变得更重要了。<em>没有基础判断力的人，用 AI 只会更快地写出烂代码。</em><br>
+        <strong>③ 独立开发在数学上是负期望值。</strong>大多数独立游戏不赚钱。这不是劝你别做，而是<em>建议你别把它当成唯一的收入来源</em>。<br>
+        <strong>④ 前面几页会很枯燥。</strong>类型系统、GC、四元数——这些不像"让角色跑起来"那么有成就感。但它们决定了你的天花板。
+      </div>
+      <p>如果你看到这里还没有被劝退，那就可以开始了。先从 <strong>02 环境搭建</strong> 入手——<em>不要在没跑通代码之前读任何理论</em>。</p>
+
+      <div class="grid grid--2">
+        <a class="card-link" href="../lua/01-role.html">
+          <div class="t">01 岗位与行业现实</div>
+          <div class="d">先搞清楚这个行业的真实样子，再决定投入多少</div>
+        </a>
+        <a class="card-link" href="../lua/02-setup.html">
+          <div class="t">02 环境搭建与第一个项目</div>
+          <div class="d">当天就能做出能动的东西</div>
+        </a>
+        <a class="card-link" href="03-cs-basic.html">
+          <div class="t">03 C# 基础与类型系统</div>
+          <div class="d">一切的地基，也是面试第一大考点</div>
+        </a>
+        <a class="card-link" href="11-unity-core.html">
+          <div class="t">11 Unity 核心机制</div>
+          <div class="d">生命周期、组件架构——Unity 的地基</div>
+        </a>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

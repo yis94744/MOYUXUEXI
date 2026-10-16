@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>13 动画系统 — C# + Unity 路线｜从零基础到独立完成商业级项目</title>
+<meta name="description" content="Animator 状态机、混合树、动画事件、IK、Root Motion、Timeline、代码动画与 Tween">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C# + Unity 路线
+        <span>从零基础到独立完成商业级项目</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>13 · 动画系统</h1>
+
+<p class="lead">上一页（12）讲物理，<code>OnCollisionEnter</code> 让你知道"撞上了"。这一页讲动画——<strong>让角色看起来真的在走路、攻击、受伤</strong>。动画系统的核心是 <em>Animator 状态机</em>，而它的性能陷阱比物理更隐蔽。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（12）的物理速度会在这里被用到——<em>用 <code>velocity</code> 驱动 <code>Speed</code> 参数是最常见的做法</em>。当然也可以反过来，用动画驱动位移（根运动）。<br>
+  <strong>关键衔接</strong>：页 09 学的 <a class="kp-ref" href="09-math.html#quaternion" title="四元数">四元数</a>在 IK 和根运动里大量使用；<a class="kp-ref" href="09-math.html#interp" title="插值与缓动">插值</a>则用于动画过渡。<br>
+  <strong>下一页</strong>（14）UI 系统。动画事件（<code>Animation Event</code>）经常用来触发 UI 效果，两页会配合。<br>
+  <strong>难度提示</strong>：Animator 的<em>概念简单但参数多</em>，重点是理解<strong>"什么该放状态机、什么该用代码"</strong>。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="11-unity-core.html#lifecycle" data-brief="Awake/Start/Update/FixedUpdate/LateUpdate 的选择依据"><span class="prereq__title">生命周期与执行顺序</span><span class="prereq__page">11-unity-core</span></a>
+          <a class="prereq__item" href="09-math.html#quaternion" data-brief="轴加角表示旋转；a*b 表示先 b 后 a，从右往左读"><span class="prereq__title">四元数</span><span class="prereq__page">09-math</span></a>
+          <a class="prereq__item" href="09-math.html#interp" data-brief="帧率无关的平滑：MoveTowards/SmoothDamp/Exp 逼近"><span class="prereq__title">插值与缓动</span><span class="prereq__page">09-math</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="animator">一、Animator 状态机基础 ★</h2>
+
+<p>Animator 的使用方式很直观：<strong>代码改参数 → 状态机根据参数切换动画</strong>。但这里有几个必须知道的性能细节，<em>不知道就会写出"角色一多就卡"的项目</em>。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  Animator：参数、混合树、状态查询
+// ============================================================
+public class AnimatorBasic : MonoBehaviour
+{
+    // 【性能关键】哈希只在类加载时算一次
+    private static readonly int SpeedHash = Animator.StringToHash("Speed");
+    private static readonly int VerticalHash = Animator.StringToHash("Vertical");
+    private static readonly int GroundedHash = Animator.StringToHash("Grounded");
+    private static readonly int JumpHash = Animator.StringToHash("Jump");
+    private static readonly int DieHash = Animator.StringToHash("Die");
+
+    [SerializeField] private float _dampTime = 0.1f;
+
+    private Animator _animator;
+    private Rigidbody _rb;
+    private float _lastSpeed = float.NaN;
+
+    private void Awake()
+    {
+        _animator = GetComponent&lt;Animator&gt;();
+        _rb = GetComponent&lt;Rigidbody&gt;();
+
+        // 屏幕外完全停止更新 —— 大量角色时收益极大
+        _animator.cullingMode = AnimatorCullingMode.CullCompletely;
+
+        // 位移由代码控制时，必须关闭根运动
+        _animator.applyRootMotion = false;
+    }
+
+    private void Update()
+    {
+        // 用物理速度驱动动画（这个组合非常常见）
+        Vector3 v = _rb != null ? _rb.velocity : Vector3.zero;
+
+        // 局部速度：需要转换到物体自身的坐标系
+        Vector3 local = transform.InverseTransformDirection(v);
+
+        SyncSpeed(local.z);
+        _animator.SetFloat(VerticalHash, local.x);
+        _animator.SetBool(GroundedHash, IsGrounded());
+    }
+
+    // 【优化】只在值变化时才同步，避免每帧无谓调用
+    private void SyncSpeed(float speed)
+    {
+        if (Mathf.Approximately(speed, _lastSpeed)) return;
+        _lastSpeed = speed;
+
+        // 带阻尼的重载：第三个参数是过渡时间，让动画平滑变化
+        _animator.SetFloat(SpeedHash, speed, _dampTime, Time.deltaTime);
+    }
+
+    private bool IsGrounded()
+    {
+        return Physics.Raycast(transform.position + Vector3.up * 0.1f,
+                               Vector3.down, 0.2f, ~0, QueryTriggerInteraction.Ignore);
+    }
+
+    // ============================================================
+    //  单次动作：Trigger 会自动复位
+    // ============================================================
+    public void PlayJump()
+    {
+        // 【重要】播放一个 Trigger 前先重置其他，避免触发器堆积
+        _animator.ResetTrigger(DieHash);
+        _animator.SetTrigger(JumpHash);
+    }
+
+    public void PlayDie()
+    {
+        _animator.ResetTrigger(JumpHash);
+        _animator.SetTrigger(DieHash);
+    }
+
+    // ============================================================
+    //  状态查询
+    // ============================================================
+    public bool IsPlaying(string stateName, int layer = 0)
+    {
+        return _animator.GetCurrentAnimatorStateInfo(layer).IsName(stateName);
+    }
+
+    public bool IsInTransition(int layer = 0)
+    {
+        // 做连招判断时很有用：过渡中不接受新输入
+        return _animator.IsInTransition(layer);
+    }
+
+    public float NormalizedTime(int layer = 0)
+    {
+        // 归一化进度：0 = 开头，1 = 结束（可以大于 1，循环时会累加）
+        return _animator.GetCurrentAnimatorStateInfo(layer).normalizedTime;
+    }
+
+    public float RemainTime(string stateName, int layer = 0)
+    {
+        AnimatorStateInfo info = _animator.GetCurrentAnimatorStateInfo(layer);
+        if (!info.IsName(stateName)) return 0f;
+
+        float total = info.length;
+        float played = info.normalizedTime * total;
+        return Mathf.Max(0f, total - played);
+    }
+
+    // ============================================================
+    //  层与权重：上半身攻击 + 下半身跑动
+    // ============================================================
+    public void SetLayerWeight(int layerIndex, float weight)
+    {
+        _animator.SetLayerWeight(layerIndex, weight);
+    }
+
+    // ============================================================
+    //  直接播放（不经过状态机，适合一次性特效）
+    // ============================================================
+    public void CrossFadeTo(string stateName, float duration = 0.15f, int layer = 0)
+    {
+        _animator.CrossFade(stateName, duration, layer);
+    }
+
+    public void CrossFadeInFixedTime(string stateName, float duration = 0.15f, int layer = 0)
+    {
+        // 用固定时间过渡，不受 timeScale 影响
+        _animator.CrossFadeInFixedTime(stateName, duration, layer);
+    }
+}</code></pre>
+
+<div class="callout callout--danger">
+  <span class="callout__title">Animator 的四个性能要点</span>
+  <strong>① 参数名要用哈希，不要用字符串。</strong><code>SetFloat("Speed", v)</code> 每次调用都要对字符串做哈希计算。<em>用 <code>Animator.StringToHash</code> 缓存成 <code>static readonly int</code></em>——这是最基础也最容易忽略的优化。<br>
+  <strong>② <code>cullingMode</code> 默认是 <code>AlwaysAnimate</code>。</strong>这意味着<em>屏幕外的角色依然在完整计算动画</em>。改成 <code>CullCompletely</code> 后，屏幕外完全不更新——<strong>在有几十个角色的场景里，这一项能省下大量 CPU</strong>。<br>
+  <strong>③ 带阻尼的 <code>SetFloat</code> 会持续插值。</strong>它让参数平滑过渡，但<em>每帧都在计算</em>。只对真正需要的参数用（比如 Speed），布尔和 Trigger 不需要。<br>
+  <strong>④ 每帧无条件同步参数是浪费。</strong>如果值没变，这次调用纯属开销。<em>加一个 <code>Mathf.Approximately</code> 判断就能省下来</em>——上面的示例代码里就是这么做的。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">cullingMode 的三个选项</span>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>模式</th><th>行为</th><th>适用场景</th></tr></thead>
+    <tbody>
+      <tr><td><code>AlwaysAnimate</code></td><td>始终完整更新（<strong>默认值</strong>）</td><td>几乎不用——除非你需要读取屏幕外角色的精确骨骼位置</td></tr>
+      <tr><td><code>CullUpdateTransforms</code></td><td>屏幕外停止更新骨骼，但仍计算状态机</td><td>需要屏幕外角色保持逻辑但不渲染</td></tr>
+      <tr><td><code>CullCompletely</code></td><td>屏幕外完全停止</td><td><strong>绝大多数情况的最佳选择</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <strong>注意</strong>：<code>CullCompletely</code> 下屏幕外的角色<em>动画会"冻结"</em>。如果游戏逻辑依赖动画位置（比如判断攻击判定框），<strong>要么改成 <code>CullUpdateTransforms</code>，要么在逻辑里做屏幕外特殊处理</strong>。
+</div>
+
+<h2 id="ik">二、IK 与根运动 ★</h2>
+
+<p>这是动画系统里<strong>最"高级"但也最实用</strong>的部分。IK 让动画贴合环境，根运动让动画驱动位移。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  IK 与 Root Motion：让动画与世界贴合
+// ============================================================
+public class AnimatorIKDemo : MonoBehaviour
+{
+    // 这三个目标在 Inspector 里拖入（编译器的 CS0649 警告可忽略，
+    // 也可以在代码里用 = null 显式初始化来消除）
+    [SerializeField] private Transform _lookTarget = null;
+    [SerializeField] private Transform _rightHandTarget = null;
+    [SerializeField] private Transform _leftFootTarget = null;
+    [SerializeField] private float _lookWeight = 1f;
+
+    private Animator _animator;
+
+    private void Awake()
+    {
+        _animator = GetComponent&lt;Animator&gt;();
+    }
+
+    // ============================================================
+    //  OnAnimatorIK：IK 求解前的回调（必须开启 IK Pass）
+    // ============================================================
+    // 【前提】在 Animator 的对应 Layer 上勾选 IK Pass，
+    //        否则这个回调根本不会被调用。
+    private void OnAnimatorIK(int layerIndex)
+    {
+        if (_animator == null) return;
+
+        // ---------- 头部朝向：让角色看着目标 ----------
+        if (_lookTarget != null)
+        {
+            _animator.SetLookAtWeight(
+                weight: _lookWeight,      // 总权重
+                bodyWeight: 0.3f,         // 身体参与程度
+                headWeight: 1f,           // 头部参与程度
+                eyesWeight: 0.5f,         // 眼睛参与程度
+                clampWeight: 0.7f);       // 限制转动角度（防止脖子扭曲）
+
+            _animator.SetLookAtPosition(_lookTarget.position);
+        }
+        else
+        {
+            // 目标为 null 时把权重归零，否则角色会一直保持扭曲姿势
+            _animator.SetLookAtWeight(0f);
+        }
+
+        // ---------- 手部 IK：握枪、扶墙、攀爬 ----------
+        if (_rightHandTarget != null)
+        {
+            _animator.SetIKPositionWeight(AvatarIKGoal.RightHand, 1f);
+            _animator.SetIKRotationWeight(AvatarIKGoal.RightHand, 1f);
+            _animator.SetIKPosition(AvatarIKGoal.RightHand, _rightHandTarget.position);
+            _animator.SetIKRotation(AvatarIKGoal.RightHand, _rightHandTarget.rotation);
+        }
+        else
+        {
+            _animator.SetIKPositionWeight(AvatarIKGoal.RightHand, 0f);
+            _animator.SetIKRotationWeight(AvatarIKGoal.RightHand, 0f);
+        }
+
+        // ---------- 脚部 IK：让脚贴合斜坡、台阶 ----------
+        if (_leftFootTarget != null)
+        {
+            _animator.SetIKPositionWeight(AvatarIKGoal.LeftFoot, 1f);
+            _animator.SetIKRotationWeight(AvatarIKGoal.LeftFoot, 1f);
+            _animator.SetIKPosition(AvatarIKGoal.LeftFoot, _leftFootTarget.position);
+            _animator.SetIKRotation(AvatarIKGoal.LeftFoot, _leftFootTarget.rotation);
+
+            // 还有 SetIKHintPositionWeight / SetIKHintPosition
+            // 用来控制膝盖、肘部的朝向（防止关节反向弯折）
+        }
+    }
+
+    // ============================================================
+    //  OnAnimatorMove：接管根运动
+    // ============================================================
+    // 开启 applyRootMotion 后，动画自带的位移会驱动物体移动。
+    // 这个回调让你可以「读取动画的位移，但自己决定怎么用」。
+    private void OnAnimatorMove()
+    {
+        if (_animator == null) return;
+
+        // 读取动画计算出的位移增量
+        Vector3 deltaPos = _animator.deltaPosition;
+
+        // 读取动画计算出的旋转增量
+        Quaternion deltaRot = _animator.deltaRotation;
+
+        // 常见用法 1：只取水平位移，垂直交给物理
+        Vector3 horizontal = new Vector3(deltaPos.x, 0f, deltaPos.z);
+        transform.position += horizontal;
+
+        // 常见用法 2：让表面法线影响移动（在斜坡上贴着走）
+        // transform.position += Vector3.ProjectOnPlane(deltaPos, groundNormal);
+
+        transform.rotation *= deltaRot;
+    }
+
+    // ============================================================
+    //  匹配目标（Motion Matching / 步态同步）
+    // ============================================================
+    public void MatchTargetDemo()
+    {
+        // 让角色「精确攀爬到某个点」，用于翻墙、上车
+        // 一般配合 Animation Event 在动画的特定帧调用
+        // _animator.MatchTarget(
+        //     matchPosition,
+        //     matchRotation,
+        //     AvatarTarget.RightHand,
+        //     new MatchTargetWeightMask(Vector3.one, 1f),
+        //     startNormalizedTime: 0.3f,
+        //     targetNormalizedTime: 0.6f);
+    }
+
+    public bool IsMatchingTarget()
+    {
+        return _animator.isMatchingTarget;
+    }
+}
+
+// ============================================================
+//  IK 的三个前提条件
+// ============================================================
+//  1. 模型的 Rig 类型必须是 Humanoid（Generic 不支持标准 IK Goal）
+//  2. Animator 的 Layer 上要勾选 IK Pass
+//  3. 脚本挂在与 Animator 相同的 GameObject 上
+//
+//  【性能提醒】IK 求解不便宜，角色多时开销明显。
+//  建议：只对近距离角色开启，远处角色用 SetIKPositionWeight(0) 关掉。</code></pre>
+
+<div class="callout callout--warn">
+  <span class="callout__title">IK 的三个前提条件（缺一不可）</span>
+  <strong>① Rig 类型必须是 Humanoid。</strong>Generic 动画不支持标准的 IK Goal（<code>AvatarIKGoal.LeftFoot</code> 这类）。<em>用 Generic 的话只能靠额外骨骼 + 脚本手动算。</em><br>
+  <strong>② Animator 的 Layer 上必须勾选 IK Pass。</strong>不勾选的话 <code>OnAnimatorIK</code> <em>根本不会被调用</em>——而且没有任何报错提示，这是最常见的"IK 不生效"原因。<br>
+  <strong>③ 脚本必须挂在有 Animator 的那个 GameObject 上。</strong>挂在子物体上不会触发回调。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">IK 的性能提醒</span>
+  IK 求解<strong>不便宜</strong>——它需要反向推算骨骼链的旋转，迭代次数与链长相关。<br>
+  角色一多，IK 的开销会非常明显。<strong>实用的做法是分级处理</strong>：<br>
+  • 近距离角色（玩家、镜头前的敌人）：完整开启 IK<br>
+  • 中距离角色：只开头部 IK（<code>权重 0.5</code>）<br>
+  • 远距离角色：<code>SetIKPositionWeight(goal, 0f)</code> 全部关掉<br>
+  <em>而且判断应该按<strong>距离更新频率</strong>做，不要每帧都算。</em>
+</div>
+
+<h2 id="rootmotion">三、根运动：动画驱动位移</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th></th><th>代码驱动</th><th>根运动（Root Motion）</th></tr></thead>
+  <tbody>
+    <tr><td><strong>位移来源</strong></td><td>脚本计算（<code>velocity</code> / <code>CharacterController</code>）</td><td>动画曲线自带</td></tr>
+    <tr><td><strong>优点</strong></td><td>精确可控、手感一致</td><td><strong>动作与位移完美同步</strong>（不会有脚滑）</td></tr>
+    <tr><td><strong>缺点</strong></td><td>容易"脚滑"（动作与速度不匹配）</td><td>难以精确控制，<em>与物理结合麻烦</em></td></tr>
+    <tr><td><strong>适用</strong></td><td><strong>绝大多数游戏</strong></td><td>动作游戏、格斗、需要精确位移同步的场景</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">两者可以混合使用</span>
+  <code>OnAnimatorMove</code> 回调让你<strong>读取动画计算出的位移，但自己决定怎么用</strong>。常见的混合方案：<br>
+  • <strong>只取水平位移，垂直交给物理</strong>——这样角色能正常受重力影响（示例代码里的做法）<br>
+  • <strong>把位移投影到地面法线</strong>——让角色在斜坡上贴着走<br>
+  • <strong>位移乘以速度系数</strong>——用一个参数控制"这次动作走多远"<br>
+  <em>这个回调是根运动与代码控制的桥梁，值得熟练掌握。</em>
+</div>
+
+<h2 id="tween">四、什么该用状态机、什么该写代码</h2>
+
+<p>这是<strong>新手最容易用错的地方</strong>：把什么都往 Animator 里塞，结果状态机变成一团乱麻，改一个动作要动几十个过渡线。</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>需求</th><th>推荐方案</th><th>原因</th></tr></thead>
+  <tbody>
+    <tr><td>角色移动的四种状态</td><td><strong>Animator 状态机</strong></td><td>状态之间有清晰的切换关系</td></tr>
+    <tr><td>攻击连招（多段）</td><td><strong>Animator + Trigger</strong></td><td>需要精确的动画帧同步</td></tr>
+    <tr><td>UI 弹窗的缩放淡入</td><td><strong>代码 / 简单的插值</strong></td><td>用 Animator 太重，改起来也麻烦</td></tr>
+    <tr><td>道具上下浮动</td><td><strong>代码 + <code>Mathf.Sin</code></strong></td><td>一行代码的事</td></tr>
+    <tr><td>血条变化动画</td><td><strong>代码插值</strong></td><td>数值驱动的，不需要状态机</td></tr>
+    <tr><td>复杂骨骼动画（受击、死亡）</td><td><strong>Animator</strong></td><td>需要美术制作的动画资源</td></tr>
+    <tr><td>相机跟随</td><td><strong>代码 + <code>SmoothDamp</code></strong></td><td>见页 09 的插值</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">判断标准：一行代码能做完的，不要开状态机</span>
+  <strong>Animator 的成本</strong>：需要一个 Animator Controller 资产、美术要 K 帧、状态多了难维护、运行时还有性能开销。<br>
+  <strong>代码插值的成本</strong>：三行代码。<br>
+  <em>简单的、程序化的、数值驱动的动效，一律用代码。只有<strong>需要美术制作的骨骼动画</strong>才放 Animator。</em><br>
+  <strong>补充</strong>：如果你确实需要"配置化的代码动画"（比如策划想在编辑器里调缓动曲线），可以用 DOTween 这类 Tween 库，<em>它比 Animator 轻得多，也比手写代码灵活</em>。
+</div>
+
+<h2 id="tasks">五、本章动手任务</h2>
+
+<div class="tasks" data-page="13">
+  <div class="task"><input type="checkbox" id="t-13-1"><label for="t-13-1"><strong>对比 StringToHash</strong>：写一个循环调用 <code>SetFloat("Speed", v)</code> 一万次，再用哈希版本跑一遍，用 <code>ProfilerMarker</code> 对比耗时。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-2"><label for="t-13-2"><strong>验证 cullingMode</strong>：创建一个有 20 个角色的场景，用 Profiler 观察 Animator 开销；把 <code>cullingMode</code> 改成 <code>CullCompletely</code> 再对比。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-3"><label for="t-13-3"><strong>做混合树</strong>：用 Blend Tree 做八方向移动（横纵两个参数驱动），对比用四个独立状态的方案，看哪个更好维护。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-4"><label for="t-13-4"><strong>实现头部 IK</strong>：让角色看着玩家。记得先在 Layer 上勾选 <code>IK Pass</code>，<em>不勾选你会发现回调根本不触发</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-5"><label for="t-13-5"><strong>体验根运动</strong>：开启 <code>applyRootMotion</code>，实现 <code>OnAnimatorMove</code> 只取水平位移，对比全代码控制的手感差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-6"><label for="t-13-6"><strong>用 Animation Event</strong>：在攻击动画的第 30 帧插入一个事件，触发"生成伤害判定框"，理解动画与逻辑的同步方式。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-7"><label for="t-13-7"><strong>回答面试题</strong>：① <code>StringToHash</code> 有什么用？② <code>cullingMode</code> 三个模式的区别？③ IK 为什么需要勾选 IK Pass？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 知道 <code>Animator.StringToHash</code> 的用途，并能解释为什么不能用字符串参数名；<br>
+    ② 能说出 <code>cullingMode</code> 三个模式的区别，以及 <code>CullCompletely</code> 的副作用；<br>
+    ③ 能说出 IK 的三个前提条件，并知道 <code>OnAnimatorMove</code> 的作用；<br>
+    ④ <strong>能判断一个动效该用 Animator 还是代码实现</strong>；<br>
+    ⑤ 知道 Trigger 与 Bool 参数的选择依据。<br><br>
+    <em>第 ④ 条是这一页最有价值的内容——它决定了你的项目会不会在后期因为状态机失控而难以维护。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="12-unity-physics.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">12 物理系统</div>
+  </a>
+  <a class="next" href="14-unity-ui.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">14 UI 系统</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

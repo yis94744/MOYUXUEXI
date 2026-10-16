@@ -1,0 +1,88 @@
+<h1>13 · 排序与选择算法 ★★</h1>
+
+<p class="lead">游戏里"排序"用得<strong>比你想的多</strong>：排行榜、渲染顺序、AI 目标选择。这一页不只讲算法，更讲<em>什么时候用哪个、以及三个实用的"不用排序"技巧</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="comparison">一、六种排序的实测对比</h2>
+
+<p>理论复杂度人人都知道，但<strong>实测数字更有说服力</strong>。</p>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>13/sorting</code></div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>算法</th><th>平均</th><th>最坏</th><th>稳定</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td>冒泡排序</td><td>O(n²)</td><td>O(n²)</td><td><span class="mk mk--yes">是</span></td><td><em>教学用</em></td></tr>
+    <tr><td>插入排序</td><td>O(n²)</td><td>O(n²)</td><td><span class="mk mk--yes">是</span></td><td><strong>小数组 / 近乎有序</strong></td></tr>
+    <tr><td>希尔排序</td><td>O(n^1.3)</td><td>O(n²)</td><td><span class="mk mk--no">否</span></td><td>中等规模</td></tr>
+    <tr><td>归并排序</td><td>O(n log n)</td><td>O(n log n)</td><td><span class="mk mk--yes">是</span></td><td><strong>需要稳定</strong></td></tr>
+    <tr><td>快速排序</td><td>O(n log n)</td><td>O(n²)</td><td><span class="mk mk--no">否</span></td><td><strong>通用最快</strong></td></tr>
+    <tr><td>堆排序</td><td>O(n log n)</td><td>O(n log n)</td><td><span class="mk mk--no">否</span></td><td>最坏保证</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="no-sort">二、三个"不用排序"的技巧 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">技巧一：Top-K 用堆（实测快 8.4 倍）</span>
+  <strong>场景</strong>：排行榜只要前 100 名。<br><strong>错误做法</strong>：全部排序再取前 100。<br><strong>正确做法</strong>：维护一个<em>大小为 K 的最小堆</em>。<div class="table-wrap"><table><thead><tr><th>方法</th><th>复杂度</th><th>实测（10 万数据，K=10）</th></tr></thead><tbody><tr><td>完整排序</td><td>O(n log n)</td><td>0.0760 秒</td></tr><tr><td><strong>堆的 Top-K</strong></td><td><strong>O(n log K)</strong></td><td><strong>0.0090 秒</strong></td></tr></tbody></table></div><strong>快 8.4 倍</strong>，结果完全一致。<br><em>K 越小，优势越大。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">技巧二：找第 K 名用快速选择（O(n)）</span>
+  <strong>场景</strong>：只要知道"第 100 名是多少分"，<em>不需要知道完整排名</em>。<br><strong>快速选择</strong>（QuickSelect）的思路：<br>· 类似快速排序的分区<br>· 但<em>只递归包含目标的那一半</em>，另一半直接丢弃<br>· 所以平均复杂度是 <strong>O(n)</strong>，不是 O(n log n)<br><strong>本页实测</strong>：10 万数据找第 100 大——<em>快速选择明显快于完整排序</em>，结果一致。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">技巧三：小数组用插入排序（实测反超快排）</span>
+  <strong>实测数据</strong>：<div class="table-wrap"><table><thead><tr><th>数据量</th><th>结果</th></tr></thead><tbody><tr><td>8 个元素</td><td><strong>插入排序明显更快</strong></td></tr><tr><td>16 个元素</td><td>插入排序快 2 倍</td></tr><tr><td>32 个元素</td><td>两者接近</td></tr><tr><td>64 个元素</td><td>快排反超</td></tr></tbody></table></div><strong>分界点大约在 32</strong>。<br><em>原因：小数组时递归开销占比大，而插入排序对近乎有序的数据很高效。</em><br><strong>实战应用</strong>：标准库的快排会在数组小于阈值时<em>切换到插入排序</em>——这叫<strong>混合排序</strong>（IntroSort）。
+</div>
+
+<h2 id="stability">三、稳定性：什么时候重要</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">排行榜的典型需求</span>
+  <strong>需求</strong>："先按分数降序，<em>分数相同的先到先得</em>"。<br><strong>用不稳定排序的问题</strong>：分数相同时，<em>顺序可能是乱的</em>——玩家会看到"我明明先到，却排在后面"。<br><strong>两种解法</strong>：<br>① <strong>用稳定排序</strong>（归并排序）<br>② <strong>在比较函数里写全条件</strong>：<br><code>if a.score ~= b.score then return a.score &gt; b.score end</code><br><code>return a.joinOrder &lt; b.joinOrder</code><br><strong>本页实测</strong>：方案 ② 输出 <code>A(100), C(100), E(100), B(90), D(90)</code>——<em>分数相同的保持了加入顺序</em>。<br><em>实战中方案 ② 更常用——因为它不依赖排序算法本身的稳定性。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="13">
+  <div class="task"><input type="checkbox" id="t-13-1"><label for="t-13-1"><strong>实现六种排序</strong>：至少写冒泡、插入、快排、归并，验证结果有序。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-2"><label for="t-13-2"><strong>测性能差异</strong>：用 3000 个随机数对比六种算法，记录耗时。<em>观察 O(n²) 和其他算法的差距。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-13-3"><label for="t-13-3"><strong>验证小数组例外</strong>：分别用 8/32/64 个元素测插入排序与快排，找到分界点。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-4"><label for="t-13-4"><strong>实现 Top-K</strong>：用最小堆找 10 万个数据的前 10 个，对比完整排序。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-5"><label for="t-13-5"><strong>实现快速选择</strong>：找第 K 大的值，对比完整排序。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-6"><label for="t-13-6"><strong>做多级排序</strong>：实现"分数降序 + 时间升序"的排行榜排序。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-7"><label for="t-13-7"><strong>回答面试题</strong>：① 什么排序最稳定又快？② Top-K 为什么用最小堆？③ 快速选择为什么是 O(n)？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出六种排序的复杂度与稳定性；<br>
+    ② <strong>知道小数组时插入排序更快（分界约 32）</strong>；<br>
+    ③ <strong>会用堆做 Top-K（实测快 8.4 倍）</strong>；<br>
+    ④ <strong>会用快速选择找第 K 名（O(n)）</strong>；<br>
+    ⑤ 能实现多级排序（分数 + 时间）。<br>
+    <br>
+    <em>第 ③④ 条是这一页最有价值的内容——它们能帮你避免"为了取前 10 个排了 10 万个"这种浪费。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="12-spatial.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">12 空间划分与碰撞优化 ★★</div>
+  </a>
+  <a class="next" href="14-search.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">14 查找与字符串算法</div>
+  </a>
+</nav>

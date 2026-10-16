@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>25 面试、作品集与资源 — C# + Unity 路线｜从零基础到独立完成商业级项目</title>
+<meta name="description" content="四级理解标准、面试流程与高频题、作品集包装、权威资源库、行业数据与识别过时教程">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C# + Unity 路线
+        <span>从零基础到独立完成商业级项目</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>25 · 面试、作品集与资源</h1>
+
+<p class="lead">这是<strong>全站最后一页</strong>。前面 24 页给了你知识，这一页告诉你<em>怎么把知识变成 offer</em>——包括怎么答高频题、怎么包装作品集、以及<strong>怎么判断自己真的掌握了</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>前面 24 页</strong>是学习和实践。这一页是<em>把自己的能力"翻译"成面试官能听懂的语言</em>。
+  <strong>关键衔接</strong>：这一页会大量回顾前面的核心考点——<em>如果你发现某一条答不上来，就是回去复习的信号</em>。
+  <strong>本站完结</strong>：看完这一页后，建议回到 <a href="../algorithms/index.html">路线总览</a> 重新评估自己的位置。
+  <strong>重要观念</strong>：<strong>面试考的是"能不能讲清楚"，不是"知不知道"。</strong>很多人明明会，但讲不出来，就白费了。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="03-cs-basic.html#value-ref" data-brief="赋值时拷贝内容还是拷贝地址，这决定了对象会不会被共享"><span class="prereq__title">值类型与引用类型</span><span class="prereq__page">03-cs-basic</span></a>
+          <a class="prereq__item" href="07-cs-memory.html#sources" data-brief="字符串/装箱/数组/LINQ/闭包/协程等待对象等高频分配点"><span class="prereq__title">GC 分配十大来源</span><span class="prereq__page">07-cs-memory</span></a>
+          <a class="prereq__item" href="11-unity-core.html#lifecycle" data-brief="Awake/Start/Update/FixedUpdate/LateUpdate 的选择依据"><span class="prereq__title">生命周期与执行顺序</span><span class="prereq__page">11-unity-core</span></a>
+          <a class="prereq__item" href="14-unity-ui.html#rebuild" data-brief="任何元素变化都重建整个 Canvas，所以要拆分 Canvas"><span class="prereq__title">Canvas 重建机制</span><span class="prereq__page">14-unity-ui</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="levels">一、四级理解标准</h2>
+
+<p>判断自己"会不会"一个知识点，用<strong>四个等级</strong>。大多数人停在第二级就以为学会了。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>等级</th><th>标准</th><th>面试结果</th></tr></thead>
+  <tbody>
+    <tr><td><strong>L1 听过</strong></td><td>"我知道有这个东西"</td><td><span class="mk mk--no">直接淘汰</span></td></tr>
+    <tr><td><strong>L2 能说</strong></td><td>"我能说出它的定义"</td><td><span class="mk mk--warn">勉强及格</span></td></tr>
+    <tr><td><strong>L3 能讲</strong></td><td>"我能说清原理、适用场景、代价"</td><td><span class="mk mk--yes">合格</span></td></tr>
+    <tr><td><strong>L4 做过</strong></td><td>"我做过，遇到过 X 问题，用 Y 解决，效果是 Z"</td><td><span class="mk mk--yes">优秀</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">自测方法</span>
+  拿本页下面列的高频题，<strong>合上资料口头讲一遍</strong>。<br>
+  讲的过程中如果出现这些情况，说明还没到 L3：<br>
+  · "呃……就是那个……"<br>
+  · 说了一半发现自己逻辑不对<br>
+  · 只会背定义，说不出"什么时候不该用"<br><br>
+  <em>建议录音回放——你会发现自己讲得比你想象中乱。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">最容易翻车的三个知识点</span>
+  <strong>① 值类型与引用类型</strong>——以为自己会，被追问"结构体放在堆上还是栈上"就卡住。<br><br>
+  <strong>② GC 与性能</strong>——能说出"会 GC"，但说不出<em>具体哪十种情况会产生分配</em>。<br><br>
+  <strong>③ 生命周期</strong>——能背顺序，但被问"为什么输入必须放 Update"就答不上来。<br><br>
+  <em>这三个的共性是：知道"是什么"，不知道"为什么"和"所以呢"。</em>
+</div>
+
+<h2 id="questions">二、高频题分类</h2>
+
+<p>下面按主题列出高频题。<strong>每道题都应该能讲到 L3 或 L4。</strong></p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>主题</th><th>高频题</th><th>考点页</th></tr></thead>
+  <tbody>
+    <tr><td><strong>类型系统</strong></td><td>值类型 vs 引用类型；装箱在什么情况发生；struct 和 class 怎么选</td><td>03, 07</td></tr>
+    <tr><td><strong>GC 与性能</strong></td><td><strong>每帧 GC 分配的来源有哪些</strong>；怎么用 Profiler 定位</td><td>07, 21</td></tr>
+    <tr><td><strong>生命周期</strong></td><td>Awake/Start 的区别；<strong>输入为什么不能放 FixedUpdate</strong></td><td>11</td></tr>
+    <tr><td><strong>Unity 对象</strong></td><td><strong>什么是假 null</strong>；Destroy 是立即的吗</td><td>11</td></tr>
+    <tr><td><strong>物理</strong></td><td>ForceMode 四种模式；<strong>两个静态物体为什么不会碰撞</strong></td><td>12</td></tr>
+    <tr><td><strong>动画</strong></td><td>cullingMode 三个模式；IK 的前提条件</td><td>13</td></tr>
+    <tr><td><strong>UI</strong></td><td><strong>Canvas 重建是什么</strong>；怎么优化 UGUI</td><td>14</td></tr>
+    <tr><td><strong>资源</strong></td><td>Resources 为什么被弃用；AB 包的依赖问题</td><td>16</td></tr>
+    <tr><td><strong>渲染</strong></td><td>Draw Call 怎么减少；什么是 Overdraw</td><td>10, 17</td></tr>
+    <tr><td><strong>架构</strong></td><td>单例有什么问题；观察者模式怎么防泄漏</td><td>20</td></tr>
+    <tr><td><strong>并发</strong></td><td>Job 里不能做什么；NativeArray 忘了 Dispose 会怎样</td><td>18</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">加粗的题是"必问"</span>
+  上面加粗的六道题，<strong>几乎每一场 Unity 客户端面试都会出现至少两道</strong>。<br>
+  如果这些答不上来，<em>其他答得再好也很难通过</em>。<br><br>
+  <strong>建议</strong>：把这六道题的答案<em>写下来、背下来、讲出来</em>。<br>
+  注意是"讲出来"——写和讲是两种能力。
+</div>
+
+<h2 id="portfolio">三、作品集的包装</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">一个项目的描述应该包含什么</span>
+  <strong>模板</strong>：<br>
+  <code>[项目类型] + [技术亮点] + [量化结果] + [我的职责]</code><br><br>
+  <strong>差的写法</strong>：<br>
+  "做了一个塔防游戏，实现了敌人寻路和炮塔攻击。"<br><br>
+  <strong>好的写法</strong>：<br>
+  "2D 塔防，200 个敌人同时寻路。<em>用流场寻路替代 A*，把每帧寻路开销从 12ms 降到 1.5ms</em>；<br>
+  <em>用对象池 + 分帧生成把 GC Alloc 从 4KB/帧降到 0</em>。<br>
+  负责全部程序部分（寻路、战斗、UI、存档）。"<br><br>
+  <strong>区别在于</strong>：<em>量化 + 技术决策 + 取舍原因</em>。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">面试官最想听的三个问题</span>
+  <strong>① "这个项目里最难的技术问题是什么？"</strong><br>
+  → 准备一个具体的故事：<em>怎么发现、怎么定位、怎么解决、效果如何</em>。<br><br>
+  <strong>② "为什么用这个方案，不用另一个？"</strong><br>
+  → 考察<em>技术选型能力</em>，而不是"会不会用某个 API"。<br>
+  准备 2~3 个"取舍"的例子。<br><br>
+  <strong>③ "如果给你更多时间，你会怎么改进？"</strong><br>
+  → 考察<em>技术视野与自我认知</em>。<br>
+  <em>能说出"我知道这里做得不够好，应该这样改"，比"我做得很完美"更可信。</em>
+</div>
+
+<h2 id="resources">四、学习资源与下一步</h2>
+
+<p>以下是<strong>经过筛选的资源</strong>——不是越多越好，而是<em>少而精</em>。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>类型</th><th>推荐</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><strong>官方文档</strong></td><td>Unity Manual / Scripting API</td><td><em>最权威，出问题先查这里</em></td></tr>
+    <tr><td><strong>源码</strong></td><td>Unity 的 C# 参考源码（GitHub）</td><td>看引擎怎么实现的</td></tr>
+    <tr><td><strong>算法</strong></td><td><a href="../algorithms/index.html">本站算法与系统设计</a></td><td>补齐算法短板</td></tr>
+    <tr><td><strong>热更</strong></td><td><a href="../lua/index.html">本站 Lua 热更路线</a></td><td>国内手游必备</td></tr>
+    <tr><td><strong>Unreal</strong></td><td><a href="../unreal/index.html">本站 C++ + Unreal 路线</a></td><td>想转引擎方向</td></tr>
+    <tr><td><strong>社区</strong></td><td>Unity Forum / 知乎游戏开发话题</td><td>遇到具体问题时用</td></tr>
+    <tr><td><strong>实践</strong></td><td><strong>做一个完整项目</strong></td><td><em>最有效的学习方式，没有之一</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">最后一段话</span>
+  <strong>这份路线到这里就结束了。</strong><br><br>
+  它给了你一个完整的知识体系，但<em>知识本身不产生价值</em>——<strong>把它用出来才有价值</strong>。<br><br>
+  <strong>建议的下一步</strong>：<br>
+  ① 合上这份文档，去做一个项目<br>
+  ② 遇到问题时回来查对应的页面<br>
+  ③ 做完后，回头看一遍本页的"四级理解标准"，检查自己到了哪一级<br><br>
+  <em>如果你能把这份文档里的每个知识点都讲到 L3 以上，你已经有能力进入这个行业了。</em><br><br>
+  <strong>剩下的，就是去做。</strong>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="25">
+  <div class="task"><input type="checkbox" id="t-25-1"><label for="t-25-1"><strong>做四级自测</strong>：拿"高频题"表里的题，逐条口头讲一遍，标记自己到哪一级。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-2"><label for="t-25-2"><strong>准备三个故事</strong>：最难的技术问题、一次取舍决策、一次性能优化。每个都要能量化。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-3"><label for="t-25-3"><strong>重写项目描述</strong>：用"技术亮点 + 量化结果"的模板重写你的作品集。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-4"><label for="t-25-4"><strong>补短板</strong>：把自测中低于 L3 的知识点，回到对应页面重读。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-5"><label for="t-25-5"><strong>模拟面试</strong>：找人或用 AI 做一次模拟面试，练习"讲清楚"的能力。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-6"><label for="t-25-6"><strong>开始下一个项目</strong>：把这个文档收起来，去做东西。</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能用四级标准评估自己的每个知识点</strong>；<br>
+    ② 高频题中至少 <strong>80% 能讲到 L3 以上</strong>；<br>
+    ③ 有 <strong>三个能量化讲出来的技术故事</strong>；<br>
+    ④ 作品集的描述包含"技术亮点 + 量化结果"；<br>
+    ⑤ 知道自己接下来该补什么、该做什么。<br>
+    <br>
+    <em>这五条做到，你就可以去面试了。剩下的交给运气和更多练习。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="24-projects.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">24 实战项目集</div>
+  </a>
+  <a class="next" href="api-reference.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">Unity API 速查</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

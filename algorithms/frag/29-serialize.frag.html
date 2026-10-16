@@ -1,0 +1,133 @@
+<h1>29 · 存档与序列化</h1>
+
+<p class="lead">存档是<strong>上线项目最容易出事故的地方</strong>——因为一旦错了，<em>玩家数据就丢了</em>。这一页讲<em>怎么设计一个不会丢数据的存档系统</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="formats">一、三种序列化格式的取舍</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>格式</th><th>体积</th><th>速度</th><th>可读性</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>JSON</strong></td><td>大</td><td>慢</td><td><span class="mk mk--yes">好</span></td><td>配置文件、<em>存档（简单场景）</em></td></tr>
+    <tr><td><strong>二进制</strong></td><td><strong>小</strong></td><td><strong>快</strong></td><td><span class="mk mk--no">差</span></td><td><strong>存档、网络</strong></td></tr>
+    <tr><td><strong>Lua 表</strong></td><td>中</td><td>中</td><td>好</td><td><em>Lua 项目专用</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">存档的第一原则：向后兼容 ★★★</span>
+  <strong>场景</strong>：v1.0 的玩家存档，在 v1.1 里要怎么读？<br><br>
+  <strong>错误做法</strong>：<br>
+  <code>-- v1.1 直接读 v1.0 的存档</code><br>
+  <code>local level = data.newField  -- 老存档里没有这个字段</code><br>
+  <code>-- level 是 nil -> 崩溃</code><br><br>
+  <strong>正确做法</strong>：<br>
+  ① <strong>存档带版本号</strong>：<code>{ version = 2, ... }</code><br>
+  ② <strong>读取时迁移</strong>：<br>
+  <code>if data.version == 1 then</code><br>
+  <code>&nbsp;&nbsp;data.newField = DEFAULT_VALUE</code><br>
+  <code>&nbsp;&nbsp;data.version = 2</code><br>
+  <code>end</code><br>
+  ③ <strong>所有字段都要有默认值</strong>：<code>data.newField or DEFAULT</code><br><br>
+  <strong>必须遵守的规则</strong>：<br>
+  · <strong>永远不要删除字段</strong>——只标记废弃<br>
+  · <strong>永远不要改变字段类型</strong>（<em>number 不能变成 string</em>）<br>
+  · <strong>每次改存档结构都要写迁移逻辑</strong><br>
+  · <strong>测试老存档能否在新版本读取</strong><br><br>
+  <em>上线后才发现"老玩家存档读不了"，是最严重的事故之一。</em>
+</div>
+
+<h2 id="safety">二、存档系统的五个安全措施 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">措施一：原子写入（防止存档损坏）</span>
+  <strong>问题</strong>：写入过程中崩溃/断电 → <em>存档文件被写坏一半</em>。<br><br>
+  <strong>解决</strong>：<em>先写临时文件，成功后再替换</em>。<br>
+  <code>写 save.tmp</code><br>
+  <code>校验 save.tmp 可读</code><br>
+  <code>删除 save.dat</code><br>
+  <code>重命名 save.tmp → save.dat</code><br><br>
+  <strong>关键点</strong>：<em>文件系统层面保证"要么是完整的旧数据，要么是完整的新数据"</em>。<br>
+  <strong>这和页 17 的热更原子切换是同一个思路。</strong>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">措施二：备份（防止数据丢失）</span>
+  <strong>问题</strong>：存档写坏了，玩家数据全丢。<br><br>
+  <strong>解决</strong>：<strong>保留上一份存档</strong>。<br>
+  · <code>save.dat</code>——当前存档<br>
+  · <code>save.bak</code>——上一份存档<br>
+  · 写入前：<em>把 save.dat 复制成 save.bak</em><br>
+  · 读取失败时：<em>尝试从 save.bak 恢复</em><br><br>
+  <strong>进一步</strong>：<em>服务器备份</em>（<em>重要数据上传服务器</em>）。<br>
+  <strong>这是防"玩家换设备"和"本地数据丢失"的唯一手段。</strong>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">措施三：校验（发现损坏）</span>
+  <strong>做法</strong>：存档里存一个<em>校验值</em>（CRC / MD5 / 简单哈希）。<br>
+  读取时重新计算，<em>不一致就说明损坏了</em>。<br><br>
+  <strong>校验值放哪</strong>：<br>
+  · 存档文件末尾（<em>读完后校验</em>）<br>
+  · 单独一个 .checksum 文件<br><br>
+  <strong>作用</strong>：<br>
+  · 发现"文件被截断"<br>
+  · 发现"部分字节被改"<br>
+  · <em>但不能发现"有意的完整篡改"</em>（<em>那需要加密签名</em>）
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">措施四：加密（防篡改）与措施五：压缩</span>
+  <strong>加密</strong>：<br>
+  · 防止玩家<em>直接修改存档文件</em>作弊<br>
+  · <em>但客户端加密总是能被破解</em>（<em>见页 21</em>）<br>
+  · <strong>关键数据应该在服务器</strong><br>
+  · 加密的实际价值：<em>提高修改门槛</em><br><br>
+  <strong>压缩</strong>：<br>
+  · 存档大时用（<em>比如 > 100KB</em>）<br>
+  · 常用算法：LZ4（<em>快</em>）、zlib（<em>压缩率高</em>）<br>
+  · <strong>注意</strong>：<em>压缩后仍然要校验</em>（<em>压缩本身不保证数据正确</em>）<br><br>
+  <strong>顺序</strong>：<em>序列化 → 压缩 → 加密 → 写入</em><br>
+  <strong>读取</strong>：<em>读取 → 解密 → 解压 → 反序列化</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="29">
+  <div class="task"><input type="checkbox" id="t-29-1"><label for="t-29-1"><strong>实现版本迁移</strong>：设计 v1 和 v2 的存档结构，实现"读 v1 自动升级到 v2"。</label></div>
+  <div class="task"><input type="checkbox" id="t-29-2"><label for="t-29-2"><strong>测试向后兼容</strong>：用 v1 的存档在新版本读取，验证不崩溃且数据正确。</label></div>
+  <div class="task"><input type="checkbox" id="t-29-3"><label for="t-29-3"><strong>实现原子写入</strong>：写临时文件 + 校验 + 重命名，验证写入中断不会损坏存档。</label></div>
+  <div class="task"><input type="checkbox" id="t-29-4"><label for="t-29-4"><strong>加备份</strong>：实现 <code>save.bak</code>，故意损坏主存档，验证能从备份恢复。</label></div>
+  <div class="task"><input type="checkbox" id="t-29-5"><label for="t-29-5"><strong>加校验</strong>：给存档算哈希值，篡改一个字节，验证能检测出来。</label></div>
+  <div class="task"><input type="checkbox" id="t-29-6"><label for="t-29-6"><strong>回答面试题</strong>：① 存档怎么做向后兼容？② 怎么防止存档写坏？③ 为什么客户端加密不能防作弊？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道存档的第一原则是"不丢数据"</strong>；<br>
+    ② <strong>能实现版本迁移，保证老存档能读</strong>；<br>
+    ③ <strong>知道"永远不要删除字段、不要改变类型"这两条铁律</strong>；<br>
+    ④ <strong>能实现原子写入和备份</strong>；<br>
+    ⑤ 知道加密只能提高门槛，关键数据要在服务器。<br>
+    <br>
+    <em>第 ② 和 第 ④ 条是这一页的核心——它们决定你的游戏会不会发生"玩家数据丢失"事故。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="28-bitwise.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">28 位运算与数据压缩</div>
+  </a>
+  <a class="next" href="30-debug-tools.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">30 调试工具与可视化</div>
+  </a>
+</nav>

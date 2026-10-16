@@ -1,0 +1,109 @@
+<h1>32 · 实战项目</h1>
+
+<p class="lead">这一页给出<strong>五个由浅入深的项目</strong>。它们不是"练习题"，而是<em>能展示你算法能力的作品</em>——每个都能写进简历。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="projects">一、五个项目（难度递增）</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>#</th><th>项目</th><th>核心算法</th><th>相关页</th><th>时长</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><strong>网格寻路演示器</strong></td><td>A*、BFS、可视化</td><td>10-12</td><td>1 周</td></tr>
+    <tr><td>2</td><td><strong>碰撞检测性能对比</strong></td><td>空间划分、暴力对比</td><td><strong>12</strong></td><td>1 周</td></tr>
+    <tr><td>3</td><td><strong>AI 行为演示</strong></td><td>状态机、行为树、调度</td><td>16-17</td><td>2 周</td></tr>
+    <tr><td>4</td><td><strong>游戏系统实现集</strong></td><td>红点、任务、Buff、背包</td><td>21-25</td><td>3 周</td></tr>
+    <tr><td>5</td><td><strong>性能优化案例分析</strong></td><td>六种模式 + 实测数据</td><td>26-30</td><td>2 周</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">为什么这五个项目"值得做"</span>
+  <strong>它们不是"实现一个算法"，而是"展示算法能力"</strong>：<br><br>
+  <strong>项目 2（碰撞检测对比）</strong>是最推荐的——因为：<br>
+  · 能展示<strong>性能意识</strong>（<em>知道暴力 O(n²) 不行</em>）<br>
+  · 能展示<strong>实测能力</strong>（<em>有数据对比</em>）<br>
+  · <strong>能展示发现陷阱的能力</strong>（<em>空间网格格子太小的静默错误</em>）<br>
+  · <em>面试官一看就知道你真做过</em><br><br>
+  <strong>项目 5（性能优化案例）</strong>的价值在<strong>数据</strong>：<br>
+  · 优化前的数字<br>
+  · 优化手段<br>
+  · 优化后的数字<br>
+  · <em>"为什么这个手段有效"的分析</em><br><br>
+  <em>有数据的项目，比功能炫酷的项目更受面试官青睐。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">怎么让项目"值得写进简历"</span>
+  <strong>不是"我实现了 A* 寻路"，而是：</strong><br>
+  · "<em>实现了 A* + 流场两种寻路，在 200 单位场景下把寻路开销从 12ms 降到 1.5ms</em>"<br>
+  · "<em>用空间网格优化碰撞检测，把 1000 个单位的检测从 O(n²) 的 500ms 降到 8ms</em>"<br>
+  · "<em>发现并修复了网格格子小于半径导致的静默漏检问题（实测只检测到 33/167 个碰撞）</em>"<br><br>
+  <strong>区别在于：量化 + 技术决策 + 你发现的问题。</strong><br>
+  <em>第三个例子最适合——它展示的是"发现了别人发现不了的问题"。</em>
+</div>
+
+<h2 id="skeleton">二、每个项目都该有的东西</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>要素</th><th>为什么</th><th>怎么体现</th></tr></thead>
+  <tbody>
+    <tr><td><strong>可视化</strong></td><td>让结果一眼可见</td><td><em>画路径、画范围、画网格</em></td></tr>
+    <tr><td><strong>性能数据</strong></td><td>证明你真的测了</td><td><strong>优化前后对比</strong></td></tr>
+    <tr><td><strong>算法对比</strong></td><td>展示选型能力</td><td><em>多种算法同一场景对比</em></td></tr>
+    <tr><td><strong>边界处理</strong></td><td>展示工程严谨性</td><td><em>空数据、极值、异常输入</em></td></tr>
+    <tr><td><strong>README</strong></td><td>方便他人理解</td><td><strong>技术选型 + 数据 + 结论</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">可视化为什么重要</span>
+  <strong>算法是抽象的，图是具体的。</strong><br><br>
+  一个能<em>实时画出 A* 搜索过程</em>的项目，价值远超一个只有黑盒函数的项目：<br>
+  · 面试官能<strong>立刻理解你在做什么</strong><br>
+  · 展示你<em>能用可视化调试</em>（页 30 的能力）<br>
+  · <strong>演示效果好</strong>——面试时能直接跑给面试官看<br><br>
+  <em>投入很小（画几条线），收益很大。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="32">
+  <div class="task"><input type="checkbox" id="t-32-1"><label for="t-32-1"><strong>选两个项目</strong>：一个"能快速做完的"，一个"有挑战的"。</label></div>
+  <div class="task"><input type="checkbox" id="t-32-2"><label for="t-32-2"><strong>先做可视化</strong>：在实现算法之前，先把可视化搭好。<em>它能帮你调试。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-32-3"><label for="t-32-3"><strong>记录数据</strong>：每做一个优化，记录前后数字。</label></div>
+  <div class="task"><input type="checkbox" id="t-32-4"><label for="t-32-4"><strong>做算法对比</strong>：同一场景至少对比两种算法。</label></div>
+  <div class="task"><input type="checkbox" id="t-32-5"><label for="t-32-5"><strong>写 README</strong>：技术选型 + 性能数据 + 发现的陷阱。</label></div>
+  <div class="task"><input type="checkbox" id="t-32-6"><label for="t-32-6"><strong>做完它</strong>：不换项目，直到能完整演示。</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>有一个能完整运行并演示的项目</strong>；<br>
+    ② 项目包含可视化；<br>
+    ③ <strong>有优化前后的性能数据</strong>；<br>
+    ④ 至少对比了两种算法；<br>
+    ⑤ 能说出项目中发现的一个"陷阱"。<br>
+    <br>
+    <em>第 ③ 和 第 ⑤ 条是简历和面试的关键——**数据**和**发现问题的能力**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="31-interview.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">31 面试题库 ★★</div>
+  </a>
+  <a class="next" href="33-reference.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">33 算法速查</div>
+  </a>
+</nav>

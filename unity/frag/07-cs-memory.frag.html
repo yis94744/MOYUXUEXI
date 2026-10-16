@@ -1,0 +1,527 @@
+
+      <h1>07 · 内存、GC 与零分配 ★</h1>
+      <p class="lead">这一页是 C# 语言线的<strong>收官，也是全站分量最重的一页之一</strong>。前面六页你学会了各种工具——但每个工具都有"账单"：<em><a class="kp-ref" href="03-cs-basic.html#boxing" title="装箱与拆箱">装箱</a>要分配、<a class="kp-ref" href="05-cs-adv.html#closure" title="闭包与捕获">闭包</a>要分配、<a class="kp-ref" href="05-cs-adv.html#linq" title="LINQ 与延迟执行">LINQ</a>要分配、<a class="kp-ref" href="06-cs-modern.html#reflection" title="反射">反射</a>要分配</em>。这一页把这些账单收拢起来，告诉你<strong>哪些账必须付、哪些能省、以及怎么省</strong>。</p>
+
+      <div class="callout callout--note">
+        <span class="callout__title">这一页在路线中的位置</span>
+        <strong>前一页</strong>（06）教你用泛型、反射、特性写"可复用的代码"。但反射慢、泛型不当会装箱——你已经开始感觉到"能力越大，代价越大"。<br>
+        <strong>这一页</strong>把这些代价量化：<em>Unity 用的 GC 是什么样的、它什么时候卡、你的代码在哪产生垃圾</em>。<br>
+        <strong>下一页</strong>（08）讲协程与异步——它们也有分配问题（<code>new WaitForSeconds</code>），到这里就全部串起来了。<br>
+        <strong>为什么把性能放在语言线里？</strong>因为等你写完几十个脚本再学 GC，<em>架构已经烂了，改起来是重写</em>。
+      </div>
+
+      <h2 id="model">一、先搞懂 Unity 的内存模型</h2>
+      <p>Unity 的内存分成几块，<strong>不同块的问题要用不同工具解决</strong>。搞混它们，你会用错工具、找错方向。</p>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>内存区域</th><th>里面装什么</th><th>谁管它</th><th>泄漏表现</th><th>查它的工具</th></tr></thead>
+        <tbody>
+          <tr><td><strong>托管堆</strong></td><td>C# 对象、装箱的值类型、字符串</td><td>Boehm GC</td><td>托管内存持续上涨</td><td>Memory Profiler</td></tr>
+          <tr><td><strong>Native 内存</strong></td><td>纹理、网格、音频、GameObject</td><td>Unity 引擎（引用计数）</td><td>纹理/网格数量不降</td><td>Memory Profiler</td></tr>
+          <tr><td><strong>栈</strong></td><td>局部变量、方法调用帧</td><td>自动回收</td><td>几乎不会泄漏</td><td>—</td></tr>
+          <tr><td><strong>非托管分配</strong></td><td>NativeArray、ComputeBuffer</td><td><strong>你必须手动 Dispose</strong></td><td>报 Native Collection not disposed</td><td>Leak Detection</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--warn">
+        <span class="callout__title">关键认知：GC 只管托管堆</span>
+        <strong>GC 不会帮你回收纹理、网格、RenderTexture。</strong>这些是 Native 对象，靠 Unity 的引用计数机制管理。<br>
+        所以你经常看到的现象是：<em>托管内存很小，但应用照样爆内存</em>——因为涨的是 Native 内存。<br>
+        反过来，<strong>NativeArray、ComputeBuffer 这类非托管分配，即使有 GC 也不会被自动回收</strong>，必须手动 <code>Dispose()</code>。
+      </div>
+
+      <h2 id="boehm">二、Boehm GC：Unity 用的是什么样的 GC</h2>
+      <p>Unity（无论 Mono 还是 IL2CPP）用的都是 <strong>Boehm GC</strong>。它不是"现代 GC"，理解它的特性才能理解性能问题的根源。</p>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>特性</th><th>说明</th><th>对你的影响</th></tr></thead>
+        <tbody>
+          <tr><td><strong>非分代</strong></td><td>不像 .NET GC 分 0/1/2 代</td><td>每次都扫描<strong>全部</strong>对象，不是只扫新对象</td></tr>
+          <tr><td><strong>非压缩</strong></td><td>回收后不整理内存</td><td><strong>容易产生内存碎片</strong>，堆只增不减</td></tr>
+          <tr><td><strong>全停顿</strong></td><td>回收时暂停所有线程</td><td>停顿时间与<strong>存活对象数量</strong>成正比</td></tr>
+          <tr><td><strong>标记-清除</strong></td><td>标记存活对象，清除其余</td><td>分配越多 → 扫描越久 → 卡顿越久</td></tr>
+          <tr><td><strong>增量 GC</strong></td><td>Unity 2019.1+ 可开启</td><td>把一次大停顿<strong>拆成多次小停顿</strong>，强烈建议开启</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">两个必须纠正的误解</span>
+        <strong>误解一：「IL2CPP 没有 GC。」</strong><br>IL2CPP 只是把 IL 转成 C++ 再编译，<em>GC 依然是 Boehm</em>。"换了 IL2CPP 就不卡了"是错的。<br>
+        <strong>误解二：「用 GC.Collect 手动回收就能解决问题。」</strong><br><code>GC.Collect()</code> 会触发一次<strong>全停顿</strong>回收，本身就是卡顿来源。正确的做法是<em>少产生垃圾</em>，而不是频繁手动回收。
+      </div>
+
+      <h3 id="incremental">开启增量 GC</h3>
+
+      <pre class="mono code-block"><code>// Edit -&gt; Project Settings -&gt; Player -&gt; Other Settings
+//   [x] Use Incremental GC            &lt;- 强烈建议勾选
+//   Incremental GC Time Slice   3      &lt;- 每次切片的时间上限（毫秒）
+
+using UnityEngine;
+
+public class GcConfig : MonoBehaviour
+{
+    private void Start()
+    {
+        // 默认：GC 自动触发
+        // GarbageCollector.GCMode = GarbageCollector.Mode.Enabled;
+
+        // 手动模式：只在调用 Collect 时回收
+        // GarbageCollector.GCMode = GarbageCollector.Mode.Manual;
+
+        // 关闭 GC（危险，只适合完全零分配的项目）
+        // GarbageCollector.GCMode = GarbageCollector.Mode.Disabled;
+    }
+
+    // 手动触发的正确时机：场景切换、加载界面
+    public void ForceCollectOnLoadingScreen()
+    {
+        System.GC.Collect();
+        System.GC.WaitForPendingFinalizers();
+        System.GC.Collect();
+    }
+}</code></pre>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">增量 GC 能解决什么、不能解决什么</span>
+        <strong>能解决</strong>：把一次 20ms 的大停顿拆成 7 次 3ms 的小停顿。<em>体感上从"明显卡一下"变成"几乎感觉不到"。</em><br>
+        <strong>不能解决</strong>：垃圾总量本身。如果每帧产生 100KB 垃圾，<strong>GC 依然会高频触发</strong>，只是每次停顿短了。<br>
+        <strong>正确的优先级是</strong>：① 先减少分配 → ② 再开启增量 GC → ③ 最后才考虑手动控制。
+      </div>
+
+      <h2 id="sources">三、每帧 GC 分配的十大来源 ★</h2>
+      <p>下面这份清单<strong>必须背下来</strong>。面试会问，实战更要靠它。我把它们按<em>出现频率</em>排序——排在前面的，是你在 Profiler 里最常看到的。</p>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using System.Collections.Generic;
+using System.Text;
+
+// ============================================================
+//  Update 里最常见的 GC 分配来源（按出现频率排序）
+// ============================================================
+public class GcSources : MonoBehaviour
+{
+    private int _score;
+    private float _time;
+    private List&lt;Enemy&gt; _enemies = new List&lt;Enemy&gt;();
+    private Enemy _target;
+
+    // ---------- 来源 1：字符串拼接 ----------
+    private void Update_Strings()
+    {
+        // 每帧分配 3~4 个字符串对象
+        Debug.Log("Score: " + _score + " / Time: " + _time);
+    }
+    // 修复：条件编译 + 只在变化时输出
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private static void LogScore(int score, float time)
+    {
+        Debug.Log("Score: " + score + " / Time: " + time);
+    }
+
+    // ---------- 来源 2：装箱 ----------
+    private void Update_Boxing()
+    {
+        Debug.LogFormat("Score: {0}", _score);   // params object[] -&gt; 装箱
+    }
+
+    // ---------- 来源 3：数组分配 ----------
+    private void Update_Arrays()
+    {
+        // 每次调用都新建一个 RaycastHit[]
+        RaycastHit[] hits = Physics.RaycastAll(transform.position, Vector3.down, 10f);
+        Debug.Log(hits.Length);
+    }
+
+    // ---------- 来源 4：LINQ ----------
+    private void Update_Linq()
+    {
+        // 迭代器对象 + 闭包 + 结果 List，一次三份分配
+        var alive = _enemies.Where(e =&gt; e.Hp &gt; 0f).ToList();
+        Debug.Log(alive.Count);
+    }
+
+    // ---------- 来源 5：闭包捕获 ----------
+    private void Update_Closure()
+    {
+        // lambda 捕获了 this 和 _score
+        _enemies.Sort((a, b) =&gt; a.Hp.CompareTo(b.Hp));
+    }
+
+    // ---------- 来源 6：协程等待对象 ----------
+    private System.Collections.IEnumerator Routine()
+    {
+        while (true)
+        {
+            yield return new WaitForSeconds(1f);   // 每次循环都 new 一个
+        }
+    }
+
+    // ---------- 来源 7：枚举转字符串 ----------
+    private void Update_EnumToString()
+    {
+        Debug.Log(System.DayOfWeek.Monday.ToString());
+    }
+
+    // ---------- 来源 8：GetComponents 系列 ----------
+    private void Update_GetComponents()
+    {
+        Collider[] cols = GetComponentsInChildren&lt;Collider&gt;();   // 分配数组
+        Debug.Log(cols.Length);
+    }
+
+    // ---------- 来源 9：Camera.main ----------
+    private void Update_CameraMain()
+    {
+        // 内部是 FindGameObjectWithTag，有开销
+        Camera.main.transform.position = Vector3.zero;
+    }
+
+    // ---------- 来源 10：LayerMask.GetMask ----------
+    private void Update_GetMask()
+    {
+        // 每次都要按名字查层号
+        int mask = LayerMask.GetMask("Ground");
+        Debug.Log(mask);
+    }
+}
+
+public class Enemy
+{
+    public float Hp;
+}</code></pre>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>来源</th><th>典型代码</th><th>修复方式</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><strong>字符串拼接</strong></td><td><code>"HP: " + hp</code></td><td>StringBuilder / TMP SetText / 条件编译</td></tr>
+          <tr><td>2</td><td><strong>装箱</strong></td><td><code>Debug.LogFormat("{0}", i)</code></td><td>泛型容器 / 避免 object 参数</td></tr>
+          <tr><td>3</td><td><strong>数组分配</strong></td><td><code>Physics.RaycastAll()</code></td><td><code>RaycastNonAlloc</code> + 预分配数组</td></tr>
+          <tr><td>4</td><td><strong>LINQ</strong></td><td><code>list.Where(...).ToList()</code></td><td>手写循环</td></tr>
+          <tr><td>5</td><td><strong>闭包捕获</strong></td><td><code>list.Sort((a,b) =&gt; ...)</code></td><td>静态比较器 / static lambda</td></tr>
+          <tr><td>6</td><td><strong>协程等待对象</strong></td><td><code>new WaitForSeconds(1f)</code></td><td>缓存 WaitForSeconds</td></tr>
+          <tr><td>7</td><td><strong>枚举转字符串</strong></td><td><code>SomeEnum.Value.ToString()</code></td><td>缓存字符串</td></tr>
+          <tr><td>8</td><td><strong>GetComponents 系列</strong></td><td><code>GetComponentsInChildren&lt;T&gt;()</code></td><td>Awake 收集一次并缓存</td></tr>
+          <tr><td>9</td><td><strong>Camera.main</strong></td><td>每帧访问</td><td>缓存到字段</td></tr>
+          <tr><td>10</td><td><strong>LayerMask.GetMask</strong></td><td>每帧调用</td><td>缓存为 static readonly</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <h3 id="fixed">零分配版本：逐个击破</h3>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using System.Collections.Generic;
+using UnityEngine.Profiling;
+
+// ============================================================
+//  上面的每一条，这里给出零分配版本
+// ============================================================
+public class GcFixed : MonoBehaviour
+{
+    private int _score;
+    private float _time;
+    private List&lt;Enemy&gt; _enemies = new List&lt;Enemy&gt;();
+
+    // 预分配缓冲区，全程复用
+    private readonly RaycastHit[] _hitBuffer = new RaycastHit[16];
+    private readonly Collider[] _colliderBuffer = new Collider[32];
+    private readonly List&lt;Enemy&gt; _tempList = new List&lt;Enemy&gt;(64);
+    private readonly System.Text.StringBuilder _sb = new System.Text.StringBuilder(64);
+
+    // 缓存
+    private Camera _cam;
+    private static readonly int GroundMask = LayerMask.GetMask("Ground");
+    private static readonly System.Comparison&lt;Enemy&gt; HpComparison =
+        (a, b) =&gt; a.Hp.CompareTo(b.Hp);
+    private readonly WaitForSeconds _wait1s = new WaitForSeconds(1f);
+
+    private void Awake()
+    {
+        _cam = Camera.main;                 // 只查一次
+    }
+
+    private void Update()
+    {
+        _time += Time.deltaTime;
+
+        // ---------- 只在实际变化时更新 UI ----------
+        // 而不是每帧无条件刷新
+        UpdateUiIfNeeded();
+
+        // ---------- 零分配物理查询 ----------
+        int count = Physics.RaycastNonAlloc(
+            transform.position, Vector3.down, _hitBuffer, 10f, GroundMask);
+
+        if (count == _hitBuffer.Length)
+        {
+            Debug.LogWarning("缓冲区可能已满，结果被截断");
+        }
+
+        // ---------- 零分配排序 ----------
+        _enemies.Sort(HpComparison);
+
+        // ---------- 手写循环代替 LINQ ----------
+        _tempList.Clear();
+        for (int i = 0; i &lt; _enemies.Count; i++)
+        {
+            if (_enemies[i].Hp &gt; 0f) _tempList.Add(_enemies[i]);
+        }
+    }
+
+    private int _lastShownScore = -1;
+
+    private void UpdateUiIfNeeded()
+    {
+        if (_score == _lastShownScore) return;   // 没变就不动
+        _lastShownScore = _score;
+
+        _sb.Clear();
+        _sb.Append("Score: ").Append(_score);
+        // label.SetText(_sb);   // TMP 的零分配重载
+    }
+
+    // 协程复用等待对象
+    private System.Collections.IEnumerator Routine()
+    {
+        while (true)
+        {
+            yield return _wait1s;   // 复用同一个对象
+        }
+    }
+
+    // ---------- 测量工具：把分配量打出来 ----------
+    public void MeasureAlloc(string label, System.Action action)
+    {
+        long before = Profiler.GetMonoUsedSizeLong();
+        action();
+        long after = Profiler.GetMonoUsedSizeLong();
+        Debug.Log(label + " 分配: " + (after - before) + " 字节");
+    }
+}
+
+public class Enemy2
+{
+    public float Hp;
+}</code></pre>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">十条修复规则的记忆口诀</span>
+        <strong>缓存</strong>：能缓存的都缓存（组件、相机、Mask、WaitForSeconds）。<br>
+        <strong>复用</strong>：能复用的都复用（数组缓冲区、List、StringBuilder）。<br>
+        <strong>延后</strong>：不必要的工作别每帧做（UI 只在变化时更新、日志只在编辑器里输出）。<br>
+        <strong>替换</strong>：用 NonAlloc 替换 Alloc、用手写循环替换 LINQ、用静态比较器替换闭包。<br>
+        <em>这四条覆盖了 90% 的 GC 问题。</em>
+      </div>
+
+      <h2 id="detect">四、怎么找到你项目里的分配 ★</h2>
+      <p>上面是"通用清单"，但<strong>你的项目具体在哪分配，必须用工具查</strong>。这一节讲完整的排查流程。</p>
+
+      <div class="kp">
+        <div class="kp__head">用 Profiler 定位分配来源（五步）</div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>第 1 步：打开 Profiler 的 CPU 模块</strong><br><span class="mono">Window -> Analysis -> Profiler</span>，选 CPU Usage。如果是真机调试，用 <span class="mono">Attach To Player</span> 连上设备。</p></div>
+        </div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>第 2 步：打开 GC Alloc 列</strong><br>Hierarchy 视图左上角的列设置图标，勾选 <b>GC Alloc</b>。<em>这一列显示每个函数在当前帧分配了多少字节。</em></p></div>
+        </div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>第 3 步：找分配最多的行，按大小排序</strong><br>点 GC Alloc 列标题排序。<strong>重点关注两个位置</strong>：① <span class="mono">PlayerLoop</span> 下的 <span class="mono">Update.ScriptRunBehaviourUpdate</span>；② 分配量大的具体方法名。</p></div>
+        </div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>第 4 步：点开看调用栈</strong><br>选中一行，下方会展开调用栈。<em>很多分配不是你写的代码直接产生的</em>——比如 <span class="mono">string.Concat</span> 是你那句字符串拼接引起的。顺着调用栈往上找，才能找到"你自己的那一行"。</p></div>
+        </div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>第 5 步：验证修复效果</strong><br>改完代码后重新跑，对比同一位置的 GC Alloc。<strong>目标是把 Update 相关行的分配降到 0 B。</strong></p></div>
+        </div>
+      </div>
+
+      <div class="callout callout--warn">
+        <span class="callout__title">关于 Deep Profile</span>
+        <strong>Deep Profile 会逐方法采样，开销极大</strong>——可能让帧率降 10 倍以上，还会自己产生大量分配。<br>
+        正确的用法：<em>只在排查具体问题时短时间开启</em>，找到线索就关掉。<br>
+        <strong>更精细的做法</strong>：用 <code>ProfilerMarker</code> 手动标记关键代码段，这样即使不开 Deep Profile 也能看到分段耗时。
+      </div>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using Unity.Profiling;
+using UnityEngine;
+
+// ============================================================
+//  用 ProfilerMarker 手动标记代码段
+// ============================================================
+public class ProfilerMarkerDemo : MonoBehaviour
+{
+    // 静态只读：创建 Marker 本身有开销，不要每次新建
+    private static readonly ProfilerMarker s_MovementMarker =
+        new ProfilerMarker("MySystem.Movement");
+    private static readonly ProfilerMarker s_AiMarker =
+        new ProfilerMarker("MySystem.AI");
+    private static readonly ProfilerMarker s_PathMarker =
+        new ProfilerMarker("MySystem.AI.Pathfinding");
+
+    private void Update()
+    {
+        using (s_MovementMarker.Auto())     // using 作用域 = 采样区间
+        {
+            UpdateMovement();
+        }
+
+        using (s_AiMarker.Auto())
+        {
+            UpdateAI();
+        }
+    }
+
+    private void UpdateAI()
+    {
+        // 可以嵌套，Profiler 里会显示层级
+        using (s_PathMarker.Auto())
+        {
+            // 寻路计算
+        }
+    }
+
+    private void UpdateMovement() { }
+
+    // ---------- 用 Profiler API 测量分配量 ----------
+    public void MeasureAlloc(string label, System.Action action)
+    {
+        long before = UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong();
+        action();
+        long after = UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong();
+        Debug.Log(label + " 分配: " + (after - before) + " 字节");
+    }
+}</code></pre>
+
+      <h2 id="layout">五、从"少分配"到"缓存友好"</h2>
+      <p>消除分配是<strong>第一步</strong>。但真正的高手会走到第二步：<em>让数据的内存布局更利于 CPU 读取</em>。这就是页 03 提到的"struct 数组比 class 数组快 2–5 倍"背后的原理。</p>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  从"对象数组"到"结构体数组"的演进
+// ============================================================
+
+// ---------- 阶段 1：最直观的写法（class 数组）----------
+public class UnitClass
+{
+    public Vector3 Position;
+    public float Hp;
+    public float Speed;
+}
+// 问题：
+// 1) 每个 UnitClass 都是堆对象，有 16 字节对象头开销
+// 2) 数组里只存指针，真实数据散落在堆的各处
+// 3) 遍历时每次解引用都可能缓存未命中（cache miss）
+
+// ---------- 阶段 2：改成 struct（内存连续）----------
+public struct UnitStruct
+{
+    public Vector3 Position;   // 12 字节
+    public float Hp;           // 4 字节
+    public float Speed;        // 4 字节
+}
+// 收益：
+// 1) 零 GC 分配（值类型数组）
+// 2) 内存完全连续：64 字节缓存行能装 3 个 UnitStruct
+// 3) 遍历速度提升 2~5 倍
+
+// ---------- 阶段 3：按"访问模式"拆分（SoA）----------
+// 如果你只更新位置，不碰血量和速度，那把数据拆开更省缓存
+public struct PositionData { public Vector3 Value; }   // 12 字节
+public struct HealthData   { public float Value; }     // 4 字节
+public struct SpeedData    { public float Value; }     // 4 字节
+// 遍历位置时，只需加载 PositionData 数组
+// 64 字节缓存行能装 5 个 PositionData（vs 3 个完整 UnitStruct）
+// 这就是 ECS（页 18）的核心思想
+
+public class LayoutDemo : MonoBehaviour
+{
+    private UnitStruct[] _units = new UnitStruct[10000];
+
+    private void Update()
+    {
+        float dt = Time.deltaTime;
+
+        // 顺序遍历连续内存，CPU 预取器友好
+        for (int i = 0; i &lt; _units.Length; i++)
+        {
+            // 数组索引是变量，可以直接就地修改
+            _units[i].Position += Vector3.forward * (_units[i].Speed * dt);
+        }
+    }
+
+    // ---------- 对比：List&lt;struct&gt; 的陷阱 ----------
+    private System.Collections.Generic.List&lt;UnitStruct&gt; _list =
+        new System.Collections.Generic.List&lt;UnitStruct&gt;();
+
+    private void ListTrap()
+    {
+        // 编译错误 CS1612：List 的索引器返回的是副本，不是变量
+        // _list[0].Position += Vector3.one;
+
+        // 正确做法：取出 -&gt; 改 -&gt; 写回（两次结构体拷贝）
+        UnitStruct u = _list[0];
+        u.Hp -= 10f;
+        _list[0] = u;
+
+        // 如果这是热路径，改回数组能省下这两次拷贝
+    }
+}</code></pre>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">什么时候才该做布局优化</span>
+        <strong>答案是：绝大多数时候不需要。</strong>先用 Profiler 找到真实瓶颈，再优化。<br>
+        上面这些技巧只在两种情况值得：① 数据量确实很大（1 万以上），且这是热点循环；② 目标是移动端，需要榨干每一分性能。<br>
+        <strong>写代码的第一优先级永远是正确和可读。</strong>过早优化只会让半年后的你调试时想打自己。
+      </div>
+
+      <h2 id="tasks">六、本章动手任务</h2>
+
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="t-07-1">
+          <label for="t-07-1"><strong>建一个"GC 重灾区"场景</strong>：把上面十大来源全部写进一个 <code>Update</code> 里，用 Profiler 观察每帧的 GC Alloc 数值。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-07-2">
+          <label for="t-07-2"><strong>逐个消除</strong>：按照清单逐条修复，每修一条就记录 GC Alloc 的下降量。<em>做完你会对"哪些是真凶"有肌肉记忆</em>。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-07-3">
+          <label for="t-07-3"><strong>开启增量 GC</strong>：在 Player Settings 里勾选 Use Incremental GC，对比开启前后的帧率曲线。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-07-4">
+          <label for="t-07-4"><strong>用 ProfilerMarker 标记</strong>：给你项目里的主要系统加上标记，体验一下"不用 Deep Profile 也能看到分段耗时"。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-07-5">
+          <label for="t-07-5"><strong>手写一个分配检测工具</strong>：用 <code>Profiler.GetMonoUsedSizeLong()</code> 包一个方法，传入任意 Action 并打印它分配了多少字节。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-07-6">
+          <label for="t-07-6"><strong>背下十大来源</strong>：合上页面，默写这十条。<em>这是游戏程序面试的高频题</em>。</label>
+        </li>
+      </ul>
+
+      <div class="milestone">
+        <p class="mb0">
+          <strong>本章过关标准</strong>：<br>① 能画图说明 Unity 的内存分区，以及 GC 管的是哪一块；<br>② 能说出 Boehm GC 的四条特性，以及增量 GC 解决了什么、没解决什么；<br>③ <strong>能默写至少 8 条每帧分配来源及其修复方式</strong>；<br>④ 能独立使用 Profiler 的 GC Alloc 列定位到一个具体分配点；<br>⑤ 知道 <code>struct</code> 数组为什么快，以及什么时候才值得这样优化。<br><br><em>这一页的内容会在页 21（性能优化实战）再次出现，但那时是从"整个项目"的视角看。现在先把"每一帧、每一行代码"这一层打透。</em>
+        </p>
+      </div>
+
+      <nav class="page-nav">
+        <a href="06-cs-modern.html">
+          <div class="dir">← C# 语言线</div>
+          <div class="title">06 泛型、反射与现代特性</div>
+        </a>
+        <a class="next" href="08-cs-async.html">
+          <div class="dir">C# 语言线 →</div>
+          <div class="title">08 协程与异步编程</div>
+        </a>
+      </nav>

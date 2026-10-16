@@ -1,0 +1,541 @@
+
+      <h1>04 · 面向对象与接口</h1>
+      <p class="lead">面向对象不是"把代码写进类里"。它的真正价值是<strong>控制变化的传播范围</strong>——改一个需求，你希望只动一个文件，而不是全局搜索替换 50 处。这一页讲的是<em>怎么用 OOP 的四个工具（封装、继承、多态、接口）来实现这件事</em>。</p>
+
+      <div class="callout callout--note">
+        <span class="callout__title">阶段目标</span>
+        约 <strong>1.5 周</strong>，35 小时。结束时你能：解释 <code>virtual/override/new</code> 的区别、说清接口和抽象类各自的适用场景、知道 Unity 为什么推崇"组合优于继承"、能自己设计一个可扩展的模块结构。
+      </div>
+
+      <h2 id="three">一、封装的真实价值</h2>
+      <p>教科书说封装是"隐藏内部实现"。这没说错，但太抽象。<strong>封装的实际收益是：把"可能变化的东西"和"不该受影响的东西"隔开。</strong></p>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  反例：所有状态都是 public，外部可以任意修改
+// ============================================================
+public class PlayerBad : MonoBehaviour
+{
+    public float hp = 100f;
+    public float maxHp = 100f;
+    public int level = 1;
+}
+
+// 问题：
+// 1) 外部可以写 player.hp = 99999f;   绕过所有规则
+// 2) 血条 UI 无法知道"血量什么时候变了"，只能每帧轮询
+// 3) 想加"血量变化时播特效"，得去改所有修改 hp 的地方
+
+// ============================================================
+//  正例：用属性把规则集中到一处
+// ============================================================
+public class PlayerGood : MonoBehaviour
+{
+    [SerializeField] private float _maxHp = 100f;
+    [SerializeField] private float _hp = 100f;
+    [SerializeField] private int _level = 1;
+
+    // 血量变化时通知外部，而不是让外部轮询
+    public event System.Action&lt;float, float&gt; HpChanged;   // (current, max)
+    public event System.Action&lt;int&gt; LevelChanged;
+
+    public float Hp
+    {
+        get { return _hp; }
+        set
+        {
+            // 规则集中在这里：钳制、去重、发通知
+            float clamped = Mathf.Clamp(value, 0f, _maxHp);
+            if (Mathf.Approximately(clamped, _hp)) return;   // 值没变就不通知
+
+            _hp = clamped;
+            HpChanged?.Invoke(_hp, _maxHp);
+
+            if (_hp &lt;= 0f) OnDeath();
+        }
+    }
+
+    public float MaxHp
+    {
+        get { return _maxHp; }
+        set
+        {
+            _maxHp = Mathf.Max(1f, value);
+            Hp = _hp;   // 触发一次钳制，防止当前血量超过新上限
+        }
+    }
+
+    public int Level
+    {
+        get { return _level; }
+        set
+        {
+            int v = Mathf.Max(1, value);
+            if (v == _level) return;
+            _level = v;
+            LevelChanged?.Invoke(_level);
+        }
+    }
+
+    private void OnDeath() { Debug.Log("死亡"); }
+}</code></pre>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">Unity 的序列化与封装的平衡</span>
+        Unity 只序列化<strong>字段</strong>，不序列化属性。所以你会看到上面的写法：<code>[SerializeField] private</code> 字段 + 公开属性。<br>
+        这样既能在 Inspector 里调参，又能保证外部只能通过属性修改——<em>这是 Unity 项目的标准范式</em>。<br>
+        不要为了方便就把字段写成 <code>public</code>。<strong>Inspector 可见和 public 是两件事</strong>，用 <code>[SerializeField]</code> 就能兼得。
+      </div>
+
+      <h2 id="inherit">二、继承与多态</h2>
+
+      <h3 id="virt-new">virtual / override / new 的区别（高频面试题）</h3>
+      <p>这三个关键字看起来相似，但行为完全不同。<strong>搞混它们会导致"调用了错误的实现"这种极难排查的 bug。</strong></p>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+public class Animal
+{
+    public virtual void Speak() { Debug.Log("..."); }
+}
+
+public class Dog : Animal
+{
+    public override void Speak() { Debug.Log("Woof"); }
+}
+
+public class Cat : Animal
+{
+    public new void Speak() { Debug.Log("Meow"); }   // new：隐藏，不是多态
+}
+
+public class PolyDemo : MonoBehaviour
+{
+    private void Start()
+    {
+        Animal a1 = new Dog();
+        a1.Speak();          // Woof  &lt;- 虚方法表动态派发，走 Dog 的实现
+
+        Animal a2 = new Cat();
+        a2.Speak();          // ...   &lt;- new 只做静态隐藏，仍走 Animal 的实现！
+
+        Cat c = new Cat();
+        c.Speak();           // Meow  &lt;- 静态类型是 Cat，走 Cat 的实现
+    }
+}</code></pre>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>对比项</th><th><code>override</code></th><th><code>new</code></th></tr></thead>
+        <tbody>
+          <tr><td>机制</td><td>虚方法表（vtable）动态派发</td><td>编译期按变量的静态类型解析</td></tr>
+          <tr><td>基类引用调用</td><td><strong>执行子类实现</strong></td><td><strong>执行基类实现</strong></td></tr>
+          <tr><td>Unity 中的使用</td><td>覆盖 Update 逻辑、AI 状态基类</td><td>几乎不用，容易埋 bug</td></tr>
+          <tr><td>编译警告</td><td>无</td><td>无。<em>但不写 <code>new</code> 时会报 <strong>CS0114</strong> 警告</em></td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--warn">
+        <span class="callout__title">上面代码的输出是反直觉的</span>
+        <code>Animal a2 = new Cat(); a2.Speak();</code> 输出的是 <strong>"..."</strong>，不是 "Meow"。<br>
+        因为 <code>new</code> 只做<em>静态隐藏</em>：编译器看变量的声明类型是 <code>Animal</code>，就绑定到 <code>Animal.Speak</code>。<br>
+        <strong>这就是为什么实战中几乎不用 <code>new</code> 来"覆盖"方法。</strong>要覆盖就用 <code>override</code>。
+      </div>
+
+      <div class="callout callout--note">
+        <span class="callout__title">CS0114 与 CS0108：两个容易搞混的警告</span>
+        这两个警告都与「子类成员隐藏了基类同名成员」有关，但触发条件不同：<br>
+        <div class="table-wrap">
+        <table>
+          <thead><tr><th>写法</th><th>编译器行为</th></tr></thead>
+          <tbody>
+            <tr><td><code>public override void F()</code></td><td>正常，无警告</td></tr>
+            <tr><td><code>public new void F()</code></td><td>正常，无警告（<em>显式声明了隐藏意图</em>）</td></tr>
+            <tr><td><code>public void F()</code>（<strong>不写任何关键字</strong>）</td><td><strong>warning CS0114</strong>：提示「隐藏了继承的成员，请添加 override 或 new」</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <strong>所以：</strong><br>
+        • <em>写了 <code>new</code> 就不会有警告</em>——因为编译器认为你是故意的；<br>
+        • 只有<strong>忘记写关键字</strong>时才会得到 CS0114。<br><br>
+        <strong>CS0108 是另一个场景</strong>：当基类成员<em>不是</em> virtual 时，子类写同名成员会产生 CS0108。<br>
+        <em>本页的对比表针对的是 <code>override</code> 与 <code>new</code> 的语义差异，不是警告本身。</em>
+      </div>
+
+      <h3 id="abstract">抽象类：定义"必须实现什么"</h3>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  抽象基类：不能实例化，可以有实现
+// ============================================================
+public abstract class Actor : MonoBehaviour
+{
+    public string ActorName { get; protected set; }
+    public float Hp { get; protected set; }
+
+    public abstract void Tick(float dt);          // 必须被子类实现
+
+    public virtual void TakeDamage(float dmg)     // 可以被子类覆盖
+    {
+        Hp -= dmg;
+        if (Hp &lt;= 0f) OnDeath();
+    }
+
+    protected virtual void OnDeath()
+    {
+        Debug.Log(ActorName + " died");
+    }
+}
+
+// ============================================================
+//  派生类
+// ============================================================
+public sealed class PlayerActor : Actor        // sealed：不能再被继承
+{
+    [SerializeField] private float _moveSpeed = 5f;
+
+    private void Awake()
+    {
+        ActorName = "Player";
+        Hp = 100f;
+    }
+
+    public override void Tick(float dt)
+    {
+        float h = Input.GetAxisRaw("Horizontal");
+        float v = Input.GetAxisRaw("Vertical");
+        transform.Translate(new Vector3(h, 0f, v) * (_moveSpeed * dt), Space.World);
+    }
+
+    public override void TakeDamage(float dmg)
+    {
+        base.TakeDamage(dmg * 0.8f);              // 调用基类实现（减伤 20%）
+    }
+}</code></pre>
+
+      <div class="callout callout--warn">
+        <span class="callout__title">Unity 的一个限制：抽象 MonoBehaviour 不能挂载</span>
+        继承自 <code>MonoBehaviour</code> 的<strong>抽象类不能直接挂到 GameObject 上</strong>（Unity 会拒绝）。<br>
+        但它可以作为 <code>[SerializeField]</code> 字段的类型来接收子类实例——<em>这是 Unity 里"多态序列化"的标准做法</em>。<br>
+        不过要注意：<strong>普通 <code>[SerializeField]</code> 用在抽象类字段上，Unity 会按声明的类型序列化，子类新增字段会丢失。</strong>需要真正的多态序列化要用 <code>[SerializeReference]</code>（Unity 2019.3+）。
+      </div>
+
+      <h2 id="interface">三、接口：能力契约</h2>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+public interface IDamageable
+{
+    float CurrentHp { get; }
+    bool IsDead { get; }
+    void TakeDamage(float amount);
+}
+
+public class Crate : MonoBehaviour, IDamageable
+{
+    [SerializeField] private float _hp = 30f;
+
+    public float CurrentHp { get { return _hp; } }
+    public bool IsDead { get { return _hp &lt;= 0f; } }
+
+    public void TakeDamage(float amount) { _hp -= amount; }
+}
+
+// ============================================================
+//  用接口解耦（Unity 核心技巧）
+// ============================================================
+public class Weapon : MonoBehaviour
+{
+    [SerializeField] private float _damage = 10f;
+
+    public void Fire(Vector3 origin, Vector3 dir)
+    {
+        // TryGetComponent 支持接口类型 T，且不产生 GC（Unity 2019.2+）
+        if (Physics.Raycast(origin, dir, out RaycastHit hit, 100f))
+        {
+            if (hit.collider.TryGetComponent(out IDamageable target))
+            {
+                target.TakeDamage(_damage);
+            }
+        }
+    }
+}</code></pre>
+
+      <div class="cmp">
+        <div class="cmp__head">
+          <span>维度</span>
+          <span>接口 interface</span>
+          <span>抽象类 abstract class</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>多重实现</strong></span>
+          <span><span class="mk mk--yes">可以</span> 一个类能实现多个接口</span>
+          <span><span class="mk mk--no">不行</span> 只能继承一个类</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>实例字段</strong></span>
+          <span><span class="mk mk--no">不能有</span></span>
+          <span><span class="mk mk--yes">可以有</span></span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>构造函数</strong></span>
+          <span><span class="mk mk--no">没有</span></span>
+          <span><span class="mk mk--yes">有</span></span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>方法实现</strong></span>
+          <span>C# 8 默认接口实现 <strong>Unity 不支持</strong></span>
+          <span><span class="mk mk--yes">可以</span> 有默认实现</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>Inspector 引用</strong></span>
+          <span><span class="mk mk--no">不能直接序列化</span></span>
+          <span><span class="mk mk--yes">可以</span> 拖入子类实例</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>适用场景</strong></span>
+          <span>能力契约：可被伤害、可交互、可存档</span>
+          <span>同类事物的公共基类：敌人、UI 面板</span>
+        </div>
+      </div>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">C# 8 的默认接口实现在 Unity 中不可用</span>
+        这是<strong>Unity 的硬限制</strong>：Mono 运行时没有实现这个特性，即使 Unity 支持 C# 8 语法。<br>
+        语法能编译，但运行时会报错。所以：<strong>不要在 Unity 里给接口写默认方法实现</strong>——需要共享代码逻辑就用抽象类或扩展方法。
+      </div>
+
+      <h2 id="compose">四、组合优于继承 ★</h2>
+      <p>这是 Unity 最核心的设计哲学，也是从"会写代码"到"会设计"的分水岭。</p>
+
+      <div class="cmp">
+        <div class="cmp__head">
+          <span></span>
+          <span>继承方案（会爆炸）</span>
+          <span>组合方案（Unity 的方式）</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>结构</strong></span>
+          <span>Enemy → FlyingEnemy → FlyingEnemyWithShield → …</span>
+          <span>GameObject 挂多个独立组件</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>新增能力</strong></span>
+          <span>要新建一个子类，继承链越拉越长</span>
+          <span>挂一个新组件，不影响其他</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>能力组合</strong></span>
+          <span>会飞的、有盾的、会治疗的 → 需要 2^n 个子类</span>
+          <span>任意组合，各组件独立工作</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>代码复用</strong></span>
+          <span>靠基类，父类一改所有子类受影响</span>
+          <span>靠组合，组件之间解耦</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>调试</strong></span>
+          <span>要沿着继承链向上找</span>
+          <span>看 Inspector 就知道这个对象有什么能力</span>
+        </div>
+      </div>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  反例：用继承实现敌人（很快会失控）
+// ============================================================
+public class EnemyBase : MonoBehaviour { }
+public class FlyingEnemy : EnemyBase { }
+public class ShieldFlyingEnemy : FlyingEnemy { }
+public class HealingShieldFlyingEnemy : ShieldFlyingEnemy { }
+// 每加一种能力就多一层。
+// 想要"会治疗的陆地敌人"？再开一条继承链。
+
+// ============================================================
+//  正例：用组件组合（Unity 的方式）
+// ============================================================
+// GameObject "FlyingShieldEnemy" 上挂：
+//   - Health.cs        负责血量与受伤
+//   - FlyMover.cs      负责飞行移动
+//   - Shield.cs        负责护盾减伤
+//   - Healer.cs        负责治疗队友
+//
+// 想要"会治疗的陆地敌人"？挂 Health + WalkMover + Healer 就行，零新增代码。
+
+// ============================================================
+//  组件之间怎么通信？用接口而不是具体类型
+// ============================================================
+public interface IMover
+{
+    void Move(Vector3 direction, float deltaTime);
+}
+
+public interface IDamageable
+{
+    float CurrentHp { get; }
+    void TakeDamage(float amount);
+}
+
+// 具体组件实现接口
+public class WalkMover : MonoBehaviour, IMover
+{
+    [SerializeField] private float _speed = 3f;
+
+    public void Move(Vector3 direction, float deltaTime)
+    {
+        transform.position += direction * (_speed * deltaTime);
+    }
+}
+
+public class FlyMover : MonoBehaviour, IMover
+{
+    [SerializeField] private float _speed = 5f;
+    [SerializeField] private float _hoverAmplitude = 0.3f;
+
+    private float _phase;
+
+    public void Move(Vector3 direction, float deltaTime)
+    {
+        _phase += deltaTime * 2f;
+        Vector3 offset = direction * (_speed * deltaTime);
+        offset.y += Mathf.Sin(_phase) * _hoverAmplitude * deltaTime;
+        transform.position += offset;
+    }
+}
+
+// 使用者只依赖接口，不关心具体是走还是飞
+public class EnemyController : MonoBehaviour
+{
+    private IMover _mover;
+
+    private void Awake()
+    {
+        // 这两个组件挂哪个都行，控制器代码完全不用改
+        _mover = GetComponent&lt;IMover&gt;();
+    }
+
+    private void Update()
+    {
+        if (_mover != null)
+        {
+            Vector3 dir = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical"));
+            _mover.Move(dir.normalized, Time.deltaTime);
+        }
+    }
+}</code></pre>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">判断该用继承还是组合的三个问题</span>
+        <strong>① 是"是一种"还是"有一个"？</strong>狗"是一种"动物 → 继承；狗"有一个"项圈 → 组合。<em>实战中"有一个"的情况占绝大多数。</em><br>
+        <strong>② 这个能力需要和别的能力自由组合吗？</strong>需要 → 组合。继承的致命弱点是<em>组合爆炸</em>。<br>
+        <strong>③ 我需要复用代码还是复用接口？</strong>只想约定"能做什么" → 接口；想共享实现 → 抽象类或组合。<br>
+        <strong>经验法则</strong>：继承链<em>不要超过两层</em>。超过两层就该考虑改成组合了。
+      </div>
+
+      <h2 id="extends">五、扩展方法：给 Unity 类型加功能</h2>
+      <p>Unity 的很多内置类型（<code>Vector3</code>、<code>Transform</code>）你无法修改源码。但你可以用<strong>扩展方法</strong>给它们"添加"方法——<em>这是让代码更易读的高性价比技巧</em>。</p>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+public static class TransformExtensions
+{
+    // 扩展方法：静态类 + 静态方法 + 第一个参数带 this
+    public static Vector3 Flat(this Vector3 v)
+    {
+        return new Vector3(v.x, 0f, v.z);
+    }
+
+    public static float SqrDistanceTo(this Vector3 a, Vector3 b)
+    {
+        return (a - b).sqrMagnitude;
+    }
+
+    // 递归查找子物体
+    public static Transform FindRecursive(this Transform parent, string name)
+    {
+        for (int i = 0; i &lt; parent.childCount; i++)
+        {
+            Transform child = parent.GetChild(i);
+            if (child.name == name) return child;
+
+            Transform result = child.FindRecursive(name);
+            if (result != null) return result;
+        }
+        return null;
+    }
+
+    // 清空所有子物体
+    public static void DestroyAllChildren(this Transform parent)
+    {
+        for (int i = parent.childCount - 1; i &gt;= 0; i--)
+        {
+            Object.Destroy(parent.GetChild(i).gameObject);
+        }
+    }
+}
+
+public class ExtDemo : MonoBehaviour
+{
+    private void Start()
+    {
+        Vector3 flat = transform.position.Flat();
+        float d2 = transform.position.SqrDistanceTo(Vector3.zero);
+        Transform t = transform.FindRecursive("Head");
+        Debug.Log(flat + " " + d2 + " " + t);
+    }
+}</code></pre>
+
+      <div class="callout callout--warn">
+        <span class="callout__title">扩展方法的三个限制</span>
+        <strong>① 不能访问私有成员</strong>：它本质是静态方法，只是语法上像实例方法。<br>
+        <strong>② 不能参与多态</strong>：它不会"覆盖"实例方法。<em>如果与实例方法同名同签名，实例方法优先，扩展方法被忽略。</em><br>
+        <strong>③ 必须放在静态类里</strong>：方法必须是 <code>static</code>，第一个参数前加 <code>this</code>。<br>
+        <strong>实践建议</strong>：把扩展方法按用途分组放不同文件（<code>VectorExtensions.cs</code>、<code>TransformExtensions.cs</code>），避免一个文件里堆几百个方法。
+      </div>
+
+      <h2 id="tasks">六、本章动手任务</h2>
+
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="t-04-1">
+          <label for="t-04-1"><strong>复现 virtual vs new</strong>：写出 <code>Animal a = new Cat()</code> 的例子，把 <code>override</code> 改成 <code>new</code>，观察输出变化。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-04-2">
+          <label for="t-04-2"><strong>接口解耦练习</strong>：做一个"可被攻击的物体"，用 <code>IDamageable</code> 接口让武器能伤害<em>木箱和敌人</em>两种完全不同的对象。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-04-3">
+          <label for="t-04-3"><strong>重构继承为组合</strong>：先故意写一个三层继承的敌人体系，然后重构成组件组合，比较两者的代码量和扩展成本。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-04-4">
+          <label for="t-04-4"><strong>写三个扩展方法</strong>：给 <code>Vector3</code> 加"拍平到地面"、给 <code>Transform</code> 加"递归找子物体"和"清空子物体"。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-04-5">
+          <label for="t-04-5"><strong>回答面试题</strong>：① <code>override</code> 和 <code>new</code> 的区别？② 接口和抽象类怎么选？③ 为什么 Unity 推崇组合优于继承？</label>
+        </li>
+      </ul>
+
+      <div class="milestone">
+        <p class="mb0">
+          <strong>本章过关标准</strong>：<br>① 能画出 <code>virtual/override/new</code> 三种情况下方法调用的实际走向；<br>② 能说清接口和抽象类的五条差异，并给出各自适用场景；<br>③ 能解释"组合爆炸"是什么，并举出一个用继承会失控的例子；<br>④ 能用接口把两个毫无关系的类型（比如木箱和敌人）统一处理。<br><br><em>第 ④ 条是实战中最有用的技能——它决定了你写的系统能不能复用。</em>
+        </p>
+      </div>
+
+      <nav class="page-nav">
+        <a href="03-cs-basic.html">
+          <div class="dir">← C# 语言线</div>
+          <div class="title">03 C# 基础与类型系统</div>
+        </a>
+        <a class="next" href="05-cs-adv.html">
+          <div class="dir">C# 语言线 →</div>
+          <div class="title">05 委托、事件与 LINQ</div>
+        </a>
+      </nav>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>22 架构与设计模式 — C++ + Unreal 路线｜从零基础到 3A 级项目开发</title>
+<meta name="description" content="游戏编程模式、组件与实体、事件系统、状态机、数据驱动、大型项目架构">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C++ + Unreal 路线
+        <span>从零基础到 3A 级项目开发</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>22 · 架构与设计模式 ★★</h1>
+
+<p class="lead">Unreal 有<strong>自己的一套架构工具</strong>——Subsystem、组件、接口。<em>这一页讲<em>什么时候用哪个</em>，以及那些"看起来对但会坑你"的做法</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="22-patterns.html#subsystem" data-brief="替代手写单例，引擎管理生命周期"><span class="prereq__title">Subsystem</span><span class="prereq__page">22-patterns</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="subsystem">一、Subsystem：UE 的管理器机制 ★★</h2>
+
+<p><strong>Subsystem 是 Unreal 提供的"生命周期管理"机制</strong>——<em>它解决了"全局管理器怎么放"的问题</em>。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>类型</th><th>生命周期</th><th>用途</th></tr></thead>
+  <tbody>
+    <tr><td><strong>UGameInstanceSubsystem</strong></td><td><strong>整个游戏会话</strong></td><td><em>存档、账号、全局配置</em></td></tr>
+    <tr><td><strong>UWorldSubsystem</strong></td><td><em>每个关卡</em></td><td>关卡相关的系统</td></tr>
+    <tr><td><strong>ULocalPlayerSubsystem</strong></td><td>每个本地玩家</td><td><em>玩家设置、UI 偏好</em></td></tr>
+    <tr><td><strong>UEditorSubsystem</strong></td><td><em>编辑器会话</em></td><td>编辑器工具</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">Subsystem 替代了传统的"单例"</span>
+  <strong>传统做法</strong>（<em>不推荐</em>）：<br><code>class UMyManager : public UObject {</code><br><code>&nbsp;&nbsp;static UMyManager* Instance;   // 手写单例</code><br><code>};</code><br><em>问题</em>：<br>· <em>生命周期要自己管</em><br>· <strong>容易忘记清理</strong>（<em>→ 状态残留，Lua 站页 15 的老问题</em>）<br>· <em>多世界（PIE）时冲突</em><br><br><strong>Subsystem 做法</strong>：<br><code>class UMySystem : public UGameInstanceSubsystem {</code><br><code>&nbsp;&nbsp;virtual void Initialize(FSubsystemCollectionBase&amp; C) override;</code><br><code>&nbsp;&nbsp;virtual void Deinitialize() override;</code><br><code>};</code><br><code>// 获取</code><br><code>GetGameInstance()-&gt;GetSubsystem&lt;UMySystem&gt;();</code><br><br><strong>优势</strong>：<br>· <em>引擎管理生命周期</em>（<em>自动初始化与销毁</em>）<br>· <em>天然支持 PIE</em>（<em>每个世界独立</em>）<br>· <em>依赖注入友好</em><br><br><strong>结论</strong>：<em>需要"全局管理器"时，优先用 Subsystem，不要手写单例。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">不要把一切都做成 Subsystem</span>
+  <strong>常见过度使用</strong>：<br>· <em>把每个功能都做成一个 Subsystem</em>→ <strong>启动时全部初始化，启动变慢</strong><br>· <em>让 Subsystem 互相依赖</em>→ <strong>初始化顺序问题</strong><br><br><strong>判断标准</strong>：<br>· <em>真正需要"全局唯一 + 生命周期跟随游戏"的</em> → <strong>Subsystem</strong><br>· <em>只是一个功能模块</em> → <strong>普通类，按需创建</strong><br>· <em>只在一个关卡用</em> → <strong>WorldSubsystem 或直接放在关卡里</strong><br><br><strong>启动性能提醒</strong>：<em>Subsystem 的 Initialize 会阻塞启动</em>——<strong>不要在里面做耗时操作</strong>（<em>比如加载大数据</em>）。
+</div>
+
+<h2 id="component">二、组件化的三条原则</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>原则</th><th>做法</th><th>反例</th></tr></thead>
+  <tbody>
+    <tr><td><strong>单一职责</strong></td><td><em>一个组件一件事</em></td><td><em>Health 组件同时管 UI</em></td></tr>
+    <tr><td><strong>可独立测试</strong></td><td><strong>能不依赖 Owner 最好</strong></td><td><em>组件里到处 GetOwner()</em></td></tr>
+    <tr><td><strong>用接口解耦</strong></td><td>通过接口通信</td><td><strong>直接 Cast 到具体类</strong></td></tr>
+    <tr><td><strong>避免 Tick</strong></td><td><em>能不用就不用</em></td><td><em>每个组件都开 Tick</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">Cast 的性能与耦合问题</span>
+  <strong>常见写法</strong>：<br><code>if (AMyEnemy* E = Cast&lt;AMyEnemy&gt;(Other)) {</code><br><code>&nbsp;&nbsp;E-&gt;TakeDamage(...);</code><br><code>}</code><br><em>问题</em>：<br>· <em>强耦合</em>——必须知道具体类型<br>· <em>无法处理"实现了同样能力的其他类"</em><br>· <em>Cast 本身有开销</em><br><br><strong>更好的做法：用接口</strong>：<br><code>if (IDamageable* D = Cast&lt;IDamageable&gt;(Other)) {</code><br><code>&nbsp;&nbsp;D-&gt;TakeDamage(Amount);   // 任何实现了接口的都能处理</code><br><code>}</code><br><br><strong>好处</strong>：<br>· <em>解耦</em>——不关心具体类型<br>· <em>可扩展</em>——新类型实现接口即可<br>· <strong>UE 的 Cast 到接口有优化</strong><br><br><strong>Unreal 接口的写法</strong>：<br><code>UINTERFACE(MinimalAPI)</code><br><code>class UDamageable : public UInterface { GENERATED_BODY() };</code><br><code>class IDamageable { GENERATED_BODY()</code><br><code>public:</code><br><code>&nbsp;&nbsp;virtual void TakeDamage(int32 Amount) = 0;</code><br><code>};</code>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="22">
+  <div class="task"><input type="checkbox" id="t-22-1"><label for="t-22-1"><strong>写一个 Subsystem</strong>：实现一个 <code>UGameInstanceSubsystem</code>，验证初始化和销毁时机。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-2"><label for="t-22-2"><strong>对比单例</strong>：把同一个功能分别用 Subsystem 和手写单例实现，对比代码量。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-3"><label for="t-22-3"><strong>验证 PIE 隔离</strong>：用 Subsystem 存数据，测试 PIE 时是否会残留。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-4"><label for="t-22-4"><strong>做接口解耦</strong>：把一处 Cast 到具体类改成 Cast 到接口。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-5"><label for="t-22-5"><strong>检查 Tick</strong>：找出项目里所有开了 Tick 的组件，看哪些可以关掉。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-6"><label for="t-22-6"><strong>回答面试题</strong>：① Subsystem 解决了什么问题？② 什么时候该用接口而不是 Cast？③ 组件化为什么重要？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出四种 Subsystem 类型及生命周期</strong>；<br>
+    ② <strong>知道 Subsystem 替代了手写单例，以及为什么更好</strong>；<br>
+    ③ 知道不要过度使用 Subsystem；<br>
+    ④ <strong>能用接口替代 Cast 到具体类</strong>；<br>
+    ⑤ 知道组件化要避免不必要的 Tick。<br>
+    <br>
+    <em>第 ② 和 第 ④ 条最实用——**它们是 UE 项目里最常见的两个架构改进点**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="21-ue-editor.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">21 编辑器扩展与插件</div>
+  </a>
+  <a class="next" href="23-perf.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">23 性能优化实战 ★★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<h1>19 · 性能实战 ★★</h1>
+
+<p class="lead">这一页把前面散落的性能知识<strong>串成一套完整的排查流程</strong>。你会学到：<em>拿到一个卡顿的 Lua 项目，怎么从零定位到具体那一行代码</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="workflow">一、五步排查流程</h2>
+
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>19/perf</code></div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>步骤</th><th>做什么</th><th>工具</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1. 确认现象</strong></td><td>卡顿？持续还是规律？</td><td>真机测试</td></tr>
+    <tr><td><strong>2. 定位类型</strong></td><td>Lua 逻辑 / C# 边界 / GC / 渲染</td><td>Profiler</td></tr>
+    <tr><td><strong>3. 缩小范围</strong></td><td>哪个模块？哪个函数？</td><td><strong>分段计时</strong></td></tr>
+    <tr><td><strong>4. 修改验证</strong></td><td>只改一处，立即测</td><td>对比数据</td></tr>
+    <tr><td><strong>5. 回归测试</strong></td><td>确认没有引入新问题</td><td>全流程跑</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="bottlenecks">二、Lua 性能的四大瓶颈 ★★★</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>瓶颈</th><th>症状</th><th>定位方法</th></tr></thead>
+  <tbody>
+    <tr><td><strong>跨语言调用过多</strong></td><td>CPU 高但 Lua 代码简单</td><td><em>统计每秒调用次数</em></td></tr>
+    <tr><td><strong>GC 频繁</strong></td><td>规律性卡顿</td><td>看 GC Alloc</td></tr>
+    <tr><td><strong>算法复杂度问题</strong></td><td>数据量增大后突然卡</td><td><strong>分段计时</strong></td></tr>
+    <tr><td><strong>字符串拼接</strong></td><td>日志或 UI 更新处卡</td><td><em>页 08 的第二点</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">分段计时：最快定位瓶颈的方法</span>
+  <strong>当 Profiler 看不清时，用手动计时</strong>：<br>
+  <code>local t1 = os.clock()</code><br>
+  <code>doSomething()</code><br>
+  <code>local dt = os.clock() - t1</code><br>
+  <code>if dt &gt; 0.001 then print("doSomething 耗时: " .. dt) end</code><br><br>
+  <strong>要点</strong>：<br>
+  · <em>只在超过阈值时打印</em>——避免日志本身成为瓶颈<br>
+  · 按<strong>模块</strong>打点，不要按函数打点（否则开销太大）<br>
+  · <strong>累计统计</strong>比单次更有意义<br><br>
+  <em>这个方法看似原始，但在 Lua 里是最有效的——因为它不依赖任何 Profiler 支持。</em>
+</div>
+
+<h2 id="boundary">三、跨语言边界的统计方法</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">给跨语言调用加计数器</span>
+  <strong>问题</strong>：你不知道每秒发生了多少次 Lua→C# 调用。<br>
+  <strong>做法</strong>：包一层计数：<br>
+  <code>local callCount = 0</code><br>
+  <code>local function wrap(fn)</code><br>
+  <code>&nbsp;&nbsp;return function(...)</code><br>
+  <code>&nbsp;&nbsp;&nbsp;&nbsp;callCount = callCount + 1</code><br>
+  <code>&nbsp;&nbsp;&nbsp;&nbsp;return fn(...)</code><br>
+  <code>&nbsp;&nbsp;end</code><br>
+  <code>end</code><br><br>
+  <strong>每秒打印一次计数</strong>，就能看出：<br>
+  · 正常情况下应该是几百次<br>
+  · 如果有几万次，<em>说明热路径上在做密集的跨语言调用</em><br><br>
+  <em>这是发现"性能黑洞"最直接的方法。</em>
+</div>
+
+<h2 id="priority">四、优化收益的优先级</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>优先级</th><th>优化项</th><th>典型收益</th><th>工作量</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1</strong></td><td>消除跨语言调用（批量/缓存）</td><td><strong>极大</strong></td><td>中</td></tr>
+    <tr><td><strong>2</strong></td><td>字符串拼接改 table.concat</td><td><strong>17~30 倍</strong></td><td>小</td></tr>
+    <tr><td><strong>3</strong></td><td>局部变量化</td><td>2 倍</td><td>小</td></tr>
+    <tr><td><strong>4</strong></td><td>避免循环内建闭包</td><td>3.8 倍</td><td>小</td></tr>
+    <tr><td><strong>5</strong></td><td>消除 GC 分配</td><td>消除卡顿</td><td>中</td></tr>
+    <tr><td><strong>6</strong></td><td>缓存表长度</td><td>3~4%</td><td>小</td></tr>
+    <tr><td><strong>7</strong></td><td>算法优化</td><td>看场景</td><td><strong>大</strong></td></tr>
+    <tr><td><strong>8</strong></td><td>分帧执行</td><td>消除单帧尖峰</td><td>中</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">为什么把算法优化排在第 7</span>
+  <strong>因为它的改动量最大、风险最高。</strong><br><br>
+  前面的 1~6 项<em>通常能把性能提升 2~5 倍</em>，而且改动小、风险低。<br>
+  只有当这些都不够时，才考虑重写算法。<br><br>
+  <strong>而且很多时候，"算法慢"只是表象</strong>——真正的问题是<em>在循环里做了跨语言调用</em>。<br>
+  <em>先检查 1~6 项，往往就能解决问题。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="19">
+  <div class="task"><input type="checkbox" id="t-19-1"><label for="t-19-1"><strong>做分段计时</strong>：给你项目的核心逻辑加计时打点，找出最耗时的模块。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-2"><label for="t-19-2"><strong>统计跨语言调用</strong>：包装一个 API 加计数，观察每秒调用次数。<em>如果超过一万次，就是优化重点。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-19-3"><label for="t-19-3"><strong>优化字符串拼接</strong>：找循环内的 <code>..</code> 拼接，改成 <code>table.concat</code>，测改善。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-4"><label for="t-19-4"><strong>定位 GC 来源</strong>：用 Profiler 找出 GC Alloc 最多的位置，逐项消除。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-5"><label for="t-19-5"><strong>做批量优化</strong>：把"循环调用 N 次 C# API"改成"一次批量调用"，测性能差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-6"><label for="t-19-6"><strong>写优化报告</strong>：记录一次完整的优化过程（问题、定位、改动、复测数字）。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-7"><label for="t-19-7"><strong>回答面试题</strong>：① 怎么定位 Lua 性能问题？② Lua 有哪四大瓶颈？③ 优化的优先级顺序？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能复述五步排查流程</strong>；<br>
+    ② <strong>能说出 Lua 的四大瓶颈及定位方法</strong>；<br>
+    ③ <strong>掌握分段计时（Lua 里最实用的定位手段）</strong>；<br>
+    ④ 会统计跨语言调用次数，判断是否为瓶颈；<br>
+    ⑤ 能按优先级安排优化工作。<br>
+    <br>
+    <em>第 ③ 条最实用——它不依赖任何工具，立刻就能用。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="18-debug.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">18 调试与排错 ★★</div>
+  </a>
+  <a class="next" href="20-engineering.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">20 工程化与协作</div>
+  </a>
+</nav>

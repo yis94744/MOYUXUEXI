@@ -1,0 +1,131 @@
+<h1>03 · 基础语法与类型</h1>
+
+<p class="lead">Lua 的语法<strong>非常小</strong>——八种类型、几个关键字、一套控制流。它的学习曲线是"<em>一周上手，一年精通</em>"：<strong>语法简单，但隐藏在语法背后的行为差异很多</strong>。这一页把那些"反直觉但必须知道"的点全部列出来。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（02）你已经装好环境、跑通了第一段脚本。这一页开始正式学语言。<br>
+  <strong>关键提醒</strong>：这一页有<em>三个反直觉的点</em>，它们会决定你后面代码的正确性——<strong>索引从 1 开始</strong>、<strong>0 是真值</strong>、<strong>不加 local 就是全局变量</strong>。<br>
+  <strong>下一页</strong>（04）讲 table 与元表，那是 Lua 真正的地基。这一页先打好语法基础。<br>
+  <strong>验证方式</strong>：本页所有代码都在 <em>Lua 5.4.7</em> 解释器里实际运行过，你看到的结果就是真实输出。
+</div>
+
+<h2 id="types">一、八种类型 ★</h2>
+
+<p>Lua 只有八种类型，比其他语言少得多，这是它轻量的原因之一。<strong>注意：类型不是"变量的属性"，而是"值本身的属性"</strong>——同一个变量可以先存数字再存字符串。</p>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>03/types</code></div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">反直觉之一：只有 nil 和 false 是假值</span>
+  这是 Lua 与 C / C++ / C# / JavaScript <strong>都不同</strong>的地方：<br>
+  <code>0</code> 是<strong>真值</strong>、空字符串 <code>""</code> 是<strong>真值</strong>、空表 <code>{}</code> 也是<strong>真值</strong>。<br><br>
+  <strong>后果</strong>：从 C# 转过来的人最容易写出这种 bug：<br>
+  <code>if (count) then ... end</code> —— 当 <code>count</code> 是 0 时，<em>依然会进入分支</em>。<br><br>
+  <strong>正确写法</strong>：<code>if count > 0 then ... end</code>，或者 <code>if count ~= nil and count ~= false then</code>。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">Lua 5.3+ 的整数与浮点</span>
+  Lua 5.3 之前只有一种 number（都是双精度浮点）。5.3 起引入了<strong>整数子类型</strong>：<br>
+  • <code>math.type(3)</code> 返回 <code>"integer"</code>，<code>math.type(3.0)</code> 返回 <code>"float"</code><br>
+  • 但 <code>3 == 3.0</code> 仍然是 <code>true</code>（比较时按数学值）<br>
+  • <code>7 // 2</code> 是整数除法（得 3），<code>7 / 2</code> 是浮点除法（得 3.5）<br>
+  • 整数会溢出回绕：<code>math.maxinteger + 1 == math.mininteger</code> 为 true<br><br>
+  <strong>实战影响</strong>：做时间累加、ID 计算时，<em>整数和浮点的精度差异会导致难以复现的 bug</em>。需要精确整数运算时，用 <code>//</code> 而不是 <code>/</code>。
+</div>
+
+<h2 id="scope">二、变量作用域与性能 ★★</h2>
+
+<p>这一节看起来是"语法基础"，但实际上是<strong>Lua 性能优化的第一课</strong>——因为访问局部变量和访问全局变量的性能差距，在热循环里非常明显。</p>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>03/scope</code></div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">反直觉之二：不加 local 就是全局变量</span>
+  Lua 默认创建<strong>全局变量</strong>。这意味着：<br>
+  <code>count = 0</code> —— 这行代码创建的是一个全局变量，会进 <code>_G</code> 表。<br><br>
+  <strong>两个后果</strong>：<br>
+  <strong>① 性能差</strong>：全局变量访问是<em>表查找</em>（相当于哈希查找），局部变量是<em>寄存器访问</em>。<br>
+  <strong>② 污染环境</strong>：不同模块的变量名会互相覆盖，产生<em>"A 模块改了全局变量导致 B 模块行为异常"</em>这类难查的 bug。<br><br>
+  <strong>规则</strong>：<em>除了确实需要全局共享的东西，所有变量都加 <code>local</code></em>。这是 Lua 代码规范的第一条。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">把常用全局函数缓存成局部变量</span>
+  这个技巧在 LuaJIT 下收益更大，但在标准 Lua 下也值得做：<br>
+  <code>local print = print</code><br>
+  <code>local table_insert = table.insert</code><br>
+  <code>local math_floor = math.floor</code><br><br>
+  <strong>为什么快</strong>：调用全局 <code>table.insert</code> 需要<em>两次表查找</em>（先找 <code>_G.table</code>，再找 <code>.insert</code>）；<br>
+  而局部变量只需<em>一次寄存器读取</em>。<br><br>
+  <strong>注意</strong>：这招在模块顶部做一次即可，<em>不要在每个函数里都写一遍</em>——那反而让代码难读。
+</div>
+
+<h2 id="syntax">三、控制流与运算符</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>类别</th><th>语法</th><th>注意点</th></tr></thead>
+  <tbody>
+    <tr><td rowspan="3"><strong>条件</strong></td><td><code>if ... then ... end</code></td><td>没有 <code>do</code>，直接 <code>then</code></td></tr>
+    <tr><td><code>if ... then ... elseif ... then ... else ... end</code></td><td>是 <code>elseif</code>，<strong>不是 <code>else if</code></strong></td></tr>
+    <tr><td><code>a and b or c</code></td><td>三元运算符的替代写法，<em>b 为 false 时会出错</em></td></tr>
+    <tr><td rowspan="3"><strong>循环</strong></td><td><code>for i = 1, 10 do ... end</code></td><td>含首尾，步长可选（<code>for i = 10, 1, -1</code>）</td></tr>
+    <tr><td><code>for k, v in pairs(t) do ... end</code></td><td>遍历所有键，<em>顺序不确定</em></td></tr>
+    <tr><td><code>while cond do ... end</code> / <code>repeat ... until cond</code></td><td><code>repeat</code> 至少执行一次</td></tr>
+    <tr><td rowspan="4"><strong>运算符</strong></td><td><code>+ - * / % ^</code></td><td><code>^</code> 是幂运算，<strong>不是异或</strong></td></tr>
+    <tr><td><code>//</code></td><td>整数除法（5.3+），向下取整</td></tr>
+    <tr><td><code>..</code></td><td>字符串拼接，<strong>两边必须是字符串或数字</strong></td></tr>
+    <tr><td><code>#</code></td><td>取长度，<em>对含 nil 的表结果不确定</em></td></tr>
+    <tr><td><strong>逻辑</strong></td><td><code>and</code> <code>or</code> <code>not</code></td><td>返回的是<strong>操作数本身</strong>，不是 true/false</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">and / or 返回操作数，不是布尔值</span>
+  这是 Lua 的一个<em>很有用但容易误用</strong>的特性：<br>
+  <code>print(1 and 2)</code> 输出 <code>2</code>（不是 true）<br>
+  <code>print(nil and 2)</code> 输出 <code>nil</code><br>
+  <code>print(nil or 3)</code> 输出 <code>3</code><br>
+  <code>print(false or "默认值")</code> 输出 <code>"默认值"</code><br><br>
+  <strong>用途</strong>：这正是 Lua 没有三元运算符却能写默认值的原因：<br>
+  <code>local name = input or "无名"</code> —— 用得最多的一行代码。<br><br>
+  <strong>陷阱</strong>：如果 <code>input</code> 的值是 <code>false</code>，这行会<em>错误地取到默认值</em>。<br>
+  <em>所以当变量可能是 false 时，必须写 <code>if input == nil then</code> 来区分。</em>
+</div>
+
+<h2 id="tasks">四、本章动手任务</h2>
+
+<div class="tasks" data-page="03">
+  <div class="task"><input type="checkbox" id="t-03-1"><label for="t-03-1"><strong>验证真假值</strong>：写 <code>if 0 then print("真") end</code> 和 <code>if "" then</code>，确认它们都进入分支。<em>然后用 C# 思维写一个 bug 并修掉它。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-03-2"><label for="t-03-2"><strong>实测 local 的性能差异</strong>：把示例里的对比代码跑一遍，记录全局变量与局部变量的耗时比。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-3"><label for="t-03-3"><strong>制造全局变量污染</strong>：写两个模块都定义 <code>config = {}</code>（不加 local），观察后者覆盖前者。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-4"><label for="t-03-4"><strong>整数与浮点实验</strong>：分别用 <code>/</code> 和 <code>//</code> 做 10 次除法累加，对比结果差异；再试试 <code>math.maxinteger + 1</code>。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-5"><label for="t-03-5"><strong>and/or 陷阱</strong>：写 <code>local v = false or "default"</code>，观察结果。<em>然后写出正确的"只在 nil 时取默认值"的写法。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-03-6"><label for="t-03-6"><strong>回答面试题</strong>：① Lua 有哪八种类型？② 哪些值是假值？③ 为什么所有变量都要加 local？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能默写八种类型，并说出哪些值是假值；<br>
+    ② <strong>能解释局部变量与全局变量的性能差异及其成因</strong>；<br>
+    ③ 知道 <code>and</code> / <code>or</code> 返回的是操作数而非布尔值，并能说出它的用途与陷阱；<br>
+    ④ 知道整数与浮点在什么情况下会导致 bug；<br>
+    ⑤ 能说出至少三种"从 C# 转 Lua 时最容易犯的错"。<br><br>
+    <em>这一页的语法很简单，但第 ② 和第 ③ 条是真正影响代码质量的知识点。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="02-setup.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">02 环境搭建</div>
+  </a>
+  <a class="next" href="04-lua-table.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">04 table 与元表 ★</div>
+  </a>
+</nav>

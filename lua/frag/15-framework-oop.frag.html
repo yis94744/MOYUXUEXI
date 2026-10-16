@@ -1,0 +1,169 @@
+<h1>15 · 面向对象框架 ★★</h1>
+
+<p class="lead">这一页把页 06 的 <code>class</code> <strong>工程化</strong>。而且——<em>我在写这一页的示例时，真的踩进了一个经典陷阱</em>：<code>self.super</code> 导致的无限递归。<strong>这个坑值得单独讲。</strong></p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（14）实现了核心模块。这一页给它们<strong>统一的代码风格</strong>。
+  <strong>关键衔接</strong>：页 06 讲 <code>class</code> 的<em>原理</em>；这一页讲<em>框架里怎么用，以及会踩什么坑</em>。
+  <strong>下一页</strong>（16）UI 框架。<em>UI 框架是 class 系统最大的用户。</em>
+  <strong>验证方式</strong>：本页所有代码在 Lua 5.4.7 实测运行，<em>包括那个陷阱的复现</em>。
+</div>
+
+<h2 id="what">一、框架级 class 需要什么</h2>
+
+<p>页 06 的实现<strong>够用但不够工程化</strong>。框架里需要更多能力。</p>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>15/class</code></div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>能力</th><th>为什么需要</th><th>实现方式</th></tr></thead>
+  <tbody>
+    <tr><td><strong>构造函数</strong></td><td>初始化实例数据</td><td><code>ctor</code> 约定 + <code>new</code> 自动调用</td></tr>
+    <tr><td><strong>继承链</strong></td><td>多级继承</td><td><code>__base</code> 保存父类</td></tr>
+    <tr><td><strong>类型判断</strong></td><td>判断"是不是某种对象"</td><td>沿 <code>__base</code> 链向上查</td></tr>
+    <tr><td><strong>父类调用</strong></td><td>重写时复用父类逻辑</td><td><em>⚠️ 这里有个大坑（见下）</em></td></tr>
+    <tr><td><strong>类注册表</strong></td><td>按名字创建实例</td><td>工厂模式，配置驱动</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="super-trap">二、⭐ 一个真实踩到的坑：self.super 无限递归</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">错误示范：这样写会栈溢出</span>
+  <strong>我最初写这一页的示例时，就是这么写的：</strong>
+  <pre><code>local Character = class("Character", Entity)
+
+function Character:ctor(id, name)
+  self.super.ctor(self, id, name)   -- ❌ 无限递归！
+end</code></pre>
+  运行结果：<code>stack overflow</code>，堆栈里全是同一个 <code>ctor</code> 在循环调用。
+  <strong>看起来完全合理对不对？</strong>——"我在 Character 里，调父类 Entity 的 ctor"。
+  但它错了，而且错得很隐蔽。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">根因：self.super 查的是"实例的类"，不是"当前方法的类"</span>
+  <strong>关键理解</strong>：<code>self</code> 是<strong>实例</strong>，不是类。
+  · <code>self.super</code> 实际是 <code>getmetatable(self).super</code>
+  · 而 <code>getmetatable(self)</code> 是<strong>实例所属的类（Player）</strong>
+  · 所以 <code>p.super</code> 永远是 <strong>Character</strong>（Player 的父类）
+  <strong>本页实测验证了这一</strong>点：
+  <pre><code>p.super 实际是: Character
+-- 注意！p 是 Player 的实例，但 p.super 拿到的是 Character</code></pre>
+  <strong>于是递归发生了</strong>：
+  · 创建 Player 实例 → 调用 <code>Character:ctor</code>
+  · 里面写 <code>self.super.ctor</code> → <code>self</code> 是 p → <code>p.super</code> 是 <strong>Character</strong>
+  · 结果又调用了 <code>Character:ctor</code> → <em>无限循环</em>
+  <strong>三级继承时必然踩坑</strong>，两级可能侥幸不崩（因为 self 的类与当前类刚好一致）。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">正确做法：用局部变量捕获父类</span>
+  <strong>每个类都要单独捕获自己的父类</strong>：
+  <pre><code>local Character = class("Character", Entity)
+local super = Character.super          -- ✅ 捕获
+
+function Character:ctor(id, name)
+  super.ctor(self, id, name)           -- ✅ 用局部变量
+end
+
+local Player = class("Player", Character)
+local superPlayer = Player.super        -- ✅ 每个类单独捕获
+
+function Player:ctor(id, name, role)
+  superPlayer.ctor(self, id, name, role)
+end</code></pre>
+  <strong>为什么这样对</strong>：局部变量 <code>super</code> 在<em>定义方法时</em>就已经绑定到 <code>Character.super</code>（= Entity），<strong>与 self 是谁无关</strong>。
+  <strong>本页实测：三级继承正确工作</strong>
+  <pre><code>勇者(id=1, hp=100/100), lv=1, role=战士, gold=0 [VIP]</code></pre>
+  <em>这一行的每一段都来自不同层级的构造函数——说明 super 调用链完全正确。</em>
+</div>
+
+<h2 id="composition">三、组合优于继承</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">组件化：避免类爆炸</span>
+  <strong>问题</strong>：如果 UI 界面都靠继承，<em>每加一个能力，组合数翻倍</em>：
+  <code>ListView</code>, <code>RedDotView</code>, <code>ListViewRedDot</code>, <code>AnimListView</code>, <code>AnimRedDotListView</code>…
+  <strong>解决</strong>：把能力做成<strong>可挂载的组件</strong>：
+  <pre><code>local bagView = View.new("背包界面")
+bagView:addComponent(ListComponent, 20)
+bagView:addComponent(RedDotComponent, "bag.new")</code></pre>
+  <strong>本页实测输出</strong>：
+  · 组件数量: 2
+  · 列表组件滚动到: 250
+  · 红点组件刷新: true / true(无变化) / false(消失)
+  <em>注意第二次 refresh(true) 返回 false——红点组件会做状态去重，无变化时不触发 UI 刷新。这是很实用的优化。</em>
+</div>
+
+<h2 id="registry">四、类注册表：配置驱动</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">把"类型判断"变成"查表"</span>
+  <strong>没有注册表时</strong>：
+  <pre><code>if typeName == "Player" then new(Player, ...)
+elseif typeName == "Monster" then new(Monster, ...)
+elseif ... end</code></pre>
+  <em>每新增一种类型都要改这段代码。</em>
+  <strong>有注册表时</strong>：
+  <pre><code>ClassRegistry.register("Player", Player)
+local obj = ClassRegistry.create(cfg.class, table.unpack(cfg.args))</code></pre>
+  <strong>本页实测</strong>：从配置表批量创建了 3 个对象（2 个 Player + 1 个 Entity），<em>代码里没有任何类型判断</em>。
+  <strong>价值</strong>：策划在配置表里写 <code>"Player"</code>，代码就能创建对应对象——<strong>加新类型不用改代码</strong>。
+</div>
+
+<h2 id="singleton">五、单例的状态残留 ★★</h2>
+
+<div class="callout callout--warn">
+  <span class="callout__title">Lua 热更项目最常见的疑难 bug</span>
+  <strong>问题</strong>：Lua 模块是全局缓存的，<em>重新加载脚本时单例的状态会残留</em>。
+  <strong>触发场景</strong>：
+  · 热更新后重新执行模块代码
+  · 编辑器里停止播放再重新开始
+  · <em>结果：上次的数据还在，产生诡异 bug</em>
+  <strong>三种解决办法</strong>：
+  ① <strong>提供 <code>reset()</code> 方法</strong>——框架启动时统一调用所有单例的 reset
+  ② <strong>在模块末尾返回新表</strong>——避免缓存旧表
+  ③ <strong>避免在单例里存"应该有生命周期"的数据</strong>——<em>那类数据应该属于具体对象</em>
+  <em>这一条在页 18（调试排错）会再次出现——它是 Lua 项目最容易被忽视、又最难排查的问题之一。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="15">
+  <div class="task"><input type="checkbox" id="t-15-1"><label for="t-15-1"><strong>复现 super 陷阱</strong>：故意写成 <code>self.super.ctor(self, ...)</code>，观察栈溢出。<em>这个坑踩一次就记住了。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-15-2"><label for="t-15-2"><strong>验证根因</strong>：打印 <code>p.super.__name</code>，确认它拿到的是 Player 的父类而不是当前的类。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-3"><label for="t-15-3"><strong>实现工程级 class</strong>：加 ctor、__base、isInstanceOf、new。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-4"><label for="t-15-4"><strong>做三级继承</strong>：Entity → Character → Player，验证每层的构造与重写都正确。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-5"><label for="t-15-5"><strong>做组件化</strong>：给一个 View 挂载两个组件，验证能力可自由组合。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-6"><label for="t-15-6"><strong>做类注册表</strong>：实现"从配置表创建对象"，验证加新类型不用改创建代码。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-7"><label for="t-15-7"><strong>复现状态残留</strong>：写一个存数据的单例，重新执行模块代码，观察数据是否残留。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-8"><label for="t-15-8"><strong>回答面试题</strong>：① Lua 怎么实现继承？② <code>self.super</code> 为什么危险？③ 什么情况该用组合而不是继承？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能写出框架级 <code>class</code>（ctor + 继承链 + 类型判断）；<br>
+    ② <strong>能解释 <code>self.super</code> 为什么会无限递归，以及正确写法</strong>；<br>
+    ③ 知道调用父类方法必须显式传 self；<br>
+    ④ <strong>能用组件化代替深继承，避免类爆炸</strong>；<br>
+    ⑤ <strong>知道 Lua 单例的状态残留问题及三种解决办法</strong>。<br>
+    <br>
+    <em>第 ② 条是这一页最有价值的内容——这个坑我自己写示例时就踩了，它能帮你省下几小时的调试时间。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="14-framework-modules.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">14 核心模块实现</div>
+  </a>
+  <a class="next" href="16-framework-ui.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">16 UI 框架 ★★★</div>
+  </a>
+</nav>

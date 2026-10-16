@@ -1,0 +1,217 @@
+{
+  "title": "C# + Unity 路线",
+  "subtitle": "从零基础到独立完成商业级项目",
+  "key": "csu",
+  "pages": [
+    {
+      "file": "index.html",
+      "num": "",
+      "group": "开始",
+      "title": "路线总览",
+      "desc": "C# + Unity 完整学习地图、七阶段路线、每阶段验收标准、怎么用这份指南"
+    },
+    {
+      "file": "01-role.html",
+      "num": "01",
+      "group": "开始",
+      "title": "岗位与行业现实",
+      "desc": "Unity 岗位分类、真实 JD 拆解、薪资区间、职业风险、岗位选择自查表"
+    },
+    {
+      "file": "02-setup.html",
+      "num": "02",
+      "group": "开始",
+      "title": "环境搭建与第一个项目",
+      "desc": "Unity Hub 与版本选择、IDE 配置、项目结构、调试环境、跑通第一个可玩场景"
+    },
+    {
+      "file": "kp-index.html",
+      "num": "",
+      "group": "开始",
+      "title": "知识点索引",
+      "desc": "全站 92 个知识点的总目录，支持按分类浏览与快速跳转"
+    },
+    {
+      "file": "03-cs-basic.html",
+      "num": "03",
+      "group": "C# 语言线",
+      "title": "C# 基础与类型系统",
+      "desc": "值类型与引用类型、装箱、struct/class 选型、字符串、集合、类型转换、可空类型"
+    },
+    {
+      "file": "04-cs-oop.html",
+      "num": "04",
+      "group": "C# 语言线",
+      "title": "面向对象与接口",
+      "desc": "封装继承多态、virtual/override/new、接口与抽象类、属性、扩展方法、组合优于继承"
+    },
+    {
+      "file": "05-cs-adv.html",
+      "num": "05",
+      "group": "C# 语言线",
+      "title": "委托、事件与 LINQ",
+      "desc": "delegate 与 event、Lambda 闭包陷阱、LINQ 延迟执行、UnityEvent、性能取舍"
+    },
+    {
+      "file": "06-cs-modern.html",
+      "num": "06",
+      "group": "C# 语言线",
+      "title": "泛型、反射与现代特性",
+      "desc": "泛型约束与方差、反射与 IL2CPP 限制、特性、异常、C# 6→9 特性与 Unity 支持矩阵"
+    },
+    {
+      "file": "07-cs-memory.html",
+      "num": "07",
+      "group": "C# 语言线",
+      "title": "内存、GC 与零分配",
+      "desc": "托管堆与 Boehm GC、每帧分配来源清单、装箱消除、结构体数组、缓存友好设计"
+    },
+    {
+      "file": "08-cs-async.html",
+      "num": "08",
+      "group": "C# 语言线",
+      "title": "协程与异步编程",
+      "desc": "Coroutine 原理与全部陷阱、async/await 线程模型、UniTask、CancellationToken"
+    },
+    {
+      "file": "09-math.html",
+      "num": "09",
+      "group": "数学与图形",
+      "title": "游戏数学基础",
+      "desc": "向量点积叉积、坐标系与手性、矩阵变换、四元数与旋转叠加顺序、插值与缓动"
+    },
+    {
+      "file": "10-graphics.html",
+      "num": "10",
+      "group": "数学与图形",
+      "title": "渲染管线与 Shader",
+      "desc": "渲染管线阶段、坐标空间、光照模型、ShaderLab/HLSL、后处理、URP 与自定义 Pass"
+    },
+    {
+      "file": "11-unity-core.html",
+      "num": "11",
+      "group": "Unity 引擎线",
+      "title": "Unity 核心机制",
+      "desc": "生命周期与执行顺序、GameObject/Component、变换层级、预制体、ScriptableObject、场景"
+    },
+    {
+      "file": "12-unity-physics.html",
+      "num": "12",
+      "group": "Unity 引擎线",
+      "title": "物理系统",
+      "desc": "Rigidbody 与力、碰撞体与触发器、碰撞矩阵、射线检测、物理材质、性能与替代方案"
+    },
+    {
+      "file": "13-unity-anim.html",
+      "num": "13",
+      "group": "Unity 引擎线",
+      "title": "动画系统",
+      "desc": "Animator 状态机、混合树、动画事件、IK、Root Motion、Timeline、代码动画与 Tween"
+    },
+    {
+      "file": "14-unity-ui.html",
+      "num": "14",
+      "group": "Unity 引擎线",
+      "title": "UI 系统",
+      "desc": "UGUI 锚点与布局、Canvas 重建机制、性能优化、TextMeshPro、UI Toolkit 选型"
+    },
+    {
+      "file": "15-unity-input.html",
+      "num": "15",
+      "group": "Unity 引擎线",
+      "title": "输入与音频",
+      "desc": "旧输入系统、新 Input System 与 InputAction、手柄与触屏、AudioMixer、3D 音效"
+    },
+    {
+      "file": "16-unity-assets.html",
+      "num": "16",
+      "group": "Unity 引擎线",
+      "title": "资源管理与热更新",
+      "desc": "Resources 陷阱、AssetBundle 依赖管理、Addressables 深入、四种热更方案对比"
+    },
+    {
+      "file": "17-unity-render.html",
+      "num": "17",
+      "group": "Unity 引擎线",
+      "title": "渲染与画面优化",
+      "desc": "管线选择、Draw Call 与合批规则、光照与阴影、后处理、LOD、移动端画质取舍"
+    },
+    {
+      "file": "18-unity-ecs.html",
+      "num": "18",
+      "group": "Unity 引擎线",
+      "title": "Job System 与 DOTS",
+      "desc": "Job System 与依赖、Burst 编译、NativeContainer、ECS 架构、何时值得迁移"
+    },
+    {
+      "file": "19-unity-editor.html",
+      "num": "19",
+      "group": "Unity 引擎线",
+      "title": "编辑器扩展与工具链",
+      "desc": "自定义 Inspector、EditorWindow、PropertyDrawer、AssetPostprocessor、构建脚本自动化"
+    },
+    {
+      "file": "20-patterns.html",
+      "num": "20",
+      "group": "通用能力",
+      "title": "架构与设计模式",
+      "desc": "单例/观察者/状态机/命令/策略/组合、事件总线、DI、MVC/MVP、对象池与优化"
+    },
+    {
+      "file": "21-perf.html",
+      "num": "21",
+      "group": "通用能力",
+      "title": "性能优化实战",
+      "desc": "Profiler 与 Frame Debugger、CPU/GPU 瓶颈定位、GC 消除、内存与真机调优流程"
+    },
+    {
+      "file": "22-network-eng.html",
+      "num": "22",
+      "group": "通用能力",
+      "title": "网络、工程化与发布",
+      "desc": "帧同步与状态同步、Netcode/NGO/Mirror、Git+LFS、asmdef、测试、CI/CD、打包上架"
+    },
+    {
+      "file": "23-ai.html",
+      "num": "23",
+      "group": "AI 时代",
+      "title": "AI 辅助开发与 AI NPC",
+      "desc": "AI 编程助手真实效果与风险、AI 美术管线、版权红线、LLM 驱动 NPC 架构与安全"
+    },
+    {
+      "file": "24-projects.html",
+      "num": "24",
+      "group": "实践与参考",
+      "title": "实战项目集",
+      "desc": "从入门到作品级的 10 个项目，每个都有明确验收标准与扩展方向"
+    },
+    {
+      "file": "25-interview.html",
+      "num": "25",
+      "group": "实践与参考",
+      "title": "面试、作品集与资源",
+      "desc": "四级理解标准、面试流程与高频题、作品集包装、权威资源库、行业数据与识别过时教程"
+    },
+    {
+      "file": "api-reference.html",
+      "num": "",
+      "group": "参考",
+      "title": "Unity API 速查",
+      "desc": "从 Unity 程序集提取的 8998 条真实 API 签名，覆盖 110 个类型"
+    },
+    {
+      "file": "26-advanced-api.html",
+      "num": "26",
+      "group": "实践与参考",
+      "title": "进阶 API 与性能陷阱",
+      "desc": "零分配物理查询、Transform 批量 API、组件技巧、相机坐标转换、音频经验值"
+    },
+    {
+      "file": "27-unity-components.html",
+      "num": "27",
+      "group": "实践与参考",
+      "title": "Unity 组件使用技巧",
+      "desc": "各内置组件的高频用法、参数含义、常见坑与最佳实践"
+    }
+  ]
+}

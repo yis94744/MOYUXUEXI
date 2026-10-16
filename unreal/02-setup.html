@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>02 环境搭建与第一个项目 — C++ + Unreal 路线｜从零基础到 3A 级项目开发</title>
+<meta name="description" content="Visual Studio 配置、UE 版本选择、源码编译、项目结构、调试与热重载">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C++ + Unreal 路线
+        <span>从零基础到 3A 级项目开发</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>02 · 环境搭建与第一个项目</h1>
+
+<p class="lead">这一页的目标：<strong>当天编译并运行第一个 Unreal C++ 项目</strong>。<em>Unreal 的安装配置比 Unity 复杂，但走对流程就不难。</em></p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="install">一、安装清单</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>组件</th><th>版本建议</th><th>体积</th><th>备注</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Visual Studio 2022</strong></td><td>17.x Community</td><td>~10 GB</td><td><strong>必须装 C++ 工作负载</strong></td></tr>
+    <tr><td><strong>UE5 引擎</strong></td><td>5.3 / 5.4</td><td>~40 GB</td><td><em>用 Epic Launcher 装</em></td></tr>
+    <tr><td><strong>引擎源码（可选）</strong></td><td>GitHub 版本</td><td>~100 GB</td><td><em>深入引擎时再装</em></td></tr>
+    <tr><td><strong>.NET SDK</strong></td><td>6.0+</td><td>~500 MB</td><td>UE 构建工具依赖</td></tr>
+    <tr><td><strong>Rider（可选）</strong></td><td>最新版</td><td>~2 GB</td><td><strong>比 VS 好用（推荐）</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">四个必踩的坑</span>
+  <strong>① 没装 VS 的 C++ 工作负载</strong><br>
+  只装 VS 不够——<em>必须勾选"使用 C++ 的桌面开发"</em>。<br>
+  症状：<code>Unable to find Visual Studio installation</code><br><br>
+  <strong>② 没装 Windows SDK</strong><br>
+  属于 C++ 工作负载的一部分，但<em>有时要手动勾</em>。<br><br>
+  <strong>③ 没装 .NET SDK</strong><br>
+  UE 的构建工具（UnrealBuildTool）是 C# 写的。<br>
+  症状：<code>UnrealBuildTool 无法运行</code><br><br>
+  <strong>④ 项目路径含中文或空格</strong><br>
+  <strong>这是最常见的坑。</strong><br>
+  UE 对路径很敏感，<em>中文路径会导致各种诡异的编译错误</em>。<br>
+  <strong>规则</strong>：<em>路径全英文、无空格、不要太深</em>（例如 <code>D:\UEProjects\MyGame</code>）。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">推荐的开发环境组合</span>
+  <strong>编辑器</strong>：Rider for Unreal Engine（<em>比 VS 好用很多</em>）<br>
+  · 更好的代码补全<br>
+  · 能识别 UE 的宏<br>
+  · 重构功能强<br><br>
+  <strong>如果你只能用 VS</strong>：<br>
+  · 装 <strong>Visual Assist</strong> 插件（<em>付费但值得</em>）<br>
+  · 或者用 <strong>VS Code + C++ 插件</strong>（<em>但要配 compile_commands.json</em>）<br><br>
+  <strong>为什么编辑器很重要</strong>：<em>Unreal 的代码量很大，没有好的跳转和补全，开发效率会大幅下降。</em>
+</div>
+
+<h2 id="first-project">二、创建第一个项目</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">创建流程</span>
+  <strong>① 打开 Epic Launcher，启动 UE5</strong><br>
+  <strong>② 选择"游戏" → 选模板</strong><br>
+  · <strong>Blank</strong>——空的，从零开始（<em>推荐学习用</em>）<br>
+  · <strong>Third Person</strong>——第三人称模板（<em>有现成角色</em>）<br>
+  <strong>③ 关键设置</strong><br>
+  · <strong>Blueprint 或 C++？</strong>→<em>选 C++</em>（<em>会生成 C++ 项目结构</em>）<br>
+  · <strong>Starter Content</strong>→<em>建议勾选</em>（<em>有一些免费素材</em>）<br>
+  · <strong>项目位置</strong>→<strong>全英文路径</strong><br>
+  <strong>④ 点击创建，等待编译</strong><br>
+  <em>第一次会编译引擎相关的东西，可能需要 10~30 分钟。</em><br>
+  <strong>⑤ 编译完成后会打开编辑器</strong><br><br>
+  <strong>如果编译失败</strong>：<em>优先检查上面那四个坑</em>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="02">
+  <div class="task"><input type="checkbox" id="t-02-1"><label for="t-02-1"><strong>装好 VS + C++ 工作负载</strong>：确认"使用 C++ 的桌面开发"已勾选。</label></div>
+  <div class="task"><input type="checkbox" id="t-02-2"><label for="t-02-2"><strong>装好 UE5</strong>：用 Epic Launcher 安装。</label></div>
+  <div class="task"><input type="checkbox" id="t-02-3"><label for="t-02-3"><strong>创建 C++ 项目</strong>：选 Blank 模板 + C++ 类型，路径全英文。</label></div>
+  <div class="task"><input type="checkbox" id="t-02-4"><label for="t-02-4"><strong>编译并运行</strong>：等待编译完成，能看到编辑器界面。</label></div>
+  <div class="task"><input type="checkbox" id="t-02-5"><label for="t-02-5"><strong>加一行代码</strong>：在生成的 C++ 类里加一个 <code>UE_LOG</code>，重新编译看输出。<em>这是你的第一个 C++ 改动。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-02-6"><label for="t-02-6"><strong>回答面试题</strong>：① 装 UE 需要哪些组件？② 项目路径为什么不能有中文？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>VS 装了 C++ 工作负载</strong>；<br>
+    ② <strong>成功创建并编译了一个 C++ 项目</strong>；<br>
+    ③ 项目路径全英文；<br>
+    ④ 能修改 C++ 代码并重新编译；<br>
+    ⑤ 知道四个常见的安装坑。<br>
+    <br>
+    <em>这一页的标准很硬——**编译不通过就不要往下走**。Unreal 的坑大多在前面。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="../lua/01-role.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">01 岗位与行业现实</div>
+  </a>
+  <a class="next" href="03-cpp-basic.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">03 C++ 基础与编译模型 ★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03 C++ 基础与编译模型 — C++ + Unreal 路线｜从零基础到 3A 级项目开发</title>
+<meta name="description" content="类型系统、编译链接过程、头文件与 ODR、命名空间、引用与 const、Auto 与类型推导">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C++ + Unreal 路线
+        <span>从零基础到 3A 级项目开发</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>03 · C++ 基础与编译模型 ★★</h1>
+
+<p class="lead">这一页讲<strong>C++ 与 C# 最大的差异：编译模型</strong>。理解它，你才能看懂那些<em>"为什么要在头文件里写这个"的规则</em>——以及<strong>为什么 Unreal 的编译错误那么长</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="../unity/03-cs-basic.html#value-ref" data-brief="赋值时拷贝内容还是拷贝地址，这决定了对象会不会被共享"><span class="prereq__title">值类型与引用类型</span><span class="prereq__page">03-cs-basic</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="difference">一、C++ 与 C# 的编译差异</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>维度</th><th>C#</th><th>C++</th></tr></thead>
+  <tbody>
+    <tr><td><strong>编译单元</strong></td><td>所有 .cs 一起编译</td><td><strong>每个 .cpp 独立编译</strong></td></tr>
+    <tr><td><strong>声明与定义</strong></td><td>合一</td><td><strong>分离（头文件 vs 源文件）</strong></td></tr>
+    <tr><td><strong>链接</strong></td><td>运行时加载</td><td><strong>编译后链接成可执行文件</strong></td></tr>
+    <tr><td><strong>符号</strong></td><td>名称修饰（简单）</td><td><strong>名称修饰（复杂，含类型信息）</strong></td></tr>
+    <tr><td><strong>错误时机</strong></td><td><em>编译期多</em></td><td><strong>链接期也有大量错误</strong></td></tr>
+    <tr><td><strong>编译速度</strong></td><td>快</td><td><strong>慢（每个文件独立编译）</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">核心概念：声明 vs 定义</span>
+  <strong>这是理解 C++ 编译模型的关键。</strong><br><br>
+  <strong>声明（Declaration）</strong>：<em>告诉编译器"有这么个东西"</em><br>
+  <code>int Add(int a, int b);   // 只有签名，没有实现</code><br><br>
+  <strong>定义（Definition）</strong>：<em>给出具体实现</em><br>
+  <code>int Add(int a, int b) { return a + b; }</code><br><br>
+  <strong>为什么必须分离</strong>：<br>
+  · <code>.h</code> 头文件放<strong>声明</strong>——被多个 .cpp 包含<br>
+  · <code>.cpp</code> 源文件放<strong>定义</strong>——只编译一次<br>
+  · <em>如果定义放在头文件里，每个包含它的 .cpp 都会有一份</em>→ <strong>重复定义错误</strong><br><br>
+  <strong>例外：inline 函数和内联成员函数可以放头文件</strong><br>
+  <em>因为编译器会把它们"展开"到调用处，不产生独立符号。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">编译错误的三种类型</span>
+  <strong>① 编译错误（Compile Error）</strong><br>
+  单个 .cpp 文件的问题——<em>语法错、类型不匹配、找不到声明</em><br>
+  <strong>报错格式</strong>：<code>file.cpp(line): error C####: 描述</code><br><br>
+  <strong>② 链接错误（Link Error）</strong><br>
+  <em>所有 .cpp 编译通过后，链接器发现"某个符号找不到"</em><br>
+  <strong>典型错误</strong>：<code>unresolved external symbol</code><br>
+  <strong>常见原因</strong>：<br>
+  · <em>声明了但没定义</em>（写了头文件，忘了实现）<br>
+  · <em>忘了把 .cpp 加入项目</em><br>
+  · <strong>Unreal 中：忘了在 .Build.cs 里加模块依赖</strong><br><br>
+  <strong>③ 运行时错误（Runtime Error）</strong><br>
+  <em>编译链接都过了，运行时崩溃</em>——<strong>这是 C++ 最危险的</strong><br>
+  <em>因为编译器不检查数组越界、空指针、类型转换等</em>
+</div>
+
+<h2 id="header">二、头文件的写法规范</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">四个必须遵守的规则</span>
+  <strong>① 头文件保护（Include Guard）</strong><br>
+  <code>#pragma once</code> 或<br>
+  <code>#ifndef MY_HEADER_H</code> / <code>#define MY_HEADER_H</code> / <code>#endif</code><br>
+  <em>防止同一个头文件被重复包含。</em><br>
+  Unreal 用 <code>#pragma once</code>（<em>更简洁</em>）。<br><br>
+  <strong>② 前向声明（Forward Declaration）</strong><br>
+  <code>class Monster;   // 只声明，不包含头文件</code><br>
+  <em>如果只是用指针或引用，不需要完整的类定义</em>——<strong>能显著加快编译</strong>。<br>
+  <em>这是 Unreal 项目里最重要的编译优化手段。</em><br><br>
+  <strong>③ 头文件里不要写 using namespace</strong><br>
+  <em>会污染所有包含它的文件</em>。<br>
+  <strong>要在 .cpp 里用。</strong><br><br>
+  <strong>④ 包含顺序</strong><br>
+  · 先自己的头文件<br>
+  · 再项目内的<br>
+  · 再第三方库<br>
+  · 最后标准库<br>
+  <em>（Unreal 要求自己的头文件必须放第一个）</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="03">
+  <div class="task"><input type="checkbox" id="t-03-1"><label for="t-03-1"><strong>制造链接错误</strong>：声明一个函数但故意不实现，观察链接错误信息。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-2"><label for="t-03-2"><strong>制造重复定义</strong>：把函数定义放进头文件，被两个 .cpp 包含，观察错误。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-3"><label for="t-03-3"><strong>用前向声明</strong>：把某个 #include 改成前向声明，测编译时间的变化。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-4"><label for="t-03-4"><strong>读链接错误</strong>：故意写错函数名，看 <code>unresolved external symbol</code> 里的名称修饰长什么样。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-5"><label for="t-03-5"><strong>回答面试题</strong>：① 声明和定义的区别？② 链接错误常见原因？③ 前向声明为什么能加快编译？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出声明与定义的区别</strong>；<br>
+    ② <strong>能区分编译错误、链接错误、运行时错误</strong>；<br>
+    ③ 知道头文件保护的两种写法；<br>
+    ④ <strong>会用前向声明减少编译依赖</strong>；<br>
+    ⑤ 知道头文件里不该写 <code>using namespace</code>。<br>
+    <br>
+    <em>第 ② 条最实用——**能快速判断错误类型，能省下大量排查时间**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="../lua/02-setup.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">02 环境搭建与第一个项目</div>
+  </a>
+  <a class="next" href="04-cpp-memory.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">04 指针、内存与 RAII ★★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

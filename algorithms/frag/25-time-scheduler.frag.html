@@ -1,0 +1,151 @@
+<h1>25 · 定时器与事件调度</h1>
+
+<p class="lead">游戏里<strong>到处都需要"过一会儿执行"</strong>：技能冷却、Buff 到期、活动开启、心跳发送。<em>这一页讲怎么高效管理成千上万个定时任务</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="implementations">一、三种定时器实现</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>实现</th><th>复杂度</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>每帧遍历</strong></td><td><span class="mk mk--no">O(n) 每帧</span></td><td><em>定时器 < 50 个</em></td></tr>
+    <tr><td><strong>最小堆</strong></td><td><span class="mk mk--yes">O(log n) 插入，O(1) 检查</span></td><td><strong>推荐</strong></td></tr>
+    <tr><td><strong>时间轮</strong></td><td>O(1) 插入与删除</td><td><em>海量短定时器</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">每帧遍历什么时候会出问题</span>
+  <strong>看起来没问题，直到定时器变多</strong>：<br>
+  · <strong>100 个定时器</strong>——每帧 100 次比较，<em>没问题</em><br>
+  · <strong>1000 个</strong>——每帧 1000 次，<em>开始有影响</em><br>
+  · <strong>10000 个</strong>——每帧 10000 次，<strong>明显卡顿</strong><br><br>
+  <strong>什么情况会有上万个定时器</strong>：<br>
+  · 每个 Buff 一个到期定时器（<em>大型团本几十个玩家 × 每个几十个 Buff</em>）<br>
+  · 每个技能的冷却定时器<br>
+  · 每个建筑的生产定时器（<em>模拟经营类</em>）<br>
+  · 服务器端的定时任务<br><br>
+  <strong>堆的优势</strong>：<em>每帧只需检查堆顶</em>——如果堆顶没到期，<strong>整个堆都不用看</strong>。<br>
+  这在"定时器很多但大多没到期"的场景下收益巨大。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">时间轮：海量短定时器的方案</span>
+  <strong>场景</strong>：服务器每秒有几十万个定时任务。<br>
+  <strong>堆的问题</strong>：O(log n) 的插入在大规模下也有开销。<br><br>
+  <strong>时间轮的做法</strong>：<br>
+  · 一个环形数组，每个槽代表一个时间刻度<br>
+  · 插入时<em>算出差多少个刻度，放进对应的槽</em><br>
+  · 每 tick 只需处理<strong>当前槽</strong>里的任务<br><br>
+  <strong>复杂度</strong>：插入 O(1)，处理也是 O(1)（<em>摊还</em>）。<br><br>
+  <strong>限制</strong>：<br>
+  · 只适合<strong>固定间隔</strong>的短定时器<br>
+  · 长时间定时器要<em>多层时间轮</em>（类似时钟的时分秒）<br><br>
+  <em>客户端游戏用堆就够了——时间轮主要是服务器端的技术。</em>
+</div>
+
+<h2 id="problems">二、定时器的五个实战问题 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">问题一：定时器泄漏</span>
+  <strong>场景</strong>：对象销毁了，但它的定时器还在。<br>
+  · 回调执行时访问已销毁对象 → <strong>报错</strong><br>
+  · 定时器永不释放 → <strong>内存泄漏</strong><br><br>
+  <strong>解决</strong>：<br>
+  ① <strong>定时器绑定所有者</strong>：<code>schedule(delay, fn, owner)</code><br>
+  ② <strong>所有者销毁时批量取消</strong>：<code>cancelAll(owner)</code><br>
+  ③ 在回调里<strong>检查所有者是否还活着</strong><br><br>
+  <em>本页实测：给定时器加 <code>owner</code> 字段，调用 <code>cancelAll(owner)</code> 能一次性清理该对象的所有定时器。</em><br>
+  <strong>这和页 16 的"界面订阅自动取消"是同一个思路。</strong>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">问题二：同一帧触发多次</span>
+  <strong>场景</strong>：帧间隔 0.5 秒（卡顿），但定时器间隔是 0.1 秒。<br>
+  <em>这一帧内"应该"触发 5 次——触发几次？</em><br><br>
+  <strong>两种设计</strong>：<br>
+  <strong>① 每次到期触发一次</strong>——<em>一帧只触发一次，剩下的"欠账"用下一次补</em><br>
+  后果：<em>实际触发次数会少于预期</em><br>
+  <strong>② 补足所有遗漏</strong>——<em>一帧内连续触发 5 次</em><br>
+  后果：<em>可能造成瞬间大量计算（比如 5 次伤害结算）</em><br><br>
+  <strong>推荐做法</strong>：<em>方案 ①，但要记录欠账次数供业务判断</em>。<br>
+  或者在回调里传"实际经过的时间"，让业务自己决定。<br><br>
+  <strong>必须明确设计</strong>——<em>不明确的话，卡顿时会出现数值计算错误。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">问题三：在回调里取消其他定时器</span>
+  <strong>场景</strong>：定时器 A 的回调里取消了定时器 B。<br>
+  <em>如果正在遍历堆，删除元素会导致索引错位</em>。<br><br>
+  <strong>解决</strong>：<strong>标记删除</strong>（<em>本页的做法</em>）。<br>
+  · <code>cancel(id)</code> 只给定时器打上 <code>cancelled = true</code><br>
+  · 取出时<em>检查标记，跳过已取消的</em><br>
+  · <em>不从堆中间删除</em>（那需要 O(n) 查找）<br><br>
+  <strong>本页实测</strong>：取消的定时器不会触发，正常的定时器正常触发。<br>
+  <em>这和页 13 事件系统的"快照遍历"是同一类问题的不同解法。</em>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">问题四：时间精度与累积误差</span>
+  <strong>问题</strong>：用 <code>deltaTime</code> 累加会产生<em>浮点误差</em>。<br>
+  跑几小时后，<code>currentTime</code> 可能已经偏离真实时间好几秒。<br><br>
+  <strong>解决</strong>：<br>
+  ① <strong>用整数毫秒</strong>代替浮点秒——<em>避免累积误差</em><br>
+  ② 定期<strong>用真实时间校正</strong><br>
+  ③ 长时间定时（<em>比如"24 小时后"</em>）用<strong>绝对时间戳</strong>而不是累加<br><br>
+  <strong>典型事故</strong>：<em>活动"每天 0 点开启"，但因为累积误差，实际开启时间越来越晚。</em><br>
+  <strong>正确做法</strong>：<em>活动的开启时间用服务器时间戳，客户端只负责显示倒计时。</em>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">问题五：暂停与恢复</span>
+  <strong>场景</strong>：游戏暂停时，定时器应该停吗？<br><br>
+  <strong>要看定时器的类型</strong>：<br>
+  · <strong>游戏内定时器</strong>（<em>技能冷却</em>）——<strong>应该暂停</strong>（用 <code>Time.deltaTime</code>，它受 <code>timeScale</code> 影响）<br>
+  · <strong>UI 动画定时器</strong>——可能要继续<br>
+  · <strong>网络心跳</strong>——<strong>必须继续</strong>（<code>Time.unscaledDeltaTime</code>）<br>
+  · <strong>自动保存</strong>——暂停时<em>反而应该触发一次</em><br><br>
+  <strong>设计要点</strong>：<em>给定时器加一个"是否受暂停影响"的标志</em>。<br>
+  <strong>常见 bug</strong>：<em>用 <code>timeScale = 0</code> 暂停，结果网络心跳也停了，被服务器踢下线。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="25">
+  <div class="task"><input type="checkbox" id="t-25-1"><label for="t-25-1"><strong>实现堆版本</strong>：用最小堆管理定时器，实现 schedule/cancel/update。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-2"><label for="t-25-2"><strong>测性能</strong>：对比每帧遍历与堆实现在 1000 个定时器时的每帧开销。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-3"><label for="t-25-3"><strong>做所有者绑定</strong>：给定时器加 owner，实现 <code>cancelAll(owner)</code>。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-4"><label for="t-25-4"><strong>测取消</strong>：在回调里取消另一个定时器，验证用标记删除不会出错。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-5"><label for="t-25-5"><strong>做可暂停</strong>：给定时器加"是否受暂停影响"的标志，验证两类定时器行为不同。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-6"><label for="t-25-6"><strong>回答面试题</strong>：① 定时器该用什么数据结构？② 怎么防止定时器泄漏？③ 同一帧多次到期怎么处理？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道定时器少时遍历够用，多时要用堆</strong>；<br>
+    ② 知道时间轮的原理与适用场景；<br>
+    ③ <strong>能说出定时器的五个实战问题及解法</strong>；<br>
+    ④ <strong>知道"标记删除"是在回调里取消其他定时器的正确做法</strong>；<br>
+    ⑤ 知道定时器要区分"是否受暂停影响"。<br>
+    <br>
+    <em>第 ③ 和 第 ⑤ 条最有价值——它们都是从真实事故里总结出来的。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="24-inventory-drop.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">24 背包、掉落与权重随机</div>
+  </a>
+  <a class="next" href="26-perf-patterns.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">26 性能模式库 ★★★</div>
+  </a>
+</nav>

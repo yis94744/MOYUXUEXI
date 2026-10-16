@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 400" width="660" height="400" role="img" aria-label="Unity 生命周期与一帧执行顺序">
+  <defs>
+    <linearGradient id="init" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#a21caf"/></linearGradient>
+    <linearGradient id="phys" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ea580c"/><stop offset="100%" stop-color="#d97706"/></linearGradient>
+    <linearGradient id="log"  x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#0891b2"/><stop offset="100%" stop-color="#0d9488"/></linearGradient>
+    <linearGradient id="late" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#4f46e5"/></linearGradient>
+    <linearGradient id="rend" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#db2777"/><stop offset="100%" stop-color="#e11d48"/></linearGradient>
+  </defs>
+
+  <rect width="660" height="400" rx="16" fill="#f7f8fb"/>
+  <rect width="660" height="400" rx="16" fill="none" stroke="#e0e5ef" stroke-width="1.5"/>
+
+  <text x="30" y="40" fill="#12141c" font-family="-apple-system,Segoe UI,Microsoft YaHei,sans-serif"
+        font-size="17" font-weight="800">Unity 生命周期与一帧执行顺序</text>
+  <text x="30" y="61" fill="#838c9e" font-family="-apple-system,Segoe UI,Microsoft YaHei,sans-serif"
+        font-size="11.5">同一对象内顺序确定；不同对象之间的顺序不确定</text>
+
+  <g font-family="-apple-system,Segoe UI,Microsoft YaHei,sans-serif">
+    <!-- 初始化块 -->
+    <rect x="30" y="80" width="270" height="112" rx="11" fill="#f3e8ff" stroke="#a855f7" stroke-width="1.4"/>
+    <rect x="30" y="80" width="270" height="26" rx="11" fill="url(#init)"/>
+    <rect x="30" y="96" width="270" height="10" fill="url(#init)"/>
+    <text x="44" y="98" fill="#ffffff" font-size="11.5" font-weight="800">① 初始化（仅首次执行一次）</text>
+
+    <text x="46" y="128" fill="#12141c" font-size="11.5" font-weight="700">Awake()</text>
+    <text x="152" y="128" fill="#7c3aed" font-size="10">初始化自身引用（GetComponent）</text>
+
+    <text x="46" y="150" fill="#12141c" font-size="11.5" font-weight="700">OnEnable()</text>
+    <text x="152" y="150" fill="#7c3aed" font-size="10">事件订阅（可多次调用）</text>
+
+    <text x="46" y="172" fill="#12141c" font-size="11.5" font-weight="700">Start()</text>
+    <text x="152" y="172" fill="#7c3aed" font-size="10">依赖其他对象的初始化</text>
+
+    <!-- 物理块 -->
+    <rect x="316" y="80" width="150" height="112" rx="11" fill="#fff7ed" stroke="#f97316" stroke-width="1.4"/>
+    <rect x="316" y="80" width="150" height="26" rx="11" fill="url(#phys)"/>
+    <rect x="316" y="96" width="150" height="10" fill="url(#phys)"/>
+    <text x="330" y="98" fill="#ffffff" font-size="11.5" font-weight="800">② 物理循环</text>
+
+    <text x="330" y="128" fill="#12141c" font-size="11" font-weight="700">FixedUpdate()</text>
+    <text x="330" y="146" fill="#c2410c" font-size="9.5">固定步长（默认 0.02s）</text>
+    <text x="330" y="164" fill="#c2410c" font-size="9.5">一帧可执行 0 次或多次</text>
+    <text x="330" y="182" fill="#c2410c" font-size="9.5">物理操作写这里</text>
+
+    <!-- 逻辑块 -->
+    <rect x="482" y="80" width="148" height="112" rx="11" fill="#ecfeff" stroke="#06b6d4" stroke-width="1.4"/>
+    <rect x="482" y="80" width="148" height="26" rx="11" fill="url(#log)"/>
+    <rect x="482" y="96" width="148" height="10" fill="url(#log)"/>
+    <text x="496" y="98" fill="#ffffff" font-size="11.5" font-weight="800">③ 游戏逻辑</text>
+
+    <text x="496" y="128" fill="#12141c" font-size="11" font-weight="700">Update()</text>
+    <text x="496" y="146" fill="#0e7490" font-size="9.5">每渲染帧一次</text>
+    <text x="496" y="164" fill="#0e7490" font-size="9.5">读输入 / 更新 UI</text>
+    <text x="496" y="182" fill="#0e7490" font-size="9.5">协程在此之后恢复</text>
+
+    <!-- 第二行 -->
+    <rect x="30" y="206" width="270" height="88" rx="11" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.4"/>
+    <rect x="30" y="206" width="270" height="26" rx="11" fill="url(#late)"/>
+    <rect x="30" y="222" width="270" height="10" fill="url(#late)"/>
+    <text x="44" y="224" fill="#ffffff" font-size="11.5" font-weight="800">④ 晚期更新</text>
+
+    <text x="46" y="254" fill="#12141c" font-size="11.5" font-weight="700">LateUpdate()</text>
+    <text x="152" y="254" fill="#2563eb" font-size="10">相机跟随 / IK 修正</text>
+    <text x="46" y="278" fill="#525a6b" font-size="10">与 Update 同帧，仅顺序在最后</text>
+
+    <rect x="316" y="206" width="314" height="88" rx="11" fill="#fdf2f8" stroke="#ec4899" stroke-width="1.4"/>
+    <rect x="316" y="206" width="314" height="26" rx="11" fill="url(#rend)"/>
+    <rect x="316" y="222" width="314" height="10" fill="url(#rend)"/>
+    <text x="330" y="224" fill="#ffffff" font-size="11.5" font-weight="800">⑤ 渲染与帧末</text>
+
+    <text x="330" y="254" fill="#12141c" font-size="11">OnPreCull → OnWillRenderObject → 渲染（材质/光照/阴影）</text>
+    <text x="330" y="276" fill="#be123c" font-size="10">OnGUI() 每帧可能调用多次，性能敏感场景避免使用</text>
+
+    <!-- 销毁行 -->
+    <rect x="30" y="308" width="600" height="44" rx="11" fill="#fef2f2" stroke="#dc2626" stroke-width="1.4" stroke-dasharray="6 4"/>
+    <text x="46" y="328" fill="#dc2626" font-size="11.5" font-weight="800">⑥ 销毁阶段</text>
+    <text x="152" y="328" fill="#12141c" font-size="11">OnDisable() → OnDestroy() → OnApplicationQuit()</text>
+    <text x="46" y="345" fill="#7f1d1d" font-size="10">OnDisable 与 OnEnable 成对；事件订阅务必在此取消，否则会重复订阅</text>
+
+    <!-- 底部提示 -->
+    <rect x="30" y="364" width="600" height="24" rx="8" fill="#fef3c7"/>
+    <text x="330" y="380" fill="#92400e" font-size="10.5" font-weight="700" text-anchor="middle">
+      物理操作放 FixedUpdate · 依赖其他对象的初始化放 Start · 相机跟随放 LateUpdate
+    </text>
+  </g>
+</svg>

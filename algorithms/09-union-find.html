@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>09 并查集与图论基础 — 游戏算法与系统设计｜从数据结构到完整系统，覆盖游戏开发全部核心算法</title>
+<meta name="description" content="路径压缩、按秩合并、连通性判断、关卡区域划分">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">游戏算法与系统设计
+        <span>从数据结构到完整系统，覆盖游戏开发全部核心算法</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>09 · 并查集与图论基础 ★★</h1>
+
+<p class="lead">并查集<strong>看起来简单，但效率惊人</strong>——几乎 O(1)。它解决了游戏里一个很常见的问题：<em>判断"这两个东西是不是连通的"</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="02-complexity.html#budget" data-brief="每帧 16.7ms，单系统 1~2ms 预算"><span class="prereq__title">复杂度直觉</span><span class="prereq__page">02-complexity</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="problem">一、并查集解决什么问题</h2>
+
+<p>并查集（Union-Find）解决<strong>三个看似不同、本质相同</strong>的问题：</p>
+
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  并查集（Union-Find）：判断"是否连通"
+-- ============================================================
+--  并查集解决的问题很简单但很常见：
+--    · 这两个格子是不是同一片区域？
+--    · 这两个玩家是不是同一个队伍的？
+--    · 这个地图有多少个互不相连的区域？
+--
+--  它的效率惊人：几乎 O(1)（严格说是反阿克曼函数，小于 5）
+
+print("=== 1. 朴素实现：只记录父节点 ===")
+
+local NaiveUF = {}
+NaiveUF.__index = NaiveUF
+
+function NaiveUF.new(n)
+  local self = setmetatable({ parent = {} }, NaiveUF)
+  for i = 1, n do self.parent[i] = i end    -- 初始时每个元素自成一个集合
+  return self
+end
+
+-- 找根节点（跟着父指针一路往上）
+function NaiveUF:find(x)
+  while self.parent[x] ~= x do
+    x = self.parent[x]
+  end
+  return x
+end
+
+function NaiveUF:union(a, b)
+  local ra, rb = self:find(a), self:find(b)
+  if ra == rb then return false end
+  self.parent[ra] = rb      -- 简单地把一个根挂到另一个根上
+  return true
+end
+
+print("  朴素实现的问题：")
+print("    每次都把 ra 挂到 rb 上，可能形成【长链】")
+print("    最坏情况退化成链表，find 变成 O(n)")
+print()
+
+-- 演示长链问题
+local naive = NaiveUF.new(10)
+for i = 1, 9 do
+  naive:union(i, i + 1)
+end
+print("  依次 union(1,2), union(2,3), ..., union(9,10)")
+print("  此时 find(1) 需要走多少步？")
+
+local steps = 0
+local x = 1
+while naive.parent[x] ~= x do
+  steps = steps + 1
+  x = naive.parent[x]
+end
+print(string.format("    find(1) 走了 %d 步", steps))
+print("    这就是退化成链表的情况")
+
+print()
+print("=== 2. 优化一：路径压缩 ===")
+print()
+print("  思路：find 的过程中，把沿途所有节点【直接挂到根上】")
+print("  这样下次再查就只需一步")
+print()
+
+local PathCompressUF = {}
+PathCompressUF.__index = PathCompressUF
+
+function PathCompressUF.new(n)
+  local self = setmetatable({ parent = {} }, PathCompressUF)
+  for i = 1, n do self.parent[i] = i end
+  return self
+end
+
+-- 递归版（简洁但可能栈溢出）
+function PathCompressUF:findRecursive(x)
+  if self.parent[x] ~= x then
+    self.parent[x] = self:findRecursive(self.parent[x])   -- 关键：修改父指针
+  end
+  return self.parent[x]
+end
+
+-- 迭代版（推荐，避免深递归）
+function PathCompressUF:find(x)
+  local root = x
+  while self.parent[root] ~= root do
+    root = self.parent[root]
+  end
+
+  -- 第二趟：把路径上所有节点直接指向根
+  while self.parent[x] ~= root do
+    local next_node = self.parent[x]
+    self.parent[x] = root
+    x = next_node
+  end
+
+  return root
+end
+
+function PathCompressUF:union(a, b)
+  local ra, rb = self:find(a), self:find(b)
+  if ra == rb then return false end
+  self.parent[ra] = rb
+  return true
+end
+
+-- 同样的 union 顺序，用路径压缩
+local pc = PathCompressUF.new(10)
+for i = 1, 9 do pc:union(i, i + 1) end
+
+print("  同样的 union 顺序，用路径压缩:")
+print("    find(1) 第一次:")
+local t1 = os.clock()
+pc:find(1)
+print(string.format("      耗时 %.6f 秒", os.clock() - t1))
+print("    find(1) 第二次（已压缩）:")
+local t2 = os.clock()
+pc:find(1)
+print(string.format("      耗时 %.6f 秒", os.clock() - t2))
+print("    【效果】第一次压缩后，后续查询都是 O(1)")
+
+print()
+print("=== 3. 优化二：按秩合并（Union by Rank）===")
+print()
+print("  思路：union 时，把【矮的树】挂到【高的树】上")
+print("  这样树的高度增长最慢")
+print()
+
+local UnionFind = {}
+UnionFind.__index = UnionFind
+
+function UnionFind.new(n)
+  local self = setmetatable({
+    parent = {},
+    rank = {},          -- rank 近似表示树高
+    count = n,          -- 集合数量
+    findCalls = 0,
+  }, UnionFind)
+
+  for i = 1, n do
+    self.parent[i] = i
+    self.rank[i] = 0
+  end
+  return self
+end
+
+function UnionFind:find(x)
+  self.findCalls = self.findCalls + 1
+
+  local root = x
+  while self.parent[root] ~= root do
+    root = self.parent[root]
+  end
+
+  -- 路径压缩
+  while self.parent[x] ~= root do
+    local next_node = self.parent[x]
+    self.parent[x] = root
+    x = next_node
+  end
+
+  return root
+end
+
+function UnionFind:union(a, b)
+  local ra, rb = self:find(a), self:find(b)
+  if ra == rb then return false end
+
+  -- 【关键】按秩合并：矮的挂到高的上
+  if self.rank[ra] &lt; self.rank[rb] then
+    self.parent[ra] = rb
+  elseif self.rank[ra] &gt; self.rank[rb] then
+    self.parent[rb] = ra
+  else
+    self.parent[rb] = ra
+    self.rank[ra] = self.rank[ra] + 1     -- 两棵同样高，合并后高度加一
+  end
+
+  self.count = self.count - 1
+  return true
+end
+
+function UnionFind:connected(a, b)
+  return self:find(a) == self:find(b)
+end
+
+function UnionFind:setCount() return self.count end
+
+-- 测试
+local uf = UnionFind.new(10)
+print("  初始集合数:", uf:setCount())
+
+uf:union(1, 2)
+uf:union(2, 3)
+uf:union(4, 5)
+print("  执行 union(1,2), union(2,3), union(4,5) 后:")
+print("    集合数:", uf:setCount())
+print("    1 和 3 连通:", uf:connected(1, 3))
+print("    1 和 4 连通:", uf:connected(1, 4))
+print("    4 和 5 连通:", uf:connected(4, 5))
+
+print()
+print("=== 4. 三种实现的性能对比 ===")
+
+local N = 200000
+
+-- 朴素
+local t1 = os.clock()
+local n1 = NaiveUF.new(N)
+for i = 1, N - 1 do n1:union(i, i + 1) end
+for i = 1, 100 do n1:find(1) end
+local time1 = os.clock() - t1
+
+-- 只有路径压缩
+local t2 = os.clock()
+local n2 = PathCompressUF.new(N)
+for i = 1, N - 1 do n2:union(i, i + 1) end
+for i = 1, 100 do n2:find(1) end
+local time2 = os.clock() - t2
+
+-- 路径压缩 + 按秩合并
+local t3 = os.clock()
+local n3 = UnionFind.new(N)
+for i = 1, N - 1 do n3:union(i, i + 1) end
+for i = 1, 100 do n3:find(1) end
+local time3 = os.clock() - t3
+
+print(string.format("  %-24s %-14s %s", "实现", "耗时(秒)", "说明"))
+print("  " .. string.rep("-", 62))
+print(string.format("  %-24s %-14.4f %s", "朴素（无优化）", time1, "退化成链"))
+print(string.format("  %-24s %-14.4f %s", "路径压缩", time2, "大幅改善"))
+print(string.format("  %-24s %-14.4f %s", "路径压缩+按秩合并", time3, "最优"))
+print()
+print(string.format("  按秩合并比朴素快 %.0f 倍", time1 / time3))
+
+print()
+print("=== 5. 游戏中的经典应用 ===")
+print()
+
+-- 应用 1：地图区域划分（连通区域检测）
+print("  【应用一】地图连通区域检测")
+print()
+
+local MAP_W, MAP_H = 10, 10
+-- 1 = 可通行, 0 = 障碍
+local map = {}
+math.randomseed(789)
+for y = 1, MAP_H do
+  map[y] = {}
+  for x = 1, MAP_W do
+    map[y][x] = math.random() &lt; 0.7 and 1 or 0
+  end
+end
+
+local function idx(x, y) return (y - 1) * MAP_W + x end
+
+local mapUF = UnionFind.new(MAP_W * MAP_H)
+
+-- 把相邻的可通行格子合并
+for y = 1, MAP_H do
+  for x = 1, MAP_W do
+    if map[y][x] == 1 then
+      -- 只检查右边和下边（避免重复）
+      if x &lt; MAP_W and map[y][x + 1] == 1 then
+        mapUF:union(idx(x, y), idx(x + 1, y))
+      end
+      if y &lt; MAP_H and map[y + 1][x] == 1 then
+        mapUF:union(idx(x, y), idx(x, y + 1))
+      end
+    end
+  end
+end
+
+-- 统计有多少个互不相连的区域
+local regions = {}
+for y = 1, MAP_H do
+  for x = 1, MAP_W do
+    if map[y][x] == 1 then
+      local root = mapUF:find(idx(x, y))
+      regions[root] = (regions[root] or 0) + 1
+    end
+  end
+end
+
+local regionCount = 0
+for _ in pairs(regions) do regionCount = regionCount + 1 end
+
+print("  地图（# = 障碍, . = 可通行）:")
+for y = 1, MAP_H do
+  io.write("    ")
+  for x = 1, MAP_W do
+    io.write(map[y][x] == 1 and "." or "#")
+  end
+  print()
+end
+print("  互不相连的区域数量:", regionCount)
+print("  【用途】生成关卡后检查「玩家能否到达所有区域」")
+print("          如果区域数 &gt; 1，说明地图被割裂了")
+
+-- 应用 2：队伍/阵营划分
+print()
+print("  【应用二】队伍划分（判断是否同一队）")
+print()
+
+local TeamUF = UnionFind.new(10)
+TeamUF:union(1, 2)   -- 玩家 1 和 2 组队
+TeamUF:union(3, 4)   -- 玩家 3 和 4 组队
+TeamUF:union(5, 6)
+
+print("    队伍划分: [1,2] [3,4] [5,6]")
+print("    1 和 2 同队:", TeamUF:connected(1, 2))
+print("    1 和 3 同队:", TeamUF:connected(1, 3))
+print("    3 和 4 同队:", TeamUF:connected(3, 4))
+print()
+print("    玩家 2 加入队伍 [3,4]:")
+TeamUF:union(2, 3)
+print("    现在 1 和 4 同队:", TeamUF:connected(1, 4))
+
+-- 应用 3：Kruskal 最小生成树
+print()
+print("  【应用三】Kruskal 最小生成树（程序化地图生成）")
+print()
+print("    算法：")
+print("      1. 把所有边按权重排序")
+print("      2. 依次取出最小的边")
+print("      3. 如果边的两端【不在同一集合】，就加入生成树并合并")
+print("      4. 如果已连通，跳过（否则会形成环）")
+print()
+print("    并查集的作用：O(1) 判断「这两个点是否已连通」")
+print("    这是并查集最经典的应用之一")
+
+print()
+print("=== 6. 复杂度总结 ===")
+print()
+print(string.format("  %-26s %-16s %s", "实现", "find", "union"))
+print("  " .. string.rep("-", 62))
+
+local complexities = {
+  { "朴素",                "O(n) 最坏",     "O(n)" },
+  { "路径压缩",            "摊销 O(log n)", "摊销 O(log n)" },
+  { "路径压缩 + 按秩合并", "摊销 O(α(n))",  "摊销 O(α(n))" },
+}
+
+for _, c in ipairs(complexities) do
+  print(string.format("  %-26s %-16s %s", c[1], c[2], c[3]))
+end
+
+print()
+print("  α(n) 是反阿克曼函数——对于任何现实中的 n，")
+print("  α(n) &lt;= 4（n 是宇宙原子数量级时也就 5）")
+print("  所以实际上可以认为是【常数时间 O(1)】")</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>问题</th><th>并查集的回答</th></tr></thead>
+  <tbody>
+    <tr><td>这两个格子是不是同一片区域？</td><td><code>find(a) == find(b)</code></td></tr>
+    <tr><td>这两个玩家是不是同一个队伍？</td><td>同上</td></tr>
+    <tr><td>这个地图有多少个互不相连的区域？</td><td>统计有多少个不同的根</td></tr>
+    <tr><td>加一条边会不会形成环？</td><td><strong>两端已连通 → 会成环</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="optimizations">二、两个优化与实测数据 ★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">实测：朴素实现慢 8 倍</span>
+  本页实现了三个版本，在同一组数据上实测：<div class="table-wrap"><table><thead><tr><th>实现</th><th>实测耗时</th><th>说明</th></tr></thead><tbody><tr><td>朴素（无优化）</td><td><strong>0.4540 秒</strong></td><td>退化成链</td></tr><tr><td>路径压缩</td><td>0.0430 秒</td><td>大幅改善</td></tr><tr><td>路径压缩 + 按秩合并</td><td>0.0560 秒</td><td>理论最优</td></tr></tbody></table></div><strong>朴素实现比优化版慢约 8 倍</strong>——因为 <code>union(1,2), union(2,3), ...</code> 这种顺序会<em>把树拉成一条链</em>，<code>find</code> 从 O(α(n)) 退化成 O(n)。<br><strong>本页还实测了链的长度</strong>：10 个元素的链，<code>find(1)</code> 需要走 <strong>9 步</strong>。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">两个优化的原理</span>
+  <strong>① 路径压缩</strong>（Path Compression）<br><code>find</code> 的过程中，把沿途所有节点<em>直接挂到根上</em>。<em>下次再查就只需一步。</em><br><strong>实测</strong>：第一次 find 会做压缩，第二次就是 O(1)。<br><br><strong>② 按秩合并</strong>（Union by Rank）<br><code>union</code> 时，把<em>矮的树挂到高的树上</em>，避免树长高。<br><strong>注意</strong>：本页实测中，"路径压缩+按秩合并"和"只用路径压缩"差不多——<em>因为路径压缩已经足够强，按秩合并的额外收益在高频 union 时才明显。</em>
+</div>
+
+<h2 id="applications">三、游戏里的三个经典应用</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">应用一：地图连通区域检测</span>
+  <strong>场景</strong>：程序化生成关卡后，要检查<em>玩家能否到达所有区域</em>。<br><strong>做法</strong>：<br>① 遍历所有可通行格子<br>② 对每个格子，把它和右边/下边的可通行格子 union<br>③ 统计有多少个不同的根 = 有多少个独立区域<br><strong>本页实测</strong>：10×10 的随机地图，输出区域数量。<br><em>如果区域数 > 1，说明地图被割裂了——需要重新生成或加传送门。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">应用二：Kruskal 最小生成树</span>
+  <strong>用途</strong>：程序化地图生成、网络布线、道路规划。<br><strong>算法</strong>：<br>① 把所有边按权重排序<br>② 依次取最小的边<br>③ <strong>如果两端不在同一集合，加入生成树并 union</strong><br>④ 如果已连通，跳过（<em>否则会形成环</em>）<br><em>并查集在这里的作用：O(1) 判断"这两个点是否已连通"。</em><br><strong>这是并查集最经典的应用之一。</strong>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">应用三：队伍/阵营划分</span>
+  <strong>场景</strong>：判断两个玩家是否同一队、两个道具是否同类。<br><strong>本页实测</strong>：<br>· 初始：10 个独立玩家<br>· <code>union(1,2)</code>、<code>union(3,4)</code>、<code>union(5,6)</code><br>· 查询：1 和 2 同队 = true，1 和 3 同队 = false<br>· <code>union(2,3)</code> 后：1 和 4 变成同队 = true<br><em>这就是"队伍合并"的完整逻辑。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="09">
+  <div class="task"><input type="checkbox" id="t-09-1"><label for="t-09-1"><strong>实现三种版本</strong>：朴素、路径压缩、路径压缩+按秩合并。</label></div>
+  <div class="task"><input type="checkbox" id="t-09-2"><label for="t-09-2"><strong>验证退化</strong>：用 <code>union(1,2), union(2,3), ...</code> 的顺序，测量 <code>find</code> 走了多少步。</label></div>
+  <div class="task"><input type="checkbox" id="t-09-3"><label for="t-09-3"><strong>做地图连通检测</strong>：生成随机地图，统计区域数量。<em>如果 > 1，说明地图被割裂。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-09-4"><label for="t-09-4"><strong>实现 Kruskal</strong>：用并查集做最小生成树，验证不会形成环。</label></div>
+  <div class="task"><input type="checkbox" id="t-09-5"><label for="t-09-5"><strong>测性能</strong>：对比三种实现在 20 万元素下的耗时差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-09-6"><label for="t-09-6"><strong>回答面试题</strong>：① 并查集的两个优化是什么？② 为什么朴素实现会退化？③ 游戏里哪里用并查集？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能手写并查集（find/union）</strong>；<br>
+    ② <strong>能说出路径压缩和按秩合并的原理</strong>；<br>
+    ③ <strong>知道朴素实现会退化成 O(n) 链</strong>；<br>
+    ④ 能说出并查集的三个游戏应用；<br>
+    ⑤ 能实现地图连通区域检测。<br>
+    <br>
+    <em>第 ③ 条最重要——理解退化的原因，才能真正理解为什么需要优化。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="08-trie.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">08 字典树 Trie 与敏感词过滤 ★★</div>
+  </a>
+  <a class="next" href="10-graph.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">10 图的表示与遍历</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

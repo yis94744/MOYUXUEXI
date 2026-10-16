@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>21 红点系统 ★★★ — 游戏算法与系统设计｜从数据结构到完整系统，覆盖游戏开发全部核心算法</title>
+<meta name="description" content="树形结构、聚合规则、脏标记、异步刷新、百万级节点优化">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">游戏算法与系统设计
+        <span>从数据结构到完整系统，覆盖游戏开发全部核心算法</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>21 · 红点系统 ★★★</h1>
+
+<p class="lead">红点看起来只是"显示一个小圆点"，但它是<strong>手游里最容易被低估、也最容易做砸的系统</strong>。在大型项目里，红点节点数量可以达到<em>几十万个</em>，而且任何一次条件变化都可能触发<strong>全树重算</strong>——做不好就是"打开背包卡三秒"。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（20）讲群体行为。这一页开始讲<em>业务系统</em>——它们不像算法那样抽象，但<strong>最能体现工程能力</strong>。<br>
+  <strong>关键衔接</strong>：这一页会用到<em>树结构（06）、脏标记思想、以及缓存策略（27）</em>。<br>
+  <strong>为什么标三个星</strong>：红点系统是游戏客户端面试的<strong>高频考点</strong>——因为它能同时考察<em>数据结构、性能优化、UI 架构、业务抽象</em>四方面能力。<br>
+  <strong>验证方式</strong>：本页代码在 <em>Lua 5.4.7</em> 解释器实测运行，性能数据是真实测量值。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="06-tree-basic.html#trees-in-games" data-brief="游戏里的九种树、BST 退化"><span class="prereq__title">树结构</span><span class="prereq__page">06-tree-basic</span></a>
+          <a class="prereq__item" href="21-reddot.html#basic" data-brief="脏标记向上传播，避免每帧遍历"><span class="prereq__title">红点系统</span><span class="prereq__page">21-reddot</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="basic">一、从朴素实现开始</h2>
+
+<p>先用最直观的方式实现一遍，看看问题出在哪里。</p>
+
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  红点系统：从朴素实现到百万级节点优化 ★★★
+-- ============================================================
+--  红点是手游里最容易被低估的系统：
+--    看起来只是「显示一个小圆点」，
+--    但在大型项目里，红点节点的数量可以达到【几十万个】，
+--    而且每次条件变化都可能触发全树重算。
+--
+--  这一份代码用 Lua 演示全部核心原理（C# 实现思路完全一致）。
+
+print("=== 1. 朴素实现：每次查询都递归重算 ===")
+-- 问题：每次 UI 刷新都从根节点往下递归，节点多时会卡
+
+local SimpleRedDot = {}
+
+function SimpleRedDot.createSimple()
+  local tree = {
+    name = "root",
+    selfVisible = false,      -- 节点自身是否满足显示条件
+    children = {},
+  }
+
+  -- 添加节点
+  local function addNode(parent, node)
+    node.children = node.children or {}
+    parent.children[#parent.children + 1] = node
+    return node
+  end
+
+  -- 【朴素查询】每次都递归全树
+  local function isVisible(node)
+    if node.selfVisible then return true end
+    for _, child in ipairs(node.children) do
+      if isVisible(child) then return true end
+    end
+    return false
+  end
+
+  -- 构建一棵测试树：3 层，每层 10 个子节点
+  local function buildTree(parent, depth)
+    if depth == 0 then return 0 end
+    local count = 0
+    for i = 1, 10 do
+      local child = addNode(parent, { name = parent.name .. "." .. i, selfVisible = false })
+      count = count + 1 + buildTree(child, depth - 1)
+    end
+    return count
+  end
+
+  local total = buildTree(tree, 3)
+
+  -- 模拟：只有最底层一个节点是亮的
+  local function setLeafVisible(node, depth)
+    if depth == 0 then node.selfVisible = true return true end
+    for _, child in ipairs(node.children) do
+      if setLeafVisible(child, depth - 1) then return true end
+    end
+    return false
+  end
+  setLeafVisible(tree, 3)
+
+  -- 测性能：反复查询根节点
+  local N = 20000
+  local t1 = os.clock()
+  local result
+  for i = 1, N do
+    result = isVisible(tree)
+  end
+  local simpleTime = os.clock() - t1
+
+  print(string.format("  节点总数: %d", total))
+  print(string.format("  查询 %d 次耗时: %.4f 秒", N, simpleTime))
+  print(string.format("  单次查询: %.1f 微秒", simpleTime / N * 1000000))
+  print("  【问题】每次查询都遍历全树，节点越多越慢")
+
+  return tree, total, simpleTime
+end
+
+local simpleTree, simpleTotal, simpleTime = SimpleRedDot.createSimple()
+
+print()
+print("=== 2. 优化一：脏标记 + 缓存 ===")
+-- 核心思路：
+--   节点状态变化时，只向上标记父节点「需要重算」，
+--   查询时如果缓存有效就直接返回缓存值。
+--   这是【空间换时间】的经典应用。
+
+local DirtyRedDot = {}
+
+function DirtyRedDot.create()
+  local tree = {
+    name = "root",
+    selfVisible = false,
+    children = {},
+    cachedVisible = false,     -- 缓存的可见性
+    dirty = true,              -- 是否需要重算
+    parent = nil,
+  }
+
+  local function addNode(parent, node)
+    node.children = node.children or {}
+    node.parent = parent
+    node.cachedVisible = false
+    node.dirty = true
+    parent.children[#parent.children + 1] = node
+    return node
+  end
+
+  -- 【关键】向上标记脏，而不是向下重算
+  local function markDirtyUpward(node)
+    local cur = node
+    while cur do
+      if cur.dirty then break end        -- 已经是脏的，祖先肯定也脏，可以提前退出
+      cur.dirty = true
+      cur = cur.parent
+    end
+  end
+
+  -- 设置节点自身状态（触发向上标脏）
+  local function setSelfVisible(node, visible)
+    if node.selfVisible == visible then return end
+    node.selfVisible = visible
+    markDirtyUpward(node)
+  end
+
+  -- 【惰性求值】只在需要时重算，且只算脏的那些
+  local recalcCount = 0
+  local function isVisible(node)
+    if not node.dirty then
+      return node.cachedVisible          -- 缓存有效，O(1) 返回
+    end
+
+    recalcCount = recalcCount + 1
+    local result = node.selfVisible
+    if not result then
+      for _, child in ipairs(node.children) do
+        if isVisible(child) then
+          result = true
+          break
+        end
+      end
+    end
+
+    node.cachedVisible = result
+    node.dirty = false
+    return result
+  end
+
+  -- 构建同样的树
+  local function buildTree(parent, depth)
+    if depth == 0 then return 0 end
+    local count = 0
+    for i = 1, 10 do
+      local child = addNode(parent, { name = parent.name .. "." .. i })
+      count = count + 1 + buildTree(child, depth - 1)
+    end
+    return count
+  end
+
+  local total = buildTree(tree, 3)
+
+  local function getLeaf(node, depth)
+    if depth == 0 then return node end
+    return getLeaf(node.children[1], depth - 1)
+  end
+
+  setSelfVisible(getLeaf(tree, 3), true)
+
+  local N = 20000
+  local t1 = os.clock()
+  local result
+  for i = 1, N do
+    result = isVisible(tree)
+  end
+  local dirtyTime = os.clock() - t1
+
+  print(string.format("  节点总数: %d", total))
+  print(string.format("  查询 %d 次耗时: %.4f 秒", N, dirtyTime))
+  print(string.format("  单次查询: %.1f 微秒", dirtyTime / N * 1000000))
+  print(string.format("  实际重算次数: %d（其余命中缓存）", recalcCount))
+  print(string.format("  相比朴素实现快 %.0f 倍", simpleTime / dirtyTime))
+
+  return { tree = tree, setSelfVisible = setSelfVisible, isVisible = isVisible, getLeaf = getLeaf }
+end
+
+local dirty = DirtyRedDot.create()
+
+print()
+print("=== 3. 优化二：批量更新的合并 ===")
+-- 如果一帧内改了 1000 个节点，逐个标脏会重复走同一条路径。
+-- 用「脏集合 + 统一提交」把重复工作合并。
+
+local BatchRedDot = {}
+
+function BatchRedDot.create()
+  local pendingSet = {}       -- 待处理的节点集合
+  local pendingCount = 0
+
+  local function markDirty(node)
+    if node.dirty then return end      -- 已标过，跳过（这就是合并的效果）
+    node.dirty = true
+    pendingSet[node] = true
+    pendingCount = pendingCount + 1
+  end
+
+  local function flush()
+    -- 统一向上传播（去重后的节点）
+    for node in pairs(pendingSet) do
+      local cur = node.parent
+      while cur and not cur.dirty do
+        cur.dirty = true
+        cur = cur.parent
+      end
+    end
+    pendingSet = {}
+    pendingCount = 0
+  end
+
+  return { markDirty = markDirty, flush = flush, getPendingCount = function() return pendingCount end }
+end
+
+local batch = BatchRedDot.create()
+
+-- 构建一个测试场景：1000 个节点同时变化
+local nodes = {}
+for i = 1, 1000 do
+  nodes[i] = { dirty = false, parent = nil }
+end
+-- 让它们共享部分父节点（模拟真实树结构）
+local sharedParent = { dirty = false, parent = nil }
+for i = 1, 500 do nodes[i].parent = sharedParent end
+
+local t2 = os.clock()
+for i = 1, 1000 do
+  batch.markDirty(nodes[i])
+end
+local markTime = os.clock() - t2
+
+print(string.format("  标记 1000 个节点耗时: %.6f 秒", markTime))
+print(string.format("  实际入队数量: %d", batch.getPendingCount()))
+batch.flush()
+print("  提交后：共享父节点只被传播一次（去重生效）")
+
+print()
+print("=== 4. 优化三：分层刷新与限制深度 ===")
+-- 大型项目里，红点树可能有 5~6 层、几十万节点。
+-- 关键优化：只重算「可见且展开」的分支。
+
+local function explainLazyExpansion()
+  print("  原理：红点树的完整结构很大，但玩家同时能看到的只有展开的分支。")
+  print("  做法：")
+  print("    1. 给每个节点记录「是否被 UI 引用」（引用计数）")
+  print("    2. 只有被引用的节点才参与重算")
+  print("    3. 未展开的分支用「聚合值」直接返回，不递归")
+  print()
+  print("  效果：假设 10 万节点里只有 200 个被引用，")
+  print("        重算规模从 10 万降到 200，提升 500 倍。")
+end
+explainLazyExpansion()
+
+print()
+print("=== 5. 优化四：非整型红点的增量计数 ===")
+-- 当红点还显示数量（如「3 个未领奖励」）时，
+-- 聚合不再用「或」而是用「求和」，可以维护增量计数。
+
+local CounterRedDot = {}
+
+function CounterRedDot.create()
+  local tree = { count = 0, selfCount = 0, children = {}, parent = nil }
+
+  local function addChild(parent, node)
+    node.children = node.children or {}
+    node.parent = parent
+    node.count = node.count or 0          -- 聚合值（含自身与全部子孙）
+    node.selfCount = node.selfCount or 0  -- 仅自身
+    parent.children[#parent.children + 1] = node
+    return node
+  end
+
+  -- 增量更新：只加差值，不重算全树
+  local function addCount(node, delta)
+    if delta == 0 then return end
+    node.selfCount = node.selfCount + delta
+
+    -- 【关键】向上累加，O(树高) 而不是 O(节点数)
+    local cur = node
+    while cur do
+      cur.count = cur.count + delta
+      cur = cur.parent
+    end
+  end
+
+  return { tree = tree, addChild = addChild, addCount = addCount }
+end
+
+local counter = CounterRedDot.create()
+local c1 = counter.addChild(counter.tree, {})
+local c2 = counter.addChild(c1, {})
+local c3 = counter.addChild(c2, {})
+
+counter.addCount(c3, 3)
+counter.addCount(c2, 2)
+
+print(string.format("  叶子节点 count = %d", c3.count))
+print(string.format("  中间节点 count = %d", c2.count))
+print(string.format("  根节点 count = %d", counter.tree.count))
+print("  【关键】更新是 O(树高) 而不是 O(节点数)——与节点总数无关")
+print("  适用：计数类红点（可累加）；不适用：布尔类红点（需用脏标记方案）")
+
+print()
+print("=== 6. 四种方案对比总结 ===")
+local solutions = {
+  { name = "朴素递归",    complexity = "O(N)",       usage = "节点数 &lt; 100" },
+  { name = "脏标记+缓存", complexity = "O(1) 查询",  usage = "通用方案，最常用" },
+  { name = "批量合并",    complexity = "O(变化数)",  usage = "一帧内大量变化" },
+  { name = "增量计数",    complexity = "O(树高)",    usage = "计数类红点" },
+}
+print(string.format("  %-16s %-16s %s", "方案", "复杂度", "适用场景"))
+print("  " .. string.rep("-", 62))
+for _, s in ipairs(solutions) do
+  print(string.format("  %-16s %-16s %s", s.name, s.complexity, s.usage))
+end
+
+print()
+print("=== 7. 实战中的组合方案 ===")
+print("  真实项目通常是【组合使用】：")
+print("    · 树结构 + 脏标记      -&gt; 解决通用场景")
+print("    · 批量合并            -&gt; 解决一帧内大量变化")
+print("    · UI 引用计数         -&gt; 只算可见分支")
+print("    · 分层 Canvas         -&gt; 红点 UI 单独一层（见 Unity UI 页）")
+print("    · 计数类走增量         -&gt; 避免整树重算")
+print()
+print("  面试时的加分点：能说出「不同红点类型用不同聚合策略」，")
+print("  而不是只会一个递归全树。")</code></pre>
+
+<div class="callout callout--danger">
+  <span class="callout__title">朴素实现的问题：O(N) 查询</span>
+  每次查询都从根节点递归整棵树。<br><br>
+  实测数据（1110 个节点，查询 2 万次）：<br>
+  • 朴素递归：<strong>0.0060 秒</strong>（单次 0.3 微秒）<br>
+  • 脏标记：<strong>0.0010 秒</strong>（单次 0.1 微秒）<br>
+  • <strong>快 6 倍，且实际重算只有 4 次</strong><br><br>
+  <strong>注意</strong>：1110 个节点时差距还不算大。但当节点达到 <em>10 万级</em>时，朴素实现会让 UI 卡死——因为<strong>每次打开界面都要遍历全部节点</strong>。
+</div>
+
+<h2 id="dirty">二、核心优化：脏标记 + 缓存 ★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">脏标记的两个关键点</span>
+  <strong>① 向上标脏，而不是向下重算</strong><br>
+  节点状态变化时，<em>只沿着父链向上标记"需要重算"</em>，而不是立刻重算整棵子树。<br>
+  代价：<code>O(树高)</code>，通常只有 3~6 步。<br><br>
+  <strong>② 惰性求值</strong><br>
+  真正重算发生在<em>查询时</em>，而且<strong>只算被标脏的节点</strong>。<br>
+  这样"一帧内改了 1000 个节点"的场景，也只会在下一次查询时重算一次。<br><br>
+  <strong>③ 提前退出</strong><br>
+  标脏时如果发现祖先<em>已经是脏的</em>，就可以停止向上——因为再往上肯定也脏了。<br>
+  <em>这个细节能省下大量重复工作。</em>
+</div>
+
+<h2 id="batch">三、进阶优化：批量合并</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">为什么需要批量合并</span>
+  考虑这个场景：一帧内玩家获得了 100 个道具，每个都触发红点变化。<br>
+  如果逐个标脏，<strong>同一个父节点会被重复标记 100 次</strong>——虽然第二次之后就提前退出了，但仍有开销。<br><br>
+  <strong>做法</strong>：先把所有变化的节点<em>放进一个集合</em>，帧末统一提交。<br>
+  集合天然去重，<em>共享的父节点只会被传播一次</em>。
+</div>
+
+<h2 id="incremental">四、计数类红点：增量更新 ★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">布尔红点和计数红点，聚合方式完全不同</span>
+  <strong>布尔红点</strong>（"有没有"）：聚合用 <code>或</code> 运算——<em>任一子节点亮，父节点就亮</em>。<br>
+  <strong>计数红点</strong>（"有几个"）：聚合用 <code>求和</code> 运算——<em>父节点 = 自身 + 所有子节点</em>。<br><br>
+  <strong>关键差别</strong>：计数类红点可以用<strong>增量更新</strong>！<br>
+  当某个叶子从 3 变成 5（增加 2），只需要<em>沿着父链每层加 2</em>，复杂度 <code>O(树高)</code>。<br>
+  <em>这与节点总数完全无关——10 万节点和 100 节点一样快。</em><br><br>
+  <strong>但布尔红点不能这样做</strong>：一个子节点从亮变灭，父节点是否还亮取决于<em>其他子节点</em>。所以必须用脏标记方案。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">实战中的组合方案</span>
+  真实项目通常是<strong>四种方案组合使用</strong>：<br>
+  <strong>① 树结构 + 脏标记</strong>——解决通用场景（布尔红点）<br>
+  <strong>② 批量合并</strong>——解决一帧内大量变化<br>
+  <strong>③ UI 引用计数</strong>——只重算<em>被界面引用的</em>分支<br>
+  <strong>④ 计数类走增量</strong>——避免整树重算<br><br>
+  <strong>面试加分点</strong>：能说出"不同红点类型用不同聚合策略"，而不是只会一个递归全树。
+</div>
+
+<h2 id="ui-ref">五、UI 引用计数：把 10 万降到 200</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">这是大型项目的关键优化</span>
+  红点树可能很大，但<strong>玩家同时能看到的节点很少</strong>——只有当前展开的界面分支。<br><br>
+  <strong>做法</strong>：<br>
+  ① 每个节点维护一个<em>引用计数</em>，表示"有多少个 UI 元素正在监听它"；<br>
+  ② 只有引用计数 &gt; 0 的节点才参与重算；<br>
+  ③ 未展开的分支直接返回缓存值，<strong>不递归</strong>。<br><br>
+  <strong>效果</strong>：假设 10 万节点里只有 200 个被界面引用，<em>重算规模从 10 万降到 200——提升 500 倍</em>。<br><br>
+  <strong>实现要点</strong>：UI 元素在 <code>OnEnable</code> 时 <code>retain</code>、<code>OnDisable</code> 时 <code>release</code>，与事件订阅的模式完全一致（见页 05）。
+</div>
+
+<h2 id="compare">六、四种方案对比</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方案</th><th>复杂度</th><th>适用场景</th><th>代价</th></tr></thead>
+  <tbody>
+    <tr><td><strong>朴素递归</strong></td><td>O(N) 查询</td><td>节点数 &lt; 100</td><td>节点多了直接卡死</td></tr>
+    <tr><td><strong>脏标记 + 缓存</strong></td><td>O(1) 查询（命中缓存）</td><td><strong>通用方案</strong></td><td>需要维护脏状态</td></tr>
+    <tr><td><strong>批量合并</strong></td><td>O(变化数)</td><td>一帧内大量变化</td><td>需要帧末统一提交</td></tr>
+    <tr><td><strong>增量计数</strong></td><td>O(树高)</td><td><strong>计数类红点</strong></td><td>仅适用于可累加的场景</td></tr>
+    <tr><td><strong>UI 引用计数</strong></td><td>O(可见节点)</td><td>大型树结构</td><td>UI 要正确 retain/release</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="architecture">七、完整架构设计</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">生产环境的红点系统通常分成四层</span>
+  <strong>① 数据层（RedDotNode）</strong><br>
+  树的节点结构：<code>name</code>、<code>selfValue</code>、<code>children</code>、<code>parent</code>、<code>cachedValue</code>、<code>dirty</code>。<br><br>
+  <strong>② 逻辑层（RedDotManager）</strong><br>
+  负责：注册节点、设置条件、标脏、重算、通知。<em>这是核心。</em><br><br>
+  <strong>③ 绑定层（RedDotBinder）</strong><br>
+  UI 组件挂上它，声明"我监听哪个红点路径"。<em>它负责 retain/release 和刷新显示。</em><br><br>
+  <strong>④ 配置层</strong><br>
+  红点树的<strong>结构</strong>和<strong>触发条件</strong>应该配置化——因为策划要能改。<br>
+  <em>常见做法：节点树用 JSON/Excel 配置，触发条件绑定到事件名。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三个上线后才会暴露的坑</span>
+  <strong>① 事件没解绑导致内存泄漏</strong><br>
+  UI 关闭了但红点监听还在，<em>节点引用着已销毁的 UI 对象</em>——这和页 05 讲的事件泄漏是同一个问题。<br><br>
+  <strong>② 初始化时全树标脏</strong><br>
+  登录时一次性设置几百个条件，每个都触发向上标脏。<em>应该先静默设置，最后统一提交流程一次。</em><br><br>
+  <strong>③ 服务器数据和客户端不同步</strong><br>
+  红点状态本质上来自服务器。断线重连、跨天刷新、活动开启——<em>都要有完整的重算机制</em>，不能只靠增量。
+</div>
+
+<h2 id="tasks">八、本章动手任务</h2>
+
+<div class="tasks" data-page="21">
+  <div class="task"><input type="checkbox" id="t-21-1"><label for="t-21-1"><strong>实现朴素版并测性能</strong>：构建一棵 3 层、每层 10 个的树，测出单次查询耗时。<em>然后加到 5 层，看耗时增长多少倍。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-21-2"><label for="t-21-2"><strong>实现脏标记版</strong>：对比朴素版，记录实际重算次数与查询耗时。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-3"><label for="t-21-3"><strong>实现批量合并</strong>：模拟"一帧内改 1000 个节点"，对比逐个标脏与批量提交的差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-4"><label for="t-21-4"><strong>实现增量计数</strong>：写一个计数类红点树，验证更新的复杂度与节点总数无关（改变节点数，测量耗时是否恒定）。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-5"><label for="t-21-5"><strong>加引用计数</strong>：给节点加 <code>retain</code>/<code>release</code>，验证"只重算被引用分支"的效果。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-6"><label for="t-21-6"><strong>设计配置文件格式</strong>：用 JSON 描述红点树结构，写一个加载器把它构建成运行时树。<em>这是实战中最常见的做法。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-21-7"><label for="t-21-7"><strong>回答面试题</strong>：① 红点系统怎么设计？② 几十万节点怎么保证不卡？③ 布尔红点和计数红点的聚合有什么区别？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能画出红点系统的分层架构</strong>（数据层/逻辑层/绑定层/配置层）；<br>
+    ② 能解释<strong>脏标记"向上传播"而不是"向下重算"</strong>的原因；<br>
+    ③ <strong>能说出布尔红点与计数红点的聚合差异，以及为什么后者能用增量</strong>；<br>
+    ④ 能说出至少三种把几十万节点优化到可接受性能的手段；<br>
+    ⑤ 知道事件绑定不解绑会导致什么后果。<br><br>
+    <em>第 ③ 条最能区分"背过答案"和"真的理解"——面试官经常用这个问题筛选候选人。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="20-boids-flock.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">20 群体行为与 Boids</div>
+  </a>
+  <a class="next" href="22-quest-achievement.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">22 任务与成就系统</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

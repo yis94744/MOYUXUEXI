@@ -1,0 +1,85 @@
+<h1>08 · 并发与性能 ★★</h1>
+
+<p class="lead">3A 游戏必须<strong>榨干多核 CPU</strong>。这一页讲 C++ 并发的三个层次：<em>线程、任务、无锁</em>，以及<strong>游戏里什么时候真的需要它们</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="levels">一、性能优化的三个层次</h2>
+
+<p>性能优化有<strong>明确的优先级</strong>。<em>跳过前两层直接做并行，通常得不偿失。</em></p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>层次</th><th>手段</th><th>收益</th><th>难度</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1. 算法</strong></td><td>换数据结构、减少复杂度</td><td><span class="mk mk--yes">10~1000 倍</span></td><td>中</td></tr>
+    <tr><td><strong>2. 编译器</strong></td><td>inline、const、减少拷贝</td><td><span class="mk mk--warn">1.5~3 倍</span></td><td>低</td></tr>
+    <tr><td><strong>3. 并行</strong></td><td>多线程、SIMD</td><td><span class="mk mk--warn">2~8 倍</span></td><td><span class="mk mk--no">高</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">为什么并行要放最后</span>
+  <strong>并行的代价远高于收益</strong>：<br>· <em>数据竞争</em>——最难排查的 bug 类型<br>· <em>死锁</em>——随机出现，难复现<br>· <em>调试困难</em>——断点会改变时序<br>· <strong>加速比有上限</strong>（阿姆达尔定律）<br><br><strong>阿姆达尔定律</strong>：<em>如果 20% 的代码不能并行，那么即使无限多核，最多也只能快 5 倍。</em><br><br><strong>正确顺序</strong>：<em>先测量 → 优化算法 → 再考虑并行。</em>
+</div>
+
+<h2 id="threads">二、游戏里的三种并发方案</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方案</th><th>适用</th><th>UE 的对应</th></tr></thead>
+  <tbody>
+    <tr><td><strong>std::thread</strong></td><td><em>少数长期任务</em></td><td><code>FRunnable</code></td></tr>
+    <tr><td><strong>任务队列</strong></td><td><strong>大量短期任务</strong></td><td><code>AsyncTask</code></td></tr>
+    <tr><td><strong>Job System</strong></td><td>数据并行计算</td><td><code>ParallelFor</code></td></tr>
+    <tr><td><strong>SIMD</strong></td><td>向量化计算</td><td>编译器自动 / <code>ISPC</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">UE 的 ParallelFor：最常用的并行工具</span>
+  <strong>场景</strong>：10000 个物体做相同的计算。<br><code>ParallelFor(Count, [&amp;](int32 i) {</code><br><code>&nbsp;&nbsp;Data[i] = Compute(Data[i]);</code><br><code>});</code><br><em>UE 会自动分配到多个线程。</em><br><br><strong>限制</strong>：<br>· <em>每个迭代必须独立</em>——不能有依赖<br>· <em>不能在 lambda 里分配内存</em>（<em>会有锁竞争</em>）<br>· <em>不能用 UE 的 UObject API</em>（<em>不是线程安全的</em>）<br><br><strong>加速比</strong>：<em>8 核通常能到 5~6 倍</em>（<em>不是 8 倍，因为有调度开销</em>）。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三个最常见的并发 bug</span>
+  <strong>① 数据竞争（Data Race）</strong><br>两个线程同时读写同一变量。<em>结果不确定——可能对、可能错、可能崩溃。</em><br><strong>解法</strong>：用原子变量或加锁。<br><br><strong>② 死锁（Deadlock）</strong><br>线程 A 持有锁 1 等锁 2，线程 B 持有锁 2 等锁 1。<br><em>两个都永远等下去。</em><br><strong>解法</strong>：<em>统一加锁顺序</em>，或用 <code>std::scoped_lock</code>（<em>C++17 能同时锁多个</em>）。<br><br><strong>③ 悬垂引用</strong><br>线程还在用某个对象，主线程把它销毁了。<br><strong>解法</strong>：<em>引用计数（shared_ptr）或等待线程结束</em>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="08">
+  <div class="task"><input type="checkbox" id="t-08-1"><label for="t-08-1"><strong>测 ParallelFor</strong>：写一个 10000 次的计算，对比单线程和 ParallelFor 的耗时。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-2"><label for="t-08-2"><strong>制造数据竞争</strong>：两个线程同时累加一个变量，观察结果不对。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-3"><label for="t-08-3"><strong>用原子修复</strong>：改成 <code>std::atomic</code>，验证结果正确。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-4"><label for="t-08-4"><strong>测加速比</strong>：用不同的线程数跑同一个任务，画出加速曲线。<em>观察它是不是线性的。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-08-5"><label for="t-08-5"><strong>回答面试题</strong>：① 并行为什么要放最后？② 阿姆达尔定律是什么？③ 三个常见的并发 bug？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道性能优化的三个层次及顺序</strong>；<br>
+    ② 能说出阿姆达尔定律的含义；<br>
+    ③ <strong>知道 UE 的 ParallelFor 及三个限制</strong>；<br>
+    ④ <strong>能说出三个并发 bug 及解法</strong>；<br>
+    ⑤ 有一次"测量并行加速比"的实验。<br>
+    <br>
+    <em>第 ① 条最重要——**"并行放最后"这条原则能帮你避免大量无用功**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="07-cpp-modern.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">07 现代 C++（11/14/17/20）★★</div>
+  </a>
+  <a class="next" href="09-cpp-build.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">09 构建系统与工具链</div>
+  </a>
+</nav>

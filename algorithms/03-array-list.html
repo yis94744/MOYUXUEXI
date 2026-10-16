@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03 数组、动态数组与环形缓冲 — 游戏算法与系统设计｜从数据结构到完整系统，覆盖游戏开发全部核心算法</title>
+<meta name="description" content="连续内存、扩容策略、环形队列、复用缓冲区">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">游戏算法与系统设计
+        <span>从数据结构到完整系统，覆盖游戏开发全部核心算法</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>03 · 数组、动态数组与环形缓冲</h1>
+
+<p class="lead">这是最基础的结构，但游戏里有<strong>三个高频陷阱</strong>：<em>环形缓冲的索引计算、数组与哈希的性能差异、以及如何复用缓冲区避免 GC</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（02）讲复杂度。这一页开始讲具体结构。
+  <strong>关键衔接</strong>：页 26 的<em>性能模式库</em>会反复用到"复用缓冲区"这个技巧。
+  <strong>下一页</strong>（04）链表与栈队列。<em>链表在游戏里用得少，但栈和队列非常多。</em>
+  <strong>验证方式</strong>：本页代码在 Lua 5.4.7 实测运行，<em>包括环形缓冲的索引环绕与覆盖行为</em>。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="02-complexity.html#budget" data-brief="每帧 16.7ms，单系统 1~2ms 预算"><span class="prereq__title">复杂度直觉</span><span class="prereq__page">02-complexity</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="why-array">一、为什么数组最快</h2>
+
+<p>数组的优势<strong>不是算法复杂度</strong>，而是<em>缓存友好</em>——这是硬件层面的优势。</p>
+
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  数组、动态数组与环形缓冲
+-- ============================================================
+--  这是最基础的结构，但游戏里有三个高频陷阱：
+--    ① 环形缓冲的索引计算
+--    ② 数组 vs 哈希表的性能差异
+--    ③ 复用缓冲区（避免 GC）
+
+print("=== 1. 为什么数组最快 ===")
+print()
+print("  数组的核心优势【不是算法复杂度】，而是【缓存友好】：")
+print()
+print("    连续内存 -&gt; CPU 一次加载 64 字节缓存行 -&gt; 后续访问全部命中")
+print("    链表/哈希 -&gt; 数据散落各处 -&gt; 每次访问都可能缓存未命中")
+print()
+print("  这就是为什么 Unity 的 DOTS/ECS 强调 SoA（结构体数组）布局。")
+print()
+
+-- 实测：数组 vs 哈希表的遍历
+local N = 500000
+
+local arr = {}
+for i = 1, N do arr[i] = i end
+
+local hash = {}
+for i = 1, N do hash[i] = i end
+
+local function bench(fn, times)
+  local t = os.clock()
+  for i = 1, (times or 1) do fn() end
+  return os.clock() - t
+end
+
+local tArr = bench(function()
+  local sum = 0
+  for i = 1, N do sum = sum + arr[i] end
+  return sum
+end, 3)
+
+local tHash = bench(function()
+  local sum = 0
+  for i = 1, N do sum = sum + hash[i] end
+  return sum
+end, 3)
+
+print(string.format("  数组顺序遍历 %d 次: %.4f 秒", N, tArr))
+print(string.format("  哈希(整数key) %d 次: %.4f 秒", N, tHash))
+print(string.format("  数组快 %.2f 倍", tHash / tArr))
+print("  【说明】Lua 的 table 对连续整数 key 会走数组部分，所以差距不大。")
+print("          在 C#/C++ 里，数组与哈希表的差距会更明显（可能有 5~10 倍）。")
+
+print()
+print("=== 2. 动态数组（自动扩容）===")
+
+local DynamicArray = {}
+DynamicArray.__index = DynamicArray
+
+function DynamicArray.new(initialCapacity)
+  return setmetatable({
+    data = {},
+    count = 0,
+    capacity = initialCapacity or 8,
+    growCount = 0,           -- 统计扩容次数
+  }, DynamicArray)
+end
+
+function DynamicArray:add(value)
+  if self.count &gt;= self.capacity then
+    -- 扩容：通常是【翻倍】
+    -- 为什么翻倍？这样每次插入的【摊销成本】是 O(1)
+    self.capacity = self.capacity * 2
+    self.growCount = self.growCount + 1
+  end
+
+  self.count = self.count + 1
+  self.data[self.count] = value
+end
+
+function DynamicArray:get(index)
+  if index &lt; 1 or index &gt; self.count then
+    return nil, "索引越界"
+  end
+  return self.data[index]
+end
+
+function DynamicArray:removeLast()
+  if self.count == 0 then return nil end
+  local v = self.data[self.count]
+  self.data[self.count] = nil
+  self.count = self.count - 1
+  return v
+end
+
+-- 演示扩容过程
+local da = DynamicArray.new(1)
+print("  初始容量: 1")
+print()
+print("  插入过程（观察扩容时机）:")
+for i = 1, 10 do
+  local capBefore = da.capacity
+  da:add(i)
+  if da.capacity ~= capBefore then
+    print(string.format("    插入第 %2d 个元素: 容量 %d -&gt; %d", i, capBefore, da.capacity))
+  end
+end
+print(string.format("  最终: %d 个元素, 容量 %d, 扩容 %d 次", da.count, da.capacity, da.growCount))
+print()
+print("  【关键】容量按 1,2,4,8,16 翻倍 -&gt; 总复制成本是 1+2+4+...+n = 2n")
+print("          摊到每次插入 = O(1) —— 这就是【摊销分析】")
+
+print()
+print("=== 3. 环形缓冲（Ring Buffer）★★★ ===")
+print()
+print("  环形缓冲解决的问题：")
+print("    · 固定大小的先进先出队列")
+print("    · 【零分配】—— 复用同一块内存")
+print("    · 游戏里到处都在用：输入缓冲、聊天记录、日志、音频")
+print()
+print("  核心技巧：【取模运算】让索引绕回来")
+print("    nextIndex = (currentIndex % capacity) + 1")
+print()
+
+local RingBuffer = {}
+RingBuffer.__index = RingBuffer
+
+function RingBuffer.new(capacity)
+  return setmetatable({
+    data = {},
+    capacity = capacity,
+    head = 1,            -- 读位置
+    tail = 1,            -- 写位置
+    count = 0,
+  }, RingBuffer)
+end
+
+function RingBuffer:isFull() return self.count == self.capacity end
+function RingBuffer:isEmpty() return self.count == 0 end
+
+function RingBuffer:push(value)
+  if self:isFull() then
+    -- 满了：覆盖最旧的数据（也可选择返回 false）
+    self.data[self.tail] = value
+    self.tail = (self.tail % self.capacity) + 1    -- 环形前进
+    self.head = self.tail                          -- 读位置跟着走
+    return false, "缓冲区已满，覆盖了最旧的数据"
+  end
+
+  self.data[self.tail] = value
+  self.tail = (self.tail % self.capacity) + 1
+  self.count = self.count + 1
+  return true
+end
+
+function RingBuffer:pop()
+  if self:isEmpty() then return nil end
+
+  local value = self.data[self.head]
+  self.data[self.head] = nil
+  self.head = (self.head % self.capacity) + 1
+  self.count = self.count - 1
+  return value
+end
+
+function RingBuffer:peek()
+  if self:isEmpty() then return nil end
+  return self.data[self.head]
+end
+
+function RingBuffer:toTable()
+  local result = {}
+  local idx = self.head
+  for i = 1, self.count do
+    result[i] = self.data[idx]
+    idx = (idx % self.capacity) + 1
+  end
+  return result
+end
+
+-- 演示：容量 5 的环形缓冲
+print("  容量为 5 的环形缓冲：")
+local rb = RingBuffer.new(5)
+
+print("    依次压入 1~7:")
+for i = 1, 7 do
+  local ok, msg = rb:push(i)
+  if not ok then
+    print(string.format("      push(%d) -&gt; 满了，覆盖最旧的", i))
+  end
+end
+
+print("    当前内容:", table.concat(rb:toTable(), ", "))
+print("    只保留了最后 5 个（1 和 2 被覆盖）")
+
+print()
+print("    弹出两个:")
+print("      pop() =", rb:pop())
+print("      pop() =", rb:pop())
+print("    剩余:", table.concat(rb:toTable(), ", "))
+
+print()
+print("    再压入 8, 9:")
+rb:push(8)
+rb:push(9)
+print("    当前:", table.concat(rb:toTable(), ", "))
+
+print()
+print("=== 4. 环形缓冲的经典应用 ===")
+print()
+
+-- 应用 1：输入缓冲（格斗游戏的连招检测）
+print("  【应用一】格斗游戏的连招检测")
+print()
+
+local InputBuffer = RingBuffer.new(10)
+local COMBO_WINDOW = 0.5      -- 连招窗口：0.5 秒
+
+-- 模拟玩家输入
+local function recordInput(action, timestamp)
+  InputBuffer:push({ action = action, time = timestamp })
+end
+
+-- 检测连招：在时间窗口内是否出现指定的按键序列
+local function detectCombo(sequence, currentTime)
+  local seqIndex = #sequence
+  local idx = InputBuffer.head
+  local found = {}
+
+  -- 从新到旧遍历
+  for i = 1, InputBuffer.count do
+    local pos = ((InputBuffer.tail - i) % InputBuffer.capacity)
+    if pos == 0 then pos = InputBuffer.capacity end
+
+    local entry = InputBuffer.data[pos]
+    if entry and currentTime - entry.time &lt;= COMBO_WINDOW then
+      if entry.action == sequence[seqIndex] then
+        found[#found + 1] = entry.action
+        seqIndex = seqIndex - 1
+        if seqIndex == 0 then return true end
+      end
+    end
+  end
+  return false
+end
+
+recordInput("P", 0.0)
+recordInput("P", 0.1)
+recordInput("K", 0.2)
+print("    输入序列: P, P, K")
+print("    检测 [P,P,K] 连招:", detectCombo({"P","P","K"}, 0.25))
+
+-- 应用 2：帧时间记录（用于性能分析）
+print()
+print("  【应用二】帧时间记录（性能分析）")
+print()
+
+local FrameTimeBuffer = RingBuffer.new(60)   -- 记录最近 60 帧
+math.randomseed(42)
+for i = 1, 100 do
+  -- 模拟帧时间（毫秒），偶尔有卡顿帧
+  local ft = 16.7 + (math.random() &lt; 0.1 and math.random(20, 50) or 0)
+  FrameTimeBuffer:push(ft)
+end
+
+local times = FrameTimeBuffer:toTable()
+local sum, max = 0, 0
+for _, t in ipairs(times) do
+  sum = sum + t
+  if t &gt; max then max = t end
+end
+print(string.format("    最近 60 帧：平均 %.1f ms, 最大 %.1f ms", sum / #times, max))
+print("    （这就是游戏内 FPS 显示的原理）")
+
+-- 应用 3：对象池
+print()
+print("  【应用三】对象池")
+print()
+print("    环形缓冲也可以做对象池（比栈简单，但要注意复用顺序）:")
+print("      · 优点：完全零分配")
+print("      · 缺点：满了会覆盖，不适合「不能丢」的场景")
+print("      · 更常用的对象池是【栈】：后进先出，容量不足就扩展")
+
+print()
+print("=== 5. 三个结构的对比 ===")
+print()
+print(string.format("  %-16s %-14s %-14s %s", "结构", "插入", "删除", "适用"))
+print("  " .. string.rep("-", 64))
+
+local structures = {
+  { "静态数组",   "O(1)",       "O(n)",       "大小固定、随机访问" },
+  { "动态数组",   "摊销 O(1)",  "O(n)",       "需要自动增长" },
+  { "环形缓冲",   "O(1)",       "O(1)",       "固定大小 FIFO、零分配" },
+}
+
+for _, s in ipairs(structures) do
+  print(string.format("  %-16s %-14s %-14s %s", s[1], s[2], s[3], s[4]))
+end
+
+print()
+print("=== 6. 实战选择建议 ===")
+print()
+print("  【什么时候用环形缓冲】")
+print("    · 需要固定大小的队列（输入缓冲、日志、最近 N 条记录）")
+print("    · 要求零 GC（热路径、每帧调用）")
+print("    · 旧数据可以丢弃（新的覆盖旧的）")
+print()
+print("  【什么时候不用】")
+print("    · 数据不能丢（要用可扩展的队列）")
+print("    · 需要随机访问任意位置（用数组）")
+print("    · 需要按优先级取出（用堆）")
+print()
+print("  【Lua 特别提醒】")
+print("    Lua 的 table 已经是动态数组，所以通常不需要自己实现动态数组。")
+print("    但【环形缓冲仍然值得手写】——因为它能避免 table 增长带来的 GC。")</code></pre>
+
+<h2 id="ring-apps">二、环形缓冲的三个经典应用 ★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">应用一：格斗游戏的连招检测</span>
+  把玩家输入<strong>记录进环形缓冲</strong>（容量 10~20），然后在时间窗口内<em>从新到旧扫描</em>匹配连招序列。
+  本页实测：输入 <code>P, P, K</code> 后，检测 <code>[P,P,K]</code> 连招返回 true。
+  <em>这是格斗游戏的标准做法——不需要为每个连招单独写状态机。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">应用二：帧时间记录（游戏内 FPS 显示）</span>
+  用一个容量 60 的环形缓冲记录最近 60 帧的耗时，<em>求平均和最大值</em>。
+  本页实测输出：<code>最近 60 帧：平均 19.3 ms, 最大 66.7 ms</code>。
+  <em>这就是所有游戏内 FPS 显示的原理。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">应用三：对象池</span>
+  环形缓冲可以做对象池——<strong>完全零分配</strong>。
+  但要注意它的<em>缺点</em>：满了会覆盖，不适合"不能丢"的场景。
+  <strong>更常用的对象池是栈</strong>（后进先出，容量不足就扩展）。
+</div>
+
+<h2 id="ring-impl">三、环形缓冲的实现要点</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">索引环绕的公式（容易写错）</span>
+  <strong>正确公式</strong>：<code>nextIndex = (currentIndex % capacity) + 1</code>
+  （因为 Lua 索引从 1 开始）
+  <strong>如果是从 0 开始的语言</strong>：<code>nextIndex = (currentIndex + 1) % capacity</code>
+  <strong>常见错误</strong>：写成 <code>currentIndex % (capacity - 1)</code>——<em>这会导致索引永远到不了最后一个槽</em>。
+  <strong>验证方法</strong>：给容量 5 的缓冲连续压入 7 个元素，<em>检查是否只保留最后 5 个</em>。本页实测输出 <code>3, 4, 5, 6, 7</code>——正确。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="03">
+  <div class="task"><input type="checkbox" id="t-03-1"><label for="t-03-1"><strong>实现动态数组</strong>：观察扩容时机，验证"容量翻倍"带来的摊销 O(1)。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-2"><label for="t-03-2"><strong>手写环形缓冲</strong>：不看示例实现 push/pop/peek，用 7 个元素压入 5 容量缓冲验证覆盖行为。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-3"><label for="t-03-3"><strong>做连招检测</strong>：用环形缓冲实现"在 0.5 秒内输入 P,P,K 触发连招"。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-4"><label for="t-03-4"><strong>做 FPS 显示</strong>：用环形缓冲记录最近 60 帧耗时，显示平均值与最大值。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-5"><label for="t-03-5"><strong>对比数组与哈希</strong>：在 Lua 与 C# 里各测一次顺序遍历，<em>观察两者差异（C# 里差距更明显）</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-6"><label for="t-03-6"><strong>回答面试题</strong>：① 动态数组为什么要翻倍扩容？② 环形缓冲的索引怎么算？③ 什么场景该用环形缓冲？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能解释"数组快是因为缓存友好"而不是复杂度；<br>
+    ② 能实现动态数组并说明为什么扩容要翻倍；<br>
+    ③ <strong>能手写环形缓冲并正确处理索引环绕</strong>；<br>
+    ④ 能说出环形缓冲的三个游戏应用；<br>
+    ⑤ 知道环形缓冲的缺点（满了会覆盖）及替代方案。<br>
+    <br>
+    <em>第 ③ 条是这一页的核心——环形缓冲的索引计算公式很容易写错，必须亲手验证一次。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="02-complexity.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">02 复杂度与性能直觉</div>
+  </a>
+  <a class="next" href="04-linked-stack-queue.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">04 链表、栈与队列</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

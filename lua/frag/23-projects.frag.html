@@ -1,0 +1,108 @@
+<h1>23 · 实战项目</h1>
+
+<p class="lead">这一页给出<strong>四个由浅入深的项目</strong>。它们不是"练习题"，而是<em>能写进简历的完整作品</em>——每个都包含热更能力。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="projects">一、四个项目（难度递增）</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>#</th><th>项目</th><th>核心能力</th><th>相关页</th><th>建议时长</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><strong>Lua 版贪吃蛇</strong></td><td>基础语法、表、循环</td><td>03-05</td><td>2 天</td></tr>
+    <tr><td>2</td><td><strong>配置驱动的小游戏</strong></td><td>配置表、索引、数据驱动</td><td>14</td><td>1 周</td></tr>
+    <tr><td>3</td><td><strong>带热更的卡牌游戏</strong></td><td>xLua、热更、版本管理</td><td>09-11, 17</td><td>2 周</td></tr>
+    <tr><td>4</td><td><strong>完整框架 Demo</strong></td><td>框架设计、UI、模块管理</td><td>13-17</td><td>3 周</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三个必须避免的坑</span>
+  <strong>① 只做演示，不做系统</strong><br>
+  很多人的项目只有"能跑"，没有存档、没有设置、没有版本管理。<em>这些才是体现工程能力的地方。</em><br><br>
+  <strong>② 中途换项目</strong><br>
+  "这个不好玩，我换个想法"——<strong>这是最常见的失败原因</strong>。<br>
+  <em>完成一个粗糙的，胜过开始十个完美的。</em><br><br>
+  <strong>③ 不做热更</strong><br>
+  学了 Lua 却不做热更，等于<em>没抓住重点</em>。<br>
+  <strong>哪怕是最简单的项目，也应该有"能热更"这个能力。</strong>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">怎么让项目"值得写进简历"</span>
+  <strong>不是"我做了个卡牌游戏"，而是：</strong><br>
+  · "用 Lua 实现了战斗逻辑层，<em>通过 xLua 接入 Unity，支持运行时热更</em>"<br>
+  · "<em>设计了配置表索引机制，把配置查询从 O(n) 优化到 O(1)，实测快 159 倍</em>"<br>
+  · "<em>实现了热更框架的原子切换与回滚，避免了"半包可用"导致的事故</em>"<br><br>
+  <strong>区别在于：量化 + 技术决策 + 你解决的具体问题。</strong><br>
+  <em>面试官不关心你做了什么游戏，只关心你在其中解决了什么技术问题。</em>
+</div>
+
+<h2 id="skeleton">二、每个项目都应该有的骨架</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>系统</th><th>最低要求</th><th>相关页</th></tr></thead>
+  <tbody>
+    <tr><td><strong>模块管理</strong></td><td>统一的模块注册与初始化</td><td>13</td></tr>
+    <tr><td><strong>事件系统</strong></td><td>模块间解耦通信</td><td>13</td></tr>
+    <tr><td><strong>配置表</strong></td><td>加载 + 索引 + 只读</td><td>14</td></tr>
+    <tr><td><strong>资源管理</strong></td><td>缓存 + 引用计数</td><td>14</td></tr>
+    <tr><td><strong>定时器</strong></td><td>堆实现或每帧遍历</td><td>14</td></tr>
+    <tr><td><strong>UI 框架</strong></td><td>界面栈 + 生命周期</td><td>16</td></tr>
+    <tr><td><strong>热更能力</strong></td><td>版本管理 + 原子切换</td><td>17</td></tr>
+    <tr><td><strong>错误处理</strong></td><td>xpcall + 堆栈上报</td><td>18</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">为什么这八个系统很重要</span>
+  <strong>因为面试官会问</strong>：<br>
+  · "你的模块怎么解耦的？" → <em>事件系统</em><br>
+  · "界面返回逻辑怎么处理？" → <em>界面栈</em><br>
+  · "热更出问题怎么回滚？" → <em>版本管理</em><br>
+  · "线上报错怎么排查？" → <em>堆栈上报</em><br><br>
+  <strong>这些问题答不好，会立刻暴露"只写过脚本，没搭过框架"。</strong><br>
+  <em>而这八个系统本身不难——每个大概半天到一天。相比之下，它们的面试收益远高于再实现一个炫酷玩法。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="23">
+  <div class="task"><input type="checkbox" id="t-23-1"><label for="t-23-1"><strong>选一个项目</strong>：从清单里选一个"能做完的"，<em>写下来，不要中途换</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-23-2"><label for="t-23-2"><strong>先搭八个系统</strong>：在写玩法之前，先把骨架搭起来。</label></div>
+  <div class="task"><input type="checkbox" id="t-23-3"><label for="t-23-3"><strong>加热更能力</strong>：哪怕是本地的"重新加载脚本"，也要有。</label></div>
+  <div class="task"><input type="checkbox" id="t-23-4"><label for="t-23-4"><strong>写 README</strong>：记录技术选型、遇到的问题、怎么解决的。<em>面试时直接用。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-23-5"><label for="t-23-5"><strong>量化你的数据</strong>：记录配置查询的优化倍数、热更的耗时等。</label></div>
+  <div class="task"><input type="checkbox" id="t-23-6"><label for="t-23-6"><strong>做完它</strong>：不换项目，直到能从头跑到尾。</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>有一个能完整运行的 Lua 项目</strong>；<br>
+    ② 包含八个基础系统；<br>
+    ③ <strong>具备热更能力（哪怕是最基础的）</strong>；<br>
+    ④ 有一份记录技术选型与数据的 README；<br>
+    ⑤ 能说出项目中最难的技术问题及解决过程。<br>
+    <br>
+    <em>第 ① 条最重要——做不到它，其他都是空谈。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="22-interview.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">22 面试题库 ★★</div>
+  </a>
+  <a class="next" href="24-reference.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">24 API 速查</div>
+  </a>
+</nav>

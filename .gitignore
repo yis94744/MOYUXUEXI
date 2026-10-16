@@ -19,7 +19,7 @@ desktop.ini
 ehthumbs.db
 .DS_Store
 
-# ===== 编辑器配置 =====
+# ===== 编辑器 / IDE =====
 .vs/
 .vscode/
 .idea/

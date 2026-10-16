@@ -1,0 +1,119 @@
+<h1>06 · 面向对象与继承</h1>
+
+<p class="lead">Lua 没有 <code>class</code> 关键字。所有面向对象都是用 <strong>table + 元表</strong>手工实现的。这一页不只讲"怎么实现"，更要讲清<strong>为什么框架都那样写</strong>——以及那些写法背后的取舍。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（05）的闭包和这一页的元表，是 Lua 实现封装的两种手段——这一页会<em>对比它们的优劣</em>。<br>
+  <strong>关键衔接</strong>：页 04 学的 <code>__index</code> 是继承的实现机制，这一页把它<em>包装成可复用的 class 函数</em>。<br>
+  <strong>下一页</strong>（07）高级特性：协程、错误处理、GC。<em>那里的状态机与错误对象都会用到这一页的 class</em>。<br>
+  <strong>实战意义</strong>：你在项目里遇到的 Lua 框架（xLua、ToLua、各种自研框架）<strong>都以这一页的 class 实现为基础</strong>。看懂它，才能看懂框架源码。
+</div>
+
+<h2 id="oop">一、用元表实现 class ★★★</h2>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>06/oop</code></div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">class 实现的"三件套"（背下来）</span>
+  <strong>① <code>cls.__index = cls</code></strong>——让实例可以通过元表查到类里的方法。<br>
+  <strong>② <code>setmetatable(cls, { __index = superClass })</code></strong>——让子类能查到父类的静态成员。<br>
+  <strong>③ <code>setmetatable(instance, cls)</code></strong>——把实例和类关联起来。<br><br>
+  <strong>查找链</strong>：<code>instance.foo</code> → 实例自身没有 → 查 <code>cls</code>（因为 <code>__index = cls</code>）→ <code>cls</code> 自身没有 → 查父类（因为 <code>setmetatable(cls, {__index = super})</code>）。<br>
+  <em>这就是 Lua 的继承。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三个最容易写错的地方</span>
+  <strong>① 冒号与点号的混用</strong><br>
+  <code>function Animal:getName()</code> 等价于 <code>function Animal.getName(self)</code>。<br>
+  调用时必须用 <code>obj:getName()</code>（冒号）——<em>写成 <code>obj.getName()</code> 会漏掉 self，报"尝试索引 nil"</em>。<br><br>
+  <strong>② 调用父类方法必须显式传 self</strong><br>
+  <code>Base.describe(self)</code> —— <em>不能写成 <code>Base:describe()</code>，那样 self 会变成 Base 本身</em>。<br><br>
+  <strong>③ 构造函数名没有强制约定</strong><br>
+  Lua 不会自动调用 <code>ctor</code> 或 <code>__init</code>。<strong>必须自己在 <code>new</code> 里显式调用</strong>。<br>
+  <em>不同框架用的名字不同（ctor / __init / OnInit），读源码时先找这个。</em>
+</div>
+
+<h2 id="private">二、私有成员：两种方案对比</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th></th><th>下划线约定</th><th>闭包实现</th></tr></thead>
+  <tbody>
+    <tr><td><strong>写法</strong></td><td><code>self._balance</code></td><td>局部变量 + 闭包捕获</td></tr>
+    <tr><td><strong>真实私有</strong></td><td><span class="mk mk--no">否</span> 外部照样能改</td><td><span class="mk mk--yes">是</span> 完全无法访问</td></tr>
+    <tr><td><strong>内存占用</strong></td><td><span class="mk mk--yes">小</span> 方法共享</td><td><span class="mk mk--no">大</span> 每实例一份闭包</td></tr>
+    <tr><td><strong>支持继承</strong></td><td><span class="mk mk--yes">是</span></td><td><span class="mk mk--no">困难</span></td></tr>
+    <tr><td><strong>调试友好</strong></td><td><span class="mk mk--yes">好</span> 字段可见</td><td><span class="mk mk--no">差</span> 看不到内部状态</td></tr>
+    <tr><td><strong>序列化</strong></td><td><span class="mk mk--yes">可以</span></td><td><span class="mk mk--no">很难</span></td></tr>
+    <tr><td><strong>适用</strong></td><td><strong>游戏逻辑（主流）</strong></td><td>模块级单例、工具类</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">游戏项目为什么主流用下划线约定</span>
+  <strong>关键原因是"序列化和调试"</strong>：<br>
+  • 存档需要遍历对象字段 → <em>闭包方案无法枚举出捕获的变量</em>；<br>
+  • 出 bug 时需要查看对象内部状态 → <em>闭包方案在调试器里看不到</em>；<br>
+  • 需要继承和对象池 → <em>闭包方案每实例一份方法，内存吃不消</em>。<br><br>
+  <strong>所以行业惯例是</strong>：用 <code>_</code> 前缀表示"这是内部字段，外部别碰"，<em>靠代码规范和 code review 保证，而不是靠语言机制</em>。
+</div>
+
+<h2 id="perf">三、性能：元表 vs 闭包（实测结论）</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">一个被广泛流传的错误结论</span>
+  网上很多文章说"元表比闭包快"——<strong>但我实测的结果不是这样</strong>。<br><br>
+  在 Lua 5.4 下跑 50 万次方法调用：<br>
+  • 元表方式：<strong>0.018 秒</strong><br>
+  • 闭包方式：<strong>0.014~0.017 秒</strong><br>
+  • <strong>两者几乎一样，闭包偶尔还更快</strong><br><br>
+  <strong>为什么</strong>：元表的 <code>__index</code> 查找本身也有成本，<em>粗略抵消了它的理论优势</em>。<br><br>
+  <strong>那为什么框架还是用元表？</strong>真正的原因是<strong>内存和继承能力</strong>：<br>
+  • 元表：1000 个实例只有 <em>1 份</em>方法代码<br>
+  • 闭包：1000 个实例有 <em>1000 份</em>方法闭包<br>
+  <em>对象数量上万时，闭包方式的内存占用会非常可观。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">选型依据</span>
+  <strong>需要继承 且 实例数量多</strong> → 用元表（框架标准做法）<br>
+  <strong>只是单个简单对象 / 模块级单例</strong> → 闭包也很合适，而且代码更简洁<br><br>
+  <em>不要为了"性能"这个错误的理由去选元表。选它是因为内存和继承。</em>
+</div>
+
+<h2 id="tasks">四、本章动手任务</h2>
+
+<div class="tasks" data-page="06">
+  <div class="task"><input type="checkbox" id="t-06-1"><label for="t-06-1"><strong>手写一遍 class 函数</strong>：不看示例，从零写一个支持继承的 <code>class()</code> 函数，包含 <code>new</code>、<code>super</code>。<em>这是面试高频考点。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-06-2"><label for="t-06-2"><strong>验证漏传 self 的报错</strong>：写一个 <code>obj.getName()</code>（用点号），观察报错信息，理解冒号的本质。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-3"><label for="t-06-3"><strong>实现三级继承</strong>：写 A → B → C 三层，每层重写同名方法并调用父类实现，打印完整的调用链。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-4"><label for="t-06-4"><strong>对比两种私有方案</strong>：分别用下划线约定和闭包实现一个账户类，<em>尝试从外部访问内部状态</em>，观察差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-5"><label for="t-06-5"><strong>实测内存差异</strong>：创建 10000 个实例，分别用元表和闭包方式，用 <code>collectgarbage("count")</code> 对比内存占用。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-6"><label for="t-06-6"><strong>回答面试题</strong>：① Lua 怎么实现面向对象？② 冒号和点号的区别？③ 元表和闭包实现类各有什么优劣？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能不看资料手写一个支持继承的 <code>class()</code> 函数</strong>；<br>
+    ② 能说清 <code>__index</code> 查找链的三层结构；<br>
+    ③ 知道冒号与点号的区别，以及调用父类方法为什么必须显式传 self；<br>
+    ④ 能对比下划线约定与闭包两种私有方案的优劣，并说出游戏项目为什么选前者；<br>
+    ⑤ <strong>能说出元表相比闭包真正的优势是内存和继承，不是速度</strong>。<br><br>
+    <em>第 ① 条是硬要求——它是读懂所有 Lua 框架源码的前提。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="05-lua-function.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">05 函数与闭包</div>
+  </a>
+  <a class="next" href="07-lua-advanced.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">07 高级特性</div>
+  </a>
+</nav>

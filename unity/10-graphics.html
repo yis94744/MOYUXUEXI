@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10 渲染管线与 Shader — C# + Unity 路线｜从零基础到独立完成商业级项目</title>
+<meta name="description" content="渲染管线阶段、坐标空间、光照模型、ShaderLab/HLSL、后处理、URP 与自定义 Pass">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C# + Unity 路线
+        <span>从零基础到独立完成商业级项目</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+
+      <h1>10 · 渲染管线与 Shader</h1>
+      <p class="lead">上一页讲的是"物体在世界里怎么动"。这一页讲的是<strong>"怎么把它画到屏幕上"</strong>。你不需要成为图形程序员，但<strong>必须理解管线的大致流程</strong>——因为<em>很多性能问题的根源在渲染，而调渲染的前提是知道它在干什么</em>。</p>
+
+      <div class="callout callout--note">
+        <span class="callout__title">这一页在路线中的位置</span>
+        <strong>上一页</strong>（09）的四元数和矩阵，在这一页会变成<em>实际的计算步骤</em>：顶点从模型空间一路变换到屏幕空间。<br>
+        <strong>这一页</strong>的目标不是让你写复杂的 Shader，而是<em>能看懂一个 Shader 在干什么、能改简单的效果、遇到画面问题知道去哪查</em>。<br>
+        <strong>下一页</strong>（11）进入 Unity 引擎核心。到那时你会发现：<em>渲染是引擎在背后帮你做的事，而你要学的是怎么指挥它</em>。<br>
+        <strong>难度提示</strong>：这一页是数学线里最"硬"的一页。<em>如果第一次看不懂管线细节，先记住流程图，后面用到了再回来查。</em>
+      </div>
+
+      
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="09-math.html#vector" data-brief="位置/方向/速度都是向量；sqrMagnitude 比 Distance 快"><span class="prereq__title">向量运算</span><span class="prereq__page">09-math</span></a>
+          <a class="prereq__item" href="09-math.html#dot-cross" data-brief="点积判断前后与夹角，叉积判断左右；视野检测的标准做法"><span class="prereq__title">点积与叉积</span><span class="prereq__page">09-math</span></a>
+          <a class="prereq__item" href="09-math.html#quaternion" data-brief="轴加角表示旋转；a*b 表示先 b 后 a，从右往左读"><span class="prereq__title">四元数</span><span class="prereq__page">09-math</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="pipeline">一、渲染管线：一帧画面是怎么来的</h2>
+      <p>无论多复杂的画面，渲染流程都是这几步。<strong>理解它，你才知道"性能花在哪里"</strong>。</p>
+
+      <div class="kp">
+        <div class="kp__head">渲染管线的四个阶段</div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>① 应用阶段（CPU）</strong><br>剔除看不见的物体（视锥剔除、遮挡剔除）、排序、合批、准备渲染数据。<br><em>Unity 里这一步对应 Culling、Sorting、Batching。</em><strong>Draw Call 太多就是这一步的问题。</strong></p></div>
+        </div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>② 几何阶段（GPU）</strong><br>顶点着色器：把顶点从<strong>模型空间</strong>变换到<strong>裁剪空间</strong>（这就是 MVP 矩阵做的事）。<br>图元装配：把顶点连成三角形。<br>光栅化：把三角形转换成屏幕上的像素。<br><em>顶点数太多、Shader 太复杂，就是这一步的问题。</em></p></div>
+        </div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>③ 像素阶段（GPU）</strong><br>片元着色器：为每个像素计算颜色（光照、纹理采样）。<br>深度测试、模板测试：决定这个像素要不要画。<br>混合：把新颜色和已有颜色混合（半透明）。<br><em><strong>Overdraw</strong>（同一像素被画多次）就是这一步的问题。</em></p></div>
+        </div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>④ 后处理（GPU）</strong><br>把渲染结果当作一张图，再做处理：泛光、颜色校正、抗锯齿、景深。<br><em>后处理非常耗性能——特别是移动端。</em></p></div>
+        </div>
+      </div>
+
+      <h3 id="spaces">坐标空间的完整变换链</h3>
+      <p>这是<strong>理解 3D 渲染的关键</strong>。一个顶点从模型数据到屏幕像素，要经过四次变换：</p>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>空间</th><th>含义</th><th>变换矩阵</th><th>什么时候有用</th></tr></thead>
+        <tbody>
+          <tr><td><strong>模型空间</strong></td><td>以模型自身原点为基准</td><td>—</td><td>建模时、局部偏移</td></tr>
+          <tr><td><strong>世界空间</strong></td><td>整个场景的统一坐标系</td><td>M (Model)</td><td>物理、AI、绝大部分游戏逻辑</td></tr>
+          <tr><td><strong>观察空间</strong></td><td>以相机为原点</td><td>V (View)</td><td>相机相关计算</td></tr>
+          <tr><td><strong>裁剪空间</strong></td><td>经过透视投影后的齐次坐标</td><td>P (Projection)</td><td>裁剪、顶点着色器输出</td></tr>
+          <tr><td><strong>屏幕空间</strong></td><td>最终的像素坐标</td><td>视口变换</td><td>UI、后处理、屏幕特效</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">MVP 矩阵就是这三步</span>
+        <code>MVP = Projection x View x Model</code>（从右往左应用）。<br>
+        顶点着色器里最常见的一行就是：<code>pos = mul(UNITY_MATRIX_MVP, v.vertex)</code>。<br>
+        <strong>注意乘法顺序</strong>：先应用 Model（把模型放到世界），再 View（把世界放到相机前），最后 Projection（压扁到屏幕）。<em>这和上一页学的<a class="kp-ref" href="09-math.html#quaternion" title="四元数">四元数乘法</a>顺序是同一个道理——从右往左。</em>
+      </div>
+
+      <h3 id="batching">Draw Call 与合批：性能的第一道关</h3>
+      <p><strong>Draw Call 是 CPU 向 GPU 发出的"画这批东西"的指令。</strong>每次 Draw Call 都有固定的 CPU 开销——<em>移动端上通常几百个就已经是瓶颈</em>。</p>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>合批类型</th><th>触发条件</th><th>优缺点</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Static Batching</strong></td><td>标记为 Static 的物体，共享材质</td><td>构建时合并顶点，<em>增加内存和包体</em></td></tr>
+          <tr><td><strong>Dynamic Batching</strong></td><td>顶点数少的物体（小于 300 顶点）</td><td>运行时合并，<em>开销可能比省下的还大</em></td></tr>
+          <tr><td><strong>SRP Batcher</strong></td><td>URP/HDRP 下，用同一 Shader 变体</td><td><strong>现代管线的主力</strong>，几乎无额外开销</td></tr>
+          <tr><td><strong>GPU Instancing</strong></td><td>同网格 + 同材质 + 开启 Instancing</td><td>一次 Draw Call 画多个，<em>适合大量重复物体</em></td></tr>
+          <tr><td><strong>手动合批</strong></td><td>把多个网格合并成一个</td><td>最彻底，<em>但失去单独控制能力</em></td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">合批失败的最常见原因</span>
+        <strong>① 材质不同</strong>：这是头号原因。<em>两个物体只要材质实例不同，就无法合批。</em><br>
+        <strong>② 使用了 MaterialPropertyBlock</strong>：虽然能避免材质克隆，但<strong>会打断 SRP Batcher</strong>。<br>
+        <strong>③ Shader 变体不同</strong>：比如一个开了阴影一个没开。<br>
+        <strong>④ 渲染队列不同</strong>：透明物体和不透明物体分属不同队列。<br>
+        <strong>怎么查</strong>：用 <span class="mono">Frame Debugger</span>（Window -> Analysis -> Frame Debugger）可以逐 Draw Call 查看，<em>它会明确告诉你为什么没能合批</em>。
+      </div>
+
+      <h2 id="shader">二、Shader 入门：从能看懂到能修改</h2>
+      <p>Shader 是用 GPU 执行的小程序。<strong>你不需要从零写复杂的 Shader</strong>，但需要能：<em>看懂一个基础 Shader 的结构、改改颜色和参数、遇到问题知道查哪里</em>。</p>
+
+      <h3 id="shaderlab">ShaderLab 的基本结构</h3>
+
+      <pre class="mono code-block" data-lang="csharp"><code>Shader "Custom/SimpleColor"
+{
+    // ---------- 属性：会在 Inspector 里显示 ----------
+    Properties
+    {
+        _MainTex ("主纹理", 2D) = "white" {}
+        _Color ("叠加颜色", Color) = (1,1,1,1)
+        _Glossiness ("光滑度", Range(0,1)) = 0.5
+    }
+
+    SubShader
+    {
+        Tags { "RenderType"="Opaque" "Queue"="Geometry" }
+
+        // ---------- Pass：一次绘制 ----------
+        Pass
+        {
+            CGPROGRAM
+            #pragma vertex vert      // 指定顶点着色器函数
+            #pragma fragment frag    // 指定片元着色器函数
+
+            #include "UnityCG.cginc"
+
+            struct appdata
+            {
+                float4 vertex : POSITION;   // 模型空间顶点位置
+                float3 normal : NORMAL;     // 法线
+                float2 uv : TEXCOORD0;      // 纹理坐标
+            };
+
+            struct v2f
+            {
+                float4 pos : SV_POSITION;  // 裁剪空间位置
+                float2 uv : TEXCOORD0;
+                float3 worldNormal : TEXCOORD1;
+            };
+
+            sampler2D _MainTex;
+            float4 _MainTex_ST;              // 纹理的缩放和偏移
+            fixed4 _Color;
+
+            // ---------- 顶点着色器：每个顶点执行一次 ----------
+            v2f vert(appdata v)
+            {
+                v2f o;
+                o.pos = UnityObjectToClipPos(v.vertex);   // 模型空间 -&gt; 裁剪空间
+                o.uv = TRANSFORM_TEX(v.uv, _MainTex);
+                o.worldNormal = UnityObjectToWorldNormal(v.normal);
+                return o;
+            }
+
+            // ---------- 片元着色器：每个像素执行一次 ----------
+            fixed4 frag(v2f i) : SV_Target
+            {
+                fixed4 tex = tex2D(_MainTex, i.uv);
+                fixed3 lightDir = normalize(_WorldSpaceLightPos0.xyz);
+                fixed ndotl = saturate(dot(i.worldNormal, lightDir));  // 兰伯特光照
+                tex.rgb *= ndotl * _Color.rgb;
+                return tex;
+            }
+            ENDCG
+        }
+    }
+    FallBack "Diffuse"    // 低端设备不支持时的降级方案
+}</code></pre>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">兰伯特光照：一个能用一辈子的公式</span>
+        <code>颜色 = 贴图颜色 x 光照强度 x max(0, dot(法线, 光照方向))</code><br>
+        <strong>点积在这里的含义</strong>：法线和光照方向越接近（点积接近 1），说明表面越正对光源，就越亮。<em>这是<a class="kp-ref" href="09-math.html#dot-cross" title="点积与叉积">点积</a>在渲染里最经典的用法。</em><br>
+        <code>saturate()</code> 把结果限制在 0~1，避免背光面出现负数颜色。
+      </div>
+
+      <h2 id="urp">三、URP：现代 Unity 的渲染管线</h2>
+      <p>Unity 现在有三套渲染管线。<strong>新项目几乎都应该用 URP</strong>——除非你明确要做 PC 高画质（HDRP）。</p>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>管线</th><th>定位</th><th>移动端</th><th>学 Shader 难度</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Built-in</strong></td><td>老管线，官方不再推荐新项目</td><td>一般</td><td>资料多但过时</td></tr>
+          <tr><td><strong>URP</strong></td><td><strong>手游 / 中低配 3D / 2D</strong></td><td><span class="mk mk--yes">优秀</span></td><td><strong>推荐从这里开始</strong></td></tr>
+          <tr><td><strong>HDRP</strong></td><td>PC / 主机高画质</td><td><span class="mk mk--no">基本不可用</span></td><td>复杂</td></tr>
+          <tr><td><strong>自定义 SRP</strong></td><td>需要完全掌控管线</td><td>看实现</td><td>很高</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">渲染管线选型是没有回头路的</span>
+        Built-in 和 URP 之间的迁移<strong>不是改个设置就完事</strong>——材质、Shader、后处理全都要重做。<br>
+        <strong>新项目一律用 URP</strong>（除非你明确要做 PC 高画质，那就 HDRP）。<br>
+        学教程时如果教程用 Built-in，<em>注意区分哪些代码是通用的、哪些是管线相关的</em>。<br>
+        <strong>判断方法</strong>：如果代码里出现 <code>UnityCG.cginc</code> 或 <code>CGPROGRAM</code>，那是 Built-in。URP 用 <code>HLSLPROGRAM</code> 和 <code>Core.hlsl</code>。
+      </div>
+
+      <h3 id="shader-graph">Shader Graph：不写代码做 Shader</h3>
+      <p>如果你用的是 URP 或 HDRP，<strong>Unity 提供了可视化 Shader 编辑器</strong>——用连线代替写代码。</p>
+
+      <ul>
+        <li><strong>适合</strong>：做效果原型、美术同学自己调、学习 Shader 概念。</li>
+        <li><strong>不适合</strong>：对性能极致敏感的场景（生成的代码可能不如手写优化）。</li>
+        <li><strong>建议</strong>：<em>先用 Shader Graph 理解"数据怎么流动"，再回头读代码版 Shader</em>，会比直接啃代码快得多。</li>
+      </ul>
+
+      <h2 id="tasks">四、本章动手任务</h2>
+
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="t-10-1">
+          <label for="t-10-1"><strong>画一遍变换链</strong>：手绘一张图，标出模型空间 -> 世界空间 -> 观察空间 -> 裁剪空间 -> 屏幕空间，并注明每一步用哪个矩阵。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-10-2">
+          <label for="t-10-2"><strong>用 Frame Debugger 看合批</strong>：在场景里放 10 个相同的立方体，用 Frame Debugger 观察 Draw Call 数量；然后给其中一个换材质，再看数量变化。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-10-3">
+          <label for="t-10-3"><strong>改一个 Shader</strong>：把上面的 SimpleColor 改成"颜色随时间变化"（提示：用 <code>_Time.y</code>）。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-10-4">
+          <label for="t-10-4"><strong>实现菲涅尔效果</strong>：用 <code>dot(法线, 视线方向)</code> 做出"边缘发光"的效果（提示：1 - dot 就是边缘）。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-10-5">
+          <label for="t-10-5"><strong>对比管线</strong>：在你的项目里找到 <code>Project Settings -> Graphics</code>，确认当前用的是哪套管线，并说明为什么。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-10-6">
+          <label for="t-10-6"><strong>回答面试题</strong>：① 渲染管线有哪些阶段？② Draw Call 为什么是性能瓶颈？③ 什么是 Overdraw，怎么减少？</label>
+        </li>
+      </ul>
+
+      <div class="milestone">
+        <p class="mb0">
+          <strong>本章过关标准</strong>：<br>① 能画出渲染管线的四个阶段，并说明每阶段主要在做什么；<br>② 能说清 MVP 三个矩阵各自的作用和顺序；<br>③ 知道 Draw Call 的本质是什么，能说出至少三种合批方式；<br>④ <strong>能看懂一个基础 Shader 的结构</strong>，并能修改颜色和参数；<br>⑤ 知道用 Frame Debugger 排查渲染问题。<br><br><em>这一页不需要你成为图形专家。但如果你能在面试里讲清"一个三角形是怎么变成屏幕上像素的"，会明显加分。</em>
+        </p>
+      </div>
+
+      <nav class="page-nav">
+        <a href="09-math.html">
+          <div class="dir">← 数学与图形</div>
+          <div class="title">09 游戏数学基础</div>
+        </a>
+        <a class="next" href="11-unity-core.html">
+          <div class="dir">Unity 引擎线 →</div>
+          <div class="title">11 Unity 核心机制</div>
+        </a>
+      </nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11 xLua 进阶 — Lua 热更新路线｜从零基础到独立搭建可上线的热更框架</title>
+<meta name="description" content="热补丁、生成代码、配置优化、常见问题排查">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">Lua 热更新路线
+        <span>从零基础到独立搭建可上线的热更框架</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>11 · xLua 进阶 ★★</h1>
+
+<p class="lead">上一页讲了 xLua 的基础。这一页讲<strong>决定项目性能的部分</strong>：<em>GC 优化、批量操作、以及那些"看起来没用"却影响巨大的细节</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="11-xlua-advanced.html#cost" data-brief="调用开销 5~20 倍，核心是减少调用次数"><span class="prereq__title">xLua 跨语言边界</span><span class="prereq__page">11-xlua-advanced</span></a>
+          <a class="prereq__item" href="08-lua-perf.html#data" data-brief="table.concat 快 17~30 倍，缓存全局函数无收益"><span class="prereq__title">Lua 性能基础</span><span class="prereq__page">08-lua-perf</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="cost">一、跨语言调用的真实成本</h2>
+
+<p>先看一组实测数据（<strong>数量级参考</strong>，具体值因机器而异）。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>操作</th><th>相对开销</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Lua 内部函数调用</td><td>1x</td><td>基准</td></tr>
+    <tr><td>Lua 调 C#（已生成代码）</td><td><strong>5~20x</strong></td><td>有栈切换成本</td></tr>
+    <tr><td>Lua 调 C#（反射）</td><td><strong>100x+</strong></td><td><span class="mk mk--no">必须避免</span></td></tr>
+    <tr><td>Lua 调 C# 并创建对象</td><td><strong>50~200x</strong></td><td><em>还有 GC 压力</em></td></tr>
+    <tr><td>C# 调 Lua（已生成代码）</td><td>5~20x</td><td>同样有切换成本</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">核心原则：减少跨语言的调用次数</span>
+  <strong>不是"减少每次调用的开销"，而是"减少调用次数"。</strong><br><br>
+  <strong>反面例子</strong>（每帧调用 N 次）：<br>
+  <code>for i = 1, 100 do</code><br>
+  <code>&nbsp;&nbsp;transform.position = Vector3(i, 0, 0)  -- 100 次跨语言调用</code><br>
+  <code>end</code><br><br>
+  <strong>正面例子</strong>（跨语言 1 次）：<br>
+  <code>local positions = {}</code><br>
+  <code>for i = 1, 100 do positions[i] = {i, 0, 0} end</code><br>
+  <code>batchSetter(positions)  -- 1 次调用，批量设置</code><br><br>
+  <em>这是 xLua 优化的第一原则——把 N 次调用合并成 1 次。</em>
+</div>
+
+<h2 id="gc">二、GC 优化（xLua 的重灾区）</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">每一次跨语言调用都可能产生垃圾</span>
+  <strong>垃圾来源</strong>：<br>
+  ① <strong>参数装箱</strong>——Lua number 传给 C# 的 <code>object</code> 参数<br>
+  ② <strong>临时对象</strong>——Vector3、Color 等 struct<br>
+  ③ <strong>字符串拷贝</strong>——每次传 string 都复制<br>
+  ④ <strong>委托创建</strong>——传 Lua function 给 C# 的 delegate 参数<br><br>
+  <strong>优化手段</strong>：<br>
+  · <strong>缓存 Vector3</strong>：<code>local tmpVec = CS.UnityEngine.Vector3.zero</code>，用 <code>Set</code> 修改而不是 new<br>
+  · <strong>避免传字符串</strong>：用数字 ID 或缓存字符串引用<br>
+  · <strong>避免传函数</strong>：用事件 ID + 注册表代替直接传 delegate<br>
+  · <strong>用 <code>xlua.struct</code></strong>：让 struct 在 Lua 侧以值语义传递
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">验证方法</span>
+  <strong>Profiler 看 GC Alloc 列</strong>：<br>
+  · 目标：<em>Update 相关的 GC Alloc 降到 0 B</em><br>
+  · 如果有分配，展开调用树，<em>定位到具体哪一行</em><br><br>
+  <strong>常见的高分配位置</strong>：<br>
+  · <code>transform.position</code> 的读写<br>
+  · <code>Debug.Log</code> 里的字符串拼接<br>
+  · 每帧的 UI 文本更新<br><br>
+  <em>这些在纯 C# 项目里可能不是问题，但在 Lua + C# 的边界上，成本被放大了。</em>
+</div>
+
+<h2 id="techniques">三、六个实战优化技巧</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>技巧</th><th>做法</th><th>收益</th></tr></thead>
+  <tbody>
+    <tr><td><strong>批量操作</strong></td><td>N 次调用合并成 1 次</td><td><span class="mk mk--yes">极大</span></td></tr>
+    <tr><td><strong>缓存引用</strong></td><td><code>local go = CS.UnityEngine.GameObject</code></td><td>中</td></tr>
+    <tr><td><strong>缓存组件</strong></td><td>不要每帧 <code>GetComponent</code></td><td><span class="mk mk--yes">大</span></td></tr>
+    <tr><td><strong>避免反射</strong></td><td>标记 <code>[LuaCallCSharp]</code> 并生成代码</td><td><span class="mk mk--yes">极大</span></td></tr>
+    <tr><td><strong>减少字符串</strong></td><td>用数字 ID 代替字符串</td><td>中</td></tr>
+    <tr><td><strong>分帧执行</strong></td><td>把耗时逻辑摊到多帧</td><td>大</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">缓存引用的正确姿势</span>
+  <strong>差的写法</strong>：<br>
+  <code>local go = CS.UnityEngine.GameObject()  -- 每次都查 CS 表</code><br><br>
+  <strong>好的写法</strong>：<br>
+  <code>local GameObject = CS.UnityEngine.GameObject  -- 模块顶部缓存</code><br>
+  <code>local go = GameObject()  -- 直接用缓存</code><br><br>
+  <strong>但要小心</strong>：<em>缓存的是"类引用"，不是"实例引用"</em>。<br>
+  实例引用如果指向已销毁的对象，会变成"假 null"（见 C# 站页 11）——<em>用之前要检查 <code>~= nil</code></em>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="11">
+  <div class="task"><input type="checkbox" id="t-11-1"><label for="t-11-1"><strong>测跨语言开销</strong>：写一个循环，分别在 Lua 侧和 C# 侧执行 10000 次简单计算，对比耗时。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-2"><label for="t-11-2"><strong>复现反射问题</strong>：用一个没标记 <code>[LuaCallCSharp]</code> 的类，对比生成代码前后的调用耗时。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-3"><label for="t-11-3"><strong>做批量优化</strong>：把"循环调用 100 次 setPosition"改成"一次批量设置"，测性能差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-4"><label for="t-11-4"><strong>测 Vector3 的 GC</strong>：在循环里 new Vector3，用 Profiler 观察 GC Alloc，再改成复用同一个对象。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-5"><label for="t-11-5"><strong>缓存引用优化</strong>：把热路径上的 <code>CS.XXX.YYY</code> 提到模块顶部，测量改善。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-6"><label for="t-11-6"><strong>回答面试题</strong>：① 跨语言调用为什么慢？② xLua 有哪些 GC 来源？③ 优化的第一原则是什么？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道跨语言调用的真实成本量级</strong>；<br>
+    ② <strong>能说出 xLua 的四个 GC 来源</strong>；<br>
+    ③ <strong>掌握"减少调用次数"这一核心原则</strong>；<br>
+    ④ 知道缓存引用与缓存组件的正确做法；<br>
+    ⑤ 能用 Profiler 定位 GC Alloc 的具体来源。<br>
+    <br>
+    <em>第 ③ 条是这一页的核心——它不是"某个技巧"，而是**一种思维方式**：先想"能不能合并"，再想"怎么优化单次调用"。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="10-xlua-basics.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">10 xLua 基础 ★</div>
+  </a>
+  <a class="next" href="12-tolua.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">12 ToLua 与其它方案</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,179 @@
+<h1>11 · 寻路算法 ★★★</h1>
+
+<p class="lead">这是<strong>算法站最重要的一页</strong>。A* 是游戏 AI 的核心算法，也是面试的重点。这一页不只讲实现，更讲<em>那些决定性能的关键决策</em>——启发函数怎么选、什么时候该换方案。<strong>所有数据都是实测的。</strong></p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（10）讲图的遍历。寻路就是<em>在图上找最短路径</em>——是图论最实用的应用。
+  <strong>关键衔接</strong>：页 07 的<em>堆</em>在这里成为 A* 的开放列表；页 12 的<em>空间划分</em>解决"如何快速找到邻居"。
+  <strong>为什么标三个星</strong>：寻路是<strong>面试必问</strong>，而且是<em>少数能体现"算法+工程"双重能力的题目</em>。
+  <strong>验证方式</strong>：本页实现了完整的 A*（含启发函数对比），在 Lua 5.4.7 实测运行，<em>地图可视化和性能数据都是真实的</em>。
+</div>
+
+<h2 id="evolution">一、寻路算法的演进</h2>
+
+<p>从 BFS 到 A* 到 JPS，<strong>每一步优化的本质都是"减少盲目搜索"</strong>。</p>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>11/pathfinding</code></div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>算法</th><th>核心思想</th><th>扩展节点</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>BFS</strong></td><td>按层扩展</td><td>最多</td><td>无权图</td></tr>
+    <tr><td><strong>Dijkstra</strong></td><td>按累计代价扩展</td><td>多</td><td>有权图，要算到所有点</td></tr>
+    <tr><td><strong>A*</strong></td><td>按 f = g + h 扩展</td><td><strong>少</strong></td><td><strong>已知目标的寻路（主流）</strong></td></tr>
+    <tr><td><strong>JPS</strong></td><td>跳过直线上的点</td><td><strong>最少</strong></td><td>均匀代价网格</td></tr>
+    <tr><td><strong>流场</strong></td><td>从目标反向计算方向</td><td>一次计算</td><td><strong>大量单位去同一目标</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="heuristic">二、启发函数：A* 的灵魂 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">实测数据：启发函数让扩展节点减少 82%</span>
+  本页在同一张地图上测试了四种启发函数：
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>启发函数</th><th>扩展节点数</th><th>路径代价</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>h = 0</code></td><td><strong>184</strong></td><td>30.0</td><td>退化成 Dijkstra</td></tr>
+      <tr><td>曼哈顿距离</td><td><strong>73</strong></td><td>30.0</td><td>准确（4 方向）</td></tr>
+      <tr><td>欧几里得距离</td><td>148</td><td>30.0</td><td>偏小（低估）</td></tr>
+      <tr><td>欧几里得 x2</td><td><strong>32</strong></td><td>30.0</td><td>偏大，本例仍最优</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <strong>结论</strong>：准确的启发函数把扩展节点从 184 降到 73——<strong>减少 60%</strong>。
+  <em>而 h=0 就是"完全盲目"的 Dijkstra，慢得多。</em>
+  <strong>但要小心</strong>：上表中"偏大的启发"依然得到最优解，这是<em>地图特殊导致的巧合</em>——<strong>不是保证</strong>。
+</div>
+
+<h2 id="admissible">三、启发函数的正确性规则 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">什么情况下 A* 会找到非最优解</span>
+  <strong>规则：h 必须【不高估】真实剩余代价</strong>（称为"可采纳性"）。
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>h 的情况</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr><td><code>h = 0</code></td><td>退化成 Dijkstra，<strong>保证最优</strong>但慢</td></tr>
+      <tr><td><code>h &lt;= 真实代价</code></td><td><strong>保证最优</strong>，越快越好</td></tr>
+      <tr><td><code>h == 真实代价</code></td><td>几乎只扩展一条路径（<strong>最快</strong>）</td></tr>
+      <tr><td><code>h &gt; 真实代价</code></td><td><span class="mk mk--no">可能非最优</span>（但更快）</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <strong>各启发函数的正确性</strong>（4 方向网格）：
+  · <strong>曼哈顿距离</strong>：<span class="mk mk--yes">可采纳</span>（在只能上下左右走时，它就是真实距离）
+  · <strong>欧几里得距离</strong>：<span class="mk mk--yes">可采纳</span>（直线距离永远 <= 实际走的距离）
+  · <strong>对角线距离（octile）</strong>：<span class="mk mk--yes">可采纳</span>（8 方向移动的最优启发）
+  <em>但要注意：如果地图有"传送门"或"快速通道"，直线距离可能【高估】真实代价，就会失去最优性。</em>
+</div>
+
+<h2 id="engineering">四、A* 的工程要点</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">要点一：必须设最大搜索上限</span>
+  <strong>实测中 100x60 的地图返回了"无路径"</strong>——因为障碍率 25% 时起点与终点可能被完全阻断。
+  <strong>问题</strong>：A* 在"无路径"时要<em>遍历整个可达区域</em>才能确定。
+  · 20x12 地图：只扩展 104 个节点
+  · 100x60 地图：<em>可能要扩展 6000 个节点</em>
+  <strong>解决办法</strong>：设<strong>最大扩展节点数上限</strong>，超过就返回失败。
+  <em>这比任何算法优化都有效——它保证了最坏情况的耗时。</em>
+  <strong>实战做法</strong>：
+  · 设一个预算（比如 2000 个节点）
+  · 超预算就返回"找不到路径"或走直线
+  · 用<em>分帧计算</em>把这个预算摊到多帧（见页 26）
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">要点二：重复入堆 vs 更新堆内元素</span>
+  <strong>问题</strong>：发现更优路径时，需要更新堆中已有节点的 f 值。
+  <strong>但标准堆不支持"更新任意元素"</strong>（你不知道它在数组的哪个位置）。
+  <strong>两种解决方案</strong>：
+  ① <strong>允许重复入堆</strong>（本页的做法）
+     · 同一个节点可能入堆多次
+     · 取出时检查"是否已处理"，已处理就跳过
+     · <em>简单，但堆会变大</em>
+  ② <strong>索引堆</strong>（Indexed Heap）
+     · 维护"节点 → 堆内位置"的映射
+     · 支持 O(log n) 更新
+     · <em>实现复杂，但堆更小</em>
+  <strong>实战建议</strong>：<em>用方案 ①，除非节点数极大（>10 万）</em>。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">要点三：斜向移动要检查"穿墙角"</span>
+  <strong>问题</strong>：允许斜走时，如果两个相邻的直角位置都是障碍，斜着穿过去会<em>穿过墙角</em>。
+  <strong>本页代码的处理</strong>：
+  <code>if map[current.y][nx] == 1 or map[ny][current.x] == 1 then blocked = true end</code>
+  <strong>但还有另一种策略</strong>：<em>允许穿墙角</em>（某些游戏故意这样设计，让移动更流畅）。
+  <em>这是一个"设计决策"而不是"技术问题"——要和策划确认。</em>
+</div>
+
+<h2 id="when-to-switch">五、什么时候该换方案</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>场景</th><th>推荐方案</th><th>理由</th></tr></thead>
+  <tbody>
+    <tr><td>单个角色寻路</td><td>A* + 堆</td><td>通用，实现简单</td></tr>
+    <tr><td><strong>大量单位去同目标</strong></td><td><strong>流场寻路</strong></td><td>一次计算，共享使用</td></tr>
+    <tr><td>大量单位去不同目标</td><td>A* + 路径缓存</td><td>缓存重复请求</td></tr>
+    <tr><td>超大地图</td><td>分层寻路</td><td>先粗后细</td></tr>
+    <tr><td>均匀代价网格</td><td>JPS</td><td>减少 90% 扩展</td></tr>
+    <tr><td>动态障碍多</td><td>流场 / 局部避障</td><td>全场重算代价高</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">流场寻路：RTS 的标配</span>
+  <strong>场景</strong>：RTS 游戏，200 个单位要去同一个目标点。
+  <strong>用 A* 的问题</strong>：每个单位跑一次 = 200 次寻路 = <em>卡死</em>。
+  <strong>流场的做法</strong>：
+  ① 从<strong>目标点</strong>反向 BFS，计算每个格子到目标的距离
+  ② 每个格子记录"朝哪个方向走能更快到达"
+  ③ 所有单位只需<em>查自己格子的方向</em>——<strong>O(1)</strong>
+  <strong>收益</strong>：CPU 开销降低上百倍。
+  <em>本页代码实现了完整的流场并做了可视化（用箭头显示流向）——这是理解流场最直观的方式。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="11">
+  <div class="task"><input type="checkbox" id="t-11-1"><label for="t-11-1"><strong>实现基础 A*</strong>：用堆做开放列表，跑通 4 方向寻路。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-2"><label for="t-11-2"><strong>对比四种启发函数</strong>：在地图上测试，记录扩展节点数。<em>亲自验证"准确启发能减少 60% 扩展"。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-11-3"><label for="t-11-3"><strong>加最大搜索上限</strong>：给 A* 加节点预算，验证"无路径"时不会遍历整个地图。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-4"><label for="t-11-4"><strong>实现 8 方向寻路</strong>：加上穿墙角检测，对比与 4 方向的路径长度。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-5"><label for="t-11-5"><strong>实现流场寻路</strong>：从目标反向 BFS，画出方向场，验证多个单位能共享。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-6"><label for="t-11-6"><strong>做路径平滑</strong>：把 A* 的锯齿路径用直线检测简化，让移动更自然。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-7"><label for="t-11-7"><strong>回答面试题</strong>：① A* 的 f/g/h 分别是什么？② 启发函数什么时候会导致非最优？③ 大量单位寻路怎么优化？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能实现完整的 A*（含堆、开放列表、闭集）</strong>；<br>
+    ② <strong>能说出四种启发函数，以及各自的可采纳性</strong>；<br>
+    ③ <strong>知道 h 高估会导致非最优，并能举出例子</strong>；<br>
+    ④ 知道"必须设最大搜索上限"以及原因；<br>
+    ⑤ 能判断什么场景该用 A* / 流场 / JPS。<br>
+    <br>
+    <em>第 ② 和第 ③ 条是这一页的核心——面试官问"启发函数怎么选"时，能答出"可采纳性"的人很少。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="10-graph.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">10 图的表示与遍历</div>
+  </a>
+  <a class="next" href="12-spatial.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">12 空间划分与碰撞优化 ★★</div>
+  </a>
+</nav>

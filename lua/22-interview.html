@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>22 面试题库 — Lua 热更新路线｜从零基础到独立搭建可上线的热更框架</title>
+<meta name="description" content="Lua 语法、xLua 原理、框架设计、性能优化高频题">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">Lua 热更新路线
+        <span>从零基础到独立搭建可上线的热更框架</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>22 · 面试题库 ★★</h1>
+
+<p class="lead">这一页把<strong>所有知识点变成可检验的问题</strong>。每道题都标注了<em>它考的是哪一页</em>——<strong>答不上来就是回去复习的信号</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="basics">一、语言基础（页 01-08）</h2>
+
+<p>这些是<strong>筛选题</strong>——答不上来会直接被判定为"不会 Lua"。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>题目</th><th>考点</th><th>出处</th></tr></thead>
+  <tbody>
+    <tr><td>Lua 有几种类型？</td><td>类型系统</td><td>03</td></tr>
+    <tr><td>为什么索引从 1 开始？</td><td>设计理念</td><td>03</td></tr>
+    <tr><td><code>0</code> 是真值还是假值？</td><td><strong>只有 nil 和 false 是假</strong></td><td>03</td></tr>
+    <tr><td><code>#t</code> 在什么情况下不可靠？</td><td><strong>表含 nil 时未定义</strong></td><td>03</td></tr>
+    <tr><td><code>table.insert</code> 和 <code>t[#t+1] = v</code> 有区别吗？</td><td>性能与语义</td><td>03</td></tr>
+    <tr><td><code>__index</code> 表形式和函数形式的区别？</td><td>元表</td><td>04</td></tr>
+    <tr><td><code>rawget</code> 和 <code>t[k]</code> 的区别？</td><td><strong>是否触发元表</strong></td><td>04</td></tr>
+    <tr><td>怎么实现继承？</td><td>元表链</td><td>04</td></tr>
+    <tr><td>多返回值会被截断吗？</td><td><strong>会（除函数调用参数和 return）</strong></td><td>05</td></tr>
+    <tr><td>闭包捕获的是值还是引用？</td><td>upvalue</td><td>05</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">最容易答错的三道</span>
+  <strong>① "0 是真值还是假值？"</strong><br>
+  <em>只有 <code>nil</code> 和 <code>false</code> 是假值。0 和空字符串都是真值。</em><br>
+  <strong>这和 C/C#/Python 都不同</strong>，是从其他语言转过来最容易踩的坑。<br><br>
+  <strong>② "<code>#t</code> 可靠吗？"</strong><br>
+  <em>对连续数组可靠；对含 <code>nil</code> 的表是"未定义行为"。</em><br>
+  可能返回 2，也可能返回 4——<strong>取决于内部数组边界的实现</strong>。<br>
+  可靠做法：用 <code>select("#", ...)</code> 数参数，或自己维护计数。<br><br>
+  <strong>③ "多返回值什么时候会被截断？"</strong><br>
+  <em>除了"函数调用参数"和"return"两个位置，其他都会截断成一个值。</em><br>
+  <code>local t = {multiReturn()}</code> → 不会截断（全部收进表）<br>
+  <code>local a = multiReturn()</code> → 截断成第一个<br>
+  <code>(multiReturn())</code> → <strong>加括号强制截断</strong>
+</div>
+
+<h2 id="hotupdate">二、热更与框架（页 09-17）</h2>
+
+<p>这些是<strong>区分选题</strong>——决定了你是"会 Lua"还是"能做热更"。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>题目</th><th>考点</th><th>出处</th></tr></thead>
+  <tbody>
+    <tr><td>热更的三个层次是什么？</td><td>资源/逻辑/框架</td><td>09</td></tr>
+    <tr><td>热更的本质是什么？</td><td><strong>清 <code>package.loaded</code> + 重新 require</strong></td><td>09</td></tr>
+    <tr><td>清了缓存为什么可能不生效？</td><td><strong>旧引用指向旧模块</strong></td><td>09</td></tr>
+    <tr><td>热更怎么做回滚？</td><td>保留旧版本 + 切换版本号</td><td>17</td></tr>
+    <tr><td>怎么防止"下载一半就用了"？</td><td><strong>临时目录 + 校验 + 原子切换</strong></td><td>17</td></tr>
+    <tr><td>xLua 的三种调用方式？</td><td>生成代码/反射</td><td>10</td></tr>
+    <tr><td>跨语言调用为什么慢？</td><td>参数编组 + 栈切换</td><td>11</td></tr>
+    <tr><td>xLua 有哪些 GC 来源？</td><td>struct/string/table/delegate</td><td>11</td></tr>
+    <tr><td>UI 为什么用栈？</td><td>后进先出天然匹配</td><td>16</td></tr>
+    <tr><td>怎么避免"界面关了还在刷新"？</td><td><strong>订阅自动取消</strong></td><td>16</td></tr>
+    <tr><td><code>self.super</code> 有什么陷阱？</td><td><strong>三级继承时会无限递归</strong></td><td>15</td></tr>
+    <tr><td>Lua 单例有什么坑？</td><td><strong>热重载状态残留</strong></td><td>15</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">这一组题是"加分项"</span>
+  <strong>绝大部分求职者能答语言基础的题</strong>，但<em>能答清热更问题的很少</em>。<br><br>
+  <strong>尤其是这三道</strong>：<br>
+  · <strong>"清了缓存为什么不生效"</strong>——考对 <code>require</code> 机制的理解<br>
+  · <strong>"<code>self.super</code> 有什么陷阱"</strong>——考真实踩坑经验<br>
+  · <strong>"怎么防止下载一半就用"</strong>——考工程严谨性<br><br>
+  <em>能流畅答出这三道，说明你真的做过（而不只是学过）。</em>
+</div>
+
+<h2 id="perf">三、性能与调试（页 18-21）</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>题目</th><th>考点</th><th>出处</th></tr></thead>
+  <tbody>
+    <tr><td>怎么定位 Lua 性能问题？</td><td><strong>分段计时</strong></td><td>19</td></tr>
+    <tr><td>Lua 有哪四大瓶颈？</td><td>跨语言/GC/算法/字符串</td><td>19</td></tr>
+    <tr><td>最值得做的优化是什么？</td><td><strong>table.concat 拼接</strong></td><td>08</td></tr>
+    <tr><td>Lua 里缓存全局函数有用吗？</td><td><strong>5.4 下没有明显收益</strong></td><td>08</td></tr>
+    <tr><td><code>ipairs</code> 和数字 for 哪个快？</td><td><strong>数字 for 快（ipairs 慢 2.6 倍）</strong></td><td>08</td></tr>
+    <tr><td>怎么获取丢掉的调用栈？</td><td><code>xpcall + debug.traceback</code></td><td>18</td></tr>
+    <tr><td>内存只涨不降怎么排查？</td><td>订阅泄漏/缓存无上限</td><td>18</td></tr>
+    <tr><td>客户端加密能防住作弊吗？</td><td><strong>不能，只是提高成本</strong></td><td>21</td></tr>
+    <tr><td>哪些逻辑必须放服务器？</td><td>数值/资源/概率/时间</td><td>21</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三个"反常识"的答案，答对了很加分</span>
+  <strong>① "缓存全局函数有用吗？"</strong><br>
+  <em>在 Lua 5.4 下【没有明显收益】</em>——因为全局变量存在数组里，访问本身就是 O(1)。<br>
+  这和 LuaJIT 时代、以及很多博客的说法相反。<strong>能说出"要实测"比背结论更重要。</strong><br><br>
+  <strong>② "<code>ipairs</code> 比数字 for 快吗？"</strong><br>
+  <em>反而【慢 2.6 倍】</em>——因为每次迭代都要调用迭代器函数。<br>
+  热路径应该用<strong>数字 for + 缓存长度</strong>。<br><br>
+  <strong>③ "客户端加密能防住作弊吗？"</strong><br>
+  <em>不能。</em>加密的价值是提高攻击成本，<strong>真正的安全靠服务器权威</strong>。<br>
+  <em>敢直接说"不能"的人，通常比说"能防住"的人更懂安全。</em>
+</div>
+
+<h2 id="self-check">四、自我检验标准</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>等级</th><th>标准</th><th>面试结果</th></tr></thead>
+  <tbody>
+    <tr><td><strong>L1 听过</strong></td><td>知道有这个东西</td><td><span class="mk mk--no">淘汰</span></td></tr>
+    <tr><td><strong>L2 能说</strong></td><td>能说出定义</td><td><span class="mk mk--warn">勉强</span></td></tr>
+    <tr><td><strong>L3 能讲</strong></td><td>能说清原理、场景、代价</td><td><span class="mk mk--yes">合格</span></td></tr>
+    <tr><td><strong>L4 做过</strong></td><td>能说出"我踩过 X 坑，用 Y 解决"</td><td><span class="mk mk--yes">优秀</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">怎么知道自己到了 L4</span>
+  <strong>标志是"能主动说出反例"</strong>。<br><br>
+  比如被问"Lua 怎么优化字符串拼接"：<br>
+  · <strong>L2 的回答</strong>："用 table.concat"<br>
+  · <strong>L4 的回答</strong>："用 table.concat，能快几十倍。<em>但要注意——不是所有拼接都值得改，短的、次数少的拼接改起来反而降低可读性。我先用 Profiler 确认它是瓶颈再改。</em>"<br><br>
+  <strong>区别在于：L4 知道"什么时候不适用"。</strong><br>
+  <em>这需要真的做过、真的踩过坑。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="22">
+  <div class="task"><input type="checkbox" id="t-22-1"><label for="t-22-1"><strong>逐题自测</strong>：合上资料，把上面的题口头答一遍，标记自己到哪一级。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-2"><label for="t-22-2"><strong>录音回放</strong>：录下自己的回答，回放听——<em>你会发现自己讲得比想象中乱</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-3"><label for="t-22-3"><strong>准备三个故事</strong>：热更事故、性能优化、疑难 bug 排查。每个都要能说清"怎么发现、怎么定位、怎么解决"。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-4"><label for="t-22-4"><strong>补短板</strong>：把低于 L3 的题，回到对应页面重读。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-5"><label for="t-22-5"><strong>模拟面试</strong>：找人互相提问，练习"讲清楚"的能力。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-6"><label for="t-22-6"><strong>回答开放题</strong>：① 你觉得 Lua 最大的缺点是什么？② 如果让你重新设计热更方案，你会怎么做？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>语言基础题全部能到 L3</strong>（页 01-08）；<br>
+    ② <strong>热更与框架题至少 80% 能到 L3</strong>（页 09-17）；<br>
+    ③ 能答出三个"反常识"的题（缓存函数、ipairs、客户端加密）；<br>
+    ④ <strong>有至少三个能量化讲出来的技术故事</strong>；<br>
+    ⑤ 能主动说出至少三个"什么时候不该用"的场景。<br>
+    <br>
+    <em>第 ⑤ 条最难也最能加分——它证明你不是在背答案，而是真的理解。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="21-security.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">21 安全与加密</div>
+  </a>
+  <a class="next" href="23-projects.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">23 实战项目</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

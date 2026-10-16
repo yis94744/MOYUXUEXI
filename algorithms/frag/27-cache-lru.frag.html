@@ -1,0 +1,144 @@
+<h1>27 · 缓存策略与 LRU</h1>
+
+<p class="lead">缓存<strong>是优化性能最有力的手段</strong>，但它有个致命问题：<em>内存只涨不降</em>。这一页讲<em>怎么给缓存加"上限"和"淘汰策略"</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="three-problems">一、缓存的三个必须解决的问题</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>问题</th><th>不解决的后果</th><th>方案</th></tr></thead>
+  <tbody>
+    <tr><td><strong>什么时候失效</strong></td><td>拿到过期数据</td><td>时间/版本/手动失效</td></tr>
+    <tr><td><strong>缓存多大</strong></td><td>内存爆掉</td><td><strong>容量上限</strong></td></tr>
+    <tr><td><strong>满了淘汰谁</strong></td><td>频繁淘汰有用的</td><td><strong>淘汰策略</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">没有上限的缓存 = 内存泄漏</span>
+  <strong>这是最常见的性能 bug 之一</strong>：<br>
+  <code>cache[key] = value  -- 只加不删</code><br>
+  · 游戏运行 10 分钟没问题<br>
+  · 运行 1 小时内存涨到 500MB<br>
+  · 运行 3 小时崩溃<br><br>
+  <strong>为什么难发现</strong>：<em>短期测试看不出来，只在长时间运行时暴露。</em><br><br>
+  <strong>解决</strong>：<em>给每个缓存都设容量上限和淘汰策略</em>。<br>
+  <strong>这是"必须做"而不是"可选优化"。</strong>
+</div>
+
+<h2 id="policies">二、四种淘汰策略的对比 ★★★</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>策略</th><th>淘汰谁</th><th>实现难度</th><th>命中率</th></tr></thead>
+  <tbody>
+    <tr><td><strong>FIFO</strong></td><td>最早进入的</td><td><span class="mk mk--yes">易</span></td><td><span class="mk mk--warn">一般</span></td></tr>
+    <tr><td><strong>LRU</strong></td><td><strong>最久未使用的</strong></td><td><span class="mk mk--warn">中</span></td><td><span class="mk mk--yes">好</span></td></tr>
+    <tr><td><strong>LFU</strong></td><td>使用次数最少的</td><td><span class="mk mk--no">难</span></td><td>好（但可能淘汰新数据）</td></tr>
+    <tr><td><strong>TTL</strong></td><td>过期的</td><td><span class="mk mk--yes">易</span></td><td><em>看场景</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">LRU 的正确实现：哈希表 + 双向链表</span>
+  <strong>LRU 需要 O(1) 完成两件事</strong>：<br>
+  ① <strong>查找</strong>——某个 key 在不在缓存里<br>
+  ② <strong>移动</strong>——把刚用过的移到"最新"位置<br><br>
+  <strong>只用哈希表</strong>：能 O(1) 查找，但<em>无法知道谁最久没用</em>。<br>
+  <strong>只用链表</strong>：能知道顺序，但<em>查找是 O(n)</em>。<br><br>
+  <strong>组合起来</strong>：<br>
+  · <strong>哈希表</strong>：key → 链表节点（<em>O(1) 定位</em>）<br>
+  · <strong>双向链表</strong>：维护使用顺序（<em>O(1) 移动</em>）<br>
+  · 访问时：<em>把节点移到链表头部</em><br>
+  · 满了时：<em>删除链表尾部</em><br><br>
+  <strong>为什么必须双向</strong>：<em>单向链表无法 O(1) 删除已知节点</em>（<em>拿不到前驱</em>）。<br><br>
+  <strong>实战简化</strong>：<em>Lua 里可以用一个表存顺序 + 一个表存数据</em>，但完全 O(1) 需要额外维护索引。<br>
+  如果缓存不大（几千项），<em>简单实现就够</em>。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">Lua 里的简化 LRU</span>
+  <strong>不需要真的实现双向链表</strong>——可以用"时间戳"近似：<br>
+  <code>cache[key] = { value = v, lastUsed = os.clock() }</code><br>
+  · 访问时<em>更新 lastUsed</em><br>
+  · 满了时<em>遍历找出 lastUsed 最小的</em>淘汰<br>
+  <strong>复杂度</strong>：淘汰是 O(n)，但<em>淘汰不频繁</em>（只在满时发生）。<br>
+  <strong>适用</strong>：缓存规模几千项以内。<br><br>
+  <strong>更简单的近似</strong>：<em>随机淘汰一个</em>。<br>
+  看起来粗暴，但实测命中率<strong>只比 LRU 差一点</strong>——因为缓存通常是"热点集中"的。<br>
+  <em>如果实现成本高，随机淘汰是可行的折中。</em>
+</div>
+
+<h2 id="applications">三、游戏里的缓存应用</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>场景</th><th>缓存什么</th><th>策略</th></tr></thead>
+  <tbody>
+    <tr><td><strong>配置表索引</strong></td><td>id → 配置对象</td><td><em>不淘汰（一次性）</em></td></tr>
+    <tr><td><strong>路径缓存</strong></td><td>起点终点 → 路径</td><td><strong>LRU + TTL</strong></td></tr>
+    <tr><td><strong>寻路网格</strong></td><td>计算好的流场</td><td>LRU</td></tr>
+    <tr><td><strong>UI 图集</strong></td><td>加载过的贴图</td><td>LRU</td></tr>
+    <tr><td><strong>字符串格式化</strong></td><td>常用格式串</td><td>FIFO</td></tr>
+    <tr><td><strong>距离计算</strong></td><td>复杂表达式的值</td><td>TTL（<em>每帧清</em>）</td></tr>
+    <tr><td><strong>网络响应</strong></td><td>接口返回</td><td><strong>TTL</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">什么时候该加缓存</span>
+  <strong>判断标准：同样的计算是不是发生了很多次？</strong><br><br>
+  <strong>值得缓存</strong>：<br>
+  · 结果<strong>不变或很少变</strong><br>
+  · 计算<strong>有成本</strong>（复杂、IO、跨语言）<br>
+  · 调用<strong>频繁</strong><br><br>
+  <strong>不值得缓存</strong>：<br>
+  · 结果每次都不同（<em>随机数</em>）<br>
+  · 计算很便宜（<em>加两个数</em>）——<em>缓存查找本身也有成本</em><br>
+  · 只调用一次<br><br>
+  <strong>注意</strong>：<em>缓存查找的成本可能比计算本身还高</em>。<br>
+  <strong>实测方法</strong>：<em>加缓存前后各测一次，只看数据。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="27">
+  <div class="task"><input type="checkbox" id="t-27-1"><label for="t-27-1"><strong>实现 LRU</strong>：用"哈希表 + lastUsed 时间戳"的简化版，测命中率。</label></div>
+  <div class="task"><input type="checkbox" id="t-27-2"><label for="t-27-2"><strong>对比策略</strong>：实现 FIFO、LRU、随机三种，用同一组访问序列对比命中率。</label></div>
+  <div class="task"><input type="checkbox" id="t-27-3"><label for="t-27-3"><strong>复现内存泄漏</strong>：写一个没有上限的缓存，持续访问新 key，观察内存增长。</label></div>
+  <div class="task"><input type="checkbox" id="t-27-4"><label for="t-27-4"><strong>加容量上限</strong>：给上面的缓存加上限和淘汰，验证内存稳定。</label></div>
+  <div class="task"><input type="checkbox" id="t-27-5"><label for="t-27-5"><strong>找项目里的缓存</strong>：列出你项目的所有缓存，检查<em>是否都有上限</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-27-6"><label for="t-27-6"><strong>回答面试题</strong>：① LRU 为什么要哈希表+双向链表？② 什么情况随机淘汰也够用？③ 什么时候不该加缓存？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道缓存必须解决三个问题（失效、上限、淘汰）</strong>；<br>
+    ② <strong>知道"没有上限的缓存 = 内存泄漏"</strong>；<br>
+    ③ <strong>能说出四种淘汰策略及适用场景</strong>；<br>
+    ④ <strong>理解 LRU 需要哈希表 + 双向链表的组合</strong>；<br>
+    ⑤ 知道什么时候该加缓存、什么时候不该。<br>
+    <br>
+    <em>第 ② 和 第 ⑤ 条最实用——前者能避免一类严重 bug，后者能避免过度优化。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="26-perf-patterns.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">26 性能模式库 ★★★</div>
+  </a>
+  <a class="next" href="28-bitwise.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">28 位运算与数据压缩</div>
+  </a>
+</nav>

@@ -1,0 +1,90 @@
+<h1>09 · 并查集与图论基础 ★★</h1>
+
+<p class="lead">并查集<strong>看起来简单，但效率惊人</strong>——几乎 O(1)。它解决了游戏里一个很常见的问题：<em>判断"这两个东西是不是连通的"</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="problem">一、并查集解决什么问题</h2>
+
+<p>并查集（Union-Find）解决<strong>三个看似不同、本质相同</strong>的问题：</p>
+
+<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>09/union-find</code></div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>问题</th><th>并查集的回答</th></tr></thead>
+  <tbody>
+    <tr><td>这两个格子是不是同一片区域？</td><td><code>find(a) == find(b)</code></td></tr>
+    <tr><td>这两个玩家是不是同一个队伍？</td><td>同上</td></tr>
+    <tr><td>这个地图有多少个互不相连的区域？</td><td>统计有多少个不同的根</td></tr>
+    <tr><td>加一条边会不会形成环？</td><td><strong>两端已连通 → 会成环</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="optimizations">二、两个优化与实测数据 ★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">实测：朴素实现慢 8 倍</span>
+  本页实现了三个版本，在同一组数据上实测：<div class="table-wrap"><table><thead><tr><th>实现</th><th>实测耗时</th><th>说明</th></tr></thead><tbody><tr><td>朴素（无优化）</td><td><strong>0.4540 秒</strong></td><td>退化成链</td></tr><tr><td>路径压缩</td><td>0.0430 秒</td><td>大幅改善</td></tr><tr><td>路径压缩 + 按秩合并</td><td>0.0560 秒</td><td>理论最优</td></tr></tbody></table></div><strong>朴素实现比优化版慢约 8 倍</strong>——因为 <code>union(1,2), union(2,3), ...</code> 这种顺序会<em>把树拉成一条链</em>，<code>find</code> 从 O(α(n)) 退化成 O(n)。<br><strong>本页还实测了链的长度</strong>：10 个元素的链，<code>find(1)</code> 需要走 <strong>9 步</strong>。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">两个优化的原理</span>
+  <strong>① 路径压缩</strong>（Path Compression）<br><code>find</code> 的过程中，把沿途所有节点<em>直接挂到根上</em>。<em>下次再查就只需一步。</em><br><strong>实测</strong>：第一次 find 会做压缩，第二次就是 O(1)。<br><br><strong>② 按秩合并</strong>（Union by Rank）<br><code>union</code> 时，把<em>矮的树挂到高的树上</em>，避免树长高。<br><strong>注意</strong>：本页实测中，"路径压缩+按秩合并"和"只用路径压缩"差不多——<em>因为路径压缩已经足够强，按秩合并的额外收益在高频 union 时才明显。</em>
+</div>
+
+<h2 id="applications">三、游戏里的三个经典应用</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">应用一：地图连通区域检测</span>
+  <strong>场景</strong>：程序化生成关卡后，要检查<em>玩家能否到达所有区域</em>。<br><strong>做法</strong>：<br>① 遍历所有可通行格子<br>② 对每个格子，把它和右边/下边的可通行格子 union<br>③ 统计有多少个不同的根 = 有多少个独立区域<br><strong>本页实测</strong>：10×10 的随机地图，输出区域数量。<br><em>如果区域数 > 1，说明地图被割裂了——需要重新生成或加传送门。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">应用二：Kruskal 最小生成树</span>
+  <strong>用途</strong>：程序化地图生成、网络布线、道路规划。<br><strong>算法</strong>：<br>① 把所有边按权重排序<br>② 依次取最小的边<br>③ <strong>如果两端不在同一集合，加入生成树并 union</strong><br>④ 如果已连通，跳过（<em>否则会形成环</em>）<br><em>并查集在这里的作用：O(1) 判断"这两个点是否已连通"。</em><br><strong>这是并查集最经典的应用之一。</strong>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">应用三：队伍/阵营划分</span>
+  <strong>场景</strong>：判断两个玩家是否同一队、两个道具是否同类。<br><strong>本页实测</strong>：<br>· 初始：10 个独立玩家<br>· <code>union(1,2)</code>、<code>union(3,4)</code>、<code>union(5,6)</code><br>· 查询：1 和 2 同队 = true，1 和 3 同队 = false<br>· <code>union(2,3)</code> 后：1 和 4 变成同队 = true<br><em>这就是"队伍合并"的完整逻辑。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="09">
+  <div class="task"><input type="checkbox" id="t-09-1"><label for="t-09-1"><strong>实现三种版本</strong>：朴素、路径压缩、路径压缩+按秩合并。</label></div>
+  <div class="task"><input type="checkbox" id="t-09-2"><label for="t-09-2"><strong>验证退化</strong>：用 <code>union(1,2), union(2,3), ...</code> 的顺序，测量 <code>find</code> 走了多少步。</label></div>
+  <div class="task"><input type="checkbox" id="t-09-3"><label for="t-09-3"><strong>做地图连通检测</strong>：生成随机地图，统计区域数量。<em>如果 > 1，说明地图被割裂。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-09-4"><label for="t-09-4"><strong>实现 Kruskal</strong>：用并查集做最小生成树，验证不会形成环。</label></div>
+  <div class="task"><input type="checkbox" id="t-09-5"><label for="t-09-5"><strong>测性能</strong>：对比三种实现在 20 万元素下的耗时差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-09-6"><label for="t-09-6"><strong>回答面试题</strong>：① 并查集的两个优化是什么？② 为什么朴素实现会退化？③ 游戏里哪里用并查集？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能手写并查集（find/union）</strong>；<br>
+    ② <strong>能说出路径压缩和按秩合并的原理</strong>；<br>
+    ③ <strong>知道朴素实现会退化成 O(n) 链</strong>；<br>
+    ④ 能说出并查集的三个游戏应用；<br>
+    ⑤ 能实现地图连通区域检测。<br>
+    <br>
+    <em>第 ③ 条最重要——理解退化的原因，才能真正理解为什么需要优化。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="08-trie.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">08 字典树 Trie 与敏感词过滤 ★★</div>
+  </a>
+  <a class="next" href="10-graph.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">10 图的表示与遍历</div>
+  </a>
+</nav>

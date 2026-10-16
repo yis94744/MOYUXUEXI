@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>09 游戏数学基础 — C# + Unity 路线｜从零基础到独立完成商业级项目</title>
+<meta name="description" content="向量点积叉积、坐标系与手性、矩阵变换、四元数与旋转叠加顺序、插值与缓动">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C# + Unity 路线
+        <span>从零基础到独立完成商业级项目</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+
+      <h1>09 · 游戏数学基础</h1>
+      <p class="lead">很多人一听到"数学"就想跳过。但游戏开发用到的数学<strong>其实很少，而且非常具体</strong>——真正每天都在用的只有四样：<em>向量、矩阵、四元数、插值</em>。它们不是为了考试，而是为了回答四个实际问题：<strong>东西朝哪、怎么转、怎么动、怎么摆</strong>。</p>
+
+      <div class="callout callout--note">
+        <span class="callout__title">这一页在路线中的位置</span>
+        <strong>前面八页</strong>（03–08）讲的是"语言"：怎么写出正确的 C# 代码。你已经掌握了工具。<br>
+        <strong>这一页</strong>开始讲"内容"：<em>游戏世界里的一切位置、朝向、运动，都是数学</em>。你会发现页 03 学的 <code>Vector3</code> 是 <a class="kp-ref" href="03-cs-basic.html#value-ref" title="值类型与引用类型">值类型</a>这件事，在这里有了实际意义。<br>
+        <strong>下一页</strong>（10）讲渲染管线：那本质上是"把这些数学用在屏幕上"。<br>
+        <strong>难度曲线</strong>：这一页会比前面轻松一些——因为它更直观。<em>但四元数那部分需要你动手算一遍。</em>
+      </div>
+
+      
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="03-cs-basic.html#value-ref" data-brief="赋值时拷贝内容还是拷贝地址，这决定了对象会不会被共享"><span class="prereq__title">值类型与引用类型</span><span class="prereq__page">03-cs-basic</span></a>
+          <a class="prereq__item" href="03-cs-basic.html#choose" data-brief="小、不可变、数量大用 struct；需要继承或引用语义用 class"><span class="prereq__title">struct 与 class 选型</span><span class="prereq__page">03-cs-basic</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="why">一、为什么游戏开发需要数学</h2>
+      <p>先破除一个误解：<strong>你不需要成为数学高手才能做游戏</strong>。Unity 已经把 95% 的数学封装成了 API——你调 <code>Vector3.Distance</code> 就行，不需要知道它是怎么算的。</p>
+      <p>但剩下 5% 你必须懂，因为<strong>不懂就会写出"能跑但很慢"或"看起来对但结果错"的代码</strong>。具体来说：</p>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>数学概念</th><th>游戏里解决什么问题</th><th>不懂的后果</th></tr></thead>
+        <tbody>
+          <tr><td><strong>向量</strong></td><td>位置、方向、速度、距离</td><td>每帧调用 Distance 导致性能问题；判断方向时写出错误逻辑</td></tr>
+          <tr><td><strong>点积 / 叉积</strong></td><td>判断前后、左右、夹角、视线检测</td><td>不知道可以用点积判断朝向，写出复杂的三角函数</td></tr>
+          <tr><td><strong>矩阵</strong></td><td>坐标空间转换（模型 -> 世界 -> 屏幕）</td><td>看不懂 Shader；不理解为什么父物体移动子物体会跟着动</td></tr>
+          <tr><td><strong>四元数</strong></td><td>旋转、朝向、平滑转向</td><td><strong>旋转顺序搞错导致物体歪头</strong>（最常见的 bug）</td></tr>
+          <tr><td><strong>插值</strong></td><td>平滑移动、相机跟随、缓动动画</td><td>写出与帧率相关的代码，高刷屏上快、低端机上慢</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">学习方法建议</span>
+        <strong>不要先学理论再做游戏</strong>，那样你会失去动力。<br>
+        推荐顺序：<em>先看这一页的"每个概念解决什么问题"，然后动手写一遍代码，遇到不理解的地方再回头查</em>。<br>
+        <strong>最重要的练习</strong>：把页 04 的角色控制器改成用点积判断"敌人在不在视野内"，把页 02 的 LookAt 改成用四元数平滑转向。<em>当你发现数学能让代码更简单时，就真正学会了。</em>
+      </div>
+
+      <h2 id="vector">二、向量：位置与方向</h2>
+      <p>向量就是一个"带方向的箭头"。在游戏里，<strong>位置、速度、加速度、朝向全都是向量</strong>——只是语义不同。<code>Vector3(1, 0, 0)</code> 可以是"在 x=1 的位置"，也可以是"向右的速度"。</p>
+
+      <h3 id="vector-ops">核心运算速查</h3>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>运算</th><th>符号</th><th>几何含义</th><th>游戏用途</th></tr></thead>
+        <tbody>
+          <tr><td><strong>加法</strong></td><td><code>a + b</code></td><td>首尾相接</td><td>位置 + 位移 = 新位置</td></tr>
+          <tr><td><strong>数乘</strong></td><td><code>a * 2f</code></td><td>拉长 / 缩短</td><td>速度 x 时间 = 位移</td></tr>
+          <tr><td><strong>长度</strong></td><td><code>a.magnitude</code></td><td>箭头的长度</td><td>距离、速度大小</td></tr>
+          <tr><td><strong>归一化</strong></td><td><code>a.normalized</code></td><td>方向不变，长度变 1</td><td>求"朝哪个方向"</td></tr>
+          <tr><td><strong>点积</strong></td><td><code>Vector3.Dot(a,b)</code></td><td><strong>判断夹角</strong></td><td>前方/背后、视野、光照</td></tr>
+          <tr><td><strong>叉积</strong></td><td><code>Vector3.Cross(a,b)</code></td><td>垂直于两者的向量</td><td><strong>判断左右</strong>、求法线</td></tr>
+          <tr><td><strong>投影</strong></td><td><code>Vector3.Project</code></td><td>一个向量在另一个上的影子</td><td>沿坡面滑行、斜面移动</td></tr>
+          <tr><td><strong>反射</strong></td><td><code>Vector3.Reflect</code></td><td>弹射方向</td><td>子弹反弹、光线追踪</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  向量：游戏开发中最基本的数学对象
+// ============================================================
+public class VectorBasics : MonoBehaviour
+{
+    private void Start()
+    {
+        Vector3 a = new Vector3(3f, 4f, 0f);
+        Vector3 b = new Vector3(1f, 0f, 0f);
+
+        // ---------- 长度 ----------
+        float len = a.magnitude;            // 5（会开平方，较慢）
+        float sqrLen = a.sqrMagnitude;      // 25（快，比较距离时用这个）
+
+        // ---------- 距离：两种写法 ----------
+        float dist = Vector3.Distance(a, b);          // 慢：内部开平方
+        float sqrDist = (a - b).sqrMagnitude;         // 快：不开平方
+
+        // 只比较"谁更近"时用平方距离
+        Debug.Log("距离 " + dist + "，平方距离 " + sqrDist);
+
+        // ---------- 归一化 ----------
+        Vector3 norm = a.normalized;        // 长度变成 1，不修改 a
+        a.Normalize();                      // 就地归一化
+
+        // ---------- 点积：判断方向和角度 ----------
+        // dot &gt; 0：同向（夹角 &lt; 90 度）
+        // dot = 0：垂直
+        // dot &lt; 0：反向（夹角 &gt; 90 度）
+        Vector3 forward = transform.forward;
+        Vector3 toTarget = (Vector3.zero - transform.position).normalized;
+        float dot = Vector3.Dot(forward, toTarget);
+
+        if (dot &gt; 0.7f)
+        {
+            Debug.Log("目标在正前方 45 度内");
+        }
+        else if (dot &gt; 0f)
+        {
+            Debug.Log("目标在前方");
+        }
+        else
+        {
+            Debug.Log("目标在后方");
+        }
+
+        // ---------- 叉积：求垂直于两者的向量 ----------
+        // 用途：判断左右、生成法线、算力矩
+        Vector3 cross = Vector3.Cross(forward, toTarget);
+
+        // cross.y &gt; 0 说明目标在右侧，&lt; 0 在左侧（Unity 是左手坐标系）
+        if (cross.y &gt; 0f) Debug.Log("目标在右侧");
+        else if (cross.y &lt; 0f) Debug.Log("目标在左侧");
+
+        // ---------- 投影 ----------
+        // b 在 a 方向上的投影
+        Vector3 proj = Vector3.Project(b, a.normalized);
+
+        // b 在垂直于 a 的平面上的投影
+        Vector3 perp = Vector3.ProjectOnPlane(b, a.normalized);
+
+        // ---------- 反射：弹射方向 ----------
+        Vector3 incoming = new Vector3(1f, -1f, 0f).normalized;
+        Vector3 normal = Vector3.up;
+        Vector3 reflected = Vector3.Reflect(incoming, normal);
+
+        Debug.Log(norm + " " + proj + " " + perp + " " + reflected + " " + len + " " + sqrLen);
+    }
+}</code></pre>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">一个能省下大量性能的细节：用 sqrMagnitude 代替 Distance</span>
+        <code>Vector3.Distance</code> 内部要<strong>开平方根</strong>——这是个相对昂贵的运算。<br>
+        如果你只是<strong>比较远近</strong>（谁离我更近？在不在范围内？），那就<em>不需要开平方</em>：<code>(a - b).sqrMagnitude &lt; range * range</code> 就够了。<br>
+        <strong>什么时候必须用 Distance</strong>：需要真实的距离数值时（比如扣血公式、显示"距离 3.7 米"）。<br>
+        <em>在每帧执行数千次的地方，这个替换能省下可观的 CPU 时间。</em>
+      </div>
+
+      <h3 id="dot-cross">点积与叉积：判断方向的利器</h3>
+      <p>这两个运算是<strong>新手最容易忽略、但最能简化代码</strong>的工具。很多需要"算角度 + 判断象限"的复杂逻辑，用点积一行就够。</p>
+
+      <div class="kp">
+        <div class="kp__head">点积的三个用途</div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>① 判断方向关系</strong><br><code>Dot(a, b) &gt; 0</code> 同向；<code>== 0</code> 垂直；<code>&lt; 0</code> 反向。<em>注意：前提是 a 和 b 都是单位向量。</em></p></div>
+        </div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>② 判断是否在视野内</strong><br><code>Dot(transform.forward, toTarget.normalized) &gt; 0.7f</code> 表示目标在前方约 45 度内。<strong>不需要三角函数，不需要算角度。</strong><em>这是 AI 视野检测的标准做法。</em></p></div>
+        </div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>③ 求夹角</strong><br><code>Mathf.Acos(Dot(a.normalized, b.normalized)) * Mathf.Rad2Deg</code>。<em>但更推荐直接用 <code>Vector3.Angle(a, b)</code>，它内部做了数值稳定性处理。</em></p></div>
+        </div>
+      </div>
+
+      <div class="kp">
+        <div class="kp__head">叉积的用途</div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>判断左右</strong>（最常用）<br><code>Vector3.Cross(forward, toTarget).y</code> 的符号就能告诉你目标在左侧还是右侧。<br><em>Unity 是左手坐标系，y &gt; 0 是右侧。这一点和很多数学教材相反，必须动手验证一次。</em></p></div>
+        </div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>求法线</strong><br>给定三角形的两个边向量，叉积就是它的法线。<em>这是网格生成、光照计算的基础。</em></p></div>
+        </div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>算力矩 / 角速度</strong><br>物理引擎内部大量使用。<em>日常开发中很少直接用到。</em></p></div>
+        </div>
+      </div>
+
+      <h2 id="quaternion">三、四元数：旋转的正确表示 ★</h2>
+      <p>这是本页<strong>最难也最重要</strong>的部分。四元数经常被当作"黑盒"，但它其实有一个非常直观的几何解释：<strong>四元数 = 一根轴 + 一个旋转角度</strong>。</p>
+
+      <div class="callout callout--note">
+        <span class="callout__title">为什么不用欧拉角</span>
+        欧拉角（<code>(x, y, z)</code> 三个角度）看起来更直观，但有三个致命问题：<br><strong>① 万向节死锁</strong>：在某些角度下会失去一个旋转自由度，导致旋转"卡住"。<br><strong>② 插值困难</strong>：<code>(350, 0, 0)</code> 到 <code>(10, 0, 0)</code> 直接插值会倒退 340 度。<br><strong>③ 顺序敏感</strong>：<code>(30, 40, 50)</code> 到底是什么顺序？不同引擎约定不同，<em>而且结果完全不同</em>。<br>
+        <strong>四元数解决了全部三个问题</strong>，代价是它不直观。<em>但只要你记住"轴 + 角"这个图像，就不难了。</em>
+      </div>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  四元数：旋转的本质是"绕一根轴转一个角度"
+// ============================================================
+public class QuaternionBasics : MonoBehaviour
+{
+    private void Start()
+    {
+        // ---------- 创建 ----------
+        Quaternion identity = Quaternion.identity;                    // 无旋转
+        Quaternion fromEuler = Quaternion.Euler(0f, 90f, 0f);         // 欧拉角 -&gt; 四元数
+        Quaternion look = Quaternion.LookRotation(Vector3.forward, Vector3.up);  // 朝向
+        Quaternion axis = Quaternion.AngleAxis(45f, Vector3.up);      // 绕轴转
+
+        // ---------- 属性 ----------
+        Vector3 euler = fromEuler.eulerAngles;          // 转回欧拉角
+        Quaternion inv = Quaternion.Inverse(fromEuler); // 逆旋转
+
+        // ---------- 旋转向量 ----------
+        Vector3 rotated = fromEuler * Vector3.forward;  // 四元数 * 向量
+
+        // ---------- 旋转叠加：顺序至关重要 ----------
+        Quaternion rx = Quaternion.AngleAxis(30f, Vector3.right);
+        Quaternion ry = Quaternion.AngleAxis(90f, Vector3.up);
+
+        // a * b 表示：先应用 b，再应用 a（从右往左读）
+        Quaternion firstRxThenRy = ry * rx;   // 先绕 X 转 30，再绕 Y 转 90
+        Quaternion firstRyThenRx = rx * ry;   // 先绕 Y 转 90，再绕 X 转 30
+
+        // 两者结果完全不同！
+        Debug.Log("先X后Y: " + (firstRxThenRy * Vector3.forward));
+        Debug.Log("先Y后X: " + (firstRyThenRx * Vector3.forward));
+
+        // ---------- 朝向目标 + 本地偏移（常用写法）----------
+        Vector3 toTarget = (Vector3.zero - transform.position).normalized;
+        if (toTarget != Vector3.zero)
+        {
+            // 基准朝向
+            Quaternion targetRotation = Quaternion.LookRotation(toTarget, Vector3.up);
+
+            // 本地偏移：让模型低头 10 度（相对于自己的朝向）
+            Quaternion localOffset = Quaternion.Euler(10f, 0f, 0f);
+
+            // 先应用偏移，再转到目标朝向
+            transform.rotation = targetRotation * localOffset;
+        }
+
+        // ---------- 插值 ----------
+        Quaternion slerp = Quaternion.Slerp(identity, fromEuler, 0.5f);   // 球面插值（推荐）
+        Quaternion rot = Quaternion.RotateTowards(identity, fromEuler, 90f * Time.deltaTime);
+
+        // ---------- 角度 ----------
+        float angle = Quaternion.Angle(identity, fromEuler);   // 两个旋转的夹角
+
+        Debug.Log(look + " " + axis + " " + euler + " " + inv + " " + rotated);
+        Debug.Log(slerp + " " + rot + " " + angle);
+    }
+
+    // ---------- 2D：只绕 Z 轴旋转 ----------
+    private void FaceTarget2D(Transform self, Transform target)
+    {
+        Vector3 diff = target.position - self.position;
+        float angleDeg = Mathf.Atan2(diff.y, diff.x) * Mathf.Rad2Deg;
+        self.rotation = Quaternion.Euler(0f, 0f, angleDeg - 90f);
+    }
+}</code></pre>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">乘法顺序：这是四元数唯一的难点</span>
+        <strong>规则</strong>：<code>a * b</code> 表示<em>先应用 b，再应用 a</em>（从右往左读）。<br>
+        <strong>为什么容易记反</strong>：因为读代码是从左往右的，但四元数乘法的语义是从右往左。<br>
+        <strong>实战写法</strong>：<code>transform.rotation = targetRotation * localOffset;</code><br>读作"先应用本地偏移，再转到目标朝向"。<em>这样写出来的旋转始终相对于物体自己，不会出现歪头。</em>
+      </div>
+
+      <h3 id="quat-practice">四元数的四条实践规则</h3>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>规则</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><strong>不要用 == 比较</strong></td><td>浮点误差。用 <code>Quaternion.Angle(a, b) &lt; 1f</code> 判断"转到了"</td></tr>
+          <tr><td><strong>不要反复转换欧拉角和四元数</strong></td><td>每次转换都有精度损失，累积会出错。<em>用四元数存状态，只在显示时转欧拉角</em></td></tr>
+          <tr><td><strong>旋转叠加必须用乘法</strong></td><td>四元数不能相加。<code>q1 * q2</code> 才是叠加</td></tr>
+          <tr><td><strong>平滑转向用 Slerp 或 RotateTowards</strong></td><td>不要用 Lerp（不匀速），更不要手算角度</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <h2 id="interp">四、插值：让运动自然起来 ★</h2>
+      <p>插值是游戏里<strong>用得最多、也最容易写错</strong>的东西。新手最常见的 bug 就是：<em>在自己电脑上流畅，到 144Hz 屏幕上快到飞起，或者低端机上慢得像蜗牛</em>。</p>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  插值与缓动：让运动"自然"起来的数学
+// ============================================================
+public class InterpolationDemo : MonoBehaviour
+{
+    [SerializeField] private Transform _target;
+    [SerializeField] private float _moveSpeed = 5f;
+    [SerializeField] private float _smoothTime = 0.3f;
+
+    private Vector3 _velocity;
+
+    private void Update()
+    {
+        // ---------- 线性插值 Lerp ----------
+        // t = 0 返回 a，t = 1 返回 b，会被自动 Clamp01
+        // 注意：Lerp(current, target, 0.1f) 每帧调用是「指数逼近」，
+        // 不是匀速，而且与帧率相关
+        transform.position = Vector3.Lerp(transform.position, _target.position, 0.1f);
+
+        // ---------- 正确的匀速移动：MoveTowards ----------
+        // 以固定速度靠近，不会过冲
+        transform.position = Vector3.MoveTowards(
+            transform.position, _target.position, _moveSpeed * Time.deltaTime);
+
+        // ---------- 帧率无关的平滑：SmoothDamp ----------
+        // 内部维护速度状态，自动处理帧率
+        transform.position = Vector3.SmoothDamp(
+            transform.position, _target.position, ref _velocity, _smoothTime);
+
+        // ---------- 帧率无关的指数插值 ----------
+        // 如果你坚持要用 Lerp，必须这样写才能与帧率无关
+        float t = 1f - Mathf.Exp(-10f * Time.deltaTime);
+        transform.position = Vector3.Lerp(transform.position, _target.position, t);
+
+        // ---------- 旋转插值 ----------
+        Vector3 dir = (_target.position - transform.position).normalized;
+        if (dir != Vector3.zero)
+        {
+            Quaternion targetRot = Quaternion.LookRotation(dir);
+            // Slerp 用于旋转（保持角速度均匀）
+            transform.rotation = Quaternion.Slerp(
+                transform.rotation, targetRot, 5f * Time.deltaTime);
+        }
+    }
+
+    // ---------- 缓动函数 ----------
+    private void EasingDemo()
+    {
+        float t = Mathf.Repeat(Time.time, 1f);   // 0 -&gt; 1 循环
+
+        // 平滑起停（两端慢中间快）
+        float smooth = Mathf.SmoothStep(0f, 1f, t);
+
+        // 来回摆动（乒乓）
+        float pingpong = Mathf.PingPong(Time.time, 1f);
+
+        // 自定义缓动：ease out（开始快，结束慢）
+        float easeOut = 1f - Mathf.Pow(1f - t, 3f);
+
+        // 自定义缓动：ease in-out
+        float easeInOut = t &lt; 0.5f
+            ? 4f * t * t * t
+            : 1f - Mathf.Pow(-2f * t + 2f, 3f) / 2f;
+
+        Debug.Log(smooth + " " + pingpong + " " + easeOut + " " + easeInOut);
+    }
+
+    // ---------- 角度插值（处理绕圈问题）----------
+    private void AngleLerp()
+    {
+        float current = 350f;
+        float target = 10f;
+
+        // 直接用 Lerp 会绕远路（350 -&gt; 10 会倒退 340 度）
+        float bad = Mathf.Lerp(current, target, 0.5f);      // 180（错的）
+
+        // 正确：用 LerpAngle，会自动选择最短路径
+        float good = Mathf.LerpAngle(current, target, 0.5f);   // 0（对的）
+
+        Debug.Log(bad + " vs " + good);
+    }
+}</code></pre>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">帧率无关：这是插值最重要的概念</span>
+        <strong>错误的写法</strong>：<code>Lerp(pos, target, 0.1f)</code> 每帧调用。<br><em>问题</em>：60 FPS 时每秒逼近 6 次，144 FPS 时每秒逼近 14 次——<strong>高刷屏上快得多</strong>。<br>
+        <strong>正确写法有三种</strong>：<br>① <code>MoveTowards(pos, target, speed * Time.deltaTime)</code> —— 匀速，最常用<br>② <code>SmoothDamp(pos, target, ref vel, smoothTime)</code> —— 平滑起停，相机的标准做法<br>③ <code>t = 1 - Exp(-k * deltaTime)</code> 配 Lerp —— 帧率无关的指数逼近<br>
+        <strong>判断标准</strong>：如果你的插值代码里出现了裸的数字（比如 0.1f），而没有乘以 <code>deltaTime</code>，那它<em>几乎一定是错的</em>。
+      </div>
+
+      <h3 id="lerp-vs-move">三种平滑方式怎么选</h3>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>方法</th><th>运动特征</th><th>适用场景</th></tr></thead>
+        <tbody>
+          <tr><td><code>MoveTowards</code></td><td>匀速直线，到点即停</td><td>角色移动、UI 平移、<strong>需要精确到达</strong></td></tr>
+          <tr><td><code>SmoothDamp</code></td><td>平滑加速 + 平滑减速</td><td><strong>相机跟随</strong>、需要"顺滑感"</td></tr>
+          <tr><td><code>Lerp</code> + Exp</td><td>开始快、越来越慢（永远逼近但不等于）</td><td>UI 淡入淡出、数值逼近</td></tr>
+          <tr><td><code>PingPong</code></td><td>来回摆动</td><td>巡逻、呼吸动画</td></tr>
+          <tr><td><code>SmoothStep</code></td><td>两端慢、中间快</td><td>缓动、过渡效果</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <h2 id="tasks">五、本章动手任务</h2>
+
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="t-09-1">
+          <label for="t-09-1"><strong>验证点积判断</strong>：在场景里放一个目标物，用 <code>Vector3.Dot</code> 判断它在主角前方还是后方，把结果打到 Console。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-09-2">
+          <label for="t-09-2"><strong>验证叉积左右</strong>：用 <code>Vector3.Cross</code> 判断左右，<em>自己动手确认 Unity 里哪个符号对应哪边</em>。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-09-3">
+          <label for="t-09-3"><strong>手算一次四元数乘法</strong>：创建两个旋转，分别算 <code>a*b</code> 和 <code>b*a</code>，观察两者的 <code>forward</code> 和 <code>up</code> 差异。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-09-4">
+          <label for="t-09-4"><strong>修复帧率相关 bug</strong>：故意写一个用固定 t 值的 Lerp，在不同帧率下观察速度差异。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-09-5">
+          <label for="t-09-5"><strong>做平滑相机</strong>：用 <code>SmoothDamp</code> 实现一个跟随相机的脚本，对比直接用 Lerp 的手感差异。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-09-6">
+          <label for="t-09-6"><strong>回答面试题</strong>：① 点积和叉积分别能做什么？② 为什么用四元数不用欧拉角？③ 怎么写出帧率无关的插值？</label>
+        </li>
+      </ul>
+
+      <div class="milestone">
+        <p class="mb0">
+          <strong>本章过关标准</strong>：<br>① 能说出点积和叉积各自能解决什么问题，并各举一个游戏场景；<br>② 知道什么时候该用 <code>sqrMagnitude</code> 代替 <code>Distance</code>；<br>③ <strong>能说清四元数乘法的顺序规则</strong>，并解释为什么容易记反；<br>④ 能写出帧率无关的平滑移动代码，并说出为什么固定 t 值是错的；<br>⑤ 知道 MoveTowards / SmoothDamp / Lerp 各自适合什么场景。<br><br><em>第 ③ 和第 ④ 条是实战中最容易出 bug 的两处。数学不难，难的是记住这些"反直觉但有道理"的约定。</em>
+        </p>
+      </div>
+
+      <nav class="page-nav">
+        <a href="08-cs-async.html">
+          <div class="dir">← C# 语言线</div>
+          <div class="title">08 协程与异步编程</div>
+        </a>
+        <a class="next" href="10-graphics.html">
+          <div class="dir">数学与图形 →</div>
+          <div class="title">10 渲染管线与 Shader</div>
+        </a>
+      </nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

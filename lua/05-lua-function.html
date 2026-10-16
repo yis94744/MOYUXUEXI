@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>05 函数与闭包 — Lua 热更新路线｜从零基础到独立搭建可上线的热更框架</title>
+<meta name="description" content="多返回值、可变参数、闭包、尾调用、函数式编程">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">Lua 热更新路线
+        <span>从零基础到独立搭建可上线的热更框架</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>05 · 函数与闭包</h1>
+
+<p class="lead">Lua 的函数是<strong>一等公民</strong>——可以赋给变量、存进表、当参数传、当返回值。这让 Lua 能写出非常灵活的代码，但也带来两个必须理解的概念：<strong>闭包</strong>和<strong>尾调用</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（04）的元表让你能给 table 定义行为。这一页讲<em>函数本身作为值</em>能做什么。<br>
+  <strong>关键衔接</strong>：元表里的 <code>__index</code> 用函数实现、框架里的回调系统、事件监听——<em>全部基于这一页的闭包</em>。<br>
+  <strong>下一页</strong>（06）面向对象。你会看到<em>闭包实现的私有成员</em>和<em>元表实现的继承</em>两种封装方式的对比。<br>
+  <strong>验证方式</strong>：本页所有代码在 <em>Lua 5.4.7</em> 解释器里实际运行过。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="../unity/05-cs-adv.html#delegate" data-brief="event 是委托的安全封装，订阅必须成对取消否则内存泄漏"><span class="prereq__title">委托与事件</span><span class="prereq__page">05-cs-adv</span></a>
+          <a class="prereq__item" href="../unity/05-cs-adv.html#closure" data-brief="Lambda 捕获外部变量会生成堆对象，每帧执行就是每帧分配"><span class="prereq__title">闭包与捕获</span><span class="prereq__page">05-cs-adv</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="function">一、函数的多种形态</h2>
+
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  函数：一等公民
+-- ============================================================
+--  Lua 的函数是「值」，可以赋给变量、存进表、当参数传递、当返回值。
+--  这与其他语言的方法完全不同，也是 Lua 灵活性的来源。
+
+print("=== 1. 三种定义方式（完全等价）===")
+local f1 = function(a, b) return a + b end
+local function f2(a, b) return a + b end          -- 语法糖
+local f3 = function(a, b) return a + b end
+
+print("结果:", f1(1, 2), f2(3, 4), f3(5, 6))
+
+-- 【重要】f2 与 f1 有一个微妙区别：
+-- local function 在定义时就把自己放进作用域，所以能递归；
+-- local f = function 不行（此时 f 还是 nil）。
+local function factorial(n)
+  if n &lt;= 1 then return 1 end
+  return n * factorial(n - 1)          -- 能递归，因为 factorial 已入作用域
+end
+print("递归阶乘 5! =", factorial(5))
+
+print()
+print("=== 2. 多返回值（Lua 的特色）===")
+local function multiReturn()
+  return 1, 2, 3
+end
+
+local a, b, c = multiReturn()
+print("全部接收:", a, b, c)
+
+local only = multiReturn()
+print("只接收第一个:", only)
+
+-- 用 table.pack 完整捕获
+local packed = table.pack(multiReturn())
+print("pack 完整捕获: n =", packed.n, packed[1], packed[2], packed[3])
+
+-- 【高坑点】多返回值在表达式中间会被截断为 1 个
+local function three() return "x", "y", "z" end
+print("放在参数中间:", three(), "结束")            -- 只有 "x"
+print("放在最后:", "开始", three())                 -- 三个值都在
+
+-- 用括号强制只取第一个
+print("加括号强制单个:", (three()))
+
+print()
+print("=== 3. 可变参数 ... ===")
+local function sum(...)
+  local total = 0
+  for _, v in ipairs({ ... }) do          -- 打包成表再遍历
+    total = total + v
+  end
+  return total
+end
+print("sum(1,2,3,4,5) =", sum(1, 2, 3, 4, 5))
+print("sum() =", sum())                     -- 0
+
+-- select 是处理可变参数的利器
+local function countArgs(...)
+  return select("#", ...)                 -- 返回参数个数
+end
+print("参数个数:", countArgs(1, nil, 3, nil))  -- 4（nil 也算）
+
+local function fromNth(n, ...)
+  return select(n, ...)                   -- 返回第 n 个及之后的所有值
+end
+print("从第 2 个开始:", fromNth(2, "a", "b", "c", "d"))
+
+-- 【注意】# 对含 nil 的表结果不确定，select("#") 才是唯一可靠的方法
+local function countWithNil(...)
+  local t = { ... }
+  return #t, select("#", ...)
+end
+local lenByHash, lenBySelect = countWithNil(1, 2, nil, 4)
+print("中间有 nil 时 —— #t =", lenByHash, " select('#') =", lenBySelect)
+print("  ^ 本例恰好相等，但 # 对含 nil 的表【结果未定义】，不同版本可能不同")
+print("  结论：要准确计数必须用 select('#', ...)，不要依赖 #")
+
+-- 再看一个 # 明显不可靠的例子
+local tailNil = { 1, 2, 3, nil }
+print("尾部有 nil: #t =", #tailNil, "（可能是 4 也可能是 3，取决于内部实现）")
+print("  安全做法:", select("#", 1, 2, 3, nil))
+
+print()
+print("=== 4. 闭包：捕获外部变量 ===")
+local function makeCounter()
+  local count = 0                         -- 这个变量被闭包捕获
+  return function()
+    count = count + 1
+    return count
+  end
+end
+
+local counter1 = makeCounter()
+local counter2 = makeCounter()
+print("counter1:", counter1(), counter1(), counter1())
+print("counter2:", counter2())             -- 独立的状态，从 1 开始
+print("counter1 继续:", counter1())        -- 4，不受 counter2 影响
+
+print()
+print("=== 5. 闭包实现私有状态（Lua 的封装方式）===")
+local function createAccount(initial)
+  local balance = initial               -- 外部无法直接访问
+
+  local self = {}
+
+  function self.deposit(amount)
+    if amount &lt;= 0 then error("金额必须为正") end
+    balance = balance + amount
+    return balance
+  end
+
+  function self.withdraw(amount)
+    if amount &gt; balance then return false, "余额不足" end
+    balance = balance - amount
+    return true, balance
+  end
+
+  function self.getBalance()
+    return balance
+  end
+
+  return self
+end
+
+local acc = createAccount(100)
+acc.deposit(50)
+print("存款后余额:", acc.getBalance())
+local ok, result = acc.withdraw(30)
+print("取款 30:", ok, "余额:", result)
+local ok2, err2 = acc.withdraw(1000)
+print("超额取款:", ok2, err2)
+print("balance 无法直接访问:", acc.balance)      -- nil（真正的私有）
+
+print()
+print("=== 6. 尾调用优化（Tail Call）===")
+-- 【重要】Lua 支持尾调用优化：如果 return 后面直接跟函数调用，
+-- Lua 会复用当前栈帧，不会栈溢出。
+-- 但如果有额外运算，就不是尾调用。
+
+-- 真正的尾调用（不会栈溢出）
+local function tailSum(n, acc)
+  acc = acc or 0
+  if n == 0 then return acc end
+  return tailSum(n - 1, acc + n)        -- 纯 return，是尾调用
+end
+print("尾调用求和 1..100000 =", tailSum(100000))
+
+-- 非尾调用（会栈溢出）
+local function nonTailSum(n)
+  if n == 0 then return 0 end
+  return n + nonTailSum(n - 1)          -- 有加法运算，不是尾调用
+end
+print("非尾调用求和 1..100 =", nonTailSum(100))
+-- 实测：Lua 5.4 的默认栈很深，20 万层【不会】溢出。继续加大到 200 万层。
+local ok3, err3 = pcall(nonTailSum, 200000)
+print("非尾调用 20 万层:", ok3, "结果:", tostring(err3):sub(1, 20))
+
+local ok4, err4 = pcall(nonTailSum, 5000000)
+print("非尾调用 500 万层:", ok4)
+if not ok4 then
+  print("  错误信息:", tostring(err4):sub(1, 60))
+  print("  ^ 这就是栈溢出：非尾调用会不断累积栈帧")
+end
+print("对比：尾调用 10 万层成功，因为 Lua 复用了栈帧，不会累积")
+
+print()
+print("=== 7. 函数作为参数与返回值（高阶函数）===")
+local function map(tbl, fn)
+  local result = {}
+  for i, v in ipairs(tbl) do
+    result[i] = fn(v)
+  end
+  return result
+end
+
+local function filter(tbl, pred)
+  local result = {}
+  for _, v in ipairs(tbl) do
+    if pred(v) then result[#result + 1] = v end
+  end
+  return result
+end
+
+local function reduce(tbl, fn, init)
+  local acc = init
+  for _, v in ipairs(tbl) do
+    acc = fn(acc, v)
+  end
+  return acc
+end
+
+local nums = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }
+local doubled = map(nums, function(x) return x * 2 end)
+local evens = filter(nums, function(x) return x % 2 == 0 end)
+local total = reduce(nums, function(a, b) return a + b end, 0)
+
+print("map 翻倍:", table.concat(doubled, ", "))
+print("filter 偶数:", table.concat(evens, ", "))
+print("reduce 求和:", total)
+
+print()
+print("=== 8. 函数性能：局部化与避免闭包开销 ===")
+local N = 3000000
+
+-- 直接在循环内创建闭包（慢，每次分配）
+local t1 = os.clock()
+local s1 = 0
+for i = 1, N do
+  local fn = function(x) return x + 1 end
+  s1 = s1 + fn(1)
+end
+local closureTime = os.clock() - t1
+
+-- 循环外创建（快）
+local adder = function(x) return x + 1 end
+local t2 = os.clock()
+local s2 = 0
+for i = 1, N do
+  s2 = s2 + adder(1)
+end
+local cachedTime = os.clock() - t2
+
+print(string.format("循环内建闭包: %.4f 秒", closureTime))
+print(string.format("循环外建一次: %.4f 秒", cachedTime))
+print(string.format("快 %.1f 倍", closureTime / cachedTime))
+print("结果一致:", s1 == s2 and s2 == N * 2)</code></pre>
+
+<div class="callout callout--danger">
+  <span class="callout__title">多返回值的三个陷阱</span>
+  <strong>陷阱一：多返回值在表达式中间会被截断为 1 个</strong><br>
+  <code>print(three(), "结束")</code> —— 只输出第一个值。<br>
+  <code>print("开始", three())</code> —— 三个值都在（因为它在最后）。<br>
+  <em>要完整保留，用 <code>table.pack(f())</code> 或把调用放在最后。</em><br><br>
+  <strong>陷阱二：<code>{...}</code> 会丢掉中间的 nil</strong><br>
+  <code>local t = {...}</code> 之后 <code>#t</code> 不可靠。<em>要准确计数必须用 <code>select("#", ...)</code>。</em><br><br>
+  <strong>陷阱三：加括号会强制只取一个值</strong><br>
+  <code>(three())</code> 只返回第一个值。<em>这是"显式截断"的标准写法。</em>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">local function 与 local f = function 的区别</span>
+  <strong><code>local function f() ... end</code></strong>——定义时<em>就把 f 放进作用域</em>，所以函数体里能递归调用自己。<br>
+  <strong><code>local f = function() ... end</code></strong>——赋值时 f 还是 nil，<em>函数体里访问 f 会得到全局的 f（通常是 nil）</em>。<br><br>
+  <strong>结论</strong>：需要递归时，<strong>必须用 <code>local function</code></strong>。
+</div>
+
+<h2 id="closure">二、闭包：捕获外部变量 ★★</h2>
+
+<p>闭包是<strong>函数 + 它捕获的外部变量</strong>的组合。它是 Lua 里实现"私有状态"的标准手段，也是<em>性能陷阱的高发区</em>。</p>
+
+<div class="callout callout--tip">
+  <span class="callout__title">闭包的两个经典用途</span>
+  <strong>① 私有状态</strong>（真正的私有，外部无法访问）<br>
+  把变量声明成局部变量，然后让方法闭包捕获它。这是 <em>Lua 里唯一能实现"真私有"的方式</em>——用 <code>_</code> 前缀只是约定，外部照样能改。<br><br>
+  <strong>② 工厂函数 / 带状态的函数</strong><br>
+  <code>makeCounter()</code> 每次调用返回一个独立计数的函数——<em>两个 counter 互不影响</em>，因为它们捕获的是不同的局部变量。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">闭包的性能陷阱：循环内创建</span>
+  实测数据（Lua 5.4，300 万次循环）：<br>
+  • 循环内每次创建闭包：<strong>0.34 秒</strong><br>
+  • 循环外创建一次复用：<strong>0.07 秒</strong><br>
+  • <strong>相差约 5 倍</strong><br><br>
+  <strong>原因</strong>：每次创建闭包都会<em>分配一个新的函数对象</em>并捕获变量，这有内存分配成本。<br><br>
+  <strong>规则</strong>：<em>热路径（Update、循环体）里不要在循环内创建匿名函数</em>。<br>
+  把函数提到循环外，或定义成模块级局部函数。
+</div>
+
+<h2 id="tailcall">三、尾调用优化 ★</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">什么是尾调用</span>
+  当一个函数的<strong>最后一个动作</strong>是"返回另一个函数的调用结果"，且<em>没有额外运算</em>时，Lua 会复用当前栈帧，<strong>不会累积调用栈</strong>。<br><br>
+  <strong>是尾调用</strong>：<code>return f(x)</code><br>
+  <strong>不是尾调用</strong>：<code>return f(x) + 1</code>（有加法）、<code>return f(x), g(y)</code>（多个返回值）
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">实测数据：栈深度差异</span>
+  在 Lua 5.4 下实测：<br>
+  • <strong>尾调用</strong>：10 万层递归<em>正常返回</em>，因为栈帧被复用<br>
+  • <strong>非尾调用</strong>：20 万层仍能过，但 <em>500 万层就 <code>stack overflow</code></em><br><br>
+  <strong>实战意义</strong>：<br>
+  • 状态机的状态跳转、递归下降的解析器、协程调度——<strong>设计成尾调用可以支持任意深度</strong>；<br>
+  • 常见错误是把 <code>return f(x) * 2</code> 这种写法用在深递归上，<em>几百层就崩</em>。
+</div>
+
+<h2 id="tasks">四、本章动手任务</h2>
+
+<div class="tasks" data-page="05">
+  <div class="task"><input type="checkbox" id="t-05-1"><label for="t-05-1"><strong>验证多返回值截断</strong>：写一个返回三个值的函数，分别放在 <code>print</code> 的参数<em>中间</em>和<em>最后</em>，观察输出差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-2"><label for="t-05-2"><strong>实现私有状态</strong>：用闭包写一个银行账户，包含存款/取款/查余额，确保 <code>acc.balance</code> 读不到。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-3"><label for="t-05-3"><strong>对比闭包创建开销</strong>：把示例里的性能对比跑一遍，记录实测倍数。<em>然后在你自己的项目代码里找找有没有循环内建闭包的地方。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-05-4"><label for="t-05-4"><strong>触发栈溢出</strong>：写一个非尾调用的深递归，找到它崩溃的层数；然后改成尾调用，验证能跑更深。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-5"><label for="t-05-5"><strong>用 select 处理可变参数</strong>：写一个函数，用 <code>select("#", ...)</code> 统计参数个数（包含 nil），再用 <code>select(n, ...)</code> 取前 n 个。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-6"><label for="t-05-6"><strong>回答面试题</strong>：① 闭包捕获的是什么？② 什么情况下会栈溢出？③ 多返回值什么时候会被截断？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出 <code>local function</code> 与 <code>local f = function</code> 的区别及其影响；<br>
+    ② <strong>能解释多返回值在三种场景下的截断规则</strong>；<br>
+    ③ 能用闭包实现真正的私有成员；<br>
+    ④ <strong>能判断一段代码是不是尾调用，并知道不满足时会栈溢出</strong>；<br>
+    ⑤ 知道循环内创建闭包的性能代价。<br><br>
+    <em>第 ④ 条在写状态机、递归算法时非常实用——它决定了你的代码能撑多深。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="04-lua-table.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">04 table 与元表 ★</div>
+  </a>
+  <a class="next" href="06-lua-oop.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">06 面向对象与继承</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

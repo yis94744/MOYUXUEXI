@@ -1,0 +1,446 @@
+
+      <h1>05 · 委托、事件与 LINQ</h1>
+      <p class="lead">这三个东西是<strong>让代码"解耦"的核心工具</strong>。没有它们，你的 Player 类会直接引用 UI、音效、成就、统计等一大堆系统；有了它们，Player 只管发"我受伤了"这个事实，<em>谁关心谁自己去听</em>。但它们也是<strong>GC 分配的重灾区</strong>——这一页同时讲"怎么用"和"怎么用得不掉帧"。</p>
+
+      <div class="callout callout--note">
+        <span class="callout__title">阶段目标</span>
+        约 <strong>1.5 周</strong>，35 小时。结束时你能：用事件重构一个紧耦合的模块、说清闭包捕获什么时候产生堆分配、知道 LINQ 在什么场景下不该用。
+      </div>
+
+      <h2 id="delegate">一、委托与事件</h2>
+
+      <h3 id="delegate-basic">委托：类型安全的方法引用</h3>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+// ============================================================
+//  自定义委托类型
+// ============================================================
+public delegate void DamageHandler(int amount, string source);
+
+public class Health
+{
+    public DamageHandler OnDamage;
+
+    public void ApplyDamage(int amount, string source)
+    {
+        OnDamage?.Invoke(amount, source);   // ?. 保证无订阅者时不抛异常
+    }
+}
+
+public class DelegateDemo : MonoBehaviour
+{
+    private void LogDamage(int amount, string source)
+    {
+        Debug.Log(amount + " from " + source);
+    }
+
+    private void Start()
+    {
+        var h = new Health();
+
+        h.OnDamage += LogDamage;                                // 方法组
+        h.OnDamage += (a, s) =&gt; Debug.Log("lambda " + a);       // Lambda
+
+        h.ApplyDamage(10, "fire");      // 两个处理器依次执行
+
+        h.OnDamage -= LogDamage;        // 移除
+        h.OnDamage = null;              // 清空
+    }
+}</code></pre>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>内置委托</th><th>签名</th><th>典型用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>Action</code></td><td><code>void ()</code></td><td>无参无返回</td></tr>
+          <tr><td><code>Action&lt;T1,…&gt;</code></td><td><code>void (T1,…)</code></td><td>最多 16 个参数</td></tr>
+          <tr><td><code>Func&lt;TResult&gt;</code></td><td><code>TResult ()</code></td><td>有返回值</td></tr>
+          <tr><td><code>Predicate&lt;T&gt;</code></td><td><code>bool (T)</code></td><td><code>List.Find</code> 等</td></tr>
+          <tr><td><code>Comparison&lt;T&gt;</code></td><td><code>int (T,T)</code></td><td><code>List.Sort</code></td></tr>
+          <tr><td><code>UnityAction</code></td><td><code>void ()</code></td><td>UnityEvent 专用</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--note">
+        <span class="callout__title">多播委托的返回值只取最后一个</span>
+        <code>Func&lt;int&gt; f = () =&gt; 1; f += () =&gt; 2; f += () =&gt; 3;</code> 调用 <code>f()</code> 返回 <strong>3</strong>。<br>
+        想拿到全部结果，用 <code>f.GetInvocationList()</code> 遍历——但注意<strong>这会产生数组分配</strong>，不要放热路径。
+      </div>
+
+      <h3 id="event">事件：委托的安全封装</h3>
+      <p><code>event</code> 关键字把委托字段保护起来：<strong>外部只能 <code>+=</code> / <code>-=</code>，不能赋值、不能直接调用</strong>。这是"发布-订阅"模式在 C# 里的标准实现。</p>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+
+public class PlayerHealth : MonoBehaviour
+{
+    [SerializeField] private float _maxHp = 100f;
+    private float _hp;
+
+    // 事件声明：外部只能订阅/取消订阅
+    public event System.Action&lt;float, float&gt; HpChanged;   // (current, max)
+    public event System.Action Died;
+
+    private void Awake() { _hp = _maxHp; }
+
+    public void TakeDamage(float amount)
+    {
+        if (_hp &lt;= 0f) return;
+
+        _hp = Mathf.Max(0f, _hp - amount);
+        HpChanged?.Invoke(_hp, _maxHp);      // ?. 保证无订阅者时不抛异常
+
+        if (_hp &lt;= 0f) Died?.Invoke();
+    }
+}
+
+// ============================================================
+//  订阅方：UI 血条
+// ============================================================
+public class HpBar : MonoBehaviour
+{
+    [SerializeField] private PlayerHealth _health;
+    [SerializeField] private UnityEngine.UI.Image _fill;
+
+    // 必须成对订阅/取消订阅！这是 Unity 最常见的泄漏来源
+    private void OnEnable()  { _health.HpChanged += HandleHpChanged; }
+    private void OnDisable() { _health.HpChanged -= HandleHpChanged; }
+
+    private void HandleHpChanged(float current, float max)
+    {
+        _fill.fillAmount = max &lt;= 0f ? 0f : current / max;
+    }
+}</code></pre>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">为什么必须成对取消订阅</span>
+        事件列表里保存着订阅者的委托，<strong>委托持有订阅者实例的引用</strong>。<br>
+        如果 UI 对象被 <code>Destroy</code> 了但没取消订阅，那么：<br>① 它<strong>无法被 GC 回收</strong>（内存泄漏）；<br>② 事件再次触发时会调用到<strong>已销毁的对象</strong>，抛 <code>MissingReferenceException</code>。<br>
+        <strong>规则</strong>：<em>在 <code>OnEnable</code> 里订阅，就在 <code>OnDisable</code> 里取消</em>。用这对回调能自动处理"对象被禁用"和"对象被销毁"两种情况。
+      </div>
+
+      <h3 id="unityevent">C# event vs UnityEvent</h3>
+
+      <div class="cmp">
+        <div class="cmp__head">
+          <span>维度</span>
+          <span>C# <code>event</code></span>
+          <span><code>UnityEvent</code></span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>Inspector 配置</strong></span>
+          <span><span class="mk mk--no">不可见</span></span>
+          <span><span class="mk mk--yes">可视化连线</span></span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>性能</strong></span>
+          <span><span class="mk mk--yes">更快</span> 直接委托调用</span>
+          <span><span class="mk mk--warn">稍慢</span> 内部列表 + 虚调用</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>序列化</strong></span>
+          <span>不序列化</span>
+          <span>可序列化（编辑器里保存绑定）</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>参数限制</strong></span>
+          <span>任意泛型</span>
+          <span>最多 4 个参数</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>移除监听</strong></span>
+          <span>直接 <code>-=</code></span>
+          <span><strong>传 lambda 时无法移除</strong></span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>适用</strong></span>
+          <span>代码内部模块解耦、高频事件</span>
+          <span>策划配置、UI 按钮、美术连线</span>
+        </div>
+      </div>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using UnityEngine.Events;
+
+public class Interactable : MonoBehaviour
+{
+    // 可在 Inspector 里配置，不需要写代码
+    public UnityEvent OnInteract;
+    public UnityEvent&lt;int&gt; OnScore;              // 泛型版（2020.1+ 可在 Inspector 配置）
+    public UnityEvent&lt;string, float&gt; OnMessage;
+
+    private void OnMouseDown()
+    {
+        OnInteract?.Invoke();
+    }
+}
+
+// ============================================================
+//  代码绑定的正确姿势
+// ============================================================
+public class InteractBinder : MonoBehaviour
+{
+    [SerializeField] private Interactable _target;
+    private UnityAction _cachedHandler;      // 关键：保存引用才能移除
+
+    private void OnEnable()
+    {
+        // 错误：传 lambda 后无法移除（每次都是新对象）
+        // _target.OnInteract.AddListener(() =&gt; Debug.Log("hi"));
+
+        // 正确：先存到变量，再添加
+        _cachedHandler = () =&gt; Debug.Log("interacted");
+        _target.OnInteract.AddListener(_cachedHandler);
+    }
+
+    private void OnDisable()
+    {
+        if (_target == null) return;
+
+        if (_cachedHandler != null)
+        {
+            _target.OnInteract.RemoveListener(_cachedHandler);
+            _cachedHandler = null;
+        }
+    }
+}</code></pre>
+
+      <h2 id="closure">二、闭包：Lambda 的隐蔽成本 ★</h2>
+      <p>Lambda 很方便，但<strong>捕获外部变量时会生成一个隐藏的类实例</strong>——每次都分配堆内存。这是 Unity 里"代码看起来很干净但每帧掉帧"的常见原因——它正是 <a class="kp-ref" href="07-cs-memory.html#sources" title="GC 分配十大来源">GC 分配十大来源</a>里的第 5 条。</p>
+
+      <div class="callout callout--note">
+        <span class="callout__title">闭包分配规则（必须记住）</span>
+        <strong>① 不捕获任何外部状态</strong>（只用静态方法或字面量）→ 编译器会缓存委托实例，<strong>零分配</strong>。<br>
+        <strong>② 捕获了局部变量</strong> → 生成闭包类实例，<strong>每次执行都分配</strong>。<br>
+        <strong>③ 捕获了 <code>this</code></strong>（访问实例字段或调用实例方法）→ 同样生成包装对象，<strong>每次执行都分配</strong>。<br>
+        <em>所以 <code>Update</code> 里写的 lambda 是 GC 的头号来源之一。</em>
+      </div>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class ClosureDemo : MonoBehaviour
+{
+    private void Start()
+    {
+        // ============ for 循环变量捕获（经典 bug）============
+        var actions = new List&lt;Action&gt;();
+        for (int i = 0; i &lt; 3; i++)
+        {
+            actions.Add(() =&gt; Debug.Log(i));   // 全部输出 3
+        }
+        foreach (var a in actions) a();
+
+        // 修复：引入局部副本
+        actions.Clear();
+        for (int i = 0; i &lt; 3; i++)
+        {
+            int captured = i;
+            actions.Add(() =&gt; Debug.Log(captured));   // 0, 1, 2
+        }
+        foreach (var a in actions) a();
+
+        // foreach 的迭代变量在 C# 5+ 是每次迭代独立拷贝，没有这个问题
+        actions.Clear();
+        foreach (int item in new[] { 0, 1, 2 })
+        {
+            actions.Add(() =&gt; Debug.Log(item));       // 0, 1, 2
+        }
+        foreach (var a in actions) a();
+    }
+}</code></pre>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
+using System.Collections.Generic;
+
+public class ClosurePerf : MonoBehaviour
+{
+    private List&lt;Enemy&gt; _enemies = new List&lt;Enemy&gt;();
+
+    // 每帧分配：lambda 捕获了 _enemies 和 this
+    private void BadUpdate()
+    {
+        _enemies.Sort((a, b) =&gt; a.Hp.CompareTo(b.Hp));   // 每次都是新委托
+    }
+
+    // 零分配：静态比较器，编译器缓存实例
+    private static readonly System.Comparison&lt;Enemy&gt; HpComparison =
+        (a, b) =&gt; a.Hp.CompareTo(b.Hp);
+
+    private void GoodUpdate()
+    {
+        _enemies.Sort(HpComparison);
+    }
+
+    // C# 9 的 static lambda（Unity 2021.2+）：编译期保证不捕获
+    private void StaticLambdaUpdate()
+    {
+        _enemies.Sort(static (a, b) =&gt; a.Hp.CompareTo(b.Hp));
+    }
+}
+
+public class Enemy
+{
+    public float Hp;
+}</code></pre>
+
+      <h2 id="linq">三、LINQ：能力与代价</h2>
+      <p>LINQ 让代码<strong>极其可读</strong>，代价是<strong>每次查询都会分配对象</strong>——这也是 <a class="kp-ref" href="07-cs-memory.html#sources" title="GC 分配十大来源">GC 来源清单</a>里的一条。关键不是"用不用"，而是<em>知道在什么地方不能用</em>。</p>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using System.Linq;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class LinqDemo : MonoBehaviour
+{
+    public class Enemy
+    {
+        public int Id;
+        public string Name;
+        public float Hp;
+        public int Level;
+        public bool IsBoss;
+    }
+
+    private List&lt;Enemy&gt; _enemies = new List&lt;Enemy&gt;();
+
+    private void Start()
+    {
+        // ---------- 筛选与投影 ----------
+        List&lt;Enemy&gt; alive = _enemies.Where(e =&gt; e.Hp &gt; 0f).ToList();
+        string[] names = _enemies.Select(e =&gt; e.Name).ToArray();
+
+        // ---------- 排序 ----------
+        List&lt;Enemy&gt; sorted = _enemies.OrderBy(e =&gt; e.Level)
+                                     .ThenByDescending(e =&gt; e.Hp)
+                                     .ToList();
+
+        // ---------- 聚合 ----------
+        int totalLevel = _enemies.Sum(e =&gt; e.Level);
+        float avgHp = _enemies.Average(e =&gt; e.Hp);
+        int bossCount = _enemies.Count(e =&gt; e.IsBoss);
+
+        // ---------- 查找 ----------
+        Enemy first = _enemies.FirstOrDefault(e =&gt; e.IsBoss);
+        bool anyAlive = _enemies.Any(e =&gt; e.Hp &gt; 0f);
+
+        // ---------- 分组 ----------
+        foreach (var g in _enemies.GroupBy(e =&gt; e.Level))
+        {
+            Debug.Log(g.Key + ": " + g.Count());
+        }
+
+        // ============ 延迟执行（必须理解）============
+        var query = _enemies.Where(e =&gt; e.Hp &gt; 0f);   // 此时没有执行！
+        _enemies.Add(new Enemy { Hp = 1f });          // 修改源集合
+        foreach (var e in query) { }                  // 遍历时才执行，看到最新的集合
+
+        // 想快照就加 ToList
+        var snapshot = _enemies.Where(e =&gt; e.Hp &gt; 0f).ToList();
+
+        Debug.Log(alive.Count + names.Length + sorted.Count + totalLevel + avgHp + bossCount);
+        Debug.Log(first + " " + anyAlive + " " + snapshot.Count);
+    }
+}</code></pre>
+
+      <div class="callout callout--warn">
+        <span class="callout__title">延迟执行：既是特性也是陷阱</span>
+        <code>var query = _enemies.Where(e =&gt; e.Hp &gt; 0f);</code> —— <strong>这一行不执行任何筛选</strong>，只是构造了一个"查询描述"。<br>
+        真正执行发生在你<strong>遍历它的时候</strong>。所以：<br>① 中间修改了源集合，遍历时看到的是<strong>最新的</strong>集合；<br>② 同一个 query 遍历两次会执行两次；<br>③ 源集合在遍历过程中被修改，会抛 <code>InvalidOperationException</code>。<br>
+        想让它变成快照，加 <code>.ToList()</code> / <code>.ToArray()</code>。
+      </div>
+
+      <h3 id="linq-perf">LINQ 的性能代价</h3>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using System.Linq;
+using UnityEngine;
+
+public class LinqPerf : MonoBehaviour
+{
+    private System.Collections.Generic.List&lt;Transform&gt; _enemies
+        = new System.Collections.Generic.List&lt;Transform&gt;();
+
+    // ❌ 每帧 LINQ：多次 GC 分配（迭代器对象、闭包、结果集合）
+    private void BadUpdate()
+    {
+        Transform target = _enemies
+            .Where(e =&gt; e != null)
+            .OrderBy(e =&gt; (e.position - transform.position).sqrMagnitude)
+            .FirstOrDefault();
+
+        if (target != null) Attack(target);
+    }
+
+    // ✅ 手写循环：零 GC，速度更快
+    private Transform FindNearest()
+    {
+        Transform best = null;
+        float bestSqr = float.MaxValue;
+        Vector3 myPos = transform.position;
+
+        for (int i = 0; i &lt; _enemies.Count; i++)
+        {
+            Transform e = _enemies[i];
+            if (e == null) continue;
+
+            float d2 = (e.position - myPos).sqrMagnitude;
+            if (d2 &lt; bestSqr) { bestSqr = d2; best = e; }
+        }
+        return best;
+    }
+
+    private void Attack(Transform t) { }
+}</code></pre>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">LINQ 使用策略</span>
+        <strong>放心用</strong>：初始化、编辑器工具、关卡加载、存档读写。这些地方可读性远比性能重要。<br>
+        <strong>不要用</strong>：<code>Update</code>、<code>FixedUpdate</code>、物理回调、渲染相关、任何每帧执行且数据量大的地方。<br>
+        <strong>折中方案</strong>：如果确实需要 LINQ 语义又要性能，可以看 <code>ZLinq</code>、<code>StructLinq</code> 这类零分配实现，或者自己写几个常用的扩展方法。<br>
+        <em>最重要的一点：先用 Profiler 确认这里真的是瓶颈，再决定要不要改。绝大多数项目的卡顿不在 LINQ 上。</em>
+      </div>
+
+      <h2 id="tasks">四、本章动手任务</h2>
+
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="t-05-1">
+          <label for="t-05-1"><strong>用事件重构</strong>：写一个 Player 类，把"受伤时更新血条、播放音效、记录统计"三件事改成事件订阅，让 Player 不引用任何其他系统。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-05-2">
+          <label for="t-05-2"><strong>故意制造泄漏</strong>：写一个订阅事件但不在 <code>OnDisable</code> 取消订阅的组件，反复创建销毁，用 Memory Profiler 观察对象数量只增不减。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-05-3">
+          <label for="t-05-3"><strong>测量闭包分配</strong>：在 <code>Update</code> 里写一个捕获 <code>this</code> 的 lambda，用 Profiler 看 GC Alloc，然后改成静态比较器对比。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-05-4">
+          <label for="t-05-4"><strong>验证延迟执行</strong>：构造一个 LINQ 查询，在遍历前修改源集合，观察结果变化；然后加 <code>ToList()</code> 再试一次。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-05-5">
+          <label for="t-05-5"><strong>回答面试题</strong>：① 委托和事件的区别？② 为什么 Lambda 会产生 GC 分配？③ LINQ 的延迟执行可能带来什么 bug？</label>
+        </li>
+      </ul>
+
+      <div class="milestone">
+        <p class="mb0">
+          <strong>本章过关标准</strong>：<br>① 能用事件把两个原本互相引用的模块彻底解耦，并说清为什么要成对取消订阅；<br>② 能判断一段 lambda 代码<em>会不会</em>产生堆分配，并说出理由；<br>③ 能说出至少三种应该避免 LINQ 的场景；<br>④ 能解释延迟执行可能导致的 bug。<br><br><em>第 ② 条是性能优化的基础——你没法消除你看不见的分配。</em>
+        </p>
+      </div>
+
+      <nav class="page-nav">
+        <a href="04-cs-oop.html">
+          <div class="dir">← C# 语言线</div>
+          <div class="title">04 面向对象与接口</div>
+        </a>
+        <a class="next" href="06-cs-modern.html">
+          <div class="dir">C# 语言线 →</div>
+          <div class="title">06 泛型、反射与现代特性</div>
+        </a>
+      </nav>

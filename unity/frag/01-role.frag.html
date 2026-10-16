@@ -1,0 +1,161 @@
+
+      <h1>01 · 岗位与行业现实</h1>
+      <p class="lead">在投入几百小时之前，你至少该知道：<strong>这个行业有哪些岗位、分别要什么能力、薪资大概什么水平、以及有哪些坑</strong>。这一页不讲技术，讲<em>选择和判断</em>。</p>
+
+      <div class="callout callout--warn">
+        <span class="callout__title">关于本页数据</span>
+        下面所有薪资数字来自<strong>公开招聘信息与从业者访谈的汇总</strong>，是区间而非承诺。具体数字受城市、公司规模、个人能力影响极大，<em>请当作量级参考，不要当作谈判依据</em>。<br>
+        行业变化很快，如果你看到这一页时数据已经明显过时，以你在招聘网站上看到的最新信息为准。
+      </div>
+
+      <h2 id="spectrum">一、岗位全景</h2>
+      <p>游戏开发不是"一个岗位"，而是一条从内容到技术的谱系。<strong>不同岗位的能力要求、成长路径、薪资天花板差别极大</strong>，先认清自己在谱系的哪个位置。</p>
+
+      <figure class="figure">
+        <img src="assets/img/job-spectrum.svg" alt="游戏程序岗位谱系" loading="lazy">
+        <figcaption>越往右越接近引擎底层，人数越少，门槛越高，但可替代性也越低</figcaption>
+      </figure>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>岗位</th><th>做什么</th><th>核心技能</th><th>人数占比</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Gameplay 程序</strong></td><td>写玩法逻辑：技能、战斗、任务、UI 交互</td><td>引擎 API 熟练 + 架构能力</td><td><span class="mk mk--yes">最多</span> 约 50%</td></tr>
+          <tr><td><strong>系统程序</strong></td><td>背包、邮件、活动、充值等系统模块</td><td>业务抽象 + 数据结构</td><td>约 20%</td></tr>
+          <tr><td><strong>UI / 交互程序</strong></td><td>界面逻辑、动效、多分辨率适配</td><td>UGUI/TMP + 美术协作</td><td>约 10%</td></tr>
+          <tr><td><strong>工具 / 编辑器程序</strong></td><td>给策划美术做工具，提升团队效率</td><td>编辑器扩展 + 自动化</td><td>约 8%</td></tr>
+          <tr><td><strong>引擎 / 图形程序</strong></td><td>渲染管线、性能优化、引擎改造</td><td>图形学 + C++ + 硬件知识</td><td><span class="mk mk--no">最少</span> 约 7%</td></tr>
+          <tr><td><strong>网络 / 服务端程序</strong></td><td>同步、匹配、后端服务</td><td>网络协议 + 分布式</td><td>约 5%</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">给新手的选型建议</span>
+        <strong>90% 的新手应该从 Gameplay 程序入门。</strong>它是需求量最大的岗位，也是<em>最容易积累作品</em>的方向——你做的每个小游戏都是作品。<br>
+        <strong>不要一上来就冲"引擎/图形程序"。</strong>那个方向需要扎实的图形学和 C++ 基础，通常是<em>工作 3–5 年后</em>的转型目标。<br>
+        <strong>工具程序是被低估的方向。</strong>门槛不高、需求稳定、而且能<em>深入理解引擎</em>——做工具的人往往比写玩法的人更懂引擎。
+      </div>
+
+      <h2 id="jd">二、真实 JD 拆解</h2>
+      <p>下面是一条<strong>综合了多个真实招聘信息</strong>的 Unity 客户端岗位描述。我拆开逐条解释——<em>招聘要求里的每一句，都对应着本站的某个页面</em>。</p>
+
+      <div class="kp">
+        <div class="kp__head">JD 原文（典型初中级 Unity 客户端）</div>
+        <div class="kp__row">
+          <div class="kp__body"><p><strong>岗位职责</strong></p><p>1. 负责游戏客户端功能模块的设计与开发；<br>2. 与策划、美术协作，实现游戏玩法与表现；<br>3. 参与客户端性能优化，解决卡顿、内存等问题；<br>4. 参与技术方案评审，撰写技术文档。</p><p><strong>任职要求</strong></p><p>1. 本科及以上学历，计算机相关专业优先；<br>2. 2 年以上 Unity 开发经验，熟悉 C#；<br>3. 熟悉 Unity 引擎架构与常用组件；<br>4. 理解面向对象设计，有良好的编码习惯；<br>5. 有性能优化经验者优先；<br>6. 熟悉 UGUI / 热更新 / 网络同步者加分。</p></div>
+        </div>
+      </div>
+
+      <h3 id="jd-map">逐条对照：这句话到底在考什么</h3>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>JD 原文</th><th>真实含义</th><th>页面</th></tr></thead>
+        <tbody>
+          <tr><td>"熟悉 C#"</td><td>不只是语法。会问<strong>值/引用类型、GC、委托与事件、协程原理</strong></td><td>03–08</td></tr>
+          <tr><td>"熟悉引擎架构"</td><td>会问<strong>生命周期执行顺序、组件通信方式、预制体机制</strong></td><td>11</td></tr>
+          <tr><td>"理解面向对象"</td><td>会问<strong>接口与抽象类的选择、设计模式的实际应用</strong></td><td>04、20</td></tr>
+          <tr><td>"性能优化经验"</td><td><strong>最高含金量的一条</strong>。会问 GC 分配来源、Draw Call 合批规则、Profiler 使用</td><td>21、17、07</td></tr>
+          <tr><td>"熟悉的 UGUI"</td><td>不只说会用。会问 <strong>Canvas 重建机制、如何减少重绘</strong></td><td>14</td></tr>
+          <tr><td>"热更新"</td><td>会问 <strong>AssetBundle 依赖管理、Addressables、热更方案对比</strong></td><td>16</td></tr>
+          <tr><td>"网络同步"</td><td>会问 <strong>帧同步 vs 状态同步的区别与取舍</strong></td><td>22</td></tr>
+          <tr><td>"良好的编码习惯"</td><td>会看你的代码：<strong>命名、注释、拆分类、错误处理</strong></td><td>25</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">"有性能优化经验者优先"是分水岭</span>
+        你会发现几乎所有中高级 JD 都有这一条。<strong>它是新手和熟手之间最清晰的分界线。</strong><br>
+        为什么？因为性能问题<em>不会报错</em>。代码能跑、功能正常，只是手机上卡。要定位它，你需要理解 <strong>GC 触发机制、Draw Call 合批条件、内存布局对缓存的影响</strong>——这些全都是"知道原理才能查"的东西。<br>
+        所以本站把性能内容<strong>提前到语言线里</strong>（页 07），而不是留到最后。
+      </div>
+
+      <h2 id="salary">三、薪资区间</h2>
+      <p>下面是中国大陆 Unity 客户端岗位的大致薪资区间（一线城市，2024–2025 年数据）。<strong>注意这只是游戏程序员的薪资，不是"做游戏的人"的薪资</strong>——策划、美术的薪资结构完全不同。</p>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>级别</th><th>经验</th><th>月薪区间</th><th>能力门槛</th><th>关键跃迁点</th></tr></thead>
+        <tbody>
+          <tr><td>初级</td><td>0–2 年</td><td>8–15K</td><td>能独立完成模块开发</td><td>从"能实现"到"会设计"</td></tr>
+          <tr><td>中级</td><td>2–5 年</td><td>15–30K</td><td>能负责整个系统，能定位性能问题</td><td>从"会做"到"做得快且稳"</td></tr>
+          <tr><td>高级</td><td>5–8 年</td><td>30–50K</td><td>能主导技术方案，能带人</td><td>从"解决"到"预防"</td></tr>
+          <tr><td>专家 / 主程</td><td>8 年+</td><td>50–80K+</td><td>能决定技术选型，对项目成败负责</td><td>从"技术"到"技术 + 判断力"</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--note">
+        <span class="callout__title">几个容易误解的点</span>
+        <strong>① 薪资差异主要来自"能不能解决别人解决不了的问题"</strong>，不是写了多少行代码。<br>
+        <strong>② 大厂溢价明显。</strong>同样能力，大厂可能比中小厂高 30–50%，但大厂对"基础扎实度"要求也高得多。<br>
+        <strong>③ 外包岗位薪资普遍低 30% 以上</strong>，且成长空间有限。<em>应届生如果只有外包 offer，可以作为跳板但要尽快跳出来</em>。<br>
+        <strong>④ Unreal 岗位比 Unity 少很多，但同等经验薪资普遍高 20–40%</strong>——这是技术壁垒的溢价。
+      </div>
+
+      <h2 id="risk">四、必须知道的行业风险</h2>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">四个真实存在的风险</span>
+        <strong>① 版号与政策风险。</strong>国内游戏上线需要版号，审批周期长且不确定。这直接影响到公司的新项目立项与招聘节奏——<em>行业有明显的周期性波动</em>。<br>
+        <strong>② 项目砍掉的概率很高。</strong>你参与的下一款游戏，有很大概率活不到上线。这意味着你的简历上可能有几个"没做完的项目"，面试时要能解释清楚<em>你在其中做了什么</em>。<br>
+        <strong>③ 加班强度普遍偏高。</strong>尤其在项目冲刺期（版本发布前）。不同公司差异很大，面试时<em>一定要问清楚团队的版本节奏和加班情况</em>。<br>
+        <strong>④ AI 正在改变初级岗位的构成。</strong>重复性的样板代码工作正在减少，但对"能判断方案好坏"的人需求在增加。<em>这意味着纯执行型岗位的竞争会更激烈。</em>
+      </div>
+
+      <h2 id="selfcheck">五、岗位选择自查表</h2>
+      <p>看完上面的内容，用下面 6 个问题定位自己。<strong>诚实回答，这一页的价值就在这里。</strong></p>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>问题</th><th>如果你的回答是…</th><th>建议方向</th></tr></thead>
+        <tbody>
+          <tr><td>你能接受每天 3 小时以上的持续学习吗？</td><td>不能</td><td><span class="mk mk--no">需要重新考虑</span>这个行业的学习曲线很长</td></tr>
+          <tr><td>你更喜欢"做出来"还是"搞明白"？</td><td>做出来</td><td>偏向 <strong>Gameplay / 独立开发</strong></td></tr>
+          <tr><td>你更喜欢"做出来"还是"搞明白"？</td><td>搞明白</td><td>偏向 <strong>引擎 / 图形 / 工具</strong></td></tr>
+          <tr><td>你能忍受"代码能跑但很慢"这种问题吗？</td><td>不能忍</td><td><strong>性能优化方向</strong>很适合你</td></tr>
+          <tr><td>你愿意和策划美术大量沟通吗？</td><td>愿意</td><td><strong>Gameplay 程序</strong>（沟通占比很高）</td></tr>
+          <tr><td>你希望有稳定的收入来源吗？</td><td>希望</td><td>先把本职做好，<strong>独立开发当副业</strong></td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <h2 id="tasks">六、本章动手任务</h2>
+
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="t-01-1">
+          <label for="t-01-1"><strong>看 20 条真实 JD</strong>：去招聘网站搜"Unity 客户端"，把<em>重复出现的要求</em>记下来。你会发现和上面的拆解高度重合。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-01-2">
+          <label for="t-01-2"><strong>定位自己</strong>：用上面的自查表写下你的方向选择，以及<em>理由</em>。三个月后回来看，判断是否还成立。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-01-3">
+          <label for="t-01-3"><strong>算一笔账</strong>：按每天能投入的时间，估算走完你选的路径需要多久。<em>这个数字比任何教程都更能帮你做决定</em>。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-01-4">
+          <label for="t-01-4"><strong>找一个从业者聊聊</strong>：如果能找到，问三个问题：你们团队多少人？版本节奏是怎样的？最近一年招人的标准有变化吗？</label>
+        </li>
+      </ul>
+
+      <div class="milestone">
+        <p class="mb0">
+          <strong>本章过关标准</strong>：<br>① 能说清 Gameplay 程序和引擎程序的区别，以及自己现在该走哪条；<br>② 能解释"有性能优化经验者优先"这句话为什么是分水岭；<br>③ 对行业的加班、版号、项目砍掉这些风险有心理准备，而不是只看薪资数字。
+        </p>
+      </div>
+
+      <nav class="page-nav">
+        <a href="index.html">
+          <div class="dir">← 开始</div>
+          <div class="title"> 路线总览</div>
+        </a>
+        <a class="next" href="02-setup.html">
+          <div class="dir">开始 →</div>
+          <div class="title">02 环境搭建与第一个项目</div>
+        </a>
+      </nav>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>09 热更新原理 — Lua 热更新路线｜从零基础到独立搭建可上线的热更框架</title>
+<meta name="description" content="资源热更与代码热更、AB 包、版本管理、增量更新">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">Lua 热更新路线
+        <span>从零基础到独立搭建可上线的热更框架</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>09 · 热更新原理 ★★</h1>
+
+<p class="lead">前面八页讲的是<strong>Lua 语言本身</strong>。从这一页开始讲<em>为什么游戏行业需要它</em>——热更新的完整原理与工程实现。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（08）讲性能。这一页开始讲<em>热更新的原理</em>——这是 Lua 站在游戏行业的立足点。<br>
+  <strong>关键衔接</strong>：这一页会用到页 03 的<em>require 与模块缓存</em>——热更新的核心就是<em>如何绕过缓存重新加载模块</em>。<br>
+  <strong>后三页</strong>（10-12）讲具体的框架（xLua / ToLua）。<em>那些框架的本质就是这一页讲的三件事的工程实现。</em>
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="09-hotupdate-basics.html#require" data-brief="package.loaded 缓存，热更要清缓存"><span class="prereq__title">require 与模块</span><span class="prereq__page">09-hotupdate-basics</span></a>
+          <a class="prereq__item" href="../unity/21-perf.html#workflow" data-brief="Profiler/Frame Debugger/Memory Profiler 的分工"><span class="prereq__title">性能分析工具</span><span class="prereq__page">21-perf</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="three-levels">一、热更新的三个层次</h2>
+
+<p>热更新不是一个单一技术，而是<strong>三个不同层次</strong>的能力。<em>很多项目只做了第一层，却以为做了热更。</em></p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>层次</th><th>内容</th><th>难度</th><th>覆盖率</th></tr></thead>
+  <tbody>
+    <tr><td><strong>资源热更</strong></td><td>贴图、模型、音效、配置表</td><td><span class="mk mk--yes">低</span></td><td>AssetBundle / Addressables</td></tr>
+    <tr><td><strong>逻辑热更</strong></td><td>Lua 脚本本身</td><td><span class="mk mk--warn">中</span></td><td><strong>本页重点</strong></td></tr>
+    <tr><td><strong>框架热更</strong></td><td>连框架代码都能换</td><td><span class="mk mk--no">高</span></td><td><em>需要精心设计</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">只有资源热更 = 半成品</span>
+  <strong>很多项目的"热更新"只是资源热更</strong>——换了贴图、改了配置表，但<em>逻辑 bug 还是要发版</em>。<br>
+  <strong>真正的痛点是逻辑热更</strong>：<br>
+  · 战斗公式算错了 <em>→ 要改代码</em><br>
+  · 活动逻辑有 bug <em>→ 要改代码</em><br>
+  · 数值平衡要调 <em>→ 可能要改代码</em><br>
+  <strong>这就是为什么要有 Lua 层</strong>——它让"改代码"变成"推脚本"。<br>
+  <em>而框架热更是更高的要求——它意味着你连"框架本身有 bug"都能修。这需要框架设计时就考虑清楚依赖关系。</em>
+</div>
+
+<h2 id="require">二、逻辑热更的核心：绕过模块缓存</h2>
+
+<p>Lua 的 <code>require</code> 会<strong>缓存已加载的模块</strong>（存在 <code>package.loaded</code> 里）。<em>热更新的本质就是：清掉缓存，重新加载。</em></p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>步骤</th><th>做法</th><th>注意事项</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1. 清理缓存</strong></td><td><code>package.loaded[moduleName] = nil</code></td><td>要连着子模块一起清</td></tr>
+    <tr><td><strong>2. 重新加载</strong></td><td><code>require(moduleName)</code></td><td>会重新执行模块代码</td></tr>
+    <tr><td><strong>3. 更新引用</strong></td><td>让所有旧引用指向新模块</td><td><strong>这一步最容易出错</strong></td></tr>
+    <tr><td><strong>4. 迁移状态</strong></td><td>把旧模块的数据搬到新模块</td><td><em>否则玩家数据丢失</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">最大的坑：旧引用还指向旧模块</span>
+  <strong>场景</strong>：模块 A 在加载时 <code>local B = require("B")</code>，保存了 B 的引用。<br>
+  热更 B 后，<em>A 手里的 B 还是旧的那份</em>。<br><br>
+  <strong>后果</strong>：A 调用 B 的方法时，<em>执行的是旧代码</em>——表现为"热更没生效"。<br><br>
+  <strong>三种解决方案</strong>：<br>
+  ① <strong>每次用时重新 require</strong>（性能差，但最简单）<br>
+  ② <strong>让 A 也重新加载</strong>（要处理 A 的依赖链）<br>
+  ③ <strong>不改引用，只改内容</strong>——<em>把模块做成"表 + 成员函数"，热更时只替换表的字段</em><br><br>
+  <strong>方案 ③ 是主流做法</strong>：<code>for k, v in pairs(newModule) do oldModule[k] = v end</code><br>
+  <em>这样所有持有旧引用的地方都会自动用上新代码。</em>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">状态迁移不能忘</span>
+  <strong>问题</strong>：模块里通常有状态（缓存的数据、计数、连接）。<br>
+  直接重新加载会<em>丢掉这些状态</em>。<br><br>
+  <strong>做法</strong>：热更前保存旧状态，热更后注入新模块。<br>
+  <code>local oldData = oldModule.data</code><br>
+  <code>-- 重新加载</code><br>
+  <code>newModule.data = oldData</code><br><br>
+  <em>这一步漏了，表现为"热更后玩家进度清空"——线上事故的常见原因。</em>
+</div>
+
+<h2 id="pipeline">三、完整的热更流程</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>阶段</th><th>做什么</th><th>关键点</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1. 版本比对</strong></td><td>客户端版本 vs 服务器清单</td><td>只下载差异</td></tr>
+    <tr><td><strong>2. 下载</strong></td><td>下载 Lua 脚本与资源包</td><td><strong>支持断点续传</strong></td></tr>
+    <tr><td><strong>3. 校验</strong></td><td>MD5 / 大小校验</td><td><em>防止下载损坏</em></td></tr>
+    <tr><td><strong>4. 加载</strong></td><td>从新目录加载脚本</td><td><strong>沙箱隔离</strong></td></tr>
+    <tr><td><strong>5. 执行</strong></td><td>清理缓存 + 重新 require</td><td>注意引用问题</td></tr>
+    <tr><td><strong>6. 回滚</strong></td><td>出问题时切回旧版本</td><td><strong>必须有</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">没有回滚方案 = 把项目放在没刹车的车上</span>
+  <strong>热更最危险的地方在于：它能改线上代码。</strong><br>
+  如果推了一个有问题的脚本，<em>所有玩家立刻受影响</em>。<br><br>
+  <strong>必须有的三个保障</strong>：<br>
+  ① <strong>版本回滚</strong>：保留上一版本的完整脚本，出问题一键切回<br>
+  ② <strong>灰度发布</strong>：先推 1% 玩家，观察没问题再全量<br>
+  ③ <strong>错误上报</strong>：热更后立刻监控错误率，异常自动回滚<br><br>
+  <em>这三条是"能不能上线"的分界线。做过线上项目的人都知道：热更出事故比不发版严重得多。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="09">
+  <div class="task"><input type="checkbox" id="t-09-1"><label for="t-09-1"><strong>手动清缓存</strong>：写两个模块，修改其中一个的代码，用 <code>package.loaded[mod] = nil</code> + <code>require</code> 验证热更生效。</label></div>
+  <div class="task"><input type="checkbox" id="t-09-2"><label for="t-09-2"><strong>复现旧引用问题</strong>：让 A 在加载时 require B 并保存引用，热更 B 后验证 A 用的还是旧代码。</label></div>
+  <div class="task"><input type="checkbox" id="t-09-3"><label for="t-09-3"><strong>用方案 ③ 解决</strong>：改成"替换表的字段"，验证旧引用也能用上新代码。</label></div>
+  <div class="task"><input type="checkbox" id="t-09-4"><label for="t-09-4"><strong>做状态迁移</strong>：给模块加状态，热更时保存并恢复，验证数据不丢。</label></div>
+  <div class="task"><input type="checkbox" id="t-09-5"><label for="t-09-5"><strong>设计热更清单</strong>：用 JSON 描述"版本号 + 文件列表 + MD5"，写一个差异比对函数。</label></div>
+  <div class="task"><input type="checkbox" id="t-09-6"><label for="t-09-6"><strong>回答面试题</strong>：① 热更的三个层次？② 为什么清了缓存还可能不生效？③ 热更为什么要回滚方案？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出热更新的三个层次及各自难度；<br>
+    ② <strong>知道热更的本质是"清 <code>package.loaded</code> + 重新 require"</strong>；<br>
+    ③ <strong>能解释"旧引用指向旧模块"的问题及三种解法</strong>；<br>
+    ④ 知道必须做状态迁移，否则会丢数据；<br>
+    ⑤ 能画出完整的热更流程（六步），并说出回滚的重要性。<br>
+    <br>
+    <em>第 ③ 条是这一页的核心——理解它，你就理解了所有热更框架为什么要那样设计。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="08-lua-perf.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">08 性能优化 ★★</div>
+  </a>
+  <a class="next" href="10-xlua-basics.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">10 xLua 基础 ★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

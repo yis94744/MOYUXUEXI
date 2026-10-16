@@ -1,0 +1,123 @@
+<h1>19 · GOAP 与规划型 AI</h1>
+
+<p class="lead">状态机和行为树都是<strong>"人预先设计好"</strong>的 AI。GOAP 不同——它让 AI<em>自己规划</em>达成目标的步骤。这一页讲它的原理、代价，以及<strong>什么时候值得用</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="difference">一、GOAP 与行为树的本质区别</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>维度</th><th>行为树</th><th>GOAP</th></tr></thead>
+  <tbody>
+    <tr><td><strong>决策方式</strong></td><td><strong>人预先设计</strong></td><td><strong>AI 自动规划</strong></td></tr>
+    <tr><td><strong>设计师工作</strong></td><td>画树、配条件</td><td>定义动作与效果</td></tr>
+    <tr><td><strong>计划来源</strong></td><td>固定结构</td><td><em>运行时搜索得出</em></td></tr>
+    <tr><td><strong>可预测性</strong></td><td><span class="mk mk--yes">高（好调试）</span></td><td><span class="mk mk--no">低（难调试）</span></td></tr>
+    <tr><td><strong>性能</strong></td><td><span class="mk mk--yes">好</span></td><td><span class="mk mk--no">有搜索开销</span></td></tr>
+    <tr><td><strong>适合</strong></td><td>绝大多数游戏 AI</td><td><strong>开放世界、模拟类</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">GOAP 最大的代价：可预测性</span>
+  <strong>行为树：设计师完全掌控 AI 的行为</strong><br>
+  · 出了问题容易定位（<em>看树的哪一支没走对</em>）<br>
+  · 能保证 AI 不会做蠢事<br><br>
+  <strong>GOAP：AI 自己规划</strong><br>
+  · 可能规划出<em>设计师没想到的方案</em>——这既是优点也是缺点<br>
+  · 出问题难定位（<em>要看规划器的搜索过程</em>）<br>
+  · <strong>可能规划出"蠢"的方案</strong>（比如为了拿钥匙绕很远的路）<br><br>
+  <strong>《F.E.A.R.》是 GOAP 的成功案例</strong>——士兵会做出让玩家惊讶的战术动作。<br>
+  <strong>但那个团队花了大量精力调优规划器</strong>，并且只用在少数敌人上。<br><br>
+  <em>结论：GOAP 需要很强的 AI 工程能力才能用好。大多数项目用行为树就够了。</em>
+</div>
+
+<h2 id="concepts">二、GOAP 的核心概念</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>概念</th><th>含义</th><th>例子</th></tr></thead>
+  <tbody>
+    <tr><td><strong>状态（State）</strong></td><td>世界的事实集合</td><td><code>{hasWeapon=false, enemyVisible=true}</code></td></tr>
+    <tr><td><strong>目标（Goal）</strong></td><td>希望达成的状态</td><td><code>{enemyDead=true}</code></td></tr>
+    <tr><td><strong>动作（Action）</strong></td><td>改变状态的操作</td><td><em>捡起武器、射击</em></td></tr>
+    <tr><td><strong>前置（Precondition）</strong></td><td>动作的执行条件</td><td>射击需要 <code>hasWeapon=true</code></td></tr>
+    <tr><td><strong>效果（Effect）</strong></td><td>动作执行后的状态</td><td>射击使 <code>enemyDead=true</code></td></tr>
+    <tr><td><strong>规划器（Planner）</strong></td><td>搜索动作序列</td><td><em>用 A* 搜索状态空间</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">规划器本质上就是 A*</span>
+  <strong>GOAP 的规划过程</strong>：<br>
+  · <strong>节点</strong>：世界状态<br>
+  · <strong>边</strong>：动作<br>
+  · <strong>起点</strong>：当前状态<br>
+  · <strong>终点</strong>：目标状态<br>
+  · <strong>代价</strong>：动作的代价（时间、资源）<br><br>
+  <em>所以 GOAP 的规划器就是"在状态空间里跑 A*"</em>——这解释了为什么它有性能开销。<br><br>
+  <strong>复杂度问题</strong>：<br>
+  · 状态数 = 2^(状态变量数)<br>
+  · 10 个布尔变量 = 1024 个状态<br>
+  · 20 个 = <strong>100 万</strong>——搜索会爆炸<br><br>
+  <strong>实战优化</strong>：<em>限制状态变量数量、用启发式、缓存规划结果</em>。
+</div>
+
+<h2 id="when">三、什么时候值得用 GOAP</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">四个判断标准</span>
+  <strong>值得用的信号</strong>：<br>
+  ① <strong>AI 行为高度情境化</strong>——<em>需要在很多不同情况下做不同的事</em><br>
+  ② <strong>行为组合爆炸</strong>——行为树大到难以维护<br>
+  ③ <strong>玩家期待"聪明的 AI"</strong>——<em>比如潜行游戏、模拟类</em><br>
+  ④ <strong>有 AI 工程能力</strong>——<em>能调优规划器</em><br><br>
+  <strong>不值得用的信号</strong>：<br>
+  · AI 行为比较固定（<em>RPG 的敌人、塔防的怪</em>）<br>
+  · 团队没有 AI 专家<br>
+  · 性能预算紧张<br>
+  · <strong>只是"听说 GOAP 很高级"</strong><br><br>
+  <strong>折中方案</strong>：<em>行为树 + 简单的效用评分</em>（见页 18）——<br>
+  既能有一定灵活性，又保持可预测性。<strong>这是大多数项目的甜点。</strong>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="19">
+  <div class="task"><input type="checkbox" id="t-19-1"><label for="t-19-1"><strong>设计一个 GOAP 场景</strong>：写一个"敌人要杀死玩家"的状态、目标、动作集合。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-2"><label for="t-19-2"><strong>手写规划器</strong>：用 BFS 或 A* 搜索动作序列，输出规划结果。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-3"><label for="t-19-3"><strong>验证组合爆炸</strong>：增加状态变量，观察搜索节点数的增长。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-4"><label for="t-19-4"><strong>对比行为树</strong>：用行为树实现同样的逻辑，对比代码量与可读性。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-5"><label for="t-19-5"><strong>做计划缓存</strong>：给规划器加缓存，避免重复搜索。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-6"><label for="t-19-6"><strong>回答面试题</strong>：① GOAP 和行为树的区别？② GOAP 的规划器本质是什么？③ 什么情况该用 GOAP？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出 GOAP 与行为树的六个差异；<br>
+    ② <strong>理解 GOAP 的最大代价是可预测性</strong>；<br>
+    ③ 能说出 GOAP 的六个核心概念；<br>
+    ④ <strong>知道"规划器本质上就是 A*"</strong>；<br>
+    ⑤ 能用四个标准判断"该不该用 GOAP"。<br>
+    <br>
+    <em>第 ② 和 第 ⑤ 条最有价值——它们能帮你避免"为了炫技而引入复杂架构"。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="18-decision-tree.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">18 决策树与效用 AI</div>
+  </a>
+  <a class="next" href="20-boids-flock.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">20 群体行为与 Boids</div>
+  </a>
+</nav>

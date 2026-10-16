@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>16 动画系统 — C++ + Unreal 路线｜从零基础到 3A 级项目开发</title>
+<meta name="description" content="动画蓝图、状态机、混合空间、Control Rig、IK Retargeting、Motion Warping、Root Motion">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C++ + Unreal 路线
+        <span>从零基础到 3A 级项目开发</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>16 · 动画系统</h1>
+
+<p class="lead">Unreal 的动画系统<strong>比 Unity 强大得多</strong>——<em>动画蓝图、状态机、Blend Space、IK、Control Rig</em>。这一页讲<em>游戏里真正会用到的部分</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="../unity/09-math.html#quaternion" data-brief="轴加角表示旋转；a*b 表示先 b 后 a，从右往左读"><span class="prereq__title">四元数</span><span class="prereq__page">09-math</span></a>
+          <a class="prereq__item" href="13-ue-framework.html#classes" data-brief="Actor/Pawn/Controller/GameMode/GameState"><span class="prereq__title">Gameplay 框架</span><span class="prereq__page">13-ue-framework</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="animbp">一、动画蓝图的核心结构</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>组件</th><th>作用</th><th>什么时候用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>State Machine</strong></td><td><strong>状态切换</strong></td><td><em>站立/跑/跳/落地</em></td></tr>
+    <tr><td><strong>Blend Space</strong></td><td><em>参数化混合</em></td><td><strong>速度控制步频</strong></td></tr>
+    <tr><td><strong>Blend Node</strong></td><td>多个动画混合</td><td><em>上下半身分离</em></td></tr>
+    <tr><td><strong>Anim Notify</strong></td><td><strong>动画事件</strong></td><td><em>脚步声、攻击判定</em></td></tr>
+    <tr><td><strong>Anim Montage</strong></td><td><strong>可播放的动画片段</strong></td><td><em>攻击、技能</em></td></tr>
+    <tr><td><strong>IK</strong></td><td>反向动力学</td><td><em>脚踩地面、手扶墙</em></td></tr>
+    <tr><td><strong>Control Rig</strong></td><td>程序化骨骼控制</td><td><em>程序化动画</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">Anim Notify 是"攻击判定"的标准做法 ★★</span>
+  <strong>问题</strong>：<em>攻击什么时候造成伤害？</em><br><br><strong>错误做法</strong>：<em>按下的瞬间就造成伤害</em>——<br>· 动画还没挥到，伤害已经生效<br>· 玩家感觉"打空了却掉血"<br><br><strong>正确做法</strong>：<em>在动画的"命中帧"加 Anim Notify</em>——<br>① 动画编辑里添加 Notify<br>② C++/蓝图里实现 <code>AnimNotify_AttackHit</code><br>③ 在这个回调里做判定<br><br><strong>为什么这是标准做法</strong>：<br>· <em>动画和判定同步</em>（<em>看起来对了，玩起来才对</em>）<br>· <strong>可以调"手感"</strong>——<em>把 Notify 前移一点点会更"跟手"</em><br>· <em>策划能自己调</em>（<em>不用改代码</em>）<br><br><strong>这是页 14 原则的具体体现：易变的东西放美术/策划能改的地方。</strong>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">Blend Space：速度控制步频的标准方案</span>
+  <strong>问题</strong>：跑得快时，<em>脚步动画也要快</em>。<br><br><strong>Blend Space 的做法</strong>：<br>· 横轴 = 速度（<em>0 到 600</em>）<br>· 放多个动画：<em>Idle（0）/ Walk（150）/ Run（350）/ Sprint（600）</em><br>· 引擎<strong>根据当前速度自动混合</strong><br><br><strong>好处</strong>：<br>· <em>平滑过渡，不会"突跳"</em><br>· <strong>数值调整不用改代码</strong><br>· 支持 2D（<em>再加一个方向轴</em>）<br><br><strong>相关的"动画同步"问题</strong>：<br><em>网络游戏里，两个玩家的跑动步频要一致</em>——<br><strong>UE 的 Sync Group 能解决</strong>（<em>让多个角色的动画相位同步</em>）。
+</div>
+
+<h2 id="ik">二、IK 与程序化动画</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>技术</th><th>解决</th><th>复杂度</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Foot IK</strong></td><td><em>脚踩在不平的地面</em></td><td>中</td></tr>
+    <tr><td><strong>Hand IK</strong></td><td><em>手握武器、扶墙</em></td><td>中</td></tr>
+    <tr><td><strong>Look At</strong></td><td><strong>看向目标</strong></td><td>低</td></tr>
+    <tr><td><strong>Aim Offset</strong></td><td><em>上半身朝向瞄准方向</em></td><td>中</td></tr>
+    <tr><td><strong>Control Rig</strong></td><td><em>程序化骨骼控制</em></td><td><span class="mk mk--no">高</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">IK 的价值：让动画"适应环境"</span>
+  <strong>没有 IK 的问题</strong>：<br>· <em>角色站在斜坡上，脚会悬空或陷入地面</em><br>· <em>手部固定动作，无法适应不同武器</em><br><br><strong>有 IK 之后</strong>：<br>· <strong>脚自动贴合地面</strong>（<em>Foot IK</em>）<br>· <strong>手自动对准握把</strong>（<em>Hand IK</em>）<br>· <strong>头部看向目标</strong>（<em>Look At</em>）<br><br><strong>代价</strong>：<br>· <em>每帧的骨骼计算</em>（<em>角色多时有开销</em>）<br>· <em>调试困难</em>（<em>IK 的效果很难用数值描述</em>）<br><br><strong>实践建议</strong>：<em>先用最简单的 Look At</em>，<strong>确认有需求再加复杂的 IK</strong>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="16">
+  <div class="task"><input type="checkbox" id="t-16-1"><label for="t-16-1"><strong>建一个状态机</strong>：实现 Idle → Walk → Run 的状态切换。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-2"><label for="t-16-2"><strong>用 Blend Space</strong>：用速度参数控制步频，观察过渡效果。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-3"><label for="t-16-3"><strong>加 Anim Notify</strong>：在攻击动画的命中帧加 Notify，实现伤害判定。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-4"><label for="t-16-4"><strong>前移 Notify 调手感</strong>：把 Notify 前移几帧，感受"跟手度"的变化。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-5"><label for="t-16-5"><strong>做 Look At</strong>：让角色头部看向目标，观察效果。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-6"><label for="t-16-6"><strong>试试 Foot IK</strong>：在斜坡上测试脚的贴合情况。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-7"><label for="t-16-7"><strong>回答面试题</strong>：① 攻击判定为什么要用 Anim Notify？② Blend Space 解决什么问题？③ IK 的代价是什么？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出动画蓝图的七个组件；<br>
+    ② <strong>知道"攻击判定要用 Anim Notify"，以及为什么</strong>；<br>
+    ③ <strong>知道 Blend Space 用速度控制步频</strong>；<br>
+    ④ 能说出五种 IK 技术及复杂度；<br>
+    ⑤ 有一次"调 Notify 位置改善手感"的实践。<br>
+    <br>
+    <em>第 ② 条最实用——**"动画和判定不同步"是动作游戏最常见的手感问题**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="15-ue-gas.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">15 GAS 技能系统 ★★</div>
+  </a>
+  <a class="next" href="17-ue-render.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">17 渲染与画面 ★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

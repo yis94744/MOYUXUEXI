@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>18 Job System 与 DOTS — C# + Unity 路线｜从零基础到独立完成商业级项目</title>
+<meta name="description" content="Job System 与依赖、Burst 编译、NativeContainer、ECS 架构、何时值得迁移">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">C# + Unity 路线
+        <span>从零基础到独立完成商业级项目</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>18 · Job System 与 DOTS</h1>
+
+<p class="lead">前面 17 页讲的都是<strong>在单线程上把代码写好</strong>。这一页讲的是<em>怎么用上多核 CPU</em>——Job System 让你安全地并行计算，Burst 让数学运算快 5~20 倍，ECS 让内存布局最优。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（17）讲的渲染优化救不了 CPU 逻辑。当逻辑成为瓶颈时，<em>就需要这一页的内容</em>。<br>
+  <strong>关键衔接</strong>：页 07 讲的<em>缓存友好与 SoA</em>是 ECS 的理论基础；页 03 讲的 <em>struct 选型</em>在这里变成硬要求（Job 里只能用值类型）。<br>
+  <strong>下一页</strong>（19）编辑器扩展——那是另一条完全不同的能力线。<br>
+  <strong>难度提示</strong>：这一页<strong>是全站最"硬"的一页</strong>。建议先掌握前面的内容再来。<em>如果暂时用不上，可以跳过——但要知道它的存在与适用边界。</em>
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="07-cs-memory.html#layout" data-brief="struct 数组内存连续，利用缓存行，比 class 数组快 2 到 5 倍"><span class="prereq__title">缓存友好与 SoA</span><span class="prereq__page">07-cs-memory</span></a>
+          <a class="prereq__item" href="03-cs-basic.html#choose" data-brief="小、不可变、数量大用 struct；需要继承或引用语义用 class"><span class="prereq__title">struct 与 class 选型</span><span class="prereq__page">03-cs-basic</span></a>
+          <a class="prereq__item" href="11-unity-core.html#lifecycle" data-brief="Awake/Start/Update/FixedUpdate/LateUpdate 的选择依据"><span class="prereq__title">生命周期与执行顺序</span><span class="prereq__page">11-unity-core</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="why">一、为什么需要 Job System</h2>
+
+<p>现代手机有 <strong>6~8 个核心</strong>，但普通 Unity 代码<em>只用其中一个</em>。Job System 的意义就是<strong>把能并行的计算分到多个核上</strong>。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>场景</th><th>单线程耗时</th><th>8 核理论加速</th></tr></thead>
+  <tbody>
+    <tr><td>10000 个单位的移动计算</td><td>10 ms</td><td><strong>约 1.5 ms</strong></td></tr>
+    <tr><td>大规模射线检测</td><td>8 ms</td><td>约 1.2 ms</td></tr>
+    <tr><td>网格生成 / 程序化地形</td><td>20 ms</td><td>约 3 ms</td></tr>
+    <tr><td>寻路批量计算</td><td>15 ms</td><td>约 2.5 ms</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三个必须知道的前提</span>
+  <strong>① 只有能并行的任务才有收益。</strong>互相依赖的计算没法并行。<em>如果每个单位都依赖前一个的结果，那 Job 帮不了你。</em><br><br>
+  <strong>② Job 里不能访问托管对象。</strong>不能 <code>new</code> 类、不能用 <code>List&lt;T&gt;</code>、不能抛异常、不能调 Unity API（<code>Transform</code> 等）。<em>只能用 NativeContainer 和值类型。</em><br><br>
+  <strong>③ 加速比不是线性的。</strong>8 核不会给你 8 倍——<em>有调度开销、内存带宽限制、以及不能并行的部分。</em>
+</div>
+
+<h2 id="concepts">二、Job System 的四个概念</h2>
+
+<p>理解这四件事就能用 Job System。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using Unity.Collections;
+using Unity.Jobs;
+using Unity.Burst;
+using Unity.Mathematics;
+using UnityEngine;
+
+// ============================================================
+//  Job System：多线程并行计算
+// ============================================================
+// 【核心限制】Job 里只能用值类型与 NativeContainer，
+//            不能用 class、List&lt;T&gt;、抛异常、或调用 Unity API。
+
+// ============================================================
+//  1. IJob：单线程任务
+// ============================================================
+[BurstCompile]
+public struct AddJob : IJob
+{
+    public float A;
+    public float B;
+    public NativeArray&lt;float&gt; Result;      // 需要用 NativeArray 回传结果
+
+    public void Execute()
+    {
+        Result[0] = A + B;
+    }
+}
+
+// ============================================================
+//  2. IJobParallelFor：并行处理数组
+// ============================================================
+[BurstCompile]
+public struct MoveJob : IJobParallelFor
+{
+    // 输入数据
+    [ReadOnly] public NativeArray&lt;float3&gt; Positions;
+    [ReadOnly] public NativeArray&lt;float&gt; Speeds;
+
+    // 输出数据
+    [WriteOnly] public NativeArray&lt;float3&gt; Results;
+
+    public float DeltaTime;
+
+    // 这个方法的 index 会被自动分配到多个线程上并行执行
+    public void Execute(int index)
+    {
+        float3 pos = Positions[index];
+        float speed = Speeds[index];
+
+        // 简单的移动计算
+        pos.y += speed * DeltaTime;
+        Results[index] = pos;
+    }
+}
+
+// ============================================================
+//  3. 坐标变换 Job（实战常见场景）
+// ============================================================
+[BurstCompile]
+public struct TransformJob : IJobParallelFor
+{
+    [ReadOnly] public NativeArray&lt;float3&gt; LocalPositions;
+    [ReadOnly] public float4x4 LocalToWorld;
+
+    [WriteOnly] public NativeArray&lt;float3&gt; WorldPositions;
+
+    public void Execute(int index)
+    {
+        // 用 math 库（Burst 友好的数学库，比 Mathf 快）
+        float4 local = new float4(LocalPositions[index], 1f);
+        float4 world = math.mul(LocalToWorld, local);
+        WorldPositions[index] = world.xyz;
+    }
+}
+
+// ============================================================
+//  4. 网格生成 Job（程序化生成的典型应用）
+// ============================================================
+[BurstCompile]
+public struct MeshGenerateJob : IJobParallelFor
+{
+    public int Width;
+    public float Scale;
+
+    [WriteOnly] public NativeArray&lt;float3&gt; Vertices;
+
+    public void Execute(int index)
+    {
+        int x = index % Width;
+        int z = index / Width;
+
+        // 用噪声生成高度（这里用简化的正弦组合代替真噪声）
+        float h = math.sin(x * Scale) * math.cos(z * Scale) * 2f;
+
+        Vertices[index] = new float3(x, h, z);
+    }
+}
+
+// ============================================================
+//  5. 使用示例：完整的 Job 生命周期
+// ============================================================
+public class JobDemo : MonoBehaviour
+{
+    private const int COUNT = 10000;
+
+    private NativeArray&lt;float3&gt; _positions;
+    private NativeArray&lt;float3&gt; _results;
+    private NativeArray&lt;float&gt; _speeds;
+
+    private void Start()
+    {
+        // 【第一步】分配 NativeContainer
+        // Allocator 的三种选择：
+        //   Persistent  —— 长期存在，手动释放（最常用）
+        //   Temp        —— 一帧内有效，帧末自动释放
+        //   TempJob     —— 四帧内有效，用于 Job 之间传递
+        _positions = new NativeArray&lt;float3&gt;(COUNT, Allocator.Persistent);
+        _results = new NativeArray&lt;float3&gt;(COUNT, Allocator.Persistent);
+        _speeds = new NativeArray&lt;float&gt;(COUNT, Allocator.Persistent);
+
+        for (int i = 0; i &lt; COUNT; i++)
+        {
+            _positions[i] = new float3(i % 100, 0f, i / 100);
+            _speeds[i] = 1f + (i % 5) * 0.5f;
+        }
+
+        RunJob();
+    }
+
+    private void RunJob()
+    {
+        var job = new MoveJob
+        {
+            Positions = _positions,
+            Speeds = _speeds,
+            Results = _results,
+            DeltaTime = Time.deltaTime,
+        };
+
+        // 【第二步】调度 Job
+        // 第二个参数是 batch size（每批处理多少个）
+        // 【经验值】太小 -&gt; 调度开销大；太大 -&gt; 负载不均
+        //            32 ~ 128 是常见范围
+        JobHandle handle = job.Schedule(COUNT, 64);
+
+        // 【第三步】等待完成
+        // 【重要】Complete() 会阻塞主线程直到 Job 完成。
+        //        如果在同一帧立即 Complete，就失去了并行的意义。
+        //        正确做法是让 Job 跑一帧，下一帧再 Complete。
+        handle.Complete();
+
+        // 此时可以安全读取 _results
+        Debug.Log("第一个结果: " + _results[0]);
+    }
+
+    // ============================================================
+    //  异步模式：Job 跨帧执行（推荐）
+    // ============================================================
+    private JobHandle _handle;
+    private bool _jobRunning;
+
+    private void Update()
+    {
+        // 上一帧的 Job 完成了没？
+        if (_jobRunning &amp;&amp; _handle.IsCompleted)
+        {
+            _handle.Complete();
+            _jobRunning = false;
+
+            // 这里处理结果
+            // 然后用上一帧的结果开始新的 Job
+            StartNextJob();
+        }
+    }
+
+    private void StartNextJob()
+    {
+        var job = new MoveJob
+        {
+            Positions = _positions,
+            Speeds = _speeds,
+            Results = _results,
+            DeltaTime = Time.deltaTime,
+        };
+
+        _handle = job.Schedule(COUNT, 64);
+        _jobRunning = true;
+    }
+
+    // ============================================================
+    //  【必须】释放 NativeContainer
+    // ============================================================
+    private void OnDestroy()
+    {
+        // 先等 Job 完成，否则会报错
+        _handle.Complete();
+
+        // 用 IsCreated 检查，避免重复释放
+        if (_positions.IsCreated) _positions.Dispose();
+        if (_results.IsCreated) _results.Dispose();
+        if (_speeds.IsCreated) _speeds.Dispose();
+    }
+
+    // ============================================================
+    //  性能测试：单线程 vs 多线程
+    // ============================================================
+    public void Benchmark()
+    {
+        // ---------- 单线程 ----------
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        for (int i = 0; i &lt; COUNT; i++)
+        {
+            float3 pos = _positions[i];
+            pos.y += _speeds[i] * 0.016f;
+            _results[i] = pos;
+        }
+
+        sw.Stop();
+        long singleThreadMs = sw.ElapsedMilliseconds;
+
+        // ---------- 多线程 ----------
+        sw.Restart();
+
+        var job = new MoveJob
+        {
+            Positions = _positions,
+            Speeds = _speeds,
+            Results = _results,
+            DeltaTime = 0.016f,
+        };
+
+        job.Schedule(COUNT, 64).Complete();
+
+        sw.Stop();
+        long jobMs = sw.ElapsedMilliseconds;
+
+        Debug.Log($"单线程: {singleThreadMs} ms, Job: {jobMs} ms");
+        // 【注意】Job 有调度开销，数据量小时可能反而更慢
+    }
+}
+
+// ============================================================
+//  Job 的限制清单（必须记住）
+// ============================================================
+//  ❌ 不能用 class / string / List&lt;T&gt; / Dictionary
+//  ❌ 不能抛异常（Burst 编译时无法编译 try-catch）
+//  ❌ 不能调用 Unity API（Transform、GameObject、Debug.Log 都不行）
+//  ❌ 不能有静态可变状态（多线程会竞争）
+//  ❌ 不能有引用类型的字段
+//
+//  ✅ 可以用 struct / enum / NativeArray / math 库
+//  ✅ 可以用 [ReadOnly] / [WriteOnly] 标记加速访问
+//  ✅ 可以用 [BurstCompile] 获得 5~20 倍加速
+
+// ============================================================
+//  Allocator 的选择
+// ============================================================
+//  Allocator.Persistent  —— 长期存在，必须手动 Dispose（最常用）
+//  Allocator.Temp        —— 一帧内有效，不能传给 Job
+//  Allocator.TempJob     —— 四帧内有效，可以传给 Job（有警告）
+//
+//  【常见错误】用 TempJob 分配长期使用的数组 -&gt; 四帧后自动释放 -&gt; 崩溃</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>概念</th><th>作用</th><th>关键限制</th></tr></thead>
+  <tbody>
+    <tr><td><code>IJob</code></td><td>单个任务</td><td>在<strong>一个线程</strong>上执行</td></tr>
+    <tr><td><code>IJobParallelFor</code></td><td><strong>并行</strong>处理数组</td><td>每次处理一个索引</td></tr>
+    <tr><td><code>NativeArray&lt;T&gt;</code></td><td>Job 之间共享数据</td><td><strong>必须手动 Dispose</strong></td></tr>
+    <tr><td><code>JobHandle</code></td><td>任务依赖与完成</td><td><code>Complete()</code> 会阻塞主线程</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">NativeContainer 的泄漏问题</span>
+  <strong>NativeArray 不会被 GC 回收</strong>——它是非托管内存。<br>
+  忘记 <code>Dispose()</code> 会报错：<br>
+  <code>A Native Collection has not been disposed, resulting in a memory leak.</code><br><br>
+  <strong>三个防护措施：</strong><br>
+  ① 用 <code>using</code> 语句（<code>NativeArray</code> 实现了 <code>IDisposable</code>）<br>
+  ② 开启 <strong>Jobs → Leak Detection</strong>（编辑器下会精确报出泄漏位置）<br>
+  ③ 在 <code>OnDestroy</code> 里兜底释放
+</div>
+
+<h2 id="burst">三、Burst 编译器</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">Burst 是什么</span>
+  Burst 是一个<strong>把 IL 编译成高度优化的机器码</strong>的编译器。<br>
+  它使用 LLVM 后端，能做：<br>
+  · <strong>SIMD 向量化</strong>（一次处理 4/8 个数据）<br>
+  · <strong>循环展开与内联</strong><br>
+  · <strong>去除边界检查</strong>（在有保证的情况下）<br><br>
+  <strong>实测效果</strong>：纯数学运算（矩阵乘法、向量运算）通常快 <strong>5~20 倍</strong>。<br><br>
+  <strong>限制</strong>：Burst 编译的代码里<em>不能用异常、不能用引用类型、不能用虚函数</em>。
+</div>
+
+<h2 id="ecs">四、ECS 的核心思想</h2>
+
+<p>ECS 不是"更好的 MonoBehaviour"，而是<strong>完全不同的思维方式</strong>。</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th></th><th>面向对象（MonoBehaviour）</th><th>数据导向（ECS）</th></tr></thead>
+  <tbody>
+    <tr><td><strong>数据位置</strong></td><td>散落在各对象里</td><td><strong>连续内存，按组件分组</strong></td></tr>
+    <tr><td><strong>代码组织</strong></td><td>按对象</td><td><strong>按行为</strong></td></tr>
+    <tr><td><strong>缓存命中</strong></td><td>差（指针跳转）</td><td><strong>优（顺序访问）</strong></td></tr>
+    <tr><td><strong>并行友好</strong></td><td>差（依赖复杂）</td><td><strong>优（数据无依赖）</strong></td></tr>
+    <tr><td><strong>上手难度</strong></td><td>低</td><td><span class="mk mk--no">高</span></td></tr>
+    <tr><td><strong>适合</strong></td><td>绝大多数游戏逻辑</td><td><strong>海量同质单位</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">什么时候值得用 DOTS</span>
+  <strong>值得用的场景</strong>（单位数 10000+）：<br>
+  · 大规模 RTS / 塔防 / 模拟经营<br>
+  · 弹幕游戏（几千发子弹）<br>
+  · 程序化生成的世界<br>
+  · 大规模 AI 群体<br><br>
+  <strong>不值得用的场景</strong>：<br>
+  · 普通 RPG / 动作游戏（几十个敌人）<br>
+  · <strong>UI、剧情、任务系统</strong>——这些用 DOTS 是自找麻烦<br>
+  · 团队不熟悉数据导向设计时<br><br>
+  <em>结论：DOTS 是"特化工具"，不是"升级版 Unity"。绝大多数项目用不上。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="18">
+  <div class="task"><input type="checkbox" id="t-18-1"><label for="t-18-1"><strong>写第一个 Job</strong>：用 <code>IJobParallelFor</code> 并行计算 10000 个位置的移动，对比单线程的耗时。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-2"><label for="t-18-2"><strong>制造一次 NativeArray 泄漏</strong>：故意不 Dispose，观察 Unity 报的错误信息，理解检测机制。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-3"><label for="t-18-3"><strong>用 Burst 编译</strong>：给上面的 Job 加 <code>[BurstCompile]</code>，对比加上前后的耗时差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-4"><label for="t-18-4"><strong>验证限制</strong>：在 Job 里尝试 <code>new</code> 一个 class 或调 <code>Debug.Log</code>，看编译器报什么错。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-5"><label for="t-18-5"><strong>测加速比</strong>：用不同的 batch size 跑同一个 Job，找到你机器上的最优值。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-6"><label for="t-18-6"><strong>回答面试题</strong>：① Job 里为什么不能用引用类型？② NativeArray 忘了 Dispose 会怎样？③ 什么时候该用 DOTS？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出 Job System 适用的三类场景；<br>
+    ② <strong>知道 Job 里不能做的三件事</strong>（引用类型、异常、Unity API）；<br>
+    ③ 能写出一个 <code>IJobParallelFor</code> 并正确管理 NativeArray 生命周期；<br>
+    ④ 知道 Burst 能带来多大加速，以及它的限制；<br>
+    ⑤ <strong>能判断一个项目"该不该用 DOTS"</strong>。<br>
+    <br>
+    <em>第 ⑤ 条最重要——DOTS 是特化工具，滥用它比不用更糟。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="17-unity-render.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">17 渲染与画面优化</div>
+  </a>
+  <a class="next" href="19-unity-editor.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">19 编辑器扩展与工具链</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<h1>12 · ToLua 与其它方案</h1>
+
+<p class="lead">xLua 不是唯一的选择。这一页讲<strong>主流的几种热更方案</strong>，以及<em>怎么选</em>——包括<strong>HybridCLR 这个正在改变格局的新方案</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="compare">一、四种方案的对比</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方案</th><th>原理</th><th>优势</th><th>劣势</th></tr></thead>
+  <tbody>
+    <tr><td><strong>xLua</strong></td><td>Lua 虚拟机 + 绑定生成</td><td><em>功能全、社区大、支持热补丁</em></td><td>配置复杂</td></tr>
+    <tr><td><strong>ToLua</strong></td><td>同 xLua（同源）</td><td>更早成熟、文档多</td><td><em>性能略低、维护不如 xLua</em></td></tr>
+    <tr><td><strong>Puerts</strong></td><td><strong>TypeScript / JS</strong></td><td>类型安全、前端友好</td><td>包体大、生态较新</td></tr>
+    <tr><td><strong>HybridCLR</strong></td><td><strong>真正的 C# 热更</strong></td><td><span class="mk mk--yes">不需学新语言</span></td><td><span class="mk mk--no">iOS 有审核风险</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">HybridCLR 改变了什么</span>
+  <strong>传统认知</strong>：C# 在 iOS 上不能热更（AOT 限制）。<br>
+  <strong>HybridCLR 的做法</strong>：<em>把一个 IL 解释器打进包里</em>，让 C# 也能"解释执行"。<br><br>
+  <strong>优势</strong>：<br>
+  · <strong>不需要学 Lua</strong>——用 C# 写热更代码<br>
+  · <strong>没有跨语言开销</strong>——不存在 Lua/C# 边界<br>
+  · <em>调试体验好</em>（就是普通 C# 调试）<br><br>
+  <strong>劣势与风险</strong>：<br>
+  · <strong>iOS 审核风险</strong>——Apple 的条款限制"下载可执行代码"<br>
+  · 需要<em>更复杂的打包流程</em>（要处理 AOT 泛型）<br>
+  · 解释执行<em>比 JIT 慢</em>（但仍比 Lua 快）<br><br>
+  <strong>现状</strong>：<em>新项目越来越多在评估 HybridCLR，但 Lua 仍是主流（成熟、风险低）。</em>
+</div>
+
+<h2 id="how-to-choose">二、怎么选：三个判断标准</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>情况</th><th>推荐</th><th>理由</th></tr></thead>
+  <tbody>
+    <tr><td><strong>新项目、团队会 Lua</strong></td><td>xLua</td><td>成熟、可控、风险低</td></tr>
+    <tr><td><strong>团队不会 Lua</strong></td><td>HybridCLR</td><td><em>学习成本是最大的成本</em></td></tr>
+    <tr><td><strong>已有 Lua 项目</strong></td><td><strong>不要换</strong></td><td>迁移成本远高于收益</td></tr>
+    <tr><td><strong>需要极致性能</strong></td><td>HybridCLR</td><td>没有跨语言开销</td></tr>
+    <tr><td><strong>发行到 iOS</strong></td><td>xLua 更稳</td><td><em>审核风险更低</em></td></tr>
+    <tr><td><strong>大厂主力项目</strong></td><td>xLua</td><td>经过大量线上验证</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">最重要的一条建议</span>
+  <strong>不要因为"新技术更好"就迁移。</strong><br><br>
+  迁移一个成熟项目的热更方案，意味着：<br>
+  · 重写所有热更代码<br>
+  · 重新建立工具链（打包、热更、调试）<br>
+  · <em>承担新方案的不确定性</em><br><br>
+  <strong>收益是什么？</strong>可能是性能提升 20%，或者代码更好维护。<br>
+  <strong>成本是什么？</strong>几个月的人力和一批新的线上问题。<br><br>
+  <em>这个账通常算不过来。除非项目本来就很小、或者有明确的痛点。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="12">
+  <div class="task"><input type="checkbox" id="t-12-1"><label for="t-12-1"><strong>对比性能</strong>：如果条件允许，分别用 xLua 和纯 C# 实现同一个逻辑，对比性能。</label></div>
+  <div class="task"><input type="checkbox" id="t-12-2"><label for="t-12-2"><strong>了解 HybridCLR</strong>：读一下它的官方文档，理解"IL 解释器"的原理。</label></div>
+  <div class="task"><input type="checkbox" id="t-12-3"><label for="t-12-3"><strong>评估你的项目</strong>：列出当前项目的技术栈，分析是否应该保持或迁移。<em>写出理由。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-12-4"><label for="t-12-4"><strong>搭一个最小框架</strong>：用 xLua 搭一个"加载脚本 + 执行 + 返回结果"的最小流程。</label></div>
+  <div class="task"><input type="checkbox" id="t-12-5"><label for="t-12-5"><strong>回答面试题</strong>：① xLua 与 HybridCLR 的区别？② 什么情况该迁移热更方案？③ 为什么 Lua 仍是主流？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能对比四种热更方案（xLua / ToLua / Puerts / HybridCLR）；<br>
+    ② <strong>知道 HybridCLR 的原理与风险</strong>；<br>
+    ③ 能说出选择的三个判断标准；<br>
+    ④ <strong>理解"不要为了新技术而迁移"这个原则</strong>；<br>
+    ⑤ 能搭出一个最小可用的热更流程。<br>
+    <br>
+    <em>第 ④ 条是这一页最有价值的内容——它体现的是**工程判断力**，而不只是技术知识。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="11-xlua-advanced.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">11 xLua 进阶 ★★</div>
+  </a>
+  <a class="next" href="13-framework-design.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">13 框架总体设计 ★★★</div>
+  </a>
+</nav>

@@ -1,0 +1,428 @@
+
+      <h1>08 · 协程与异步编程</h1>
+      <p class="lead">这是 C# 语言线的<strong>最后一页</strong>，也是把前面所有知识串起来的一页：协程里有分配问题（<a class="kp-ref" href="07-cs-memory.html#sources" title="GC 分配十大来源">页 07 学过</a>）、有闭包问题（<a class="kp-ref" href="05-cs-adv.html#closure" title="闭包与捕获">页 05 学过</a>）、有生命周期问题（<a class="kp-ref" href="11-unity-core.html#lifecycle" title="生命周期与执行顺序">页 11 会讲</a>）。而 async/await 则涉及<strong>线程模型</strong>——这是 Unity 新手最容易踩致命坑的地方。</p>
+
+      <div class="callout callout--note">
+        <span class="callout__title">这一页在路线中的位置</span>
+        <strong>上一页</strong>（07）讲的是"单帧内不要产生垃圾"。这一页讲的是"跨帧执行"——协程和异步。<br>
+        <strong>关键衔接</strong>：协程的 <code>new WaitForSeconds(1f)</code> 是页 07 清单里的第 6 条；协程里的 lambda 捕获是第 5 条。<em>你已经知道它们有代价了，现在学怎么正确使用它们。</em><br>
+        <strong>下一页</strong>（09）开始数学基础。这里有个过渡：<em>协程和异步都离不开"时间"的概念</em>（deltaTime、插值），而插值的数学基础正是下一页的内容。
+      </div>
+
+      <h2 id="coroutine">一、协程：分帧执行的方法</h2>
+      <p>协程是 Unity 特有的机制。它的本质是：<strong>一段可以"暂停"和"恢复"的方法</strong>，由 Unity 的更新循环驱动。它不是线程——<em>协程全程在主线程上跑</em>，只是把一段逻辑拆到多帧执行。</p>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+// ============================================================
+//  协程基础：yield 的全部用法
+// ============================================================
+public class CoroutineDemo : MonoBehaviour
+{
+    private Coroutine _handle;
+
+    private void Start()
+    {
+        _handle = StartCoroutine(MyRoutine());
+        // StopCoroutine(_handle);
+        // StopAllCoroutines();
+    }
+
+    private IEnumerator MyRoutine()
+    {
+        Debug.Log("第一帧");
+
+        yield return null;                                  // 下一帧
+        yield return new WaitForSeconds(1f);                // 1 秒（受 timeScale 影响）
+        yield return new WaitForSecondsRealtime(1f);        // 真实 1 秒
+        yield return new WaitForFixedUpdate();              // 下一个 FixedUpdate 之后
+        yield return new WaitForEndOfFrame();               // 本帧渲染结束后
+
+        yield return new WaitUntil(() =&gt; Input.GetKeyDown(KeyCode.Space));
+        yield return new WaitWhile(() =&gt; transform.position.y &gt; 0f);
+
+        yield return StartCoroutine(OtherRoutine());        // 等另一个协程结束
+
+        yield break;                                        // 立即结束
+    }
+
+    private IEnumerator OtherRoutine()
+    {
+        yield return null;
+    }
+}
+
+// ============================================================
+//  陷阱 1：物体被禁用后协程停止，且不会恢复
+// ============================================================
+public class CoroutineTrap1 : MonoBehaviour
+{
+    public void Disable()
+    {
+        gameObject.SetActive(false);   // 所有协程立刻停止，且不会自动恢复
+    }
+}
+
+// ============================================================
+//  陷阱 2：不能在 try-catch 里 yield
+// ============================================================
+public class CoroutineTrap2 : MonoBehaviour
+{
+    // 编译错误：不能在 try-catch 中 yield
+    // private IEnumerator Bad()
+    // {
+    //     try { yield return null; }
+    //     catch { }
+    // }
+
+    // 正确：把风险代码包在单独的方法里
+    private IEnumerator Good()
+    {
+        yield return null;
+        TryDoRiskyWork();
+    }
+
+    private void TryDoRiskyWork()
+    {
+        try { /* 风险代码 */ }
+        catch (System.Exception e) { Debug.LogException(e); }
+    }
+}
+
+// ============================================================
+//  陷阱 3：WaitForSeconds 每次都 new 会产生 GC
+// ============================================================
+public static class WaitCache
+{
+    private static readonly Dictionary&lt;float, WaitForSeconds&gt; _cache
+        = new Dictionary&lt;float, WaitForSeconds&gt;();
+
+    public static WaitForSeconds Get(float seconds)
+    {
+        // 量化到 0.05 秒，避免浮点键过多
+        float key = Mathf.Round(seconds * 20f) / 20f;
+        if (!_cache.TryGetValue(key, out WaitForSeconds w))
+        {
+            w = new WaitForSeconds(key);
+            _cache[key] = w;
+        }
+        return w;
+    }
+}
+
+public class CoroutineTrap3 : MonoBehaviour
+{
+    private IEnumerator Fire()
+    {
+        while (true)
+        {
+            yield return WaitCache.Get(0.1f);   // 复用，不再每次 new
+        }
+    }
+}</code></pre>
+
+      <h3 id="yield-table">yield 指令完整对照表</h3>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>yield 指令</th><th>恢复时机</th><th>受 timeScale 影响</th><th>典型用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>yield return null</code></td><td>下一帧的 Update 之后</td><td>否</td><td>逐帧逻辑、等待一帧</td></tr>
+          <tr><td><code>new WaitForSeconds(t)</code></td><td>t 秒后（缩放时间）</td><td><strong>是</strong></td><td>冷却、延时</td></tr>
+          <tr><td><code>new WaitForSecondsRealtime(t)</code></td><td>t 秒后（真实时间）</td><td>否</td><td>暂停菜单里的动画</td></tr>
+          <tr><td><code>new WaitForFixedUpdate()</code></td><td>下一个 FixedUpdate 之后</td><td><strong>是</strong></td><td>物理相关</td></tr>
+          <tr><td><code>new WaitForEndOfFrame()</code></td><td>本帧渲染结束后</td><td>否</td><td>截图、读像素</td></tr>
+          <tr><td><code>new WaitUntil(pred)</code></td><td>条件为 true 后</td><td>否</td><td>等待某个状态</td></tr>
+          <tr><td><code>new WaitWhile(pred)</code></td><td>条件为 false 后</td><td>否</td><td>等待某个状态结束</td></tr>
+          <tr><td><code>StartCoroutine(other)</code></td><td>该协程结束后</td><td>—</td><td>协程串行</td></tr>
+          <tr><td><code>yield break</code></td><td>立即结束协程</td><td>—</td><td>提前退出</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout callout--danger">
+        <span class="callout__title"><code>WaitForEndOfFrame</code> 在编辑器里的一个坑</span>
+        <strong>当 Game 视图不可见时</strong>（窗口被最小化、或切到其他标签页），<code>WaitForEndOfFrame</code> <strong>不会触发</strong>。<br>
+        表现是：你的截图协程挂住了，直到切回 Game 视图才继续。<em>这是"截图功能在编辑器里偶尔卡住"的经典原因。</em><br>
+        真机上没有这个问题。所以<strong>截图相关功能一定要在真机上验证</strong>。
+      </div>
+
+      <h2 id="trap">二、协程的四个陷阱</h2>
+
+      <h3 id="trap-disable">陷阱 1：物体被禁用，协程停止且不恢复</h3>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">这是最隐蔽的协程 bug</span>
+        <code>gameObject.SetActive(false)</code> 会<strong>立即停止该对象上所有协程</strong>，而且<em>重新激活后不会自动恢复</em>。<br>
+        典型场景：你做"角色复活"，把角色 SetActive(false) 再 SetActive(true)，结果<em>复活动画的协程再也不执行了</em>。<br>
+        <strong>解决方式</strong>：① 不用 SetActive，改用其他方式隐藏；② 在 OnEnable 里重新启动协程；③ 用状态机管理。
+      </div>
+
+      <h3 id="trap-trycatch">陷阱 2：不能在 try-catch 里 yield</h3>
+      <p>这是 <strong>C# 语言的限制</strong>（不是 Unity 的）。<code>yield return</code> 不能出现在 <code>try</code> 块里带 <code>catch</code> 的场景。解决方式是把风险代码提取成独立方法。</p>
+
+      <h3 id="trap-gc">陷阱 3：WaitForSeconds 每次 new 都产生 GC</h3>
+      <p>这是<strong>页 07 清单里的第 6 条</strong>。高频循环的协程（比如每 0.1 秒执行一次）长时间运行会产生可观的垃圾。</p>
+
+      <h3 id="trap-destroy">陷阱 4：宿主销毁后协程的残留引用</h3>
+
+      <pre class="mono code-block"><code>using System.Collections;
+using UnityEngine;
+
+// 协程宿主销毁时的行为
+public class CoroutineOwner : MonoBehaviour
+{
+    private void Start()
+    {
+        StartCoroutine(Routine());
+    }
+
+    private IEnumerator Routine()
+    {
+        while (true)
+        {
+            yield return new WaitForSeconds(1f);
+
+            // 宿主销毁后协程会停止，这一行不会执行
+            // 所以直接访问 this 的成员是"相对安全"的
+            Debug.Log(transform.position);
+        }
+    }
+}
+
+// 但如果是"别的对象"持有协程呢？
+public class CoroutineHolder : MonoBehaviour
+{
+    // 防御性写法：每轮都检查目标是否还活着
+    public IEnumerator SafeRoutine(GameObject target)
+    {
+        while (target != null)      // 用 Unity 的 == 判断（能识别"假 null"）
+        {
+            yield return new WaitForSeconds(1f);
+            if (target == null) yield break;
+            target.transform.Rotate(Vector3.up, 10f);
+        }
+    }
+}</code></pre>
+
+      <h2 id="async">三、async/await：真正的异步</h2>
+      <p>协程解决的是"分帧执行"，但<strong>它不能真正并行</strong>——因为协程还在主线程上。如果你要读一个 100MB 的文件、或者发一个网络请求，<em>协程依然会卡住主线程</em>。这时需要 <code>async/await</code> 和真正的后台线程。</p>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">Unity 里 async/await 的铁律</span>
+        <strong>在线程池线程上调用任何 Unity API 都会抛异常。</strong>错误信息是 <span class="mono">"xxx can only be called from the main thread"</span>。<br>
+        <code>Transform</code>、<code>GameObject</code>、<code>Time</code>——这些都不是线程安全的。<br>
+        <strong>记住</strong>：<em>await 之后你在哪个线程，取决于你 await 的是什么。</em>
+      </div>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>await 的对象</th><th>await 之后的线程</th><th>能否直接调 Unity API</th></tr></thead>
+        <tbody>
+          <tr><td><code>Task.Run(() =&gt; ...)</code></td><td><strong>线程池线程</strong></td><td><span class="mk mk--no">不能</span></td></tr>
+          <tr><td><code>Task.Delay(n)</code></td><td><strong>主线程</strong>（默认上下文）</td><td><span class="mk mk--yes">可以</span></td></tr>
+          <tr><td><code>await task.ConfigureAwait(false)</code></td><td><strong>线程池线程</strong></td><td><span class="mk mk--no">不能</span></td></tr>
+          <tr><td>UniTask 的 <code>UniTask.Delay</code></td><td><strong>主线程</strong></td><td><span class="mk mk--yes">可以</span></td></tr>
+          <tr><td>UniTask 的 <code>SwitchToThreadPool()</code></td><td>线程池线程</td><td><span class="mk mk--no">不能</span></td></tr>
+          <tr><td>UniTask 的 <code>SwitchToMainThread()</code></td><td>主线程</td><td><span class="mk mk--yes">可以</span></td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <pre class="mono code-block" data-lang="csharp"><code>using System.Threading;
+using System.Threading.Tasks;
+using UnityEngine;
+
+// ============================================================
+//  async/await 在 Unity 中的正确用法
+// ============================================================
+public class AsyncDemo : MonoBehaviour
+{
+    private CancellationTokenSource _cts;
+
+    private void Start()
+    {
+        _cts = new CancellationTokenSource();
+        _ = LoadAsync(_cts.Token);
+    }
+
+    private void OnDestroy()
+    {
+        // 对象销毁时取消任务，避免回调到已销毁对象
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    private async Task LoadAsync(CancellationToken token)
+    {
+        // await 之后可能回到线程池线程，不能直接调用 Unity API
+        string json = await Task.Run(() =&gt;
+            System.IO.File.ReadAllText("data.json"), token);
+
+        if (token.IsCancellationRequested) return;
+        if (this == null) return;      // 对象可能已被销毁
+
+        // 回到主线程后再调用 Unity API
+        Debug.Log(json.Length);
+    }
+}
+
+// ============================================================
+//  错误示范：三种典型崩溃
+// ============================================================
+public class AsyncWrong : MonoBehaviour
+{
+    // 错误 1：在线程池线程上调用 Unity API
+    private async void Wrong1()
+    {
+        await Task.Run(() =&gt;
+        {
+            // 崩溃：Unity API 只能在主线程调用
+            // Debug.Log(transform.position);
+        });
+    }
+
+    // 错误 2：async void 的异常无法被捕获
+    private void Wrong2()
+    {
+        // CallAsyncVoid();   // 里面抛异常会直接崩溃，无法 try-catch
+    }
+    private async void CallAsyncVoid()
+    {
+        await Task.Delay(100);
+        throw new System.Exception("这个异常会直接让程序崩溃");
+    }
+
+    // 错误 3：对象销毁后继续执行
+    private async Task Wrong3()
+    {
+        await Task.Delay(5000);     // 等 5 秒
+        transform.position = Vector3.zero;   // 此时对象可能已被销毁 -&gt; MissingReferenceException
+    }
+
+    // 正确的替代方案
+    private async Task Right3(CancellationToken token)
+    {
+        await Task.Delay(5000, token);
+        if (this == null || token.IsCancellationRequested) return;
+        transform.position = Vector3.zero;
+    }
+}</code></pre>
+
+      <h3 id="async-trap">三个典型崩溃场景</h3>
+
+      <ol>
+        <li><strong>在线程池线程上调 Unity API</strong> → 抛 <code>UnityException: ... can only be called from the main thread</code>。</li>
+        <li><strong>用 <code>async void</code></strong> → 里面的异常<em>无法被任何 try-catch 捕获</em>，直接崩溃。<strong>除了事件处理器，一律用 <code>async Task</code></strong>。</li>
+        <li><strong>对象销毁后 await 回来继续执行</strong> → <code>MissingReferenceException</code>。必须用 <code>CancellationToken</code> 或在 await 后检查 <code>this == null</code>。</li>
+      </ol>
+
+      <h2 id="unitask">四、UniTask：Unity 的现代异步方案</h2>
+      <p>原生 <code>Task</code> 在 Unity 里有几个问题：<strong>每次分配、容易用错线程、和 Unity 的 PlayerLoop 集成不好</strong>。<strong>UniTask</strong> 是社区的事实标准解决方案，它解决了这些问题。</p>
+
+      <div class="cmp">
+        <div class="cmp__head">
+          <span>维度</span>
+          <span>Coroutine</span>
+          <span>async/await + Task</span>
+          <span>UniTask</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>GC 分配</strong></span>
+          <span>每次 StartCoroutine 有少量</span>
+          <span><span class="mk mk--no">较多</span> Task 是 class</span>
+          <span><span class="mk mk--yes">零分配</span> 基于 struct</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>返回值</strong></span>
+          <span><span class="mk mk--no">不能返回</span></span>
+          <span><span class="mk mk--yes">可以</span></span>
+          <span><span class="mk mk--yes">可以</span></span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>异常传播</strong></span>
+          <span><span class="mk mk--no">只能 Debug.Log</span></span>
+          <span><span class="mk mk--yes">传播到 await 处</span></span>
+          <span><span class="mk mk--yes">传播</span></span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>取消机制</strong></span>
+          <span><code>StopCoroutine</code></span>
+          <span><code>CancellationToken</code></span>
+          <span><code>CancellationToken</code></span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>线程安全</strong></span>
+          <span><span class="mk mk--yes">主线程</span></span>
+          <span><span class="mk mk--warn">可能切线程</span></span>
+          <span><span class="mk mk--yes">主线程</span></span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>依赖</strong></span>
+          <span>内置</span>
+          <span>内置</span>
+          <span>需安装包</span>
+        </div>
+        <div class="cmp__row">
+          <span><strong>适用</strong></span>
+          <span>简单延时、序列动画</span>
+          <span>IO 密集、网络</span>
+          <span><strong>现代 Unity 项目首选</strong></span>
+        </div>
+      </div>
+
+      <div class="callout callout--tip">
+        <span class="callout__title">协程还是 UniTask？给一个明确的建议</span>
+        <strong>简单场景用协程</strong>：等 1 秒、做一个序列动画、每隔 N 帧执行一次。这些用协程最直观，不值得引入额外依赖。<br>
+        <strong>复杂场景用 UniTask</strong>：需要返回值、需要异常处理、需要取消、需要和 <code>Task</code>/网络库交互。<br>
+        <strong>不要混用。</strong>一个文件里既有 <code>StartCoroutine</code> 又有 <code>async UniTask</code>，会让"这段代码什么时候执行完"变得极难追踪。<em>按模块统一</em>。<br>
+        <strong>迁移策略</strong>：新项目直接用 UniTask；老项目<em>不要批量重写</em>协程，只在新增的复杂异步逻辑上用 UniTask。
+      </div>
+
+      <h2 id="tasks">五、本章动手任务</h2>
+
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="t-08-1">
+          <label for="t-08-1"><strong>体验 SetActive 停止协程</strong>：写一个每 0.5 秒打印一次的协程，中途 <code>SetActive(false)</code> 再 <code>SetActive(true)</code>，观察协程是否恢复。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-08-2">
+          <label for="t-08-2"><strong>测量协程分配</strong>：在 <code>while</code> 循环里用 <code>new WaitForSeconds</code> 跑 10 秒，用 Profiler 看 GC Alloc，然后改成缓存版本对比。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-08-3">
+          <label for="t-08-3"><strong>验证线程限制</strong>：写一个 <code>Task.Run</code>，在里面尝试访问 <code>transform.position</code>，看 Unity 抛什么异常。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-08-4">
+          <label for="t-08-4"><strong>修复 async void</strong>：写一个 <code>async void</code> 方法并在里面抛异常，观察是<em>无法捕获</em>的；然后改成 <code>async Task</code> 并正确 catch。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-08-5">
+          <label for="t-08-5"><strong>实现取消机制</strong>：写一个持续 10 秒的异步任务，用 <code>CancellationTokenSource</code> 在 3 秒时取消，验证它真的停了。</label>
+        </li>
+        <li>
+          <input type="checkbox" id="t-08-6">
+          <label for="t-08-6"><strong>对比三种方案</strong>：用协程、Task、UniTask 各实现一遍"等待 2 秒后输出"，比较代码量和 GC 分配。</label>
+        </li>
+      </ul>
+
+      <div class="milestone">
+        <p class="mb0">
+          <strong>本章过关标准</strong>：<br>① 能说出至少 6 种 yield 指令的恢复时机和是否受 timeScale 影响；<br>② 能解释"物体 SetActive(false) 后协程为什么不会恢复"；<br>③ <strong>能准确说出 await 之后你在哪个线程，以及能不能调 Unity API</strong>；<br>④ 能解释为什么 <code>async void</code> 是危险的；<br>⑤ 知道协程、Task、UniTask 各自的适用场景。<br><br><em>第 ③ 条是最容易出致命 bug 的地方——它不会给你"稍微不对"的结果，而是直接崩溃。</em>
+        </p>
+      </div>
+
+      <nav class="page-nav">
+        <a href="07-cs-memory.html">
+          <div class="dir">← C# 语言线</div>
+          <div class="title">07 内存、GC 与零分配</div>
+        </a>
+        <a class="next" href="09-math.html">
+          <div class="dir">数学与图形 →</div>
+          <div class="title">09 游戏数学基础</div>
+        </a>
+      </nav>

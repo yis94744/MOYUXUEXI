@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>21 安全与加密 — Lua 热更新路线｜从零基础到独立搭建可上线的热更框架</title>
+<meta name="description" content="Lua 字节码加密、AB 包加密、防破解、协议加密">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="../algorithms/index.html">Lua 热更新路线
+        <span>从零基础到独立搭建可上线的热更框架</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>21 · 安全与加密</h1>
+
+<p class="lead">这一页讲<strong>Lua 在客户端的安全问题</strong>。核心结论会很直白：<em>客户端代码永远不可信，所有关键校验必须在服务器</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  [object Object]
+</div>
+
+<h2 id="principle">一、客户端安全的基本认知 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">最重要的一条：客户端代码是公开的</span>
+  <strong>Lua 脚本在客户端就是明文（或容易被反编译的字节码）。</strong><br>
+  任何人拿到你的安装包，都能<em>看到你的逻辑、改你的数值、伪造请求</em>。<br><br>
+  <strong>所以</strong>：<br>
+  · <strong>关键数值不能只在客户端</strong>——<em>伤害公式、掉落概率、金币产出都要在服务器算</em><br>
+  · <strong>关键校验不能只在客户端</strong>——<em>背包满不满、够不够钱，服务器要再查一次</em><br>
+  · <strong>协议不能只靠客户端保证</strong>——<em>服务器要校验参数范围</em><br><br>
+  <strong>常见的错误认知</strong>：<br>
+  · "我把脚本加密了，玩家看不到" → <em>照样能反编译，只是提高门槛</em><br>
+  · "我做了反调试，改不了" → <em>能拦住普通玩家，拦不住认真的</em><br>
+  · "本地算完发给服务器就行" → <strong>这就是刷道具漏洞的根源</strong><br><br>
+  <em>加密与混淆的价值是"提高攻击成本"，而不是"杜绝攻击"。真正的安全靠服务器权威。</em>
+</div>
+
+<h2 id="encryption">二、加密与混淆的实际作用</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>手段</th><th>作用</th><th>实际效果</th></tr></thead>
+  <tbody>
+    <tr><td><strong>编译成字节码</strong></td><td>防止直接看源码</td><td><span class="mk mk--warn">提高门槛</span></td></tr>
+    <tr><td><strong>字节码加密</strong></td><td>防止直接反编译</td><td><em>运行时要解密，能被 hook</em></td></tr>
+    <tr><td><strong>变量名混淆</strong></td><td>降低可读性</td><td>有一点用</td></tr>
+    <tr><td><strong>字符串加密</strong></td><td>隐藏敏感信息</td><td><em>运行时能在内存里找到</em></td></tr>
+    <tr><td><strong>完整性校验</strong></td><td>防篡改</td><td><strong>有用（但仍能绕过）</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">加密的真实定位</span>
+  <strong>加密的目标不是"绝对安全"，而是"提高成本"</strong>。<br><br>
+  <strong>合理的目标</strong>：<br>
+  · 让普通玩家<em>不能改文件就作弊</em><br>
+  · 让修改者<em>需要一定的技术水平</em><br>
+  · 让破解的<em>收益低于成本</em><br><br>
+  <strong>不合理的目标</strong>：<br>
+  · "让所有人都改不了"——<em>做不到</em><br>
+  · "加密了就安全了"——<em>关键逻辑还是要在服务器</em><br><br>
+  <em>判断标准：如果加密被完全绕过，你的游戏会崩吗？如果会，说明设计有问题。</em>
+</div>
+
+<h2 id="server-authority">三、必须放在服务器的四类逻辑 ★★★</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>类别</th><th>为什么</th><th>例子</th></tr></thead>
+  <tbody>
+    <tr><td><strong>数值计算</strong></td><td>客户端算 = 可以改</td><td><strong>伤害、掉落、经验</strong></td></tr>
+    <tr><td><strong>资源变更</strong></td><td>客户端改 = 能刷道具</td><td><strong>金币、道具、体力</strong></td></tr>
+    <tr><td><strong>概率判定</strong></td><td>客户端随机 = 必出稀有</td><td><strong>抽卡、暴击、掉落</strong></td></tr>
+    <tr><td><strong>时间相关</strong></td><td>客户端时间可以改</td><td><strong>冷却、活动时间、签到</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">一个判断准则</span>
+  <strong>问自己：如果玩家能任意修改这个计算的结果，会怎样？</strong><br><br>
+  · <strong>会导致刷资源</strong> → 必须放服务器<br>
+  · <strong>只影响自己的显示</strong> → 可以放客户端<br>
+  · <strong>能被服务器事后校验</strong> → 可以放客户端 + 服务器校验<br><br>
+  <strong>举例</strong>：<br>
+  · 技能冷却显示 → 客户端（<em>改了也只是显示问题</em>）<br>
+  · 技能实际能否使用 → <strong>服务器</strong>（<em>改了就能无限放技能</em>）<br>
+  · 本地单人游戏的伤害 → 客户端（<em>改了自己爽，不影响别人</em>）<br>
+  · <strong>联网对战的伤害</strong> → <strong>服务器</strong><br><br>
+  <em>这个准则能帮你快速判断绝大多数场景。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="21">
+  <div class="task"><input type="checkbox" id="t-21-1"><label for="t-21-1"><strong>审计你的项目</strong>：找出所有"客户端算完就生效"的逻辑，标记哪些应该移到服务器。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-2"><label for="t-21-2"><strong>测一次反编译</strong>：用工具（如 luadec）尝试反编译你自己的 Lua 字节码，<em>感受一下防护强度</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-3"><label for="t-21-3"><strong>做参数校验</strong>：给一个网络协议加服务器端参数范围校验，验证非法参数被拒绝。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-4"><label for="t-21-4"><strong>做完整性校验</strong>：给脚本包加校验值，验证被修改后能检测出来。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-5"><label for="t-21-5"><strong>写安全清单</strong>：列出你项目里"必须服务器权威"的逻辑，做成检查表。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-6"><label for="t-21-6"><strong>回答面试题</strong>：① 客户端加密能防住作弊吗？② 哪些逻辑必须放服务器？③ 怎么判断一个逻辑该不该放服务器？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>理解"客户端代码公开"这个基本前提</strong>；<br>
+    ② <strong>知道加密的真实定位（提高成本，不是绝对安全）</strong>；<br>
+    ③ <strong>能说出必须放服务器的四类逻辑</strong>；<br>
+    ④ <strong>掌握"如果玩家改了会怎样"这个判断准则</strong>；<br>
+    ⑤ 能审计自己项目的安全问题。<br>
+    <br>
+    <em>第 ③ 和 第 ④ 条是这一页的核心——前者是知识，后者是可复用的判断方法。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="20-engineering.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">20 工程化与协作</div>
+  </a>
+  <a class="next" href="22-interview.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">22 面试题库 ★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>
