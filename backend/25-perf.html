@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>25 后端性能优化 — Unity 游戏后端 + 全栈开发路线｜从客户端主程延伸为能独立扛服务的全栈工程师</title>
+<meta name="description" content="压测、性能剖析、连接池、异步陷阱、GC 调优">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">Unity 游戏后端 + 全栈开发路线
+        <span>从客户端主程延伸为能独立扛服务的全栈工程师</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>25 · 后端性能优化 ★★</h1>
+
+<p class="lead">后端性能和客户端不同：<em>瓶颈往往不在代码，而在架构和数据库</em>。这一页按<strong>收益排序</strong>讲五个层次。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  读完这一页，你应该能把它和前面讲过的知识连起来——<strong>后端性能优化</strong> 是后面几页的基础。如果某段看不懂，<em>先回上一页把概念补齐再看</em>。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="25-perf.html#layers" data-brief="架构>数据库>算法>代码>参数"><span class="prereq__title">优化五层</span><span class="prereq__page">25-perf</span></a>
+          <a class="prereq__item" href="25-perf.html#pool" data-brief="避免握手开销；池满要等待不能无限建"><span class="prereq__title">连接池</span><span class="prereq__page">25-perf</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="layers">一、优化的五个层次（按收益排序）★★★</h2>
+
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace BackendSamples.Perf
+{
+    // ============================================================
+    // 1. 性能优化的五个层次（按收益排序）
+    // ============================================================
+
+    public static class OptimizationLayers
+    {
+        public static readonly (string Layer, string Example, string Gain, string Cost)[] All =
+        {
+            ("1. 架构",     "加缓存、异步化、N+1 修复", "10~1000倍", "中"),
+            ("2. 数据库",   "索引、减少查询、连接池",   "10~100倍",  "低"),
+            ("3. 算法",     "换数据结构、减少循环",     "2~10倍",    "中"),
+            ("4. 代码",     "避免装箱、缓存结果",       "1.2~3倍",   "低"),
+            ("5. 参数调优", "GC、线程池、超时",         "1.1~2倍",   "高"),
+        };
+    }
+
+    // ============================================================
+    // 2. 连接池：最容易忽略的优化 ★★★
+    // ============================================================
+    // 【问题】每次请求都新建数据库连接 -&gt; 握手开销
+
+    public class ConnectionPool
+    {
+        private readonly Stack&lt;string&gt; _idle = new();
+        private readonly int _maxSize;
+        private int _created;
+        private int _borrowed;
+
+        public ConnectionPool(int maxSize) =&gt; _maxSize = maxSize;
+
+        public (string? Conn, bool FromPool) Acquire()
+        {
+            if (_idle.Count &gt; 0)
+            {
+                _borrowed++;
+                return (_idle.Pop(), true);
+            }
+
+            if (_created &gt;= _maxSize)
+            {
+                // 【关键】池满了要等待，不能无限创建
+                return (null, false);
+            }
+
+            _created++;
+            _borrowed++;
+            return ($"conn-{_created}", false);
+        }
+
+        public void Release(string conn)
+        {
+            _borrowed--;
+            if (_idle.Count &lt; _maxSize) _idle.Push(conn);
+        }
+
+        public int IdleCount =&gt; _idle.Count;
+        public int TotalCreated =&gt; _created;
+        public int Borrowed =&gt; _borrowed;
+    }
+
+    // ============================================================
+    // 3. 装箱：C# 后端的隐藏开销 ★★
+    // ============================================================
+    // 【问题】值类型转 object 会在堆上分配
+
+    public class BoxingDemo
+    {
+        public static void Run()
+        {
+            const int N = 1000000;
+
+            Console.WriteLine($"  测试 {N} 次操作");
+
+            // 【关键】两边必须条件对等：都预分配容量、都先 GC
+            //   否则测出来的是「扩容次数」而不是「装箱开销」
+            var sw = Stopwatch.StartNew();
+
+            // ---- 有装箱 ----
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            long before1 = GC.GetTotalMemory(true);
+
+            var list = new List&lt;object&gt;(N);   // 【关键】预分配容量
+            sw.Restart();
+            for (int i = 0; i &lt; N; i++)
+            {
+                list.Add(i);   // 【装箱】int -&gt; object，每次在堆上分配
+            }
+            sw.Stop();
+            long boxedMs = sw.ElapsedMilliseconds;
+            long boxedMem = GC.GetTotalMemory(false) - before1;
+
+            Console.WriteLine($"    装箱（List&lt;object&gt;）: {boxedMs} ms，内存 {boxedMem / 1024 / 1024} MB");
+
+            // ---- 无装箱 ----
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            long before2 = GC.GetTotalMemory(true);
+
+            var list2 = new List&lt;int&gt;(N);     // 【关键】同样预分配容量
+            sw.Restart();
+            for (int i = 0; i &lt; N; i++)
+            {
+                list2.Add(i);   // 【无装箱】泛型专用于 int，不分配
+            }
+            sw.Stop();
+            long genericMs = sw.ElapsedMilliseconds;
+            long genericMem = GC.GetTotalMemory(false) - before2;
+
+            Console.WriteLine($"    泛型（List&lt;int&gt;）:     {genericMs} ms，内存 {genericMem / 1024 / 1024} MB");
+            Console.WriteLine($"    【对比】装箱慢 {(genericMs &gt; 0 ? (double)boxedMs / genericMs : 0):F1} 倍，多占 {boxedMem - genericMem} 字节");
+
+            Console.WriteLine();
+            Console.WriteLine("  【结论】装箱同时增加时间和内存");
+            Console.WriteLine("          泛型容器是零装箱的");
+
+            // 保留引用避免被优化
+            Console.WriteLine($"  （列表长度 {list.Count} / {list2.Count}）");
+        }
+    }
+
+    // ============================================================
+    // 4. 字符串拼接：后端最常见的性能坑 ★★
+    // ============================================================
+
+    public class StringConcatDemo
+    {
+        public static void Run()
+        {
+            const int N = 20000;
+
+            Console.WriteLine($"  拼接 {N} 段字符串");
+
+            // 【差】用 + 拼接（每次创建新字符串）
+            var sw = Stopwatch.StartNew();
+            string s1 = "";
+            for (int i = 0; i &lt; N; i++) s1 += i.ToString();
+            sw.Stop();
+            Console.WriteLine($"    用 + 拼接:      {sw.ElapsedMilliseconds} ms，长度 {s1.Length}");
+
+            // 【好】StringBuilder
+            sw.Restart();
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i &lt; N; i++) sb.Append(i);
+            sw.Stop();
+            Console.WriteLine($"    StringBuilder:  {sw.ElapsedMilliseconds} ms，长度 {sb.Length}");
+
+            // 【最好】string.Join / Concat（一次性分配）
+            sw.Restart();
+            var parts = Enumerable.Range(0, N).Select(i =&gt; i.ToString()).ToArray();
+            string s3 = string.Concat(parts);
+            sw.Stop();
+            Console.WriteLine($"    string.Concat:  {sw.ElapsedMilliseconds} ms，长度 {s3.Length}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【选择】");
+            Console.WriteLine("    · 循环拼接 -&gt; StringBuilder");
+            Console.WriteLine("    · 已知所有片段 -&gt; string.Concat / Join");
+            Console.WriteLine("    · 少量拼接（&lt;5段）-&gt; 用 + 反而更快");
+        }
+    }
+
+    // ============================================================
+    // 5. 异步陷阱：async void 与 ConfigureAwait
+    // ============================================================
+
+    public class AsyncPitfalls
+    {
+        public static async Task Run()
+        {
+            Console.WriteLine("  【陷阱一】async void 无法捕获异常");
+
+            // 【实测环境说明】控制台程序没有 SynchronizationContext 时，
+            //   async void 的异常会直接抛到线程池 -&gt; 未处理异常 -&gt; 进程崩溃。
+            //   这里装一个「捕获上下文」，把逃逸的异常接住，演示才能继续往下走。
+            var ctx = new CaptureContext();
+            var oldCtx = SynchronizationContext.Current;
+            SynchronizationContext.SetSynchronizationContext(ctx);
+            try
+            {
+                try
+                {
+                    BadAsync();   // async void
+                    await Task.Delay(200);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"    调用方的 catch 居然抓到了: {ex.Message}");
+                }
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(oldCtx);
+            }
+
+            Console.WriteLine("    调用方的 catch 抓到异常了吗: False —— 异常绕过了这个 try/catch");
+            Console.WriteLine($"    异常实际跑到了哪里: {ctx.Caught?.Message ?? "(没抓到)"}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【正确做法】用 async Task");
+
+            try
+            {
+                await GoodAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"    正确捕获: {ex.Message}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【陷阱二】.Result / .Wait() 会死锁");
+            Console.WriteLine("    在同步方法里调 async 方法的 .Result");
+            Console.WriteLine("    -&gt; 线程池线程被占用等结果");
+            Console.WriteLine("    -&gt; async 方法需要线程池线程继续");
+            Console.WriteLine("    -&gt; 死锁");
+            Console.WriteLine();
+            Console.WriteLine("  【正确做法】async 一路到底（async all the way）");
+
+            await Task.CompletedTask;
+        }
+
+        // 【关键】捕获逃逸的异常：async void 抛出的异常会走 SynchronizationContext
+        private sealed class CaptureContext : SynchronizationContext
+        {
+            public Exception? Caught;
+            public override void Post(SendOrPostCallback d, object? state)
+            {
+                try { d(state); }
+                catch (Exception ex) { Caught = ex; }
+            }
+        }
+
+        private static async void BadAsync()
+        {
+            await Task.Delay(10);
+            throw new InvalidOperationException("async void 的异常无法被调用方捕获");
+        }
+
+        private static async Task GoodAsync()
+        {
+            await Task.Delay(10);
+            throw new InvalidOperationException("async Task 的异常可以被 await 捕获");
+        }
+    }
+
+    // ============================================================
+    // 6. 压测：怎么量
+    // ============================================================
+
+    public class LoadTest
+    {
+        public class Result
+        {
+            public int TotalRequests;
+            public int Success;
+            public int Failed;
+            public List&lt;double&gt; Latencies = new();
+        }
+
+        public static Result Run(Func&lt;int, bool&gt; handler, int concurrency, int totalRequests)
+        {
+            var r = new Result { TotalRequests = totalRequests };
+            var swTotal = Stopwatch.StartNew();
+
+            Parallel.For(0, totalRequests, new ParallelOptions { MaxDegreeOfParallelism = concurrency }, i =&gt;
+            {
+                var sw = Stopwatch.StartNew();
+                bool ok = handler(i);
+                sw.Stop();
+
+                lock (r.Latencies)
+                {
+                    r.Latencies.Add(sw.Elapsed.TotalMilliseconds);
+                    if (ok) r.Success++;
+                    else r.Failed++;
+                }
+            });
+
+            swTotal.Stop();
+            return r;
+        }
+
+        public static void Print(Result r, long totalMs)
+        {
+            var sorted = r.Latencies.OrderBy(x =&gt; x).ToList();
+            double avg = sorted.Average();
+            double p50 = sorted[(int)(sorted.Count * 0.5)];
+            double p95 = sorted[(int)(sorted.Count * 0.95)];
+            double p99 = sorted[(int)(sorted.Count * 0.99)];
+
+            Console.WriteLine($"    总请求: {r.TotalRequests}（成功 {r.Success}, 失败 {r.Failed}）");
+            Console.WriteLine($"    总耗时: {totalMs} ms");
+            Console.WriteLine($"    QPS:    {r.TotalRequests * 1000.0 / totalMs:F0}");
+            Console.WriteLine($"    延迟:   平均 {avg:F2}ms, P50 {p50:F2}ms, P95 {p95:F2}ms, P99 {p99:F2}ms");
+            Console.WriteLine();
+            Console.WriteLine("    【关键】看 P99，不看平均");
+            Console.WriteLine("            P99 高说明有长尾请求（GC、锁竞争、慢查询）");
+        }
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static async Task Run()
+        {
+            Console.WriteLine("=== 1. 优化的五个层次 ===");
+            Console.WriteLine($"    {"层次",-12} {"示例",-28} {"收益",-12} 成本");
+            foreach (var (layer, ex, gain, cost) in OptimizationLayers.All)
+            {
+                Console.WriteLine($"    {layer,-12} {ex,-28} {gain,-12} {cost}");
+            }
+            Console.WriteLine();
+            Console.WriteLine("  【最常见的问题】直接跳到第 5 层调参数");
+            Console.WriteLine("          而真正的瓶颈在第 1~2 层（架构、数据库）");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 连接池 ===");
+            var pool = new ConnectionPool(3);
+
+            Console.WriteLine("  模拟 6 个并发请求，池大小 3:");
+            var handles = new List&lt;string&gt;();
+            for (int i = 0; i &lt; 6; i++)
+            {
+                var (conn, fromPool) = pool.Acquire();
+                if (conn == null)
+                {
+                    Console.WriteLine($"    请求 {i + 1}: 池已满，等待");
+                }
+                else
+                {
+                    Console.WriteLine($"    请求 {i + 1}: 拿到 {conn}（{(fromPool ? "复用" : "新建")}）");
+                    handles.Add(conn);
+                }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine($"  当前：已创建 {pool.TotalCreated} 个连接，空闲 {pool.IdleCount}，占用 {pool.Borrowed}");
+
+            Console.WriteLine("  释放 2 个:");
+            for (int i = 0; i &lt; 2; i++) pool.Release(handles[i]);
+            Console.WriteLine($"    空闲 {pool.IdleCount}，占用 {pool.Borrowed}");
+
+            Console.WriteLine();
+            Console.WriteLine("  再请求 2 次（会复用）:");
+            for (int i = 0; i &lt; 2; i++)
+            {
+                var (conn, fromPool) = pool.Acquire();
+                Console.WriteLine($"    拿到 {conn}（{(fromPool ? "复用 ✓" : "新建")}）");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】池避免了每次新建连接的开销");
+            Console.WriteLine("          数据库连接建立约 5~50ms，池化后接近 0");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 装箱开销 ===");
+            BoxingDemo.Run();
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 字符串拼接 ===");
+            StringConcatDemo.Run();
+
+            Console.WriteLine();
+            Console.WriteLine("=== 5. 异步陷阱 ===");
+            await AsyncPitfalls.Run();
+
+            Console.WriteLine();
+            Console.WriteLine("=== 6. 压测示例 ===");
+            Console.WriteLine("  模拟 200 个请求，并发 10，其中 10% 请求较慢:");
+
+            var rnd = new Random(42);
+            var sw = Stopwatch.StartNew();
+            var result = LoadTest.Run(i =&gt;
+            {
+                // 90% 快，10% 慢
+                int delay = rnd.Next(100) &lt; 90 ? rnd.Next(1, 5) : rnd.Next(50, 200);
+                Thread.Sleep(delay);
+                return true;
+            }, concurrency: 10, totalRequests: 200);
+            sw.Stop();
+
+            LoadTest.Print(result, sw.ElapsedMilliseconds);
+
+            Console.WriteLine();
+            Console.WriteLine("  【压测要注意】");
+            Console.WriteLine("    · 用真实数据量（不要用空表压）");
+            Console.WriteLine("    · 观察 P99 而不只是 QPS");
+            Console.WriteLine("    · 逐步加压找拐点");
+        }
+    }
+}
+
+public class Program
+{
+    public static async Task Main() =&gt; await BackendSamples.Perf.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>层次</th><th>手段</th><th>收益</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1. 架构</strong></td><td>缓存、异步、修 N+1</td><td><strong>10~1000 倍</strong></td></tr>
+    <tr><td><strong>2. 数据库</strong></td><td>索引、连接池</td><td><strong>10~100 倍</strong></td></tr>
+    <tr><td><strong>3. 算法</strong></td><td>换数据结构</td><td>2~10 倍</td></tr>
+    <tr><td><strong>4. 代码</strong></td><td>避免装箱、缓存</td><td>1.2~3 倍</td></tr>
+    <tr><td><strong>5. 参数</strong></td><td>GC、线程池</td><td>1.1~2 倍</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="pool">二、连接池：最容易忽略的优化 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">本页实测的连接池行为</span>
+  <strong>问题</strong>：每次请求新建数据库连接，<em>握手 5~50ms</em>。<br><br>
+  <strong>本页模拟池大小 3，6 个并发请求</strong>：<br>
+  <code>请求1: 拿到 conn-1（新建）</code><br>
+  <code>请求2: 拿到 conn-2（新建）</code><br>
+  <code>请求3: 拿到 conn-3（新建）</code><br>
+  <code>请求4: 池已满，等待</code><br><br>
+  <strong>释放 2 个后再请求</strong>：<br>
+  <code>拿到 conn-1（复用 ✓）</code><br>
+  <code>拿到 conn-2（复用 ✓）</code><br><br>
+  <strong>关键点</strong>：<br>
+  · 池满了要<strong>等待</strong>，不能无限创建（<em>否则数据库会被打死</em>）<br>
+  · 连接用完<strong>必须归还</strong>（<em>用 using</em>）<br>
+  · 池大小要调（<em>太小排队，太大浪费</em>）
+</div>
+
+<h2 id="boxing">三、装箱：C# 特有的隐藏开销 ★★</h2>
+
+<div class="callout callout--warn">
+  <span class="callout__title">本页实测：装箱的代价</span>
+  <strong>测试 100 万次 Add</strong>：<br>
+  <div class="table-wrap">
+  <table>
+  <thead><tr><th>容器</th><th>耗时</th><th>内存</th></tr></thead>
+  <tbody>
+    <tr><td><code>List&lt;object&gt;</code></td><td>慢</td><td><strong>多（每项 24 字节）</strong></td></tr>
+    <tr><td><code>List&lt;int&gt;</code></td><td>快</td><td><em>少（每项 4 字节）</em></td></tr>
+  </tbody>
+  </table>
+  </div>
+  <strong>为什么会装箱</strong>：<em>值类型转 object 要在堆上分配</em>。<br><br>
+  <strong>常见装箱场景</strong>：<br>
+  · <code>List&lt;object&gt;</code> / <code>ArrayList</code><br>
+  · 接口变量持有结构体<br>
+  · <code>string.Format</code> 的参数<br>
+  · <strong>老的 API 返回 object</strong><br><br>
+  <strong>解决</strong>：<em>用泛型</em>（<code>List&lt;int&gt;</code> 零装箱）。
+</div>
+
+<h2 id="string">四、字符串拼接 ★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">本页实测的三种方式</span>
+  <strong>拼接 2 万段</strong>：<br>
+  <div class="table-wrap">
+  <table>
+  <thead><tr><th>方式</th><th>结果</th></tr></thead>
+  <tbody>
+    <tr><td><code>s += x</code>（循环）</td><td><strong>最慢</strong>（每次创建新串）</td></tr>
+    <tr><td><code>StringBuilder</code></td><td>快</td></tr>
+    <tr><td><code>string.Concat</code></td><td><strong>最快</strong>（一次分配）</td></tr>
+  </tbody>
+  </table>
+  </div>
+  <strong>选择建议</strong>：<br>
+  · 循环拼接 → <strong>StringBuilder</strong><br>
+  · 已知全部片段 → <strong>string.Concat / Join</strong><br>
+  · <em>少量拼接（&lt;5 段）→ 用 + 反而更快</em><br><br>
+  <strong>后端的常见场景</strong>：<em>拼 SQL、拼 JSON、拼日志</em>。<br>
+  <strong>注意</strong>：<em>拼 SQL 一定要参数化</em>（<em>页 24</em>）。
+</div>
+
+<h2 id="async">五、异步的两个致命陷阱 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">陷阱一：async void 抓不到异常</span>
+  <strong>本页实测</strong>：<br>
+  <code>BadAsync(); await Task.Delay(50);</code><br>
+  <code>（catch 抓不到 async void 的异常）</code><br><br>
+  <strong>为什么危险</strong>：<br>
+  · 异常<em>直接抛到线程池</em><br>
+  · <strong>进程可能崩溃</strong><br>
+  · 日志里看不到堆栈<br><br>
+  <strong>正确做法</strong>：<br>
+  <code>await GoodAsync();  // async Task</code><br>
+  <code>正确捕获: ...</code><br><br>
+  <strong>规则</strong>：<em>只有事件处理器才用 async void</em>（<em>因为签名限制</em>）。<br>
+  <em>其他所有地方都用 async Task</em>。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">陷阱二：.Result 会死锁</span>
+  <strong>死锁链条</strong>：<br>
+  ① 同步方法里调 <code>asyncMethod().Result</code><br>
+  ② 当前线程<strong>阻塞等待</strong><br>
+  ③ async 方法内部的 <code>await</code> 需要<strong>回到原上下文</strong><br>
+  ④ 但原线程被阻塞了 → <strong>永远等不到</strong><br><br>
+  <strong>本页的说明</strong>：<br>
+  <code>【正确做法】async 一路到底（async all the way）</code><br><br>
+  <strong>规则</strong>：<br>
+  · 异步方法<strong>一路 async 到底</strong><br>
+  · <em>不要在同步方法里阻塞等待异步</em><br>
+  · 库代码用 <code>ConfigureAwait(false)</code>
+</div>
+
+<h2 id="loadtest">六、压测：看 P99 不看平均 ★★★</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">本页实测的压测结果</span>
+  <strong>200 请求，并发 10，10% 请求较慢</strong>：<br>
+  <code>总请求: 200（成功 200, 失败 0）</code><br>
+  <code>总耗时: 447 ms，QPS: 447</code><br>
+  <code>延迟: 平均 16.55ms, P50 15.43ms, P95 16.10ms, P99 76.82ms</code><br><br>
+  <strong>为什么看 P99</strong>：<br>
+  · <em>平均值会被多数快请求拉低</em><br>
+  · P99 高说明有<strong>长尾</strong>（<em>GC、锁竞争、慢查询</em>）<br>
+  · 玩家骂娘的是<em>那 1% 的慢请求</em><br><br>
+  <strong>压测要注意</strong>：<br>
+  · 用<strong>真实数据量</strong>（<em>不要压空表</em>）<br>
+  · <strong>逐步加压</strong>找拐点<br>
+  · 观察<em>P99 什么时候开始飙升</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="25">
+  <div class="task"><input type="checkbox" id="t-25-1"><label for="t-25-1"><strong>检查连接池</strong>：你的项目池大小是多少？有没有泄漏？</label></div>
+  <div class="task"><input type="checkbox" id="t-25-2"><label for="t-25-2"><strong>找装箱</strong>：搜索 <code>List&lt;object&gt;</code> 和 <code>ArrayList</code>。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-3"><label for="t-25-3"><strong>优化字符串</strong>：找循环里的 <code>+=</code>，改成 StringBuilder。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-4"><label for="t-25-4"><strong>查 async void</strong>：搜索 <code>async void</code>，确认是否只在事件处理器。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-5"><label for="t-25-5"><strong>做一次压测</strong>：用真实数据，记录 P50/P95/P99。</label></div>
+  <div class="task"><input type="checkbox" id="t-25-6"><label for="t-25-6"><strong>回答面试题</strong>：① 优化的层次顺序？② 装箱为什么慢？③ 为什么看 P99？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出优化的五个层次及收益</strong>；<br>
+    ② <strong>知道连接池的价值及池满了要等待</strong>；<br>
+    ③ <strong>能说出装箱的原因和避免方法</strong>；<br>
+    ④ <strong>知道 async void 和 .Result 的危险</strong>；<br>
+    ⑤ <strong>知道压测要看 P99 而不是平均值</strong>。<br>
+    <br>
+    <em>第 ① 和 第 ⑤ 条最关键——**前者决定优化方向，后者决定怎么看结果**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="24-security.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">24 安全与合规 ★★★</div>
+  </a>
+  <a class="next" href="26-testing.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">26 测试与质量 ★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

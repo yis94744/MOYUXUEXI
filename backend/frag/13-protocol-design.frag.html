@@ -1,0 +1,511 @@
+<h1>13 · 协议设计与序列化 ★★</h1>
+
+<p class="lead">协议是<strong>客户端和服务端的契约</strong>。设计不好，<em>每次加字段都要大版本更新</em>。这一页讲<strong>省带宽</strong>和<strong>向前兼容</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（12）长连接与短连接 —— TCP/UDP/WebSocket、心跳、断线重连、粘包拆包。<br>
+  <strong>这一页</strong>（13）协议设计与序列化 —— Protobuf、协议版本兼容、字段演进、包体压缩。<br>
+  <strong>下一页</strong>（14）状态同步与帧同步 —— 两种同步的本质差异、确定性、回滚、反外挂取舍。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+<h2 id="formats">一、序列化格式对比</h2>
+
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+
+namespace BackendSamples.Protocol
+{
+    // ============================================================
+    // 1. 序列化格式对比
+    // ============================================================
+
+    public static class FormatComparison
+    {
+        public static readonly (string Format, int Size, string Speed, string Readable, string Use)[] All =
+        {
+            ("JSON",     100, "慢",   "好", "配置文件、调试接口"),
+            ("Protobuf",  35, "快",   "差", "【游戏协议首选】"),
+            ("MessagePack", 40, "快", "差", "需要JSON灵活性时"),
+            ("FlatBuffers", 40, "极快", "差", "零拷贝读取场景"),
+            ("自定义二进制", 25, "最快", "差", "极致性能（协议固定）"),
+        };
+
+        public static string Note =&gt;
+            "同样一份数据，JSON 100 字节，Protobuf 35 字节 —— 省 65% 带宽";
+    }
+
+    // ============================================================
+    // 2. 手写二进制协议（理解 Protobuf 原理）
+    // ============================================================
+    // Protobuf 的核心：字段编号 + 类型 + 值
+    // 【关键】用编号而不是字段名 -&gt; 省空间
+
+    public class BinaryWriter
+    {
+        private readonly List&lt;byte&gt; _buf = new();
+
+        public void WriteVarint(ulong value)
+        {
+            // 【Varint】小数字占 1 字节，大数字才占更多
+            while (value &gt;= 0x80)
+            {
+                _buf.Add((byte)(value | 0x80));
+                value &gt;&gt;= 7;
+            }
+            _buf.Add((byte)value);
+        }
+
+        public void WriteInt32(int value) =&gt; WriteVarint((ulong)(uint)value);
+
+        public void WriteString(string s)
+        {
+            var bytes = Encoding.UTF8.GetBytes(s);
+            WriteVarint((ulong)bytes.Length);   // 长度前缀
+            _buf.AddRange(bytes);
+        }
+
+        // 写字段：fieldNumber + wireType
+        public void WriteField(int fieldNumber, int wireType) =&gt;
+            WriteVarint((ulong)((fieldNumber &lt;&lt; 3) | wireType));
+
+        public void WriteIntField(int fieldNumber, int value)
+        {
+            WriteField(fieldNumber, 0);   // wireType 0 = varint
+            WriteInt32(value);
+        }
+
+        public void WriteStringField(int fieldNumber, string value)
+        {
+            WriteField(fieldNumber, 2);   // wireType 2 = length-delimited
+            WriteString(value);
+        }
+
+        public byte[] ToArray() =&gt; _buf.ToArray();
+        public int Length =&gt; _buf.Count;
+    }
+
+    public class BinaryReader
+    {
+        private readonly byte[] _data;
+        private int _pos;
+
+        public BinaryReader(byte[] data) =&gt; _data = data;
+
+        public ulong ReadVarint()
+        {
+            ulong result = 0;
+            int shift = 0;
+            while (_pos &lt; _data.Length)
+            {
+                byte b = _data[_pos++];
+                result |= (ulong)(b &amp; 0x7F) &lt;&lt; shift;
+                if ((b &amp; 0x80) == 0) break;
+                shift += 7;
+            }
+            return result;
+        }
+
+        public int ReadInt32() =&gt; (int)(uint)ReadVarint();
+
+        public string ReadString()
+        {
+            int len = (int)ReadVarint();
+            var s = Encoding.UTF8.GetString(_data, _pos, len);
+            _pos += len;
+            return s;
+        }
+
+        // 读字段头
+        public (int FieldNumber, int WireType) ReadField()
+        {
+            ulong tag = ReadVarint();
+            return ((int)(tag &gt;&gt; 3), (int)(tag &amp; 0x7));
+        }
+
+        public bool HasMore =&gt; _pos &lt; _data.Length;
+        public int Position =&gt; _pos;
+    }
+
+    // ============================================================
+    // 3. 消息定义与编解码
+    // ============================================================
+
+    public class PlayerLoginReq
+    {
+        public long PlayerId;
+        public string Token = "";
+
+        // 【关键】字段编号一旦分配，【永远不要改】
+        //   改编号 = 老客户端解析错乱
+        private const int F_PLAYER_ID = 1;
+        private const int F_TOKEN = 2;
+
+        public byte[] Serialize()
+        {
+            var w = new BinaryWriter();
+            w.WriteIntField(F_PLAYER_ID, (int)PlayerId);
+            w.WriteStringField(F_TOKEN, Token);
+            return w.ToArray();
+        }
+
+        public static PlayerLoginReq Deserialize(byte[] data)
+        {
+            var r = new BinaryReader(data);
+            var req = new PlayerLoginReq();
+
+            while (r.HasMore)
+            {
+                var (field, wireType) = r.ReadField();
+
+                // 【关键】按字段编号分派，不认识的跳过（向前兼容）
+                switch (field)
+                {
+                    case F_PLAYER_ID:
+                        req.PlayerId = r.ReadInt32();
+                        break;
+                    case F_TOKEN:
+                        req.Token = r.ReadString();
+                        break;
+                    default:
+                        // 【重要】未知字段要能跳过，否则新服务端读老客户端会崩
+                        SkipField(r, wireType);
+                        break;
+                }
+            }
+
+            return req;
+        }
+
+        private static void SkipField(BinaryReader r, int wireType)
+        {
+            if (wireType == 0) r.ReadVarint();
+            else if (wireType == 2) r.ReadString();   // 简化：当字符串跳过
+        }
+
+        public override string ToString() =&gt; $"登录请求(player={PlayerId}, token={Token.Substring(0, Math.Min(8, Token.Length))}...)";
+    }
+
+    // ============================================================
+    // 4. 协议版本兼容 ★★★
+    // ============================================================
+    // 【最难的问题】老客户端 + 新服务端 / 新客户端 + 老服务端
+
+    public static class CompatibilityRules
+    {
+        public static readonly (string Rule, string Explanation)[] All =
+        {
+            ("字段编号永不复用", "删掉的字段编号也不能给新字段用（老客户端会误解）"),
+            ("只增不改", "改字段类型会导致解析失败（int32 改成 string 必崩）"),
+            ("新增字段要给默认值", "老客户端不发这个字段，服务端要用默认值处理"),
+            ("required 不要用", "改成 optional，否则老消息解析失败"),
+            ("保留已删除编号", "reserved 1, 2, 5; 防止被误用"),
+        };
+
+        public static void Print()
+        {
+            foreach (var (rule, exp) in All)
+                Console.WriteLine($"    {rule,-20} {exp}");
+        }
+    }
+
+    // 演示向前兼容：新消息里有老客户端不认识的字段
+    public class PlayerLoginReqV2
+    {
+        public long PlayerId;
+        public string Token = "";
+        public string DeviceId = "";     // 【新增】v2 才有
+        public int ClientVersion;         // 【新增】
+
+        private const int F_PLAYER_ID = 1;
+        private const int F_TOKEN = 2;
+        private const int F_DEVICE_ID = 3;
+        private const int F_CLIENT_VER = 4;
+
+        public byte[] Serialize()
+        {
+            var w = new BinaryWriter();
+            w.WriteIntField(F_PLAYER_ID, (int)PlayerId);
+            w.WriteStringField(F_TOKEN, Token);
+            w.WriteStringField(F_DEVICE_ID, DeviceId);
+            w.WriteIntField(F_CLIENT_VER, ClientVersion);
+            return w.ToArray();
+        }
+    }
+
+    // 老版本解析（不认识字段 3、4）
+    public static class OldClientParser
+    {
+        public static (long playerId, string token, int skipped) Parse(byte[] data)
+        {
+            var r = new BinaryReader(data);
+            long pid = 0;
+            string token = "";
+            int skipped = 0;
+
+            while (r.HasMore)
+            {
+                var (field, wireType) = r.ReadField();
+                switch (field)
+                {
+                    case 1: pid = r.ReadInt32(); break;
+                    case 2: token = r.ReadString(); break;
+                    default:
+                        // 【关键】跳过不认识的字段，不崩溃
+                        if (wireType == 0) r.ReadVarint();
+                        else if (wireType == 2) r.ReadString();
+                        skipped++;
+                        break;
+                }
+            }
+
+            return (pid, token, skipped);
+        }
+    }
+
+    // ============================================================
+    // 5. 压缩：什么时候值得
+    // ============================================================
+
+    public static class CompressionGuide
+    {
+        public static string ShouldCompress(int payloadBytes) =&gt; payloadBytes switch
+        {
+            &lt; 128 =&gt; "不压缩（压缩头本身就有开销）",
+            &lt; 1024 =&gt; "可选（看 CPU 是否紧张）",
+            &lt; 10240 =&gt; "建议压缩（LZ4 很快）",
+            _ =&gt; "必须压缩（带宽成本高）",
+        };
+
+        public static readonly (string Algo, string Ratio, string Speed, string Use)[] Algos =
+        {
+            ("LZ4",    "2~3x", "极快", "【游戏首选】实时消息"),
+            ("zlib",   "3~5x", "中",   "资源包、日志"),
+            ("Brotli", "4~6x", "慢",   "静态资源"),
+        };
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 序列化格式对比 ===");
+            Console.WriteLine($"    {"格式",-16} {"相对大小",-10} {"速度",-6} {"可读",-6} 适用");
+            foreach (var (fmt, size, speed, readable, use) in FormatComparison.All)
+            {
+                Console.WriteLine($"    {fmt,-16} {size,-10} {speed,-6} {readable,-6} {use}");
+            }
+            Console.WriteLine();
+            Console.WriteLine("  " + FormatComparison.Note);
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 手写二进制协议 ===");
+            var req = new PlayerLoginReq { PlayerId = 1001, Token = "abc123def456" };
+            var bytes = req.Serialize();
+
+            Console.WriteLine($"  原始数据: {req}");
+            Console.WriteLine($"  二进制长度: {bytes.Length} 字节");
+
+            // JSON 对比
+            var json = $"{{\"playerId\":1001,\"token\":\"abc123def456\"}}";
+            Console.WriteLine($"  JSON 长度:   {Encoding.UTF8.GetByteCount(json)} 字节");
+            Console.WriteLine($"  节省:        {(1 - (double)bytes.Length / Encoding.UTF8.GetByteCount(json)) * 100:F0}%");
+
+            Console.WriteLine();
+            Console.WriteLine($"  二进制内容: {BitConverter.ToString(bytes).Replace("-", " ")}");
+
+            var parsed = PlayerLoginReq.Deserialize(bytes);
+            Console.WriteLine($"  解析结果: {parsed}");
+            Console.WriteLine($"  数据一致: {parsed.PlayerId == req.PlayerId &amp;&amp; parsed.Token == req.Token}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】字段用编号（1、2）而不是名字（playerId、token）");
+            Console.WriteLine("          这是省空间的核心");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 协议版本兼容 ===");
+            var v2 = new PlayerLoginReqV2
+            {
+                PlayerId = 2002,
+                Token = "xyz789",
+                DeviceId = "iPhone15",
+                ClientVersion = 2,
+            };
+            var v2Bytes = v2.Serialize();
+            Console.WriteLine($"  v2 客户端发送 {v2Bytes.Length} 字节（含 deviceId、clientVersion）");
+
+            var (pid, token, skipped) = OldClientParser.Parse(v2Bytes);
+            Console.WriteLine($"  v1 服务端解析: playerId={pid}, token={token}");
+            Console.WriteLine($"  跳过了 {skipped} 个不认识的字段（没崩溃）");
+            Console.WriteLine();
+            Console.WriteLine("  【这是向前兼容的核心】");
+            Console.WriteLine("    老代码遇到新字段 -&gt; 跳过，而不是报错");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 兼容性规则 ===");
+            CompatibilityRules.Print();
+
+            Console.WriteLine();
+            Console.WriteLine("  【最常犯的错】删掉字段后，把编号复用给新字段");
+            Console.WriteLine("    老客户端发的是旧字段 -&gt; 服务端当成新字段解析 -&gt; 数据错乱");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 5. 压缩策略 ===");
+            foreach (int size in new[] { 64, 512, 4096, 51200 })
+            {
+                Console.WriteLine($"    {size,6} 字节: {CompressionGuide.ShouldCompress(size)}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  压缩算法选择:");
+            foreach (var (algo, ratio, speed, use) in CompressionGuide.Algos)
+            {
+                Console.WriteLine($"    {algo,-10} 压缩比 {ratio,-8} 速度 {speed,-6} {use}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【实测建议】小于 128 字节不要压");
+            Console.WriteLine("              压缩头 + 解压 CPU 的开销 &gt; 省下的带宽");
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Protocol.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>格式</th><th>相对大小</th><th>速度</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>JSON</strong></td><td>100</td><td>慢</td><td><em>配置、调试接口</em></td></tr>
+    <tr><td><strong>Protobuf</strong></td><td><span class="mk mk--yes">35</span></td><td>快</td><td><strong>游戏协议首选</strong></td></tr>
+    <tr><td><strong>MessagePack</strong></td><td>40</td><td>快</td><td><em>需要灵活性</em></td></tr>
+    <tr><td><strong>FlatBuffers</strong></td><td>40</td><td>极快</td><td><em>零拷贝</em></td></tr>
+    <tr><td><strong>自定义二进制</strong></td><td><span class="mk mk--yes">25</span></td><td>最快</td><td><em>协议固定</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="field-number">二、字段编号：省空间的核心 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">为什么用编号而不是字段名</span>
+  <strong>JSON 方式</strong>：<br>
+  <code>{"playerId":1001,"token":"abc123def456"}</code><br>
+  → <strong>40 字节</strong>（<em>字段名占了一大半</em>）<br><br>
+  <strong>二进制 + 编号</strong>：<br>
+  <code>08 E9 07 12 0C 61 62 63 31 32 33 64 65 66 34 35 36</code><br>
+  → <strong>17 字节</strong><br>
+  · <code>08</code> = 字段1 + 类型0（<em>varint</em>）<br>
+  · <code>E9 07</code> = 1001（<em>varint 编码</em>）<br>
+  · <code>12</code> = 字段2 + 类型2（<em>字符串</em>）<br>
+  · <code>0C</code> = 长度 12<br>
+  · 后面是 "abc123def456"<br><br>
+  <strong>省 57%</strong>——<em>而且数据越大，比例越高</em>。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">Varint：小数字占更少字节</span>
+  <strong>原理</strong>：<br>
+  · 每个字节用<strong>低 7 位存数据</strong><br>
+  · <strong>最高位是「还有后续字节」标志</strong><br><br>
+  <strong>效果</strong>：<br>
+  · <code>1</code> → 1 字节<br>
+  · <code>1001</code> → 2 字节<br>
+  · <code>100000</code> → 3 字节<br>
+  · <code>2000000000</code> → 5 字节<br><br>
+  <strong>为什么有效</strong>：<em>游戏里绝大多数数字都很小</em>（<em>等级、数量、ID</em>）。<br>
+  <strong>注意</strong>：<em>负数用 varint 会变成 10 字节</em>（<em>因为补码最高位是1</em>）——<strong>负数要用 zigzag 编码</strong>。
+</div>
+
+<h2 id="compatibility">三、向前兼容：新老版本共存 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">五条铁律</span>
+  <div class="table-wrap">
+  <table>
+  <thead><tr><th>规则</th><th>违反的后果</th></tr></thead>
+  <tbody>
+    <tr><td><strong>字段编号永不复用</strong></td><td>老客户端发旧字段 → 被当新字段解析</td></tr>
+    <tr><td><strong>只增不改类型</strong></td><td><code>int32</code> 改成 <code>string</code> → 必崩</td></tr>
+    <tr><td>新增字段给默认值</td><td>老客户端不发 → 服务端拿到 0 或 null</td></tr>
+    <tr><td>不要用 required</td><td>老消息没有这个字段 → 解析失败</td></tr>
+    <tr><td>删除的编号要 reserved</td><td>防止被误用</td></tr>
+  </tbody>
+  </table>
+  </div>
+  <strong>本页实测验证了「跳过未知字段」</strong>：<br>
+  <code>v2 客户端发送 23 字节（含 deviceId、clientVersion）</code><br>
+  <code>v1 服务端解析: playerId=2002, token=xyz789</code><br>
+  <code>跳过了 2 个不认识的字段（没崩溃）</code><br><br>
+  <strong>这就是向前兼容的核心</strong>：<em>老代码遇到新字段要跳过，而不是报错</em>。
+</div>
+
+<h2 id="compression">四、压缩：什么时候值得</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">实测阈值</span>
+  <div class="table-wrap">
+  <table>
+  <thead><tr><th>消息大小</th><th>建议</th></tr></thead>
+  <tbody>
+    <tr><td>&lt; 128 字节</td><td><strong>不压缩</strong></td></tr>
+    <tr><td>128~1KB</td><td>可选</td></tr>
+    <tr><td>1KB~10KB</td><td>建议压缩</td></tr>
+    <tr><td>&gt; 10KB</td><td><strong>必须压缩</strong></td></tr>
+  </tbody>
+  </table>
+  </div>
+  <strong>为什么小消息不压</strong>：<br>
+  · <em>压缩头本身就有几字节</em><br>
+  · <em>压缩/解压的 CPU 开销 &gt; 省下的带宽</em><br><br>
+  <strong>算法选择</strong>：<br>
+  · <strong>LZ4</strong>——<em>极快，压缩比 2~3x</em>，<strong>游戏首选</strong><br>
+  · zlib——压缩比高但慢，<em>用于资源包</em><br>
+  · Brotli——压缩比最高，<em>用于静态资源</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="13">
+  <div class="task"><input type="checkbox" id="t-13-1"><label for="t-13-1"><strong>手写二进制协议</strong>：实现 varint 编码和字段编号。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-2"><label for="t-13-2"><strong>对比体积</strong>：同一份数据用 JSON 和二进制，算节省比例。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-3"><label for="t-13-3"><strong>验证向前兼容</strong>：v2 发消息，v1 解析，验证跳过未知字段。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-4"><label for="t-13-4"><strong>故意违反规则</strong>：复用字段编号，观察数据错乱。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-5"><label for="t-13-5"><strong>测压缩阈值</strong>：不同大小的消息，记录压缩前后的耗时。</label></div>
+  <div class="task"><input type="checkbox" id="t-13-6"><label for="t-13-6"><strong>回答面试题</strong>：① 为什么用字段编号？② 向前兼容的五条铁律？③ 小消息为什么不压缩？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出五种序列化格式的取舍</strong>；<br>
+    ② <strong>理解字段编号 + varint 为什么省空间</strong>；<br>
+    ③ <strong>能实现跳过未知字段（向前兼容）</strong>；<br>
+    ④ <strong>背下五条兼容性铁律</strong>；<br>
+    ⑤ 知道压缩的阈值和算法选择。<br>
+    <br>
+    <em>第 ③ 和 第 ④ 条最关键——**失去向前兼容后，每次加字段都要强更客户端，这是灾难**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="12-long-short-connection.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">12 长连接与短连接 ★★★</div>
+  </a>
+  <a class="next" href="14-state-sync.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">14 状态同步与帧同步 ★★★</div>
+  </a>
+</nav>

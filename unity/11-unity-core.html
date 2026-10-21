@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">C# + Unity 路线
+      <a href="index.html">C# + Unity 路线
         <span>从零基础到独立完成商业级项目</span>
       </a>
     </div>
@@ -582,7 +582,7 @@ public class FakeNullBugs : MonoBehaviour
         // 正确：显式判断，这会调用 Unity 重载的 ==
         if (_light != null) _light.intensity = 1f;
 
-        // Unity 2020+ 也可用隐式 bool 转换
+        // 也可以用隐式 bool 转换（UnityEngine.Object 自 2019.4 起就有 op_Implicit）
         if (_light) _light.intensity = 1f;
     }
 
@@ -636,7 +636,7 @@ public static class SafeUnityAccess
 <div class="callout callout--danger">
   <span class="callout__title">四种判断写法，只有两种是对的</span>
   <strong>正确</strong>：<code>if (obj != null)</code> —— 走 Unity 重载的 == 运算符。<br>
-  <strong>正确</strong>：<code>if (obj)</code> —— Unity 2020+ 支持隐式 bool 转换。<br>
+  <strong>正确</strong>：<code>if (obj)</code> —— <code>UnityEngine.Object</code> 重载了 <code>op_Implicit</code>（2019.4 / 2021.3 / 2022.3 都有，已用编译器验证）。<br>
   <strong>错误</strong>：<code>obj?.Method()</code> —— <code>?</code> 用的是真实引用判断，<em>会绕过重载</em>。<br>
   <strong>错误</strong>：<code>obj ?? fallback</code> —— 同样绕过重载。<br>
   <strong>接口类型的额外陷阱</strong>：把 MonoBehaviour 存进接口变量后，<code>!= null</code> <em>也会失去保护</em>——因为接口类型不走 Unity 的重载。

@@ -1,0 +1,163 @@
+<h1>30 · 面试题库 ★★</h1>
+
+<p class="lead">这一页把<strong>所有知识点变成可检验的问题</strong>。每道题都标注了<em>出处页面</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（29）实战项目集 —— 五个由浅入深的后端项目，能写进简历。<br>
+  <strong>这一页</strong>（30）面试题库 —— 后端高频题，标注考点与出处。<br>
+  <strong>下一页</strong>（31）客户端转后端的思维转换 —— 从 Unity 主程到后端：优势、盲区、如何快速上手。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+<h2 id="basics">一、后端基础（页 03-10）</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>题目</th><th>答案要点</th><th>出处</th></tr></thead>
+  <tbody>
+    <tr><td>统一响应该包含什么？</td><td>code/msg/data</td><td>03</td></tr>
+    <tr><td>错误码为什么要分段？</td><td><strong>客户端可按段统一处理</strong></td><td>03</td></tr>
+    <tr><td>什么是幂等？</td><td><strong>重复调用只生效一次</strong></td><td>03</td></tr>
+    <tr><td>「已领过」该返回成功还是失败？</td><td><strong>成功</strong>（失败会死循环重试）</td><td>03</td></tr>
+    <tr><td>三种生命周期的区别？</td><td><em>Singleton/Scoped/Transient</em></td><td>04</td></tr>
+    <tr><td>DbContext 能是 Singleton 吗？</td><td><strong>不能，非线程安全</strong></td><td>04</td></tr>
+    <tr><td>中间件的顺序为什么重要？</td><td><em>决定谁先执行、能否短路</em></td><td>04</td></tr>
+    <tr><td>参数可以从哪几个位置取？</td><td>路由/查询/体/头/表单</td><td>05</td></tr>
+    <tr><td>为什么服务端必须再校验一次？</td><td><strong>客户端可绕过一切前端校验</strong></td><td>05</td></tr>
+    <tr><td>分页要防哪些边界？</td><td><em>size 太大、page 为 0</em></td><td>05</td></tr>
+    <tr><td>密码该怎么存？</td><td><strong>慢哈希 + 盐</strong></td><td>06</td></tr>
+    <tr><td>JWT 的 Payload 是加密的吗？</td><td><strong>不是，只是 Base64</strong></td><td>06</td></tr>
+    <tr><td>什么是水平越权？</td><td><em>改了资源 ID 就能看别人的</em></td><td>06</td></tr>
+    <tr><td>什么是 N+1 查询？</td><td><strong>1次主表+N次关联</strong></td><td>07</td></tr>
+    <tr><td>索引的代价是什么？</td><td><em>存储 + 写入变慢</em></td><td>07</td></tr>
+    <tr><td>穿透/击穿/雪崩的区别？</td><td><strong>不存在/热点过期/集体过期</strong></td><td>08</td></tr>
+    <tr><td>分布式锁为什么要校验 token？</td><td><em>防止删掉别人的锁</em></td><td>08</td></tr>
+    <tr><td>为什么用 AtLeastOnce？</td><td><strong>丢数据不可接受，重复可幂等解决</strong></td><td>09</td></tr>
+    <tr><td>死信队列解决什么？</td><td><em>失败消息不阻塞正常消息</em></td><td>09</td></tr>
+    <tr><td>为什么看 P99 不看平均？</td><td><strong>平均会掩盖长尾</strong></td><td>10</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">最容易答错的三道</span>
+  <strong>① "「已领过」该返回成功还是失败？"</strong><br>
+  <em>成功。</em>返回失败会导致客户端<strong>继续重试</strong>→死循环。<br><br>
+  <strong>② "DbContext 能是 Singleton 吗？"</strong><br>
+  <em>不能。</em>DbContext <strong>非线程安全</strong>，多请求共用会数据错乱。<br><br>
+  <strong>③ "JWT 的 Payload 是加密的吗？"</strong><br>
+  <em>不是。</em>只是 Base64 编码，<strong>任何人都能解码</strong>。
+</div>
+
+<h2 id="game">二、游戏后端（页 11-19）</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>题目</th><th>答案要点</th><th>出处</th></tr></thead>
+  <tbody>
+    <tr><td>有状态服务怎么扩容？</td><td><strong>路由到固定实例</strong></td><td>11</td></tr>
+    <tr><td>网关的职责是什么？</td><td>连接/路由/鉴权/推送</td><td>11</td></tr>
+    <tr><td>为什么会粘包？</td><td><strong>TCP 是字节流不是消息流</strong></td><td>12</td></tr>
+    <tr><td>心跳解决什么问题？</td><td><em>对端断电/断网不能立刻发现</em></td><td>12</td></tr>
+    <tr><td>战斗中断线该怎么处理？</td><td><strong>会话恢复，不是重新登录</strong></td><td>12</td></tr>
+    <tr><td>为什么用字段编号？</td><td><em>省空间（不传字段名）</em></td><td>13</td></tr>
+    <tr><td>向前兼容的核心是什么？</td><td><strong>跳过未知字段</strong></td><td>13</td></tr>
+    <tr><td>两种同步的区别？</td><td><em>状态同步传结果，帧同步传操作</em></td><td>14</td></tr>
+    <tr><td>帧同步为什么要定点数？</td><td><strong>浮点不确定性</strong></td><td>14</td></tr>
+    <tr><td>客户端预测的副作用？</td><td><em>预测错会「回拉」</em></td><td>14</td></tr>
+    <tr><td>结算为什么必须幂等？</td><td><strong>触发路径可能有多条</strong></td><td>15</td></tr>
+    <tr><td>怎么校验战斗数据？</td><td><em>用理论上限交叉校验</em></td><td>15</td></tr>
+    <tr><td>匹配快和准怎么平衡？</td><td><strong>随时间放宽</strong></td><td>16</td></tr>
+    <tr><td>大规模匹配为什么要分段？</td><td><em>O(n²) 会炸</em></td><td>16</td></tr>
+    <tr><td>排行榜用什么结构？</td><td><strong>跳表/ZSet</strong></td><td>17</td></tr>
+    <tr><td>赛季重置怎么做？</td><td><em>换 key，不要遍历清零</em></td><td>17</td></tr>
+    <tr><td>并发扣金币有几种方案？</td><td>加锁/乐观锁/条件UPDATE</td><td>18</td></tr>
+    <tr><td>为什么必须记流水？</td><td><strong>投诉/查漏洞/对账</strong></td><td>18</td></tr>
+    <tr><td>哪些逻辑必须服务端算？</td><td><em>改了会影响他人或经济</em></td><td>19</td></tr>
+    <tr><td>为什么不能自动封号？</td><td><strong>误封代价更大</strong></td><td>19</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">这一组是「加分项」</span>
+  <strong>绝大部分求职者能答基础题</strong>，但<em>能答清游戏后端的很少</em>。<br><br>
+  <strong>尤其是这三道</strong>：<br>
+  · <strong>"为什么会粘包？"</strong>——考网络基础<br>
+  · <strong>"帧同步为什么要定点数？"</strong>——考真实踩坑<br>
+  · <strong>"并发扣金币有几种方案？"</strong>——考工程严谨<br><br>
+  <em>能流畅答出这三道，说明你真的做过。</em>
+</div>
+
+<h2 id="fullstack">三、全栈与工程（页 20-28）</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>题目</th><th>答案要点</th><th>出处</th></tr></thead>
+  <tbody>
+    <tr><td>分页接口该返回什么？</td><td><strong>items+total+page+size</strong></td><td>20</td></tr>
+    <tr><td>查不到数据返回 404 还是空数组？</td><td><strong>空数组</strong></td><td>20</td></tr>
+    <tr><td>GM 发奖要做几道防护？</td><td><em>权限/校验/幂等/审计</em></td><td>21</td></tr>
+    <tr><td>危险操作为什么要二次确认？</td><td><strong>防误点</strong></td><td>21</td></tr>
+    <tr><td>部署必须原子是什么意思？</td><td><em>健康检查通过才切流量</em></td><td>22</td></tr>
+    <tr><td>liveness 和 readiness 的区别？</td><td><strong>重启 vs 摘流量</strong></td><td>22</td></tr>
+    <tr><td>水平扩展的前提是什么？</td><td><strong>无状态化</strong></td><td>23</td></tr>
+    <tr><td>固定窗口限流有什么问题？</td><td><em>边界处可能有 2 倍突发</em></td><td>23</td></tr>
+    <tr><td>熔断的三个状态？</td><td>Closed/Open/HalfOpen</td><td>23</td></tr>
+    <tr><td>SQL 注入怎么防？</td><td><strong>参数化查询</strong></td><td>24</td></tr>
+    <tr><td>XSS 转义要注意什么？</td><td><em>匹配输出上下文</em></td><td>24</td></tr>
+    <tr><td>密码为什么不能用可逆加密？</td><td><strong>能解密就说明泄露后能还原</strong></td><td>24</td></tr>
+    <tr><td>优化的层次顺序？</td><td>架构>数据库>算法>代码>参数</td><td>25</td></tr>
+    <tr><td>装箱为什么慢？</td><td><em>堆分配 + GC</em></td><td>25</td></tr>
+    <tr><td>async void 有什么问题？</td><td><strong>异常抓不到</strong></td><td>25</td></tr>
+    <tr><td>怎么让代码可测？</td><td><em>依赖注入 + 假时钟</em></td><td>26</td></tr>
+    <tr><td>什么时候该上微服务？</td><td><strong>大团队 + DevOps 能力</strong></td><td>27</td></tr>
+    <tr><td>贫血和充血的区别？</td><td><em>规则在 Service vs 在实体</em></td><td>27</td></tr>
+    <tr><td>AI 写后端容易犯什么错？</td><td><strong>并发/幂等/边界</strong></td><td>28</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">怎么知道自己到了 L4</span>
+  <strong>标志是「能主动说出反例和边界」</strong>。<br><br>
+  比如被问"并发扣金币怎么做"：<br>
+  · <strong>L2</strong>："加锁"<br>
+  · <strong>L4</strong>："<em>单机可以加锁，但多实例部署 lock 无效，要用条件 UPDATE 或乐观锁。我一般用条件 UPDATE，因为数据库保证原子性，不需要重试。</em>"<br><br>
+  <strong>区别在于：能说出「什么时候不适用」。</strong>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="30">
+  <div class="task"><input type="checkbox" id="t-30-1"><label for="t-30-1"><strong>逐题自测</strong>：合上资料，口头答一遍，标记到哪一级。</label></div>
+  <div class="task"><input type="checkbox" id="t-30-2"><label for="t-30-2"><strong>补短板</strong>：低于 L3 的回到对应页重读。</label></div>
+  <div class="task"><input type="checkbox" id="t-30-3"><label for="t-30-3"><strong>准备三个故事</strong>：性能优化、疑难 bug、架构设计。</label></div>
+  <div class="task"><input type="checkbox" id="t-30-4"><label for="t-30-4"><strong>练习讲边界</strong>：每道题补一句"什么情况不适用"。</label></div>
+  <div class="task"><input type="checkbox" id="t-30-5"><label for="t-30-5"><strong>模拟面试</strong>：找人互相提问。</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>基础题全部能到 L3</strong>；<br>
+    ② <strong>游戏后端题至少 80% 到 L3</strong>；<br>
+    ③ 能答出粘包、定点数、并发扣减三道加分题；<br>
+    ④ <strong>有至少三个能量化的技术故事</strong>；<br>
+    ⑤ 能主动说出至少三个"什么时候不该用"。<br>
+    <br>
+    <em>第 ⑤ 条最难也最能加分——**它证明你是真的理解**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="29-projects.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">29 实战项目集</div>
+  </a>
+  <a class="next" href="31-client-to-server.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">31 客户端转后端的思维转换 ★★★</div>
+  </a>
+</nav>

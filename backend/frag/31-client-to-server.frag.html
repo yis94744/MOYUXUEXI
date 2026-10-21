@@ -1,0 +1,154 @@
+<h1>31 · 客户端转后端的思维转换 ★★★</h1>
+
+<p class="lead">这是<strong>专门为你写的一页</strong>。你已经是客户端主程，<em>有些习惯在后端会成为负担</em>。这一页讲<strong>优势、盲区、怎么快速上手</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（30）面试题库 —— 后端高频题，标注考点与出处。<br>
+  <strong>这一页</strong>（31）客户端转后端的思维转换 —— 从 Unity 主程到后端：优势、盲区、如何快速上手。<br>
+  <strong>下一页</strong>（32）速查手册 —— 常用命令、HTTP 状态码、SQL 语法、坑位速查。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+<h2 id="advantages">一、你已有的三个优势 ★★</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>优势</th><th>在后端的价值</th></tr></thead>
+  <tbody>
+    <tr><td><strong>C# / .NET 熟练</strong></td><td>ASP.NET Core 就是 C#，<em>语法零成本</em></td></tr>
+    <tr><td><strong>性能调优直觉</strong></td><td><strong>后端同样吃性能</strong>：GC、连接池、SQL</td></tr>
+    <tr><td><strong>懂游戏业务</strong></td><td><strong>最稀缺</strong>——纯后端不懂玩法</td></tr>
+    <tr><td><strong>懂网络同步</strong></td><td><em>状态同步/帧同步你做过</em></td></tr>
+    <tr><td><strong>懂客户端约束</strong></td><td><em>能设计出客户端好用的协议</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">最大优势：能设计出「客户端愿意用」的接口</span>
+  <strong>纯后端写的接口，客户端往往用起来很别扭</strong>：<br>
+  · 一个界面要发 5 个请求才能凑齐数据<br>
+  · 字段结构不符合客户端的数据模型<br>
+  · 没有考虑网络抖动时的体验<br><br>
+  <strong>而你两边都懂</strong>，能设计出<em>「一个请求拿到一屏数据」</em>的接口。<br>
+  <em>这是纯后端给不了的价值，也是你转岗的谈判筹码。</em>
+</div>
+
+<h2 id="habits">二、五个必须改掉的客户端习惯 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">习惯一：「崩了重进就行」→ 后端不能崩</span>
+  <strong>客户端</strong>：崩了玩家重进游戏。<br>
+  <strong>后端</strong>：崩了<strong>所有玩家掉线 + 可能数据损坏</strong>。<br><br>
+  <strong>要改的地方</strong>：<br>
+  · <strong>所有异常都要捕获</strong>（<em>不能有任何未处理异常</em>）<br>
+  · <strong>关键路径加兜底</strong><br>
+  · <strong>状态要能恢复</strong>（<em>进程重启后从数据库恢复</em>）<br><br>
+  <em>本页呼应页 15 的「房间状态机」——状态转移必须显式、可恢复。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">习惯二：「内存里存着就行」→ 后端要无状态</span>
+  <strong>客户端</strong>：数据存在 MonoBehaviour 字段里。<br>
+  <strong>后端</strong>：<em>进程重启数据就没了，而且多实例不同步</em>。<br><br>
+  <strong>要改的地方</strong>（<em>页 23</em>）：<br>
+  · <strong>Session 放 Redis</strong><br>
+  · <strong>临时文件放对象存储</strong><br>
+  · <strong>定时任务状态放数据库</strong>（<em>否则每台都跑一遍</em>）<br><br>
+  <em>判断标准：换一台机器，这个状态还在吗？</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">习惯三：「每秒60帧」→ 后端看的是 QPS 和 P99</span>
+  <strong>客户端</strong>：关心帧率（16.7ms/帧）。<br>
+  <strong>后端</strong>：关心<strong>QPS + P99 延迟</strong>。<br><br>
+  <strong>要改的地方</strong>（<em>页 25</em>）：<br>
+  · <strong>看 P99 不看平均</strong><br>
+  · 优化顺序：<em>架构 → 数据库 → 算法 → 代码</em><br>
+  · <em>不要用「帧」的思维看后端</em><br><br>
+  <em>客户端的 60 帧 = 每帧 16.7ms 预算；后端的 1000 QPS = 每请求 1ms 预算。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">习惯四：「本地算就行」→ 服务端必须权威</span>
+  <strong>客户端</strong>：伤害、掉落都在本地算。<br>
+  <strong>后端</strong>：<em>客户端算的一切都可以被改</em>。<br><br>
+  <strong>要改的地方</strong>（<em>页 19</em>）：<br>
+  · 影响他人或经济的 → <strong>服务端算</strong><br>
+  · 客户端上报的数据 → <strong>交叉校验</strong><br>
+  · <em>判断标准：玩家改了会怎样？</em><br><br>
+  <em>这一条是本路线最重要的转变。</em>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">习惯五：「先跑起来再说」→ 后端要先想幂等</span>
+  <strong>客户端</strong>：重复点击顶多放两个技能。<br>
+  <strong>后端</strong>：<em>重复请求会重复发奖、重复扣钱</em>。<br><br>
+  <strong>要改的地方</strong>（<em>页 03、18</em>）：<br>
+  · <strong>所有写操作都要幂等</strong><br>
+  · 用<strong>业务唯一键</strong>去重<br>
+  · <em>「已处理」要返回成功</em><br><br>
+  <em>客户端的「重试」是必要行为，后端必须能承受。</em>
+</div>
+
+<h2 id="plan">三、90 天上手计划</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>阶段</th><th>时间</th><th>目标</th><th>验收</th></tr></thead>
+  <tbody>
+    <tr><td><strong>第 1~2 周</strong></td><td>基础</td><td>页 03-06</td><td><em>能写一个带鉴权的 CRUD</em></td></tr>
+    <tr><td><strong>第 3~4 周</strong></td><td>数据</td><td>页 07-10</td><td><strong>能设计表 + 查优化</strong></td></tr>
+    <tr><td><strong>第 5~8 周</strong></td><td>游戏后端</td><td>页 11-15</td><td><strong>能跑通一个房间服务</strong></td></tr>
+    <tr><td><strong>第 9~10 周</strong></td><td>全栈</td><td>页 20-22</td><td><em>能做一个运营后台</em></td></tr>
+    <tr><td><strong>第 11~12 周</strong></td><td>上线</td><td>页 23-25</td><td><strong>能部署 + 压测</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">一个现实的时间表</span>
+  <strong>90 天能从「会客户端」到「能写生产后端」吗？</strong><br>
+  <em>能写，但不算精通。</em><br><br>
+  <strong>现实预期</strong>：<br>
+  · <strong>1 个月</strong>：能写独立的小服务<br>
+  · <strong>3 个月</strong>：能维护一个有状态服务<br>
+  · <strong>1 年</strong>：能独立扛一个项目<br>
+  · <strong>3 年</strong>：能设计架构<br><br>
+  <strong>转岗的现实</strong>：<em>大概率是平薪或降薪</em>（<em>页 01</em>）——<strong>但天花板更高</strong>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="31">
+  <div class="task"><input type="checkbox" id="t-31-1"><label for="t-31-1"><strong>自测五个习惯</strong>：你现在有几个？</label></div>
+  <div class="task"><input type="checkbox" id="t-31-2"><label for="t-31-2"><strong>改一个习惯</strong>：从最危险的开始（<em>服务端权威</em>）。</label></div>
+  <div class="task"><input type="checkbox" id="t-31-3"><label for="t-31-3"><strong>写一份 90 天计划</strong>：按本页的时间表，标出你的进度。</label></div>
+  <div class="task"><input type="checkbox" id="t-31-4"><label for="t-31-4"><strong>找一个对照项目</strong>：把本路线的项目做成一个，边做边对照。</label></div>
+  <div class="task"><input type="checkbox" id="t-31-5"><label for="t-31-5"><strong>回答面试题</strong>：① 客户端转后端最大的思维差异？② 为什么后端不能崩？③ 你的优势是什么？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出自己的三个优势</strong>；<br>
+    ② <strong>能说出五个必须改的客户端习惯</strong>；<br>
+    ③ <strong>理解「容错假设」是最大的差异</strong>；<br>
+    ④ 有一份可执行的 90 天计划；<br>
+    ⑤ 知道转岗的现实预期（<em>平薪起步</em>）。<br>
+    <br>
+    <em>这一页没有技术难点——**它考的是「你愿不愿意改掉旧习惯」**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="30-interview.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">30 面试题库 ★★</div>
+  </a>
+  <a class="next" href="32-reference.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">32 速查手册</div>
+  </a>
+</nav>

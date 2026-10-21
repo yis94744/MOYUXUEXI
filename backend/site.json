@@ -1,0 +1,245 @@
+{
+  "title": "Unity 游戏后端 + 全栈开发路线",
+  "subtitle": "从客户端主程延伸为能独立扛服务的全栈工程师",
+  "key": "gbfs",
+  "pages": [
+    {
+      "file": "index.html",
+      "num": "",
+      "title": "路线总览",
+      "group": "开始",
+      "desc": "整条路线的结构、两段式设计与学习节奏"
+    },
+    {
+      "file": "01-role.html",
+      "num": "01",
+      "title": "岗位与行业现实",
+      "group": "开始",
+      "desc": "游戏后端 vs Web 后端 vs 全栈：分工、薪资、技能要求"
+    },
+    {
+      "file": "02-setup.html",
+      "num": "02",
+      "title": "环境搭建与第一个 API",
+      "group": "开始",
+      "desc": "装 .NET SDK、跑起第一个 Web API、理解请求响应"
+    },
+    {
+      "file": "kp-index.html",
+      "num": "",
+      "title": "知识点索引",
+      "group": "开始",
+      "desc": "全部知识点的总目录，支持跨站跳转"
+    },
+    {
+      "file": "03-http-basics.html",
+      "num": "03",
+      "title": "HTTP、REST 与 API 设计",
+      "group": "后端基础",
+      "desc": "请求方法、状态码、幂等、版本化、错误码规范"
+    },
+    {
+      "file": "04-aspnet-core.html",
+      "num": "04",
+      "title": "ASP.NET Core 框架",
+      "group": "后端基础",
+      "desc": "中间件、依赖注入、配置系统、生命周期"
+    },
+    {
+      "file": "05-routing-modelbind.html",
+      "num": "05",
+      "title": "路由、模型绑定与验证",
+      "group": "后端基础",
+      "desc": "特性路由、参数绑定来源、FluentValidation、统一响应"
+    },
+    {
+      "file": "06-auth.html",
+      "num": "06",
+      "title": "鉴权与会话",
+      "group": "后端基础",
+      "desc": "JWT、OAuth2、Session、Token 刷新、越权防护"
+    },
+    {
+      "file": "07-database.html",
+      "num": "07",
+      "title": "数据库与 EF Core",
+      "group": "后端基础",
+      "desc": "关系建模、迁移、查询优化、N+1 问题、事务"
+    },
+    {
+      "file": "08-redis-cache.html",
+      "num": "08",
+      "title": "缓存与 Redis",
+      "group": "后端基础",
+      "desc": "缓存模式、穿透雪崩击穿、分布式锁、排行榜数据结构"
+    },
+    {
+      "file": "09-message-queue.html",
+      "num": "09",
+      "title": "消息队列与异步",
+      "group": "后端基础",
+      "desc": "RabbitMQ/Kafka、削峰、最终一致、幂等消费"
+    },
+    {
+      "file": "10-logging-monitor.html",
+      "num": "10",
+      "title": "日志、监控与可观测性",
+      "group": "后端基础",
+      "desc": "结构化日志、链路追踪、指标、告警"
+    },
+    {
+      "file": "11-game-backend-overview.html",
+      "num": "11",
+      "title": "游戏后端全景",
+      "group": "游戏后端",
+      "desc": "登录服/网关/战斗服/世界服的分工与演进"
+    },
+    {
+      "file": "12-long-short-connection.html",
+      "num": "12",
+      "title": "长连接与短连接",
+      "group": "游戏后端",
+      "desc": "TCP/UDP/WebSocket、心跳、断线重连、粘包拆包"
+    },
+    {
+      "file": "13-protocol-design.html",
+      "num": "13",
+      "title": "协议设计与序列化",
+      "group": "游戏后端",
+      "desc": "Protobuf、协议版本兼容、字段演进、包体压缩"
+    },
+    {
+      "file": "14-state-sync.html",
+      "num": "14",
+      "title": "状态同步与帧同步",
+      "group": "游戏后端",
+      "desc": "两种同步的本质差异、确定性、回滚、反外挂取舍"
+    },
+    {
+      "file": "15-battle-server.html",
+      "num": "15",
+      "title": "战斗服与结算",
+      "group": "游戏后端",
+      "desc": "房间模型、战斗校验、结算幂等、断线重连补帧"
+    },
+    {
+      "file": "16-matchmaking.html",
+      "num": "16",
+      "title": "匹配系统",
+      "group": "游戏后端",
+      "desc": "Elo/MMR、匹配池、分段扩容、组队与补位"
+    },
+    {
+      "file": "17-leaderboard.html",
+      "num": "17",
+      "title": "排行榜",
+      "group": "游戏后端",
+      "desc": "Redis ZSet、分页、并列名次、赛季重置、全服榜"
+    },
+    {
+      "file": "18-inventory-economy.html",
+      "num": "18",
+      "title": "背包与经济系统",
+      "group": "游戏后端",
+      "desc": "道具流水、并发扣减、幂等、防刷、对账"
+    },
+    {
+      "file": "19-anticheat.html",
+      "num": "19",
+      "title": "防作弊与服务端权威",
+      "group": "游戏后端",
+      "desc": "哪些必须服务端算、客户端校验、异常行为检测"
+    },
+    {
+      "file": "20-fullstack-frontend.html",
+      "num": "20",
+      "title": "前端基础与选型",
+      "group": "全栈能力",
+      "desc": "Vue/React 选型、工程化、组件化思维（客户端视角切入）"
+    },
+    {
+      "file": "21-admin-panel.html",
+      "num": "21",
+      "title": "运营后台实战",
+      "group": "全栈能力",
+      "desc": "从零做一个 GM 后台：列表、筛选、权限、导出"
+    },
+    {
+      "file": "22-deploy.html",
+      "num": "22",
+      "title": "部署与运维",
+      "group": "全栈能力",
+      "desc": "Linux、Nginx、进程守护、Docker、CI/CD"
+    },
+    {
+      "file": "23-scaling.html",
+      "num": "23",
+      "title": "扩展性与高可用",
+      "group": "全栈能力",
+      "desc": "负载均衡、无状态化、分库分表、限流熔断"
+    },
+    {
+      "file": "24-security.html",
+      "num": "24",
+      "title": "安全与合规",
+      "group": "全栈能力",
+      "desc": "SQL 注入、XSS、CSRF、越权、数据加密、隐私合规"
+    },
+    {
+      "file": "25-perf.html",
+      "num": "25",
+      "title": "后端性能优化",
+      "group": "工程实践",
+      "desc": "压测、性能剖析、连接池、异步陷阱、GC 调优"
+    },
+    {
+      "file": "26-testing.html",
+      "num": "26",
+      "title": "测试与质量",
+      "group": "工程实践",
+      "desc": "单元测试、集成测试、契约测试、压测脚本"
+    },
+    {
+      "file": "27-architecture.html",
+      "num": "27",
+      "title": "架构与设计模式",
+      "group": "工程实践",
+      "desc": "分层、领域模型、微服务与单体取舍、事件驱动"
+    },
+    {
+      "file": "28-ai.html",
+      "num": "28",
+      "title": "AI 辅助后端开发",
+      "group": "工程实践",
+      "desc": "用 AI 写 CRUD、生成测试、审查 SQL 的边界"
+    },
+    {
+      "file": "29-projects.html",
+      "num": "29",
+      "title": "实战项目集",
+      "group": "求职与实践",
+      "desc": "五个由浅入深的后端项目，能写进简历"
+    },
+    {
+      "file": "30-interview.html",
+      "num": "30",
+      "title": "面试题库",
+      "group": "求职与实践",
+      "desc": "后端高频题，标注考点与出处"
+    },
+    {
+      "file": "31-client-to-server.html",
+      "num": "31",
+      "title": "客户端转后端的思维转换",
+      "group": "求职与实践",
+      "desc": "从 Unity 主程到后端：优势、盲区、如何快速上手"
+    },
+    {
+      "file": "32-reference.html",
+      "num": "32",
+      "title": "速查手册",
+      "group": "求职与实践",
+      "desc": "常用命令、HTTP 状态码、SQL 语法、坑位速查"
+    }
+  ]
+}

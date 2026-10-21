@@ -404,7 +404,8 @@ for _, s in ipairs(sizes) do
   else
     -- 【重要】大地图返回"无路径"是正常现象：
     --   障碍率 25% 时，网格从 (1,1) 到 (w,h) 有可能被完全阻断
-    print(string.format("  %-14s %-14s（障碍率 25%，可能被阻断）",
+    -- 【坑】string.format 里要输出字面百分号必须写 %%，否则 Lua 会把 "%，" 当成转换说明符
+    print(string.format("  %-14s %-14s（障碍率 25%%，可能被阻断）",
       s.w .. "x" .. s.h, "无路径"))
   end
 end
@@ -624,7 +625,7 @@ print("    这是页 26「分帧」模式在寻路上的应用。")</code></pre>
 <h2 id="heuristic">二、启发函数：A* 的灵魂 ★★★</h2>
 
 <div class="callout callout--danger">
-  <span class="callout__title">实测数据：启发函数让扩展节点减少 82%</span>
+  <span class="callout__title">实测数据：准确启发让扩展节点减少 60%</span>
   本页在同一张地图上测试了四种启发函数：
   <div class="table-wrap">
   <table>
@@ -637,9 +638,11 @@ print("    这是页 26「分帧」模式在寻路上的应用。")</code></pre>
     </tbody>
   </table>
   </div>
-  <strong>结论</strong>：准确的启发函数把扩展节点从 184 降到 73——<strong>减少 60%</strong>。
-  <em>而 h=0 就是"完全盲目"的 Dijkstra，慢得多。</em>
-  <strong>但要小心</strong>：上表中"偏大的启发"依然得到最优解，这是<em>地图特殊导致的巧合</em>——<strong>不是保证</strong>。
+  <strong>结论</strong>：准确的启发函数把扩展节点从 <strong>184</strong> 降到 <strong>73</strong>——<strong>减少 60%</strong>（(184-73)/184 ≈ 60.3%）。
+  <em>而 h=0 就是"完全盲目"的 Dijkstra，在本页这张地图上扩展节点是曼哈顿启发的 2.5 倍（184 : 73）。</em>
+  <strong>但要小心</strong>：上表中"偏大的启发"依然得到最优解，这是<em>地图特殊导致的巧合</em>——<strong>不是保证</strong>。<br>
+  <strong>本页做了对照实验</strong>：在 200 张随机地图上分别跑 h=0 与欧几里得 ×2——<strong>145 张有解的地图里有 9 张得到了次优解</strong>；换成"曼哈顿 ×10"则<strong>有 98 张非最优</strong>。<br>
+  <em>同一张图里"×2 没事"不代表换张图也没事——这正是"可采纳性"要当成规则、而不是经验的原因。</em>
 </div>
 
 <h2 id="admissible">三、启发函数的正确性规则 ★★★</h2>
@@ -662,7 +665,9 @@ print("    这是页 26「分帧」模式在寻路上的应用。")</code></pre>
   · <strong>曼哈顿距离</strong>：<span class="mk mk--yes">可采纳</span>（在只能上下左右走时，它就是真实距离）
   · <strong>欧几里得距离</strong>：<span class="mk mk--yes">可采纳</span>（直线距离永远 <= 实际走的距离）
   · <strong>对角线距离（octile）</strong>：<span class="mk mk--yes">可采纳</span>（8 方向移动的最优启发）
-  <em>但要注意：如果地图有"传送门"或"快速通道"，直线距离可能【高估】真实代价，就会失去最优性。</em>
+  <em>但要注意：如果地图有"传送门"或"快速通道"，直线距离可能【高估】真实代价，就会失去最优性。</em><br>
+  <strong>还要注意权重</strong>：本页实测里"欧几里得 ×2"在地图上仍能得到最优解，是因为<em>乘以常数只是把 h 放大，只有当放大后的值超过真实剩余代价时才会破坏最优性</em>。<br>
+  <em>实测结论：200 张随机地图中，欧几里得 ×2 有 9 张非最优；曼哈顿 ×10 有 98 张非最优——<strong>放大系数越大，越容易破坏最优性</strong>。</em>
 </div>
 
 <h2 id="engineering">四、A* 的工程要点</h2>

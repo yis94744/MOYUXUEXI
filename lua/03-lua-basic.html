@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">Lua 热更新路线
+      <a href="index.html">Lua 热更新路线
         <span>从零基础到独立搭建可上线的热更框架</span>
       </a>
     </div>
@@ -53,7 +53,7 @@
       <div class="prereq">
         <div class="prereq__label">读这一页之前，建议先掌握</div>
         <div class="prereq__list">
-          <a class="prereq__item" href="../unity/03-cs-basic.html#value-ref" data-brief="赋值时拷贝内容还是拷贝地址，这决定了对象会不会被共享"><span class="prereq__title">值类型与引用类型</span><span class="prereq__page">03-cs-basic</span></a>
+          <a class="prereq__item" href="../gamedev-csharp-unity/03-cs-basic.html#value-ref" data-brief="赋值时拷贝内容还是拷贝地址，这决定了对象会不会被共享"><span class="prereq__title">值类型与引用类型</span><span class="prereq__page">03-cs-basic</span></a>
         </div>
         <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
       </div>
@@ -66,7 +66,7 @@
 --  Lua 的八种类型与 type() 判断
 -- ============================================================
 --  Lua 只有八种类型，比其他语言少得多，这是它轻量的原因之一。
---  类型不是"变量的属性"，而是"值本身的属性"——
+--  类型不是「变量的属性」，而是「值本身的属性」——
 --  同一个变量可以先存数字再存字符串，类型跟着值走。
 
 print("=== 八种类型的 type() 输出 ===")
@@ -123,8 +123,9 @@ print("字符串转数字:", tonumber("42"), tonumber("3.14"), tonumber("0x1F"))
 print("转换失败返回 nil:", tonumber("abc"))
 print("数字转字符串:", tostring(42), tostring(3.14))
 print("隐式转换（算术自动转）:", "10" + 5)     -- 15
--- 注意：字符串拼接不会自动转
-print("拼接需要显式转换:", 10 .. "5")          -- "105"</code></pre>
+-- 注意：.. 会把【数字】自动转成字符串（但不能转 boolean/table）
+print("数字会被 .. 自动转:", 10 .. "5")       -- "105"
+print("bool 拼接会报错:", pcall(function() return true .. "x" end))</code></pre>
 
 <div class="callout callout--danger">
   <span class="callout__title">反直觉之一：只有 nil 和 false 是假值</span>
@@ -280,7 +281,7 @@ print("值多余被丢弃:", p, q)             -- 1  2</code></pre>
 
 <div class="callout callout--warn">
   <span class="callout__title">and / or 返回操作数，不是布尔值</span>
-  这是 Lua 的一个<em>很有用但容易误用</strong>的特性：<br>
+  这是 Lua 的一个<em>很有用但容易误用</em>的特性：<br>
   <code>print(1 and 2)</code> 输出 <code>2</code>（不是 true）<br>
   <code>print(nil and 2)</code> 输出 <code>nil</code><br>
   <code>print(nil or 3)</code> 输出 <code>3</code><br>

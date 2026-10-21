@@ -25,6 +25,13 @@
       "desc": "Visual Studio 配置、UE 版本选择、源码编译、项目结构、调试与热重载"
     },
     {
+      "file": "kp-index.html",
+      "num": "",
+      "title": "知识点索引",
+      "group": "开始",
+      "desc": "全部知识点的总目录，支持跨站跳转"
+    },
+    {
       "file": "03-cpp-basic.html",
       "num": "03",
       "group": "C++ 语言线",

@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">C# + Unity 路线
+      <a href="index.html">C# + Unity 路线
         <span>从零基础到独立完成商业级项目</span>
       </a>
     </div>
@@ -336,7 +336,7 @@ public class Weapon : MonoBehaviour
         </div>
         <div class="cmp__row">
           <span><strong>方法实现</strong></span>
-          <span>C# 8 默认接口实现 <strong>Unity 不支持</strong></span>
+          <span>C# 8 默认接口实现：<strong>Unity 2020.2 及更早编译期就报错</strong>，2021.3+ 可编译</span>
           <span><span class="mk mk--yes">可以</span> 有默认实现</span>
         </div>
         <div class="cmp__row">
@@ -351,10 +351,11 @@ public class Weapon : MonoBehaviour
         </div>
       </div>
 
-      <div class="callout callout--danger">
-        <span class="callout__title">C# 8 的默认接口实现在 Unity 中不可用</span>
-        这是<strong>Unity 的硬限制</strong>：Mono 运行时没有实现这个特性，即使 Unity 支持 C# 8 语法。<br>
-        语法能编译，但运行时会报错。所以：<strong>不要在 Unity 里给接口写默认方法实现</strong>——需要共享代码逻辑就用抽象类或扩展方法。
+      <div class="callout callout--warn">
+        <span class="callout__title">C# 8 的默认接口实现：按版本区分，不要一刀切</span>
+        <strong>Unity 2020.2 及更早</strong>：官方文档明确写着「Default interface methods 暂不支持，使用该特性编译器会直接报错」——那个年代的项目确实用不了。<br>
+        <strong>Unity 2021.3 起</strong>：实测可以编译。<code>interface IShape { float Area(); float Scaled(double k) =&gt; (float)(Area() * k); }</code> 在 2021.3.21f1c1 下能通过 Roslyn 编译进 <code>Assembly-CSharp.dll</code>，用 Unity 自带的 Mono 6.13 运行时调用 <code>Scaled(2)</code> 返回 8，<strong>没有运行时错误</strong>。<br>
+        <strong>但还是不建议依赖它</strong>：① IL2CPP 后端和不同 Unity 版本对 DIM 的支持并不一致；② 老教程和老项目默认「DIM 不可用」，你的代码到了别人手里可能直接编译不过。<em>需要共享逻辑时，抽象类或扩展方法依然是更稳的选择。</em>
       </div>
 
       <h2 id="compose">四、组合优于继承 ★</h2>

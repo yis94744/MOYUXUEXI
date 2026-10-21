@@ -116,7 +116,7 @@ public class PositionTrap : MonoBehaviour
         // 只需一次 native 调用，比"读-改-写"三次调用更省
         transform.Translate(5f, 0f, 0f, Space.World);
 
-        // ============ 写法三：SetPositionAndRotation（Unity 2022.1+）============
+        // ============ 写法三：SetPositionAndRotation（Unity 2021.3 LTS 已有）============
         transform.SetPositionAndRotation(new Vector3(5f, 0f, 0f), Quaternion.identity);
     }
 }</code></pre>
@@ -146,16 +146,18 @@ public class BoxingDemo : MonoBehaviour
         int back = (int)boxed;    // 拆箱：类型检查 + 取值
 
         // ============ 隐式装箱（更危险，因为看不见）============
-        // 1) 字符串拼接涉及 object 参数重载
-        Debug.Log("HP = " + hp);
+        // 注意："..." + 数值类型【不装箱】—— C# 编译器走的是 string.Concat(string, string)
+        //      重载，会先插值调用 ToString()。实测 160 字节的 struct 拼接只分配 24 B（纯字符串），
+        //      没有 168 B 的装箱。真正装箱的是下面 2)、3) 两种。
+        Debug.Log("HP = " + hp);   // 只分配字符串，不装箱
 
         // 2) 非泛型容器
         var arrayList = new ArrayList();
         arrayList.Add(hp);                  // 装箱
         arrayList.Add(Vector3.zero);        // Vector3 也装箱（12 字节）
 
-        // 3) params object[] 参数
-        string s = string.Format("{0}", hp);   // 装箱
+        // 3) params object[] 参数 —— 这里才真的装箱
+        string s = string.Format("{0}", hp);   // 装箱（实参装进 object[]）
         Debug.LogFormat("HP = {0}", hp);       // 装箱（params object[] 无法避免）
 
         Debug.Log(s + back);
@@ -319,7 +321,7 @@ public class StructSize : MonoBehaviour
         <span class="callout__title">为什么 struct 数组比 class 数组快 2–5 倍</span>
         这不是玄学，而是 <strong>CPU 缓存行（cache line）</strong>的物理限制。一次内存访问会加载 64 字节：<br>
         <strong>struct 数组</strong>：64 字节能拿到 4 个 16 字节的结构体，后续 3 次访问全部命中缓存。<br>
-        <strong>class 数组</strong>：64 字节只装了 16 个指针。真实数据散落在堆的各处，每次解引用都可能是新的内存访问。<br>
+        <strong>class 数组</strong>：64 字节只装了 8 个指针（64 位平台；IL2CPP 移动端 32 位时是 16 个）。真实数据散落在堆的各处，每次解引用都可能是新的内存访问。<br>
         这就是 Unity 的 <strong>DOTS / ECS</strong> 架构的核心思想。
       </div>
 
@@ -401,7 +403,9 @@ public class DictionaryTraps : MonoBehaviour
     {
         // ============ 坑 1：遍历中删除 ============
         // foreach (var kv in _enemies)
-        //     if (kv.Value == null) _enemies.Remove(kv.Key);   // 抛异常
+        //     if (kv.Value == null) _enemies.Remove(kv.Key);   // Dictionary 会抛 InvalidOperationException
+        //     （注意：这是 Dictionary 的行为。.NET Core 3.0+ 的 Dictionary 移除了版本号检查，
+        //       在 .NET 5/8 上"删当前项"不抛异常——但 Unity 用的 Mono 仍然会抛。）
 
         // 正确：先收集，再删除
         _toRemove.Clear();
@@ -412,13 +416,17 @@ public class DictionaryTraps : MonoBehaviour
         for (int i = 0; i &lt; _toRemove.Count; i++) _enemies.Remove(_toRemove[i]);
 
         // ============ 坑 2：用 Vector3 做键 ============
+        // 浮点误差让"看起来相等"的两个值哈希到不同桶
         var bad = new Dictionary&lt;Vector3, int&gt;();
-        bad[new Vector3(0.1f + 0.2f, 0f, 0f)] = 1;
 
-        // 浮点误差导致查不到！
-        bool found = bad.TryGetValue(new Vector3(0.3f, 0f, 0f), out int v);
+        // 1.1f - 1f 得到 0.100000024f，不是 0.1f（位模式不同 -&gt; GetHashCode 不同）
+        // 注意：0.1f + 0.2f 在 .NET/Mono 上【恰好等于】0.3f，用它演示会失败
+        float drifted = 1.1f - 1f;
+        bad[new Vector3(drifted, 0f, 0f)] = 1;
+
+        bool found = bad.TryGetValue(new Vector3(0.1f, 0f, 0f), out int v);
         Debug.Log("Vector3 键查到了吗？ " + found);   // False
-        // 因为 0.1f + 0.2f = 0.30000001f，不等于 0.3f
+        // 因为 1.1f - 1f = 0.10000002f，位模式和 0.1f 不同
 
         // 正确：网格坐标用 Vector2Int / Vector3Int
         var good = new Dictionary&lt;Vector2Int, int&gt;();
@@ -457,7 +465,7 @@ public class Enemy : MonoBehaviour { }</code></pre>
         </li>
         <li>
           <input type="checkbox" id="t-03-5">
-          <label for="t-03-5"><strong>字典踩坑实验</strong>：用 <code>Vector3</code> 做键，存入 <code>(0.1f+0.2f, 0, 0)</code>，尝试用 <code>(0.3f, 0, 0)</code> 查，观察失败。</label>
+          <label for="t-03-5"><strong>字典踩坑实验</strong>：用 <code>Vector3</code> 做键，存入 <code>(1.1f-1f, 0, 0)</code>，尝试用 <code>(0.1f, 0, 0)</code> 查，观察失败（注意：<code>0.1f+0.2f</code> 恰好等于 <code>0.3f</code>，用它演示会失败）。</label>
         </li>
         <li>
           <input type="checkbox" id="t-03-6">

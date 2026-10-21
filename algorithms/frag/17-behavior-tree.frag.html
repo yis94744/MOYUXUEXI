@@ -20,7 +20,479 @@
   <strong>没有 RUNNING 会怎样</strong>：每帧都要从头判断"我现在该做什么"，无法表达"我正在做但还没做完"。
 </div>
 
-<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>17/behavior-tree</code></div>
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  行为树：完整可运行实现 ★★★
+-- ============================================================
+--  行为树是目前游戏 AI 的【事实标准】。
+--  它比状态机更好扩展、比 GOAP 更好调试、策划能看懂。
+--
+--  这一份实现包含：
+--    · 四种节点状态
+--    · 组合节点（序列 / 选择 / 并行 / 随机）
+--    · 装饰器（反转 / 重复 / 冷却 / 条件守卫）
+--    · 叶子节点（动作 / 条件）
+--    · 黑板（数据共享）
+--    · 运行时可视化（打印执行路径）
+--
+--  【设计要点】每个节点都有 tick() 方法，返回成功/失败/运行中。
+
+print("=== 1. 四种节点状态（行为树的基础）===")
+local Status = {
+  SUCCESS = "SUCCESS",   -- 成功，本帧完成
+  FAILURE = "FAILURE",   -- 失败，本帧完成
+  RUNNING = "RUNNING",   -- 运行中，需要下一帧继续
+}
+
+print("  SUCCESS - 节点完成且成功")
+print("  FAILURE - 节点完成但失败")
+print("  RUNNING - 节点还在执行（跨帧）")
+print("  【RUNNING 是行为树的精髓】它让 AI 能记住自己做到哪一步")
+
+print()
+print("=== 2. 节点基类 ===")
+local Node = {}
+Node.__index = Node
+
+function Node.new(name)
+  return setmetatable({
+    name = name or "Node",
+    children = {},
+    parent = nil,
+  }, Node)
+end
+
+function Node:addChild(child)
+  child.parent = self
+  self.children[#self.children + 1] = child
+  return child
+end
+
+-- 子类实现 entry() 和 tick()
+function Node:entry(blackboard) end
+function Node:tick(blackboard)
+  error("子类必须实现 tick")
+end
+function Node:exit(blackboard) end
+
+print("  基类定义完成：entry / tick / exit 三个生命周期")
+
+print()
+print("=== 3. 黑板（Blackboard）：AI 的共享内存 ===")
+-- 所有节点共享一份数据，避免层层传参
+local Blackboard = {}
+Blackboard.__index = Blackboard
+
+function Blackboard.new()
+  return setmetatable({ data = {} }, Blackboard)
+end
+
+function Blackboard:set(key, value) self.data[key] = value end
+function Blackboard:get(key, default) 
+  local v = self.data[key]
+  if v == nil then return default end
+  return v
+end
+
+local bb = Blackboard.new()
+bb:set("hp", 80)
+bb:set("enemyHp", 50)
+print(string.format("  黑板: hp=%d enemyHp=%d", bb:get("hp"), bb:get("enemyHp")))
+
+print()
+print("=== 4. 组合节点：序列（Sequence）===")
+-- 依次执行子节点，全部成功才成功，任一失败立即失败
+-- 类比：AND 逻辑 / 做任务清单
+local Sequence = setmetatable({}, { __index = Node })
+Sequence.__index = Sequence
+
+function Sequence.new(name)
+  local self = Node.new(name or "Sequence")
+  setmetatable(self, Sequence)
+  self.currentIndex = 1              -- 【关键】记录执行进度，支持 RUNNING
+  return self
+end
+
+function Sequence:entry()
+  self.currentIndex = 1
+end
+
+function Sequence:tick(blackboard)
+  while self.currentIndex &lt;= #self.children do
+    local child = self.children[self.currentIndex]
+
+    -- 第一次进入子节点时调用 entry
+    if child._running ~= true then
+      if child.entry then child:entry(blackboard) end
+    end
+
+    local status = child:tick(blackboard)
+    child._lastStatus = status
+
+    if status == Status.RUNNING then
+      child._running = true
+      return Status.RUNNING          -- 记住位置，下帧从这里继续
+    end
+
+    child._running = false
+
+    if status == Status.FAILURE then
+      return Status.FAILURE          -- 短路：一个失败就整体失败
+    end
+
+    self.currentIndex = self.currentIndex + 1
+  end
+
+  return Status.SUCCESS
+end
+
+print("  序列节点：全部成功才成功，遇失败短路")
+print("  支持 RUNNING：记住执行到第几个子节点")
+
+print()
+print("=== 5. 组合节点：选择（Selector）===")
+-- 依次尝试子节点，任一成功就成功，全部失败才失败
+-- 类比：OR 逻辑 / 备选方案
+local Selector = setmetatable({}, { __index = Node })
+Selector.__index = Selector
+
+function Selector.new(name)
+  local self = Node.new(name or "Selector")
+  setmetatable(self, Selector)
+  self.currentIndex = 1
+  return self
+end
+
+function Selector:entry()
+  self.currentIndex = 1
+end
+
+function Selector:tick(blackboard)
+  while self.currentIndex &lt;= #self.children do
+    local child = self.children[self.currentIndex]
+
+    if child._running ~= true then
+      if child.entry then child:entry(blackboard) end
+    end
+
+    local status = child:tick(blackboard)
+    child._lastStatus = status
+
+    if status == Status.RUNNING then
+      child._running = true
+      return Status.RUNNING
+    end
+
+    child._running = false
+
+    if status == Status.SUCCESS then
+      return Status.SUCCESS          -- 短路：一个成功就整体成功
+    end
+
+    self.currentIndex = self.currentIndex + 1
+  end
+
+  return Status.FAILURE
+end
+
+print("  选择节点：任一成功就成功，全失败才失败")
+print("  【实战用法】按优先级排列——高优先级行为放前面")
+
+print()
+print("=== 6. 并行节点（Parallel）===")
+-- 同时 tick 所有子节点，按策略决定结果
+local Parallel = setmetatable({}, { __index = Node })
+Parallel.__index = Parallel
+
+function Parallel.new(name, successPolicy, failurePolicy)
+  local self = Node.new(name or "Parallel")
+  setmetatable(self, Parallel)
+  self.successPolicy = successPolicy or "all"    -- all / one
+  self.failurePolicy = failurePolicy or "one"    -- all / one
+  return self
+end
+
+function Parallel:tick(blackboard)
+  local successCount, failureCount = 0, 0
+
+  for _, child in ipairs(self.children) do
+    local status = child:tick(blackboard)
+
+    if status == Status.SUCCESS then
+      successCount = successCount + 1
+    elseif status == Status.FAILURE then
+      failureCount = failureCount + 1
+    end
+  end
+
+  -- 失败判定优先
+  if self.failurePolicy == "one" and failureCount &gt; 0 then
+    return Status.FAILURE
+  elseif self.failurePolicy == "all" and failureCount == #self.children then
+    return Status.FAILURE
+  end
+
+  -- 成功判定
+  if self.successPolicy == "all" and successCount == #self.children then
+    return Status.SUCCESS
+  elseif self.successPolicy == "one" and successCount &gt; 0 then
+    return Status.SUCCESS
+  end
+
+  return Status.RUNNING
+end
+
+print("  并行节点：同时执行所有子节点")
+print("  策略：successPolicy(all/one) + failurePolicy(all/one)")
+
+print()
+print("=== 7. 装饰器（Decorator）===")
+-- 只有一个子节点，修改其行为
+
+-- 7.1 反转：SUCCESS &lt;-&gt; FAILURE
+local Inverter = setmetatable({}, { __index = Node })
+Inverter.__index = Inverter
+
+function Inverter.new(name)
+  local self = Node.new(name or "Inverter")
+  setmetatable(self, Inverter)
+  return self
+end
+
+function Inverter:tick(blackboard)
+  local status = self.children[1]:tick(blackboard)
+  if status == Status.SUCCESS then return Status.FAILURE end
+  if status == Status.FAILURE then return Status.SUCCESS end
+  return status
+end
+
+-- 7.2 重复：执行 N 次或无限
+local Repeater = setmetatable({}, { __index = Node })
+Repeater.__index = Repeater
+
+function Repeater.new(name, times)
+  local self = Node.new(name or "Repeater")
+  setmetatable(self, Repeater)
+  self.times = times or -1           -- -1 表示无限
+  self.count = 0
+  return self
+end
+
+function Repeater:entry()
+  self.count = 0
+end
+
+function Repeater:tick(blackboard)
+  if self.times &gt; 0 and self.count &gt;= self.times then
+    return Status.SUCCESS
+  end
+
+  local status = self.children[1]:tick(blackboard)
+
+  if status == Status.SUCCESS then
+    self.count = self.count + 1
+    if self.times &gt; 0 and self.count &gt;= self.times then
+      return Status.SUCCESS
+    end
+    -- 重置子节点，准备下一轮
+    if self.children[1].entry then self.children[1]:entry(blackboard) end
+  elseif status == Status.FAILURE then
+    return Status.FAILURE
+  end
+
+  return Status.RUNNING
+end
+
+-- 7.3 冷却：一段时间内不执行
+local Cooldown = setmetatable({}, { __index = Node })
+Cooldown.__index = Cooldown
+
+function Cooldown.new(name, duration)
+  local self = Node.new(name or "Cooldown")
+  setmetatable(self, Cooldown)
+  self.duration = duration or 1.0
+  self.lastRunTime = -999
+  return self
+end
+
+function Cooldown:tick(blackboard)
+  local now = blackboard:get("time", 0)
+  if now - self.lastRunTime &lt; self.duration then
+    return Status.FAILURE             -- 冷却中
+  end
+
+  local status = self.children[1]:tick(blackboard)
+
+  if status ~= Status.RUNNING then
+    self.lastRunTime = now            -- 记录执行时间
+  end
+
+  return status
+end
+
+print("  反转装饰器：翻转成功/失败")
+print("  重复装饰器：执行 N 次或无限")
+print("  冷却装饰器：限制执行频率")
+print("  【实战】冷却装饰器是做技能释放节奏的关键")
+
+print()
+print("=== 8. 叶子节点：条件与动作 ===")
+local Condition = setmetatable({}, { __index = Node })
+Condition.__index = Condition
+
+function Condition.new(name, predicate)
+  local self = Node.new(name or "Condition")
+  setmetatable(self, Condition)
+  self.predicate = predicate
+  return self
+end
+
+function Condition:tick(blackboard)
+  if self.predicate(blackboard) then
+    return Status.SUCCESS
+  end
+  return Status.FAILURE
+end
+
+local Action = setmetatable({}, { __index = Node })
+Action.__index = Action
+
+function Action.new(name, fn)
+  local self = Node.new(name or "Action")
+  setmetatable(self, Action)
+  self.fn = fn
+  return self
+end
+
+function Action:entry()
+  self._entered = true
+end
+
+function Action:tick(blackboard)
+  return self.fn(blackboard, self)
+end
+
+print("  条件节点：判断真假")
+print("  动作节点：执行行为，可返回 RUNNING")
+
+print()
+print("=== 9. 组装一个完整的 boss AI ===")
+-- 一棵真实的树：
+-- 选择器
+--   ├─ 死亡检查（条件）
+--   ├─ 血量低 -&gt; 逃跑
+--   ├─ 冷却中判断 -&gt; 大招
+--   ├─ 玩家在范围内 -&gt; 攻击
+--   └─ 默认 -&gt; 巡逻
+
+local log = {}
+local function logMsg(msg)
+  log[#log + 1] = msg
+end
+
+local root = Selector.new("BossAI")
+
+-- 分支 1：死亡
+local dieCheck = Sequence.new("死亡检查")
+dieCheck:addChild(Condition.new("血量&lt;=0", function(b)
+  return b:get("hp", 100) &lt;= 0
+end))
+dieCheck:addChild(Action.new("播放死亡", function(b)
+  logMsg("  -&gt; 播放死亡动画")
+  return Status.SUCCESS
+end))
+root:addChild(dieCheck)
+
+-- 分支 2：逃跑
+local fleeSeq = Sequence.new("逃跑逻辑")
+fleeSeq:addChild(Condition.new("血量&lt;30", function(b)
+  return b:get("hp", 100) &lt; 30
+end))
+fleeSeq:addChild(Action.new("逃跑", function(b)
+  logMsg("  -&gt; 血量危险，撤退！")
+  return Status.SUCCESS
+end))
+root:addChild(fleeSeq)
+
+-- 分支 3：大招（带冷却）
+local ultSeq = Sequence.new("大招逻辑")
+local ultCooldown = Cooldown.new("大招冷却", 3.0)
+local ultAction = Action.new("释放大招", function(b)
+  logMsg("  -&gt; 释放大招！")
+  return Status.SUCCESS
+end)
+ultCooldown:addChild(ultAction)
+ultSeq:addChild(Condition.new("玩家在 10 米内", function(b)
+  return b:get("distance", 999) &lt; 10
+end))
+ultSeq:addChild(ultCooldown)
+root:addChild(ultSeq)
+
+-- 分支 4：普通攻击
+local attackSeq = Sequence.new("攻击逻辑")
+attackSeq:addChild(Condition.new("玩家在 3 米内", function(b)
+  return b:get("distance", 999) &lt; 3
+end))
+attackSeq:addChild(Action.new("普通攻击", function(b)
+  logMsg("  -&gt; 普通攻击")
+  return Status.SUCCESS
+end))
+root:addChild(attackSeq)
+
+-- 分支 5：巡逻（默认）
+root:addChild(Action.new("巡逻", function(b)
+  logMsg("  -&gt; 巡逻中...")
+  return Status.SUCCESS
+end))
+
+-- 模拟一段战斗
+print("  模拟 6 帧的战斗过程：")
+local scenarios = {
+  { time = 0.0, hp = 100, distance = 15, desc = "玩家很远" },
+  { time = 0.5, hp = 100, distance = 8,  desc = "玩家进入大招范围" },
+  { time = 1.0, hp = 100, distance = 2,  desc = "玩家近身" },
+  { time = 1.5, hp = 25,  distance = 2,  desc = "血量危险" },
+  { time = 2.0, hp = 25,  distance = 2,  desc = "仍危险" },
+  { time = 2.5, hp = 0,   distance = 2,  desc = "死亡" },
+}
+
+for i, s in ipairs(scenarios) do
+  bb:set("time", s.time)
+  bb:set("hp", s.hp)
+  bb:set("distance", s.distance)
+
+  log = {}
+  root:entry(bb)
+  local status = root:tick(bb)
+
+  print(string.format("  帧 %d [%s]: %s", i, s.desc, status))
+  for _, l in ipairs(log) do print(l) end
+end
+
+print()
+print("=== 10. 行为树 vs 状态机 vs GOAP ===")
+local comparison = {
+  { "状态机",   "简单、快",     "状态多了连线爆炸",   "角色状态、UI、简单敌人" },
+  { "行为树",   "可读、可复用", "复杂决策要写很深的树", "大多数游戏 AI（主流）" },
+  { "GOAP",     "灵活、涌现",   "难调试、性能不可控",  "模拟类、沉浸式 AI" },
+  { "效用系统", "平滑、可量化", "参数难调",          "策略游戏、资源分配" },
+}
+print(string.format("  %-10s %-16s %-22s %s", "方案", "优点", "缺点", "适用"))
+print("  " .. string.rep("-", 78))
+for _, c in ipairs(comparison) do
+  print(string.format("  %-10s %-16s %-22s %s", c[1], c[2], c[3], c[4]))
+end
+
+print()
+print("=== 11. 性能优化要点 ===")
+print("  1. 【避免每帧重建树】—— 树在初始化时构建好，运行时只 tick")
+print("  2. 【控制 tree 深度】—— 深度越大，每帧 tick 越多")
+print("  3. 【降低 tick 频率】—— 远处 AI 每 5~10 帧 tick 一次，不要每帧")
+print("  4. 【条件节点前置】—— 把最可能失败的判断放前面，利用短路")
+print("  5. 【缓存黑板读取】—— 同一帧内多次读同一个 key，缓存到局部变量")
+print("  6. 【分级更新】—— 屏幕内 AI 每帧、屏幕外 5 帧、远处 20 帧")
+print()
+print("  【经验值】一个 NPC 的行为树每帧开销通常在 1~10 微秒，")
+print("           100 个 NPC 每帧约 0.1~1 毫秒。超过就要降频。")</code></pre>
 
 <h2 id="composite">二、组合节点：序列与选择</h2>
 

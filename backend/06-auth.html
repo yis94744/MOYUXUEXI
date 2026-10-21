@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>06 鉴权与会话 — Unity 游戏后端 + 全栈开发路线｜从客户端主程延伸为能独立扛服务的全栈工程师</title>
+<meta name="description" content="JWT、OAuth2、Session、Token 刷新、越权防护">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">Unity 游戏后端 + 全栈开发路线
+        <span>从客户端主程延伸为能独立扛服务的全栈工程师</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>06 · 鉴权与会话 ★★</h1>
+
+<p class="lead">这一页讲<strong>后端安全的基石</strong>：密码怎么存、用户怎么验、权限怎么判。<em>这里做错，整个系统都是漏的</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（05）路由、模型绑定与验证 —— 特性路由、参数绑定来源、FluentValidation、统一响应。<br>
+  <strong>这一页</strong>（06）鉴权与会话 —— JWT、OAuth2、Session、Token 刷新、越权防护。<br>
+  <strong>下一页</strong>（07）数据库与 EF Core —— 关系建模、迁移、查询优化、N+1 问题、事务。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="06-auth.html#password" data-brief="慢哈希 + 盐；不能用可逆加密"><span class="prereq__title">密码存储</span><span class="prereq__page">06-auth</span></a>
+          <a class="prereq__item" href="06-auth.html#jwt" data-brief="三段结构；Payload 只是 Base64 不是加密"><span class="prereq__title">JWT</span><span class="prereq__page">06-auth</span></a>
+          <a class="prereq__item" href="06-auth.html#authz" data-brief="水平/垂直越权；必须校验资源归属"><span class="prereq__title">越权防护</span><span class="prereq__page">06-auth</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="password">一、密码存储：绝对不能明文 ★★★</h2>
+
+<p>密码存储只有<strong>一个正确答案</strong>：<em>慢哈希 + 随机盐</em>。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+
+namespace BackendSamples.Auth
+{
+    // ============================================================
+    // 1. 密码存储：绝对不能明文
+    // ============================================================
+    // 【为什么不能存 MD5/SHA1】
+    //   彩虹表可以秒破。加盐只能拖延几分钟。
+
+    public static class PasswordHasher
+    {
+        // 【正确做法】用慢哈希（PBKDF2/BCrypt/Argon2）
+        //   故意让计算变慢 -&gt; 暴力破解成本剧增
+        public static string Hash(string password, byte[] salt, int iterations = 100000)
+        {
+            using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256);
+            var hash = pbkdf2.GetBytes(32);
+            return Convert.ToBase64String(hash);
+        }
+
+        public static byte[] GenerateSalt()
+        {
+            var salt = new byte[16];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(salt);
+            return salt;
+        }
+
+        public static bool Verify(string password, string storedHash, byte[] salt, int iterations = 100000)
+        {
+            var computed = Hash(password, salt, iterations);
+            // 【安全】用固定时间比较，防止时序攻击
+            return FixedTimeEquals(computed, storedHash);
+        }
+
+        private static bool FixedTimeEquals(string a, string b)
+        {
+            if (a.Length != b.Length) return false;
+            int diff = 0;
+            for (int i = 0; i &lt; a.Length; i++) diff |= a[i] ^ b[i];
+            return diff == 0;
+        }
+    }
+
+    // ============================================================
+    // 2. JWT 结构：三段式
+    // ============================================================
+    // header.payload.signature
+
+    public static class JwtExplainer
+    {
+        public static readonly (string Part, string Content, string Note)[] Parts =
+        {
+            ("Header", "{\"alg\":\"HS256\",\"typ\":\"JWT\"}", "算法（公开）"),
+            ("Payload", "{\"sub\":\"1001\",\"exp\":1700000000}", "【不能放敏感信息】Base64 只是编码不是加密"),
+            ("Signature", "HMAC(header.payload, secret)", "签名，防篡改"),
+        };
+    }
+
+    // 简化版 JWT 实现（演示原理）
+    public class SimpleJwt
+    {
+        private readonly string _secret;
+
+        public SimpleJwt(string secret) =&gt; _secret = secret;
+
+        public string Create(Dictionary&lt;string, object&gt; payload)
+        {
+            var header = Base64Url("{\"alg\":\"HS256\",\"typ\":\"JWT\"}");
+            var body = Base64Url(Serialize(payload));
+            var sig = Base64Url(Sign(header + "." + body));
+            return header + "." + body + "." + sig;
+        }
+
+        public Dictionary&lt;string, object&gt;? Validate(string token)
+        {
+            var parts = token.Split('.');
+            if (parts.Length != 3) return null;
+
+            // 【关键】校验签名，防止篡改
+            var expected = Base64Url(Sign(parts[0] + "." + parts[1]));
+            if (expected != parts[2])
+            {
+                Console.WriteLine("    签名校验失败：token 被篡改");
+                return null;
+            }
+
+            var payload = Deserialize(FromBase64Url(parts[1]));
+
+            // 检查过期
+            if (payload.TryGetValue("exp", out var expObj) &amp;&amp; expObj is long exp)
+            {
+                if (DateTimeOffset.UtcNow.ToUnixTimeSeconds() &gt; exp)
+                {
+                    Console.WriteLine("    token 已过期");
+                    return null;
+                }
+            }
+
+            return payload;
+        }
+
+        private string Sign(string data)
+        {
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_secret));
+            return Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(data)));
+        }
+
+        private static string Base64Url(string s) =&gt;
+            Convert.ToBase64String(Encoding.UTF8.GetBytes(s))
+                .Replace('+', '-').Replace('/', '_').TrimEnd('=');
+
+        private static string FromBase64Url(string s)
+        {
+            s = s.Replace('-', '+').Replace('_', '/');
+            switch (s.Length % 4)
+            {
+                case 2: s += "=="; break;
+                case 3: s += "="; break;
+            }
+            return Encoding.UTF8.GetString(Convert.FromBase64String(s));
+        }
+
+        // 极简 JSON（演示用，生产用 System.Text.Json）
+        private static string Serialize(Dictionary&lt;string, object&gt; d) =&gt;
+            "{" + string.Join(",", d.Select(kv =&gt;
+                $"\"{kv.Key}\":{(kv.Value is string s ? "\"" + s + "\"" : kv.Value.ToString())}")) + "}";
+
+        private static Dictionary&lt;string, object&gt; Deserialize(string json)
+        {
+            var result = new Dictionary&lt;string, object&gt;();
+            json = json.Trim('{', '}');
+            foreach (var pair in json.Split(','))
+            {
+                var idx = pair.IndexOf(':');
+                if (idx &lt; 0) continue;
+                var k = pair.Substring(0, idx).Trim('"', ' ', '\n');
+                var v = pair.Substring(idx + 1).Trim(' ', '\n');
+                if (v.StartsWith("\"") &amp;&amp; v.EndsWith("\""))
+                    result[k] = v.Trim('"');
+                else if (long.TryParse(v, out long n))
+                    result[k] = n;
+                else
+                    result[k] = v;
+            }
+            return result;
+        }
+    }
+
+    // ============================================================
+    // 3. Token 刷新机制
+    // ============================================================
+    // 【问题】access token 有效期长 -&gt; 泄露后危害大
+    //         有效期短 -&gt; 用户频繁掉线
+    // 【方案】双 token
+
+    public class TokenPair
+    {
+        public string AccessToken = "";
+        public string RefreshToken = "";
+        public long AccessExpireAt;
+        public long RefreshExpireAt;
+    }
+
+    public class TokenService
+    {
+        private readonly SimpleJwt _jwt = new("my-secret-key");
+        private readonly Dictionary&lt;string, string&gt; _refreshTokens = new();   // refreshToken -&gt; userId
+
+        // access 短（15分钟），refresh 长（7天）
+        public TokenPair Issue(long userId)
+        {
+            long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+            var access = _jwt.Create(new Dictionary&lt;string, object&gt;
+            {
+                ["sub"] = userId.ToString(),
+                ["exp"] = now + 15 * 60,
+            });
+
+            var refresh = Guid.NewGuid().ToString("N");
+            _refreshTokens[refresh] = userId.ToString();
+
+            return new TokenPair
+            {
+                AccessToken = access,
+                RefreshToken = refresh,
+                AccessExpireAt = now + 15 * 60,
+                RefreshExpireAt = now + 7 * 24 * 3600,
+            };
+        }
+
+        // 用 refresh 换新的 access
+        public TokenPair? Refresh(string refreshToken)
+        {
+            if (!_refreshTokens.TryGetValue(refreshToken, out var userId))
+            {
+                Console.WriteLine("    refresh token 无效");
+                return null;
+            }
+
+            // 【安全】refresh token 一次性使用（旋转）
+            _refreshTokens.Remove(refreshToken);
+
+            return Issue(long.Parse(userId));
+        }
+
+        public long? ValidateAccess(string token)
+        {
+            var payload = _jwt.Validate(token);
+            if (payload == null) return null;
+            if (!payload.TryGetValue("sub", out var sub)) return null;
+            return long.TryParse(sub.ToString(), out long id) ? id : null;
+        }
+    }
+
+    // ============================================================
+    // 4. 越权：最常见的安全漏洞
+    // ============================================================
+    // 水平越权：用户 A 改了 URL 里的 id，看到了用户 B 的数据
+    // 垂直越权：普通用户调用了管理员接口
+
+    public class OrderService
+    {
+        private readonly Dictionary&lt;long, (long OwnerId, string Data)&gt; _orders = new()
+        {
+            [1] = (1001, "订单1的内容"),
+            [2] = (1002, "订单2的内容"),
+        };
+
+        // 【错误示范】只校验登录，不校验归属
+        public string? GetOrder_Bad(long orderId)
+        {
+            return _orders.TryGetValue(orderId, out var o) ? o.Data : null;
+        }
+
+        // 【正确做法】必须校验「这个资源是不是你的」
+        public string? GetOrder_Good(long orderId, long currentUserId)
+        {
+            if (!_orders.TryGetValue(orderId, out var o)) return null;
+
+            if (o.OwnerId != currentUserId)
+            {
+                Console.WriteLine($"    越权拦截: 用户 {currentUserId} 试图访问用户 {o.OwnerId} 的订单");
+                return null;
+            }
+
+            return o.Data;
+        }
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 密码哈希 ===");
+            var salt = PasswordHasher.GenerateSalt();
+            var hash = PasswordHasher.Hash("my-password-123", salt);
+            Console.WriteLine($"  原始密码: my-password-123");
+            Console.WriteLine($"  盐（16字节）: {Convert.ToBase64String(salt).Substring(0, 20)}...");
+            Console.WriteLine($"  PBKDF2 哈希: {hash.Substring(0, 30)}...");
+            Console.WriteLine($"  验证正确密码: {PasswordHasher.Verify("my-password-123", hash, salt)}");
+            Console.WriteLine($"  验证错误密码: {PasswordHasher.Verify("wrong-password", hash, salt)}");
+            Console.WriteLine("  【关键】慢哈希（10万次迭代）让暴力破解成本剧增");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. JWT 结构 ===");
+            foreach (var (p, c, n) in JwtExplainer.Parts)
+            {
+                Console.WriteLine($"  {p,-12} {c,-40} {n}");
+            }
+            Console.WriteLine();
+            Console.WriteLine("  【重要】Payload 只是 Base64 编码，不是加密！");
+            Console.WriteLine("          任何人都能解码看到内容 —— 不要放密码/身份证");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 双 Token 机制 ===");
+            var svc = new TokenService();
+            var pair = svc.Issue(1001);
+            Console.WriteLine($"  登录成功:");
+            Console.WriteLine($"    access token:  {pair.AccessToken.Substring(0, 40)}...");
+            Console.WriteLine($"    refresh token: {pair.RefreshToken.Substring(0, 16)}...");
+            Console.WriteLine($"    access 过期:   15 分钟后");
+            Console.WriteLine($"    refresh 过期:  7 天后");
+
+            Console.WriteLine();
+            Console.WriteLine("  验证 access token:");
+            var uid = svc.ValidateAccess(pair.AccessToken);
+            Console.WriteLine($"    解析出 userId = {uid}");
+
+            Console.WriteLine();
+            Console.WriteLine("  刷新 token（一次性）:");
+            var newPair = svc.Refresh(pair.RefreshToken);
+            Console.WriteLine($"    新 access 签发: {newPair != null}");
+
+            Console.WriteLine("  用旧的 refresh 再试一次:");
+            var again = svc.Refresh(pair.RefreshToken);
+            Console.WriteLine($"    结果: {(again == null ? "失败（已被使用）" : "成功")}");
+
+            Console.WriteLine();
+            Console.WriteLine("  篡改 token:");
+            var tampered = pair.AccessToken.Substring(0, pair.AccessToken.Length - 3) + "xyz";
+            svc.ValidateAccess(tampered);
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 越权防护 ===");
+            var orders = new OrderService();
+
+            Console.WriteLine("  用户 1001 访问自己的订单 1:");
+            Console.WriteLine($"    {orders.GetOrder_Good(1, 1001) ?? "拒绝"}");
+
+            Console.WriteLine();
+            Console.WriteLine("  用户 1001 试图访问别人（1002）的订单 2:");
+            var bad = orders.GetOrder_Good(2, 1001);
+            Console.WriteLine($"    结果: {bad ?? "拒绝"}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】只校验「登录状态」不够");
+            Console.WriteLine("          必须校验「资源归属」—— 这就是水平越权");
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Auth.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方式</th><th>安全性</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><strong>明文</strong></td><td><span class="mk mk--no">灾难</span></td><td><em>脱库即全部泄露</em></td></tr>
+    <tr><td><strong>MD5 / SHA1</strong></td><td><span class="mk mk--no">很危险</span></td><td><strong>彩虹表秒破</strong></td></tr>
+    <tr><td><strong>MD5 + 盐</strong></td><td><span class="mk mk--warn">勉强</span></td><td><em>GPU 暴力破解仍很快</em></td></tr>
+    <tr><td><strong>PBKDF2 / BCrypt / Argon2</strong></td><td><span class="mk mk--yes">正确</span></td><td><strong>故意慢，抬高破解成本</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="jwt">二、JWT：三段式结构 ★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">Payload 不是加密，只是编码</span>
+  <strong>这是最常见的误解。</strong><br><br>
+  JWT 的 Payload 只是 <strong>Base64Url 编码</strong>——<em>任何人都能解码</em>。<br>
+  打开 <code>jwt.io</code>，粘贴 token，<strong>立刻看到全部内容</strong>。<br><br>
+  <strong>所以绝对不能放</strong>：<br>
+  · 密码、身份证号、手机号<br>
+  · 内部业务数据<br>
+  · <em>任何敏感信息</em><br><br>
+  <strong>应该只放</strong>：<br>
+  · <code>sub</code>（用户 ID）<br>
+  · <code>exp</code>（过期时间）<br>
+  · <em>角色/权限标识</em><br><br>
+  <strong>本页输出验证</strong>：<code>Payload {\"sub\":\"1001\",\"exp\":...}</code> 全部是明文可读的。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">签名的作用：防篡改</span>
+  <strong>签名 = HMAC(header.payload, secret)</strong><br><br>
+  如果有人改了 payload 里的 userId：<br>
+  · <em>签名就对不上了</em><br>
+  · 服务端校验失败 → 拒绝<br><br>
+  <strong>本页实测验证</strong>：<br>
+  <code>篡改 token: 签名校验失败：token 被篡改</code><br><br>
+  <strong>但要小心</strong>：<em>secret 泄露了，签名就形同虚设</em>。<br>
+  · secret 不能写在代码里<br>
+  · 用<strong>足够长的随机字符串</strong>（32 字节以上）<br>
+  · <em>定期轮换</em>
+</div>
+
+<h2 id="dual-token">三、双 Token 机制 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">为什么需要两个 token</span>
+  <strong>单 token 的困境</strong>：<br>
+  · 有效期长 → <em>泄露后危害大（可以一直用）</em><br>
+  · 有效期短 → <em>用户频繁掉线，体验差</em><br><br>
+  <strong>双 token 的解法</strong>：<br>
+  <div class="table-wrap">
+  <table>
+  <thead><tr><th>Token</th><th>有效期</th><th>存放位置</th><th>作用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>access</strong></td><td>15 分钟</td><td>内存</td><td>访问接口</td></tr>
+    <tr><td><strong>refresh</strong></td><td>7 天</td><td>HttpOnly Cookie</td><td>换新的 access</td></tr>
+  </tbody>
+  </table>
+  </div>
+  <strong>流程</strong>：<br>
+  ① 登录 → 拿到两个 token<br>
+  ② 每次请求带 access<br>
+  ③ access 过期（401）→ 用 refresh 换新的<br>
+  ④ refresh 也过期 → <em>重新登录</em><br><br>
+  <strong>本页实测的关键设计</strong>：<em>refresh 是一次性的（旋转）</em>。<br>
+  <code>用旧 refresh 再试: 失败（已被使用）</code><br>
+  <em>这样即使 refresh 泄露，攻击者用过一次后你也会发现。</em>
+</div>
+
+<h2 id="authz">四、越权：最常见的安全漏洞 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">水平越权 vs 垂直越权</span>
+  <strong>水平越权</strong>（最常见）：<br>
+  用户 A 把 URL 里的 <code>orderId</code> 改成 B 的订单号 → <em>看到了 B 的订单</em><br>
+  <code>GET /api/orders/2</code>（但 2 号订单属于别人）<br><br>
+  <strong>垂直越权</strong>：<br>
+  普通用户直接调用管理员接口<br>
+  <code>POST /api/admin/grant-gold</code><br><br>
+  <strong>本页实测验证</strong>：<br>
+  <code>越权拦截: 用户 1001 试图访问用户 1002 的订单</code><br><br>
+  <strong>根本原因</strong>：<em>只校验了「登录了没」，没校验「这个资源是不是你的」</em>。<br><br>
+  <strong>防御原则</strong>：<br>
+  · 每个涉及资源 ID 的接口，<strong>都要校验归属</strong><br>
+  · 或者在 SQL 里直接带条件：<code>WHERE id = ? AND owner_id = ?</code><br>
+  · <em>不要相信客户端传来的任何 ID</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="06">
+  <div class="task"><input type="checkbox" id="t-06-1"><label for="t-06-1"><strong>实现密码哈希</strong>：用 PBKDF2，验证正确/错误密码。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-2"><label for="t-06-2"><strong>对比 MD5</strong>：算一次 MD5，体会「快」为什么是缺点。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-3"><label for="t-06-3"><strong>签发 JWT</strong>：实现 create/validate，验证篡改后的 token 被拒。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-4"><label for="t-06-4"><strong>解码 Payload</strong>：把生成的 token 粘到 jwt.io，<em>亲眼看到内容全是明文</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-5"><label for="t-06-5"><strong>实现双 token</strong>：access 短、refresh 长，验证 refresh 一次性。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-6"><label for="t-06-6"><strong>复现越权</strong>：写一个不校验归属的接口，用别人的 ID 访问成功。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-7"><label for="t-06-7"><strong>加归属校验</strong>：修复后验证被拦截。</label></div>
+  <div class="task"><input type="checkbox" id="t-06-8"><label for="t-06-8"><strong>回答面试题</strong>：① 密码该怎么存？② JWT 能放密码吗？③ 什么是水平越权？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道密码必须用慢哈希 + 盐</strong>；<br>
+    ② <strong>能解释 JWT 三段结构，知道 Payload 是明文</strong>；<br>
+    ③ <strong>能实现签名校验，验证篡改被拒</strong>；<br>
+    ④ <strong>理解双 token 机制及 refresh 一次性</strong>；<br>
+    ⑤ <strong>能说出水平越权和垂直越权的区别与防御</strong>。<br>
+    <br>
+    <em>第 ② 和 第 ⑤ 条最实用——**前者是常见误解，后者是真实漏洞**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="05-routing-modelbind.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">05 路由、模型绑定与验证</div>
+  </a>
+  <a class="next" href="07-database.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">07 数据库与 EF Core ★★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

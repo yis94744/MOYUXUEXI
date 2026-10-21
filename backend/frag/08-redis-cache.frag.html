@@ -1,0 +1,638 @@
+<h1>08 · 缓存与 Redis ★★</h1>
+
+<p class="lead">缓存是<strong>提升性能最有效的手段</strong>，但它有<em>三个经典的坑</em>：穿透、击穿、雪崩。这一页把它们讲透，<strong>都有可运行的验证</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（07）数据库与 EF Core —— 关系建模、迁移、查询优化、N+1 问题、事务。<br>
+  <strong>这一页</strong>（08）缓存与 Redis —— 缓存模式、穿透雪崩击穿、分布式锁、排行榜数据结构。<br>
+  <strong>下一页</strong>（09）消息队列与异步 —— RabbitMQ/Kafka、削峰、最终一致、幂等消费。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+<h2 id="patterns">一、缓存模式：Cache Aside</h2>
+
+<p>最常用的缓存模式<strong>只有两条规则</strong>：<em>读时回填，写时删除</em>。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace BackendSamples.Cache
+{
+    // ============================================================
+    // 1. 缓存三种模式
+    // ============================================================
+
+    public class PlayerData
+    {
+        public long Id;
+        public string Name = "";
+        public int Level;
+        public int Gold;
+
+        public override string ToString() =&gt; $"#{Id} {Name} Lv{Level} 金币{Gold}";
+    }
+
+    // 模拟「慢速数据库」
+    public class SlowDatabase
+    {
+        private readonly Dictionary&lt;long, PlayerData&gt; _data = new();
+        public int QueryCount;
+        public int WriteCount;
+
+        public SlowDatabase()
+        {
+            for (long i = 1; i &lt;= 100; i++)
+            {
+                _data[i] = new PlayerData { Id = i, Name = $"玩家{i}", Level = (int)(i % 50) + 1, Gold = (int)(i * 100) };
+            }
+        }
+
+        public PlayerData? Get(long id)
+        {
+            QueryCount++;
+            Thread.Sleep(2);   // 【模拟】数据库往返 2ms
+            return _data.TryGetValue(id, out var p) ? p : null;
+        }
+
+        public void Save(PlayerData p)
+        {
+            WriteCount++;
+            _data[p.Id] = p;
+        }
+    }
+
+    // 模拟缓存
+    public class FakeCache
+    {
+        private readonly Dictionary&lt;string, (object Value, DateTime ExpireAt)&gt; _store = new();
+        public int Hits, Misses;
+
+        public T? Get&lt;T&gt;(string key)
+        {
+            if (_store.TryGetValue(key, out var entry))
+            {
+                if (entry.ExpireAt &gt; DateTime.UtcNow)
+                {
+                    Hits++;
+                    return (T)entry.Value;
+                }
+                _store.Remove(key);   // 过期
+            }
+            Misses++;
+            return default;
+        }
+
+        public void Set&lt;T&gt;(string key, T value, TimeSpan ttl) =&gt;
+            _store[key] = (value, DateTime.UtcNow + ttl);
+
+        public bool Remove(string key) =&gt; _store.Remove(key);
+
+        public int Count =&gt; _store.Count;
+    }
+
+    // ============================================================
+    // 2. 三种缓存模式
+    // ============================================================
+
+    public class CachePatterns
+    {
+        private readonly SlowDatabase _db;
+        private readonly FakeCache _cache;
+
+        public CachePatterns(SlowDatabase db, FakeCache cache)
+        {
+            _db = db;
+            _cache = cache;
+        }
+
+        // 【模式一】Cache Aside（旁路缓存）—— 最常用
+        //   读：先查缓存，没有就查库并回填
+        //   写：先更新库，再删除缓存
+        public PlayerData? GetPlayer_CacheAside(long id)
+        {
+            string key = "player:" + id;
+
+            // 1. 查缓存
+            var cached = _cache.Get&lt;PlayerData&gt;(key);
+            if (cached != null) return cached;
+
+            // 2. 缓存没有，查数据库
+            var p = _db.Get(id);
+            if (p == null) return null;
+
+            // 3. 回填缓存
+            _cache.Set(key, p, TimeSpan.FromMinutes(5));
+            return p;
+        }
+
+        public void UpdatePlayer_CacheAside(PlayerData p)
+        {
+            // 【关键】先更新数据库，再删缓存
+            _db.Save(p);
+            _cache.Remove("player:" + p.Id);
+
+            // 【为什么是删而不是更新】
+            //   更新缓存可能出现「两个请求同时更新，顺序错乱」
+            //   删除更简单：下次读时自然回填最新值
+        }
+
+        // 【模式二】Read Through
+        //   应用只和缓存打交道，缓存负责查库（需缓存中间件支持）
+        //   本 demo 用包装体现
+
+        // 【模式三】Write Behind（写回）
+        //   写只写缓存，异步批量刷库
+        //   优点：写入快
+        //   缺点：缓存挂了会丢数据
+        public void WriteBehind(PlayerData p)
+        {
+            _cache.Set("player:" + p.Id, p, TimeSpan.FromMinutes(5));
+            // 【问题】如果进程崩溃，这个数据就丢了
+            //   所以只适合「丢了也不致命」的数据（如排行榜分数）
+        }
+    }
+
+    // ============================================================
+    // 3. 三大缓存问题：穿透、击穿、雪崩 ★★★
+    // ============================================================
+
+    public class CacheProblems
+    {
+        private readonly SlowDatabase _db;
+        private readonly FakeCache _cache;
+
+        public CacheProblems(SlowDatabase db, FakeCache cache)
+        {
+            _db = db;
+            _cache = cache;
+        }
+
+        // ---- 问题一：缓存穿透 ----
+        // 【场景】查询一个「根本不存在」的 ID
+        //   缓存没有 -&gt; 查库 -&gt; 库里也没有 -&gt; 不缓存
+        //   -&gt; 下次再查还是查库
+        // 【危害】大量请求直接打到数据库
+        public PlayerData? Get_NoProtection(long id)
+        {
+            var cached = _cache.Get&lt;PlayerData&gt;("player:" + id);
+            if (cached != null) return cached;
+
+            var p = _db.Get(id);      // 不存在时返回 null
+            if (p != null) _cache.Set("player:" + id, p, TimeSpan.FromMinutes(5));
+            // 【问题】p == null 时不缓存 -&gt; 每次都查库
+            return p;
+        }
+
+        // 【方案一】缓存空值（短 TTL）
+        public PlayerData? Get_CacheNull(long id)
+        {
+            string key = "player:" + id;
+
+            // 用特殊标记表示「确认不存在」
+            var cached = _cache.Get&lt;object&gt;(key);
+            if (cached != null)
+            {
+                if (cached is NullMarker) return null;   // 命中空值缓存
+                return (PlayerData)cached;
+            }
+
+            var p = _db.Get(id);
+            if (p != null)
+                _cache.Set(key, p, TimeSpan.FromMinutes(5));
+            else
+                _cache.Set(key, new NullMarker(), TimeSpan.FromSeconds(30));   // 【关键】短 TTL
+
+            return p;
+        }
+
+        // 【方案二】布隆过滤器（本 demo 简化实现）
+        public class BloomFilter
+        {
+            private readonly bool[] _bits;
+            private readonly int _hashCount;
+
+            public BloomFilter(int size = 10000, int hashCount = 3)
+            {
+                _bits = new bool[size];
+                _hashCount = hashCount;
+            }
+
+            public void Add(long id)
+            {
+                foreach (int h in Hashes(id))
+                    _bits[h] = true;
+            }
+
+            public bool MightExist(long id)
+            {
+                foreach (int h in Hashes(id))
+                    if (!_bits[h]) return false;   // 【确定不存在】
+                return true;   // 【可能存在】（有误判率）
+            }
+
+            private IEnumerable&lt;int&gt; Hashes(long id)
+            {
+                for (int i = 0; i &lt; _hashCount; i++)
+                    yield return (int)Math.Abs((id * (i * 31 + 17)) % _bits.Length);
+            }
+        }
+
+        private readonly BloomFilter _bloom = new();
+
+        public void InitBloom()
+        {
+            for (long i = 1; i &lt;= 100; i++) _bloom.Add(i);
+        }
+
+        public PlayerData? Get_Bloom(long id)
+        {
+            // 【关键】先过布隆过滤器
+            if (!_bloom.MightExist(id))
+            {
+                // 确定不存在，直接返回，不查缓存也不查库
+                return null;
+            }
+
+            var cached = _cache.Get&lt;PlayerData&gt;("player:" + id);
+            if (cached != null) return cached;
+
+            var p = _db.Get(id);
+            if (p != null) _cache.Set("player:" + id, p, TimeSpan.FromMinutes(5));
+            return p;
+        }
+
+        // ---- 问题二：缓存击穿 ----
+        // 【场景】某个「热点 key」过期瞬间，大量并发请求同时打到数据库
+        // 【与穿透的区别】击穿是「数据存在但缓存刚过期」
+
+        private readonly Dictionary&lt;string, SemaphoreSlim&gt; _locks = new();
+
+        public PlayerData? Get_WithLock(long id)
+        {
+            string key = "player:" + id;
+
+            var cached = _cache.Get&lt;PlayerData&gt;(key);
+            if (cached != null) return cached;
+
+            // 【关键】只让一个请求去查库，其他等待
+            var sem = _locks.TryGetValue(key, out var s) ? s : (_locks[key] = new SemaphoreSlim(1, 1));
+            sem.Wait();
+            try
+            {
+                // 双重检查：可能别人已经回填了
+                cached = _cache.Get&lt;PlayerData&gt;(key);
+                if (cached != null) return cached;
+
+                var p = _db.Get(id);
+                if (p != null) _cache.Set(key, p, TimeSpan.FromMinutes(5));
+                return p;
+            }
+            finally
+            {
+                sem.Release();
+            }
+        }
+
+        // ---- 问题三：缓存雪崩 ----
+        // 【场景】大量 key 在同一时刻过期 -&gt; 全部请求打到数据库
+        // 【常见原因】启动时批量预热，TTL 都一样
+        // 【方案】TTL 加随机抖动
+
+        public void SetWithJitter(string key, object value, TimeSpan baseTtl)
+        {
+            // 【关键】在基础 TTL 上加随机偏移
+            var jitter = TimeSpan.FromSeconds(new Random().Next(-60, 60));
+            _cache.Set(key, value, baseTtl + jitter);
+        }
+    }
+
+    public class NullMarker { }
+
+    // ============================================================
+    // 4. 分布式锁
+    // ============================================================
+    // 【场景】多台服务器同时处理同一个玩家的请求
+    //   进程内的 lock 不管用（跨进程）
+    //   Redis 的 SETNX 可以
+
+    public class DistributedLock
+    {
+        private readonly Dictionary&lt;string, string&gt; _redis = new();   // 模拟 Redis
+        private readonly object _sync = new();
+
+        // 【关键】SET key value NX EX seconds
+        //   NX: 不存在才设置（原子操作）
+        //   EX: 自动过期（防死锁）
+        public bool TryAcquire(string key, string token, int expireSeconds)
+        {
+            lock (_sync)
+            {
+                if (_redis.ContainsKey(key)) return false;   // 已被占用
+                _redis[key] = token;
+                return true;
+            }
+        }
+
+        public void Release(string key, string token)
+        {
+            lock (_sync)
+            {
+                // 【关键】校验 token，防止释放别人的锁
+                if (_redis.TryGetValue(key, out var owner) &amp;&amp; owner == token)
+                    _redis.Remove(key);
+            }
+        }
+
+        // 【常见错误】直接 DEL，不校验 owner
+        public void Release_Bad(string key)
+        {
+            lock (_sync)
+            {
+                // 如果锁已过期并被别人获取，这里会删掉别人的锁
+                _redis.Remove(key);
+            }
+        }
+
+        public bool IsLocked(string key)
+        {
+            lock (_sync) return _redis.ContainsKey(key);
+        }
+    }
+
+    // ============================================================
+    // 5. Redis 数据结构选型
+    // ============================================================
+
+    public static class RedisStructures
+    {
+        public static readonly (string Type, string UseCase, string GameExample)[] All =
+        {
+            ("String", "简单值、计数器", "玩家金币、在线人数"),
+            ("Hash", "对象字段", "玩家属性（避免序列化整个对象）"),
+            ("List", "队列、时间线", "聊天记录、邮件列表"),
+            ("Set", "去重、集合运算", "今日活跃玩家、好友去重"),
+            ("ZSet", "排序、排行榜", "排行榜（分数排序）"),
+            ("Bitmap", "位统计", "签到记录（每天1位）"),
+            ("HyperLogLog", "基数统计", "UV 统计（内存极小，有误差）"),
+        };
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. Cache Aside 效果 ===");
+            var db = new SlowDatabase();
+            var cache = new FakeCache();
+            var patterns = new CachePatterns(db, cache);
+
+            Console.WriteLine("  第一次查询 玩家 1（缓存未命中）:");
+            var sw = Stopwatch.StartNew();
+            var p1 = patterns.GetPlayer_CacheAside(1);
+            sw.Stop();
+            Console.WriteLine($"    结果: {p1}");
+            Console.WriteLine($"    耗时: {sw.Elapsed.TotalMilliseconds:F1} ms，数据库查询 {db.QueryCount} 次");
+
+            Console.WriteLine();
+            Console.WriteLine("  第二次查询 玩家 1（缓存命中）:");
+            sw.Restart();
+            var p2 = patterns.GetPlayer_CacheAside(1);
+            sw.Stop();
+            Console.WriteLine($"    结果: {p2}");
+            Console.WriteLine($"    耗时: {sw.Elapsed.TotalMilliseconds:F3} ms，数据库查询 {db.QueryCount} 次（不变）");
+
+            Console.WriteLine();
+            Console.WriteLine($"  缓存命中 {cache.Hits} 次，未命中 {cache.Misses} 次");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 缓存穿透 ===");
+            var db2 = new SlowDatabase();
+            var cache2 = new FakeCache();
+            var probs = new CacheProblems(db2, cache2);
+
+            Console.WriteLine("  查询一个不存在的 ID（1000），连续 5 次:");
+            Console.WriteLine("  【无防护】");
+            for (int i = 0; i &lt; 5; i++) probs.Get_NoProtection(1000);
+            Console.WriteLine($"    数据库查询: {db2.QueryCount} 次（每次都查！）");
+
+            db2.QueryCount = 0;
+            Console.WriteLine("  【缓存空值】");
+            for (int i = 0; i &lt; 5; i++) probs.Get_CacheNull(1000);
+            Console.WriteLine($"    数据库查询: {db2.QueryCount} 次（只有第1次查）");
+
+            db2.QueryCount = 0;
+            probs.InitBloom();
+            Console.WriteLine("  【布隆过滤器】");
+            for (int i = 0; i &lt; 5; i++) probs.Get_Bloom(1000);
+            Console.WriteLine($"    数据库查询: {db2.QueryCount} 次（一次都没有！）");
+
+            Console.WriteLine();
+            Console.WriteLine("  验证布隆过滤器:");
+            Console.WriteLine($"    1 可能存在: {probs.Get_Bloom(1) != null}");
+            Console.WriteLine($"    9999 可能存在: {probs.Get_Bloom(9999) != null}");
+            Console.WriteLine("    【注意】布隆过滤器有误判：说「存在」不一定真存在");
+            Console.WriteLine("            但说「不存在」一定不存在 —— 这正是穿透防护需要的");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 缓存雪崩：TTL 抖动 ===");
+            Console.WriteLine("  同一时刻预热的 3 个 key：");
+            var rnd = new Random(42);
+            for (int i = 1; i &lt;= 3; i++)
+            {
+                int jitter = rnd.Next(-60, 60);
+                Console.WriteLine($"    key{i}: 基础 300s + 抖动 {jitter:+0;-0}s = {300 + jitter}s");
+            }
+            Console.WriteLine("  【关键】避免同时过期，压力被摊开");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 分布式锁 ===");
+            var dl = new DistributedLock();
+
+            Console.WriteLine("  服务器 A 尝试加锁:");
+            bool a = dl.TryAcquire("player:1001", "token-A", 30);
+            Console.WriteLine($"    结果: {a}（锁定成功）");
+
+            Console.WriteLine("  服务器 B 尝试加同一个锁:");
+            bool b = dl.TryAcquire("player:1001", "token-B", 30);
+            Console.WriteLine($"    结果: {b}（被拒绝）");
+
+            Console.WriteLine();
+            Console.WriteLine("  服务器 B 试图释放锁（用错误的 token）:");
+            dl.Release("player:1001", "token-B");
+            Console.WriteLine($"    锁还在吗: {dl.IsLocked("player:1001")}（是的，token 不匹配）");
+
+            Console.WriteLine();
+            Console.WriteLine("  服务器 A 释放锁:");
+            dl.Release("player:1001", "token-A");
+            Console.WriteLine($"    锁还在吗: {dl.IsLocked("player:1001")}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】释放锁必须校验 token");
+            Console.WriteLine("          否则可能删掉别人的锁");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 5. Redis 数据结构选型 ===");
+            foreach (var (type, use, ex) in RedisStructures.All)
+            {
+                Console.WriteLine($"    {type,-14} {use,-18} {ex}");
+            }
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Cache.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>操作</th><th>流程</th><th>关键点</th></tr></thead>
+  <tbody>
+    <tr><td><strong>读</strong></td><td>查缓存 → 没有则查库 → 回填</td><td>先缓存后数据库</td></tr>
+    <tr><td><strong>写</strong></td><td>更新数据库 → <strong>删除</strong>缓存</td><td><strong>删而不是更新</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="three-problems">二、三大缓存问题 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">问题一：缓存穿透（查不存在的数据）</span>
+  <strong>场景</strong>：<br>
+  · 请求查 ID=999999（<em>根本不存在</em>）<br>
+  · 缓存没有 → 查库 → 库里也没有 → <strong>不缓存</strong><br>
+  · 下次同样的请求 → <em>还是查库</em><br><br>
+  <strong>危害</strong>：<em>恶意请求可以轻松打垮数据库</em>。<br><br>
+  <strong>本页实测对比</strong>：<br>
+  · <strong>无防护</strong>：5 次请求 → <strong>5 次数据库查询</strong><br>
+  · <strong>缓存空值</strong>：5 次请求 → <strong>1 次数据库查询</strong><br>
+  · <strong>布隆过滤器</strong>：5 次请求 → <strong>0 次数据库查询</strong><br><br>
+  <strong>两种方案的选择</strong>：<br>
+  · 缓存空值：<em>简单，但会占内存</em>（<em>TTL 要短，30 秒</em>）<br>
+  · 布隆过滤器：<em>内存极小，但有误判</em>（<em>说"存在"可能不存在</em>）
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">问题二：缓存击穿（热点 key 过期）</span>
+  <strong>与穿透的区别</strong>：<br>
+  · 穿透 = <em>数据根本不存在</em><br>
+  · <strong>击穿 = 数据存在，但缓存刚过期</strong><br><br>
+  <strong>场景</strong>：某个热门商品/活动，缓存过期瞬间<br>
+  · 1000 个并发请求同时发现缓存没了<br>
+  · <strong>1000 个请求同时查库</strong> → 数据库瞬间被打满<br><br>
+  <strong>解决方案：加锁 + 双重检查</strong><br>
+  · 只让一个请求去查库<br>
+  · 其他请求等待<br>
+  · <em>本页实现了 <code>Get_WithLock</code></em><br><br>
+  <strong>另一种方案</strong>：<em>逻辑过期</em>——缓存永不过期，但值里带时间戳，后台异步刷新。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">问题三：缓存雪崩（大量 key 同时过期）</span>
+  <strong>场景</strong>：<br>
+  · 服务启动时批量预热，<em>所有 key 的 TTL 都一样</em><br>
+  · 到点后<strong>全部同时失效</strong><br>
+  · 所有请求一起打到数据库 → <em>雪崩</em><br><br>
+  <strong>解决方案：TTL 加随机抖动</strong><br>
+  <code>ttl = 基础TTL + Random(-60, 60) 秒</code><br>
+  <em>本页实测：三个 key 的过期时间被错开</em>。<br><br>
+  <strong>其他方案</strong>：<br>
+  · <strong>多级缓存</strong>（本地 + Redis）<br>
+  · <strong>熔断降级</strong>（<em>数据库压力大时直接返回兜底数据</em>）
+</div>
+
+<h2 id="distributed-lock">三、分布式锁：多台服务器如何互斥 ★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">为什么进程内的 lock 不够</span>
+  <strong>场景</strong>：<br>
+  · 玩家在 A 服务器和 B 服务器同时发起「扣金币」<br>
+  · <code>lock</code> 只在<em>单进程内</em>有效<br>
+  · 两台服务器各扣一次 → <strong>扣了两次</strong><br><br>
+  <strong>Redis 分布式锁的核心</strong>：<br>
+  <code>SET key token NX EX 30</code><br>
+  · <strong>NX</strong>——不存在才设置（<em>原子操作</em>）<br>
+  · <strong>EX</strong>——自动过期（<em>防止进程崩溃导致死锁</em>）<br><br>
+  <strong>本页实测的关键设计</strong>：<br>
+  <code> 服务器 A 尝试加锁: 结果: True（锁定成功）</code><br>
+  <code> 服务器 B 尝试加同一个锁: 结果: False（被拒绝）</code><br>
+  <code> 服务器 B 试图释放锁（用错误的 token）: 锁还在吗: True（是的，token 不匹配）</code><br>
+  <code> 服务器 A 释放锁: 锁还在吗: False</code><br><br>
+  <strong>为什么必须校验 token</strong>：<em>如果锁已过期被别人获取，直接 DEL 会删掉别人的锁</em>。
+</div>
+
+<h2 id="structures">四、Redis 数据结构选型</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>类型</th><th>用途</th><th>游戏场景</th></tr></thead>
+  <tbody>
+    <tr><td><strong>String</strong></td><td>简单值、计数器</td><td>玩家金币、在线人数</td></tr>
+    <tr><td><strong>Hash</strong></td><td>对象字段</td><td>玩家属性（<em>避免序列化整个对象</em>）</td></tr>
+    <tr><td><strong>List</strong></td><td>队列、时间线</td><td>聊天记录、邮件列表</td></tr>
+    <tr><td><strong>Set</strong></td><td>去重、集合运算</td><td>今日活跃玩家、好友去重</td></tr>
+    <tr><td><strong>ZSet</strong></td><td><strong>排序</strong></td><td><strong>排行榜</strong>（页 17）</td></tr>
+    <tr><td><strong>Bitmap</strong></td><td>位统计</td><td><em>签到记录（每天1位）</em></td></tr>
+    <tr><td><strong>HyperLogLog</strong></td><td>基数统计</td><td><em>UV 统计（内存极小）</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">一个典型的选型错误</span>
+  <strong>错误做法</strong>：把玩家整个对象序列化成 JSON 存 String<br>
+  <code>SET player:1001 "{\"id\":1001,\"level\":50,\"gold\":9999,...}"</code><br>
+  <em>问题</em>：<br>
+  · 只想改金币，也要<em>读出整个对象、改、再写回</em><br>
+  · 并发下<strong>容易互相覆盖</strong><br><br>
+  <strong>正确做法</strong>：用 Hash<br>
+  <code>HSET player:1001 level 50 gold 9999</code><br>
+  <code>HINCRBY player:1001 gold 100</code>  ← <em>原子自增，不会覆盖</em><br><br>
+  <strong>原则</strong>：<em>需要单独更新字段的地方，用 Hash 不用 String</em>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="08">
+  <div class="task"><input type="checkbox" id="t-08-1"><label for="t-08-1"><strong>实现 Cache Aside</strong>：读时回填、写时删除，测命中率。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-2"><label for="t-08-2"><strong>复现缓存穿透</strong>：连续查不存在的 ID，统计数据库查询次数。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-3"><label for="t-08-3"><strong>用缓存空值修复</strong>：验证查询次数降到 1 次。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-4"><label for="t-08-4"><strong>用布隆过滤器修复</strong>：验证降到 0 次，并理解误判率。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-5"><label for="t-08-5"><strong>复现缓存击穿</strong>：模拟 100 并发查热点 key，看数据库被打多少次。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-6"><label for="t-08-6"><strong>加锁修复击穿</strong>：验证只有一个请求查库。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-7"><label for="t-08-7"><strong>实现分布式锁</strong>：验证 token 校验能防止误删别人的锁。</label></div>
+  <div class="task"><input type="checkbox" id="t-08-8"><label for="t-08-8"><strong>回答面试题</strong>：① 穿透/击穿/雪崩的区别？② 分布式锁为什么必须校验 token？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能实现 Cache Aside 并说明为什么写时删缓存</strong>；<br>
+    ② <strong>能区分穿透、击穿、雪崩三个问题</strong>；<br>
+    ③ <strong>能说出穿透的两种解决方案及取舍</strong>；<br>
+    ④ <strong>能实现分布式锁并校验 token</strong>；<br>
+    ⑤ 知道玩家属性该用 Hash 而不是 String。<br>
+    <br>
+    <em>第 ② 和 第 ④ 条最重要——**前者是面试高频题，后者是真实并发事故的来源**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="07-database.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">07 数据库与 EF Core ★★★</div>
+  </a>
+  <a class="next" href="09-message-queue.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">09 消息队列与异步 ★★</div>
+  </a>
+</nav>

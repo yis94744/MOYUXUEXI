@@ -43,7 +43,10 @@
 
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
-  [object Object]
+  <strong>上一页</strong>（08）Trie 解决"前缀匹配"。这一页的并查集解决<em>"是否连通"</em>——它是图论里最轻量、也最反直觉的结构。<br>
+  <strong>关键衔接</strong>：并查集是<em>图（10）</em>里连通分量问题的标准解法，也是<em>Kruskal 最小生成树</em>的核心；页 12 的空间划分则解决"怎么快速找到邻居"。<br>
+  <strong>下一页</strong>（10）图的表示与遍历。<em>并查集只回答"连通与否"，图遍历才能回答"路径是什么"。</em><br>
+  <strong>验证方式</strong>：本页三种实现在同一组 20 万元素上实测，<em>朴素版退化成链的过程可以用步数直接数出来</em>。
 </div>
 
 
@@ -427,7 +430,7 @@ print("  所以实际上可以认为是【常数时间 O(1)】")</code></pre>
 
 <div class="callout callout--danger">
   <span class="callout__title">实测：朴素实现慢 8 倍</span>
-  本页实现了三个版本，在同一组数据上实测：<div class="table-wrap"><table><thead><tr><th>实现</th><th>实测耗时</th><th>说明</th></tr></thead><tbody><tr><td>朴素（无优化）</td><td><strong>0.4540 秒</strong></td><td>退化成链</td></tr><tr><td>路径压缩</td><td>0.0430 秒</td><td>大幅改善</td></tr><tr><td>路径压缩 + 按秩合并</td><td>0.0560 秒</td><td>理论最优</td></tr></tbody></table></div><strong>朴素实现比优化版慢约 8 倍</strong>——因为 <code>union(1,2), union(2,3), ...</code> 这种顺序会<em>把树拉成一条链</em>，<code>find</code> 从 O(α(n)) 退化成 O(n)。<br><strong>本页还实测了链的长度</strong>：10 个元素的链，<code>find(1)</code> 需要走 <strong>9 步</strong>。
+  本页实现了三个版本，在 <strong>20 万元素</strong>上做同样的事（20 万次 union + 100 次 find），连跑 4 次：<div class="table-wrap"><table><thead><tr><th>实现</th><th>实测耗时</th><th>说明</th></tr></thead><tbody><tr><td>朴素（无优化）</td><td><strong>0.49~0.52 秒</strong></td><td>退化成链</td></tr><tr><td>路径压缩</td><td>0.049~0.053 秒</td><td>大幅改善</td></tr><tr><td>路径压缩 + 按秩合并</td><td>0.059~0.082 秒</td><td>理论最优</td></tr></tbody></table></div><strong>朴素实现比优化版慢 6~9 倍</strong>（4 次实测分别为 6 / 7 / 8 / 9 倍）——因为 <code>union(1,2), union(2,3), ...</code> 这种顺序会<em>把树拉成一条链</em>，<code>find</code> 从 O(α(n)) 退化成 O(n)。<br><strong>本页还实测了链的长度</strong>：10 个元素的链，<code>find(1)</code> 需要走 <strong>9 步</strong>。<br><br><strong>注意一个反直觉的现象</strong>：<em>"路径压缩 + 按秩合并"并不比"只用路径压缩"更快，反而常常略慢</em>。因为<strong>路径压缩已经把节点深度压到接近 1</strong>，按秩合并省下的那点高度没有价值，反而多了 rank 判断与维护的开销。<em>这说明"理论最优 ≠ 实测最快"——两者的差距要到 union 极其频繁、且不做路径压缩时才显现。</em>
 </div>
 
 <div class="callout callout--tip">

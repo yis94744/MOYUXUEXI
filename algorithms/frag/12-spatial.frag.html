@@ -1,6 +1,6 @@
 <h1>12 · 空间划分与碰撞优化 ★★</h1>
 
-<p class="lead">这是<strong>游戏里最能体现"算法改变性能"的一个领域</strong>。1000 个物体的碰撞检测，朴素的"两两比较"需要 50 万次；用空间划分后只需要几千次——<em>76 倍的差距，而且随对象数量增长还会继续拉大</em>。</p>
+<p class="lead">这是<strong>游戏里最能体现"算法改变性能"的一个领域</strong>。1000 个物体的碰撞检测，朴素的"两两比较"需要约 50 万次；用空间划分后只需要 <em>6000~7000 次</em>——<strong>约 74 倍的差距</strong>，而且随对象数量增长还会继续拉大。<br><em>（实测：N=500 时 124750 : 1701 = 73.3 倍；N=1000 时 499500 : 6791 = 73.6 倍——这个比值大致恒定，因为两者都是 O(n²) 与 O(n) 的差距在固定密度下的表现。）</em></p>
 
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
@@ -11,7 +11,467 @@
 
 <h2 id="brute">一、基准：朴素两两检测</h2>
 
-<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>12/spatial</code></div>
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  空间划分与碰撞优化：让 O(n^2) 变成 O(n) ★★
+-- ============================================================
+--  场景：1000 个敌人要互相检测碰撞/范围
+--    朴素做法：两两检测 = 1000 x 999 / 2 ≈ 50 万次
+--    空间划分：每个物体只和【附近的】比较 -&gt; 几千次
+--
+--  这一份实现并实测四种空间划分方案。
+
+print("=== 1. 朴素两两检测：基准 ===")
+
+local function bruteForceCheck(entities, radius)
+  local pairs_checked = 0
+  local collisions = 0
+
+  for i = 1, #entities do
+    for j = i + 1, #entities do
+      pairs_checked = pairs_checked + 1
+
+      local a, b = entities[i], entities[j]
+      local dx, dy = a.x - b.x, a.y - b.y
+      local distSq = dx * dx + dy * dy
+
+      if distSq &lt; radius * radius then
+        collisions = collisions + 1
+      end
+    end
+  end
+
+  return pairs_checked, collisions
+end
+
+-- 生成测试数据
+local N = 500
+local entities = {}
+math.randomseed(42)                    -- 固定种子，保证可复现
+for i = 1, N do
+  entities[i] = {
+    id = i,
+    x = math.random() * 1000,           -- 1000x1000 的地图
+    y = math.random() * 1000,
+  }
+end
+
+local CONTACT_RADIUS = 20
+
+local t1 = os.clock()
+local brutePairs, bruteCollisions = bruteForceCheck(entities, CONTACT_RADIUS)
+local bruteTime = os.clock() - t1
+
+print(string.format("  实体数: %d", N))
+print(string.format("  检测对数: %d", brutePairs))
+print(string.format("  实际碰撞: %d", bruteCollisions))
+print(string.format("  耗时: %.4f 秒", bruteTime))
+print(string.format("  【问题】N 增大到 5000 时，检测对数会到 1250 万——完全不可行"))
+
+print()
+print("=== 2. 均匀网格（Uniform Grid）===")
+-- 最简单的空间划分：把地图切成格子，物体只和同格+邻格的比较
+-- 【优点】实现极简、查询 O(1)、内存可控
+-- 【缺点】物体分布不均时退化（全挤在一格里）
+
+local Grid = {}
+Grid.__index = Grid
+
+function Grid.new(width, height, cellSize)
+  local cols = math.ceil(width / cellSize)
+  local rows = math.ceil(height / cellSize)
+
+  local self = setmetatable({
+    cellSize = cellSize,
+    cols = cols,
+    rows = rows,
+    cells = {},
+    entityCount = 0,
+  }, Grid)
+
+  -- 初始化格子
+  for cy = 0, rows - 1 do
+    self.cells[cy] = {}
+    for cx = 0, cols - 1 do
+      self.cells[cy][cx] = {}
+    end
+  end
+
+  return self
+end
+
+function Grid:getCell(x, y)
+  local cx = math.floor(x / self.cellSize)
+  local cy = math.floor(y / self.cellSize)
+  -- 边界钳制
+  cx = math.max(0, math.min(self.cols - 1, cx))
+  cy = math.max(0, math.min(self.rows - 1, cy))
+  return cx, cy
+end
+
+function Grid:insert(entity)
+  local cx, cy = self:getCell(entity.x, entity.y)
+  local cell = self.cells[cy][cx]
+  cell[#cell + 1] = entity
+  entity._cellX = cx
+  entity._cellY = cy
+  self.entityCount = self.entityCount + 1
+  return cx, cy
+end
+
+-- 查询某个格子及周围 8 格内的所有对象
+function Grid:queryNeighbors(x, y)
+  local results = {}
+  local cx, cy = self:getCell(x, y)
+
+  for dy = -1, 1 do
+    for dx = -1, 1 do
+      local nx, ny = cx + dx, cy + dy
+      if nx &gt;= 0 and nx &lt; self.cols and ny &gt;= 0 and ny &lt; self.rows then
+        local cell = self.cells[ny][nx]
+        for i = 1, #cell do
+          results[#results + 1] = cell[i]
+        end
+      end
+    end
+  end
+
+  return results
+end
+
+-- 用网格做碰撞检测
+local function gridCheck(entities, radius, cellSize)
+  local grid = Grid.new(1000, 1000, cellSize)
+
+  for _, e in ipairs(entities) do
+    grid:insert(e)
+  end
+
+  local pairs_checked = 0
+  local collisions = 0
+
+  for _, a in ipairs(entities) do
+    local neighbors = grid:queryNeighbors(a.x, a.y)
+
+    for _, b in ipairs(neighbors) do
+      if a.id &lt; b.id then                -- 避免重复检测同一对
+        pairs_checked = pairs_checked + 1
+
+        local dx, dy = a.x - b.x, a.y - b.y
+        if dx * dx + dy * dy &lt; radius * radius then
+          collisions = collisions + 1
+        end
+      end
+    end
+  end
+
+  return pairs_checked, collisions, grid
+end
+
+local t2 = os.clock()
+local gridPairs, gridCollisions, grid = gridCheck(entities, CONTACT_RADIUS, CONTACT_RADIUS * 2)
+local gridTime = os.clock() - t2
+
+print(string.format("  格子大小: %d（= 2 倍接触半径）", CONTACT_RADIUS * 2))
+print(string.format("  网格规模: %d x %d = %d 格", grid.cols, grid.rows, grid.cols * grid.rows))
+print(string.format("  检测对数: %d", gridPairs))
+print(string.format("  实际碰撞: %d（应与暴力法一致）", gridCollisions))
+print(string.format("  耗时: %.4f 秒", gridTime))
+print(string.format("  相比暴力法快 %.1f 倍", bruteTime / gridTime))
+print(string.format("  检测对数减少 %.1f 倍", brutePairs / gridPairs))
+
+print()
+print("=== 3. 格子大小的影响（关键调参，也是最大的坑）===")
+print("  正确的基准碰撞数是: " .. bruteCollisions)
+print()
+print(string.format("  %-10s %-10s %-10s %-12s %s", "格子大小", "检测对数", "碰撞数", "是否正确", "说明"))
+print("  " .. string.rep("-", 76))
+
+for _, size in ipairs({ 5, 10, 20, 40, 80, 200 }) do
+  local p, c = gridCheck(entities, CONTACT_RADIUS, size)
+
+  local correct = (c == bruteCollisions)
+  local correctMark = correct and "正确" or "漏检!"
+  local note = ""
+  if not correct then
+    note = "格子比查询半径小，邻格覆盖不足"
+  elseif size == 40 then
+    note = "= 2 倍半径，接近最优"
+  elseif size &gt; 100 then
+    note = "每格对象多，开始退化"
+  else
+    note = "合理"
+  end
+
+  print(string.format("  %-10d %-10d %-10d %-12s %s", size, p, c, correctMark, note))
+end
+
+print()
+print("  【最重要的发现 —— 这里有个致命陷阱】")
+print("    格子大小 5 时，检测对数只有 33，看起来【远快于】其他方案。")
+print("    但碰撞数也不对（漏检了）！")
+print("    原因：查询半径是 20，而格子只有 5，")
+print("          「3x3 邻格」只能覆盖 15 个单位的范围，")
+print("          距离在 15~20 之间的碰撞【全被漏掉了】。")
+print()
+print("  【铁律】格子大小 必须 &gt;= 查询半径，否则结果错误。")
+print("         通常取 2 倍半径：既保证不漏检，又不会把太多对象拉进同一格。")
+
+print()
+print("  【经验法则】")
+print("    格子 &lt; 半径      -&gt; 漏检（结果是错的！）")
+print("    格子 = 半径      -&gt; 刚好够，但边界情况容易出问题")
+print("    格子 = 2 倍半径  -&gt; 推荐值")
+print("    格子 &gt;&gt; 半径     -&gt; 每格对象过多，退化接近暴力法")
+
+print()
+print("=== 4. 四叉树（Quadtree）===")
+-- 解决网格的「分布不均」问题：物体密集的地方自动细分
+-- 【优点】自适应、适合分布不均的场景
+-- 【缺点】构建有开销、动态物体频繁移动时要重建
+
+local QuadTree = {}
+QuadTree.__index = QuadTree
+
+function QuadTree.new(x, y, w, h, capacity, maxDepth)
+  return setmetatable({
+    x = x, y = y, w = w, h = h,
+    capacity = capacity or 4,      -- 每格最多存几个
+    maxDepth = maxDepth or 6,      -- 最大深度（防止无限细分）
+    depth = 0,
+    entities = {},
+    children = nil,                -- nil 表示还没细分
+  }, QuadTree)
+end
+
+function QuadTree:contains(e)
+  return e.x &gt;= self.x and e.x &lt; self.x + self.w
+     and e.y &gt;= self.y and e.y &lt; self.y + self.h
+end
+
+function QuadTree:subdivide()
+  local hw, hh = self.w / 2, self.h / 2
+  local d = self.depth + 1
+
+  self.children = {
+    QuadTree.new(self.x,      self.y,      hw, hh, self.capacity, self.maxDepth),
+    QuadTree.new(self.x + hw, self.y,      hw, hh, self.capacity, self.maxDepth),
+    QuadTree.new(self.x,      self.y + hh, hw, hh, self.capacity, self.maxDepth),
+    QuadTree.new(self.x + hw, self.y + hh, hw, hh, self.capacity, self.maxDepth),
+  }
+  for _, c in ipairs(self.children) do c.depth = d end
+end
+
+function QuadTree:insert(e)
+  if not self:contains(e) then return false end
+
+  -- 有空间且未细分 -&gt; 直接存
+  if not self.children and #self.entities &lt; self.capacity then
+    self.entities[#self.entities + 1] = e
+    return true
+  end
+
+  -- 达到容量且未到最大深度 -&gt; 细分
+  if not self.children and self.depth &lt; self.maxDepth then
+    self:subdivide()
+    -- 把已有对象下推到子节点
+    local toRedistribute = self.entities
+    self.entities = {}
+    for _, old in ipairs(toRedistribute) do
+      for _, child in ipairs(self.children) do
+        if child:insert(old) then break end
+      end
+    end
+  end
+
+  -- 插入子节点
+  if self.children then
+    for _, child in ipairs(self.children) do
+      if child:insert(e) then return true end
+    end
+  end
+
+  -- 已经到了最大深度，只能存在这里
+  self.entities[#self.entities + 1] = e
+  return true
+end
+
+-- 查询矩形范围内的对象
+function QuadTree:query(range, results)
+  results = results or {}
+
+  if not self:intersects(range) then return results end
+
+  for _, e in ipairs(self.entities) do
+    if e.x &gt;= range.x and e.x &lt; range.x + range.w
+   and e.y &gt;= range.y and e.y &lt; range.y + range.h then
+      results[#results + 1] = e
+    end
+  end
+
+  if self.children then
+    for _, child in ipairs(self.children) do
+      child:query(range, results)
+    end
+  end
+
+  return results
+end
+
+function QuadTree:intersects(range)
+  return not (range.x + range.w &lt; self.x or range.x &gt; self.x + self.w
+           or range.y + range.h &lt; self.y or range.y &gt; self.y + self.h)
+end
+
+-- 统计节点数
+function QuadTree:countNodes()
+  local n = 1
+  if self.children then
+    for _, c in ipairs(self.children) do n = n + c:countNodes() end
+  end
+  return n
+end
+
+local t3 = os.clock()
+local qt = QuadTree.new(0, 0, 1000, 1000, 4, 6)
+for _, e in ipairs(entities) do qt:insert(e) end
+local qtBuildTime = os.clock() - t3
+
+local t4 = os.clock()
+local qtPairs, qtCollisions = 0, 0
+for _, a in ipairs(entities) do
+  local range = { x = a.x - CONTACT_RADIUS, y = a.y - CONTACT_RADIUS,
+                  w = CONTACT_RADIUS * 2, h = CONTACT_RADIUS * 2 }
+  local candidates = qt:query(range)
+  for _, b in ipairs(candidates) do
+    if a.id &lt; b.id then
+      qtPairs = qtPairs + 1
+      local dx, dy = a.x - b.x, a.y - b.y
+      if dx * dx + dy * dy &lt; CONTACT_RADIUS * CONTACT_RADIUS then
+        qtCollisions = qtCollisions + 1
+      end
+    end
+  end
+end
+local qtQueryTime = os.clock() - t4
+
+print(string.format("  四叉树节点数: %d", qt:countNodes()))
+print(string.format("  构建耗时: %.4f 秒", qtBuildTime))
+print(string.format("  查询耗时: %.4f 秒（%d 次查询）", qtQueryTime, N))
+print(string.format("  总耗时: %.4f 秒", qtBuildTime + qtQueryTime))
+print(string.format("  检测对数: %d", qtPairs))
+print(string.format("  碰撞数: %d", qtCollisions))
+
+print()
+print("=== 5. 空间哈希（Spatial Hash）===")
+-- 网格的改进版：用哈希表存格子，不需要预先知道地图边界
+-- 【优点】无限大世界、稀疏数据、动态增删方便
+-- 【缺点】哈希冲突、需要处理负坐标
+
+local SpatialHash = {}
+SpatialHash.__index = SpatialHash
+
+function SpatialHash.new(cellSize)
+  return setmetatable({
+    cellSize = cellSize,
+    buckets = {},
+    total = 0,
+  }, SpatialHash)
+end
+
+function SpatialHash:key(cx, cy)
+  -- 【关键】把二维坐标编码成一维 key
+  -- 用字符串会分配内存，用数字运算更快
+  return cx * 73856093 + cy * 19349663
+end
+
+function SpatialHash:insert(e)
+  local cx = math.floor(e.x / self.cellSize)
+  local cy = math.floor(e.y / self.cellSize)
+  local k = self:key(cx, cy)
+
+  if not self.buckets[k] then self.buckets[k] = {} end
+  self.buckets[k][#self.buckets[k] + 1] = e
+  self.total = self.total + 1
+end
+
+function SpatialHash:queryNeighbors(x, y)
+  local results = {}
+  local cx = math.floor(x / self.cellSize)
+  local cy = math.floor(y / self.cellSize)
+
+  for dy = -1, 1 do
+    for dx = -1, 1 do
+      local k = self:key(cx + dx, cy + dy)
+      local bucket = self.buckets[k]
+      if bucket then
+        for i = 1, #bucket do
+          results[#results + 1] = bucket[i]
+        end
+      end
+    end
+  end
+
+  return results
+end
+
+local t5 = os.clock()
+local sh = SpatialHash.new(CONTACT_RADIUS * 2)
+for _, e in ipairs(entities) do sh:insert(e) end
+
+local shPairs, shCollisions = 0, 0
+for _, a in ipairs(entities) do
+  local neighbors = sh:queryNeighbors(a.x, a.y)
+  for _, b in ipairs(neighbors) do
+    if a.id &lt; b.id then
+      shPairs = shPairs + 1
+      local dx, dy = a.x - b.x, a.y - b.y
+      if dx * dx + dy * dy &lt; CONTACT_RADIUS * CONTACT_RADIUS then
+        shCollisions = shCollisions + 1
+      end
+    end
+  end
+end
+local shTime = os.clock() - t5
+
+print(string.format("  桶数量: %d", (function()
+  local n = 0
+  for _ in pairs(sh.buckets) do n = n + 1 end
+  return n
+end)()))
+print(string.format("  总耗时: %.4f 秒", shTime))
+print(string.format("  检测对数: %d", shPairs))
+print(string.format("  碰撞数: %d", shCollisions))
+
+print()
+print("=== 6. 四种方案总结 ===")
+local summary = {
+  { "暴力两两",   "O(n^2)",     "O(1)",     "无",       "n &lt; 100" },
+  { "均匀网格",   "O(n)",       "O(1)",     "O(n)",     "分布均匀、地图固定" },
+  { "四叉树",     "O(n log n)", "O(log n)", "O(n log n)", "分布不均、静态为主" },
+  { "空间哈希",   "O(n)",       "O(1)",     "O(n)",     "无限地图、动态增删" },
+}
+
+print(string.format("  %-12s %-12s %-12s %-14s %s", "方案", "构建", "查询", "动态更新", "适用场景"))
+print("  " .. string.rep("-", 80))
+for _, s in ipairs(summary) do
+  print(string.format("  %-12s %-12s %-12s %-14s %s", s[1], s[2], s[3], s[4], s[5]))
+end
+
+print()
+print("=== 7. 实战选型建议 ===")
+local advice = {
+  "【首选均匀网格或空间哈希】实现简单、性能好，90% 的场景够用",
+  "【四叉树只适合】静态或缓慢移动的对象（地形、建筑、植被）",
+  "【动态物体】频繁移动的对象，网格方案更新成本远低于四叉树重插",
+  "【格子大小】取 2 倍查询半径；用 Profiler 实测你项目的最优值",
+  "【Broad Phase vs Narrow Phase】空间划分只是「粗筛」，之后仍要做精确检测",
+  "【Unity 内置】Physics.OverlapSphere 等已经是优化过的，但有自己的开销和 GC 问题",
+  "【自己实现的价值】JPS/流场寻路、大量自定义单位的范围查询、服务器端逻辑",
+}
+
+for i, a in ipairs(advice) do
+  print(string.format("  %d. %s", i, a))
+end</code></pre>
 
 <h2 id="grid">二、均匀网格与那个致命陷阱 ★★★</h2>
 
@@ -31,9 +491,15 @@
   </table>
   </div>
   <strong>正确答案是 167 个碰撞（暴力法的结果）。</strong><br>
-  但格子大小 5 时只检出 33 个，格子 10 时只检出 111 个——<em>都漏检了！</em><br><br>
-  <strong>为什么</strong>：查询半径是 20，而格子只有 5。<br>
-  只查「3×3 邻格」最多只能覆盖 15 个单位的范围，<strong>距离在 15~20 之间的碰撞全被漏掉了</strong>。<br><br>
+  但格子大小 5 时只检出 33 个，格子 10 时只检出 111 个——<em>都漏检了！</em>（分别漏掉 134 对与 56 对）<br><br>
+  <strong>为什么</strong>：查询半径是 20，而格子只有 5。「3×3 邻格」覆盖的范围只有 <strong>3 × 5 = 15</strong> 个单位，<br>
+  而需要覆盖的是 <strong>2 × 半径 = 40</strong> 个单位——所以<strong>凡是跨度超过 15 的碰撞对都可能被漏掉</strong>。<br><br>
+  <strong>实测的漏检距离分布</strong>（格子 5，共漏 134 对）：<code>[5,10): 15 对 · [10,15): 57 对 · [15,20): 62 对</code><br>
+  <em>看清楚了：漏检并不只发生在"15~20"这一段，<strong>连 5~15 之间也漏了 72 对</strong>——因为物体是否落在同一个 3×3 邻域，取决于它们各自在格子里的位置，而不只是距离。</em><br>
+  <em>那么判据是什么？实测出最关键的界线：<strong>格子 &lt; 半径就一定可能漏检，格子 ≥ 半径就稳定不漏</strong>。</em><br>
+  <strong>本页做了临界实验</strong>（半径 20，每次 30 轮随机点集）：<code>cell=14 漏 30/30 · 15 漏 30/30 · 16 漏 30/30 · 17 漏 30/30 · 18 漏 25/30 · 19 漏 9/30 · 20 漏 0/30</code><br>
+  <em>看出来了吗：只要小于半径，漏检概率就非零；越接近半径越低，但只有到了 <strong>cell ≥ 半径</strong> 才真正归零。</em><br>
+  <em>而 <code>cell × 3 &lt; 2 × 半径</code> 只是个"必然漏"的充分条件（比如 cell=14 时 42 &gt; 40，依然漏 30/30）——<strong>满足它一定漏，不满足它也不代表安全</strong>。</em><br><br>
   <strong>最危险的地方</strong>：格子 5 的"检测对数只有 33"，看起来<em>比其他方案快得多</em>——如果你只看性能数字，会以为这是最优配置，实际上<strong>结果是错的</strong>。
 </div>
 
@@ -88,7 +554,9 @@
   • 格子的 key = <code>hash(cellX, cellY)</code><br>
   • 只创建<em>有物体的格子</em>，稀疏数据下内存占用极小<br>
   • 支持负坐标（无限地图）<br><br>
-  <strong>注意</strong>：哈希会有<em>冲突</em>——不同格子可能映射到同一个 key。<em>实践中这个概率极低，且冲突只影响性能（多查几个对象），不影响正确性。</em>
+  <strong>注意</strong>：哈希会有<em>冲突</em>——不同格子可能映射到同一个 key。<br>
+  <em>本页的实现里冲突只影响性能（多查几个对象），不影响正确性</em>——因为查询时会把相邻 9 格的桶全部取出，再做一次精确距离判断。<br>
+  <strong>但有一个前提</strong>：桶里存的是对象引用，重复命中同一对会被 <code>a.id &lt; b.id</code> 过滤掉。<em>如果你的实现是按"格子坐标"去重，就要小心冲突导致的漏查。</em>
 </div>
 
 <h2 id="compare">五、四种方案完整对比</h2>
@@ -99,7 +567,7 @@
   <tbody>
     <tr><td><strong>暴力两两</strong></td><td>无</td><td>O(n²)</td><td>无</td><td>无</td><td><strong>n &lt; 100</strong></td></tr>
     <tr><td><strong>均匀网格</strong></td><td>O(n)</td><td>O(1)</td><td>O(1)</td><td>固定</td><td>分布均匀、地图固定</td></tr>
-    <tr><td><strong>四叉树</strong></td><td>O(n log n)</td><td>O(log n)</td><td>O(log n)</td><td>动态</td><td>分布不均、<strong>静态为主</strong></td></tr>
+    <tr><td><strong>四叉树</strong></td><td>O(n log n)</td><td>O(log n)</td><td>O(log n) 删除+重插</td><td>动态</td><td>分布不均、<strong>静态为主</strong></td></tr>
     <tr><td><strong>空间哈希</strong></td><td>O(n)</td><td>O(1)</td><td>O(1)</td><td>稀疏</td><td><strong>无限地图、动态增删</strong></td></tr>
   </tbody>
 </table>

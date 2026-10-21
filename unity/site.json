@@ -197,7 +197,7 @@
       "num": "",
       "group": "参考",
       "title": "Unity API 速查",
-      "desc": "从 Unity 程序集提取的 8998 条真实 API 签名，覆盖 110 个类型"
+      "desc": "Unity 2021.3 的 public API 速查：方法与属性均经编译器验证可用，已过时项单独列出"
     },
     {
       "file": "26-advanced-api.html",

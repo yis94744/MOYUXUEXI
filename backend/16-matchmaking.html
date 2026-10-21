@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>16 匹配系统 — Unity 游戏后端 + 全栈开发路线｜从客户端主程延伸为能独立扛服务的全栈工程师</title>
+<meta name="description" content="Elo/MMR、匹配池、分段扩容、组队与补位">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">Unity 游戏后端 + 全栈开发路线
+        <span>从客户端主程延伸为能独立扛服务的全栈工程师</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>16 · 匹配系统 ★</h1>
+
+<p class="lead">匹配的核心矛盾：<strong>快 vs 准</strong>。<em>解法是随时间放宽范围</em>。这一页还讲<strong>大规模下的分段匹配</strong>和 <strong>Elo 算分</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（15）战斗服与结算 —— 房间模型、战斗校验、结算幂等、断线重连补帧。<br>
+  <strong>这一页</strong>（16）匹配系统 —— Elo/MMR、匹配池、分段扩容、组队与补位。<br>
+  <strong>下一页</strong>（17）排行榜 —— Redis ZSet、分页、并列名次、赛季重置、全服榜。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="11-game-backend-overview.html#stateful" data-brief="无状态可随便扩；有状态要路由到固定实例"><span class="prereq__title">有状态 vs 无状态</span><span class="prereq__page">11-game-backend-overview</span></a>
+          <a class="prereq__item" href="16-matchmaking.html#tradeoff" data-brief="随时间放宽 MMR 范围；分段匹配避免 O(n²)"><span class="prereq__title">匹配策略</span><span class="prereq__page">16-matchmaking</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="tradeoff">一、核心矛盾：快 vs 准 ★★</h2>
+
+<p><strong>匹配快的代价</strong>：对手水平差很大。<strong>匹配准的代价</strong>：等很久。<em>解法是随时间放宽</em>。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace BackendSamples.Matchmaking
+{
+    // ============================================================
+    // 1. 匹配的核心问题
+    // ============================================================
+    // 【矛盾】
+    //   匹配快  -&gt; 对手水平差很大 -&gt; 体验差
+    //   匹配准  -&gt; 等很久 -&gt; 玩家流失
+    // 【解法】随时间放宽范围
+
+    public class MatchPlayer
+    {
+        public long PlayerId;
+        public string Name = "";
+        public int Mmr;           // 匹配分
+        public DateTime EnqueueAt;
+        public int WaitSec =&gt; (int)(DateTime.UtcNow - EnqueueAt).TotalSeconds;
+
+        public override string ToString() =&gt; $"{Name}(MMR={Mmr})";
+    }
+
+    // ============================================================
+    // 2. 基础匹配：按 MMR 差
+    // ============================================================
+
+    public class Matchmaker
+    {
+        private readonly List&lt;MatchPlayer&gt; _pool = new();
+
+        public void Enqueue(MatchPlayer p)
+        {
+            p.EnqueueAt = DateTime.UtcNow;
+            _pool.Add(p);
+            Console.WriteLine($"    {p.Name}(MMR={p.Mmr}) 进入匹配池，当前 {_pool.Count} 人");
+        }
+
+        public void Dequeue(long playerId) =&gt; _pool.RemoveAll(p =&gt; p.PlayerId == playerId);
+
+        // 【核心】匹配范围随时间放宽
+        public static int GetTolerance(int waitSec)
+        {
+            // 0-5 秒：±50 分
+            // 5-15 秒：±100
+            // 15-30 秒：±200
+            // 30 秒+：不限
+            if (waitSec &lt; 5) return 50;
+            if (waitSec &lt; 15) return 100;
+            if (waitSec &lt; 30) return 200;
+            return int.MaxValue;
+        }
+
+        // 尝试匹配一对
+        public (MatchPlayer A, MatchPlayer B)? TryMatch()
+        {
+            if (_pool.Count &lt; 2) return null;
+
+            // 【关键】按等待时间优先（等得久的先匹配）
+            var sorted = _pool.OrderByDescending(p =&gt; p.WaitSec).ToList();
+
+            for (int i = 0; i &lt; sorted.Count; i++)
+            {
+                var a = sorted[i];
+                int tol = GetTolerance(a.WaitSec);
+
+                for (int j = i + 1; j &lt; sorted.Count; j++)
+                {
+                    var b = sorted[j];
+                    if (Math.Abs(a.Mmr - b.Mmr) &lt;= tol)
+                    {
+                        _pool.Remove(a);
+                        _pool.Remove(b);
+                        return (a, b);
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        public int PoolCount =&gt; _pool.Count;
+        public IReadOnlyList&lt;MatchPlayer&gt; Pool =&gt; _pool;
+    }
+
+    // ============================================================
+    // 3. 分段匹配：大规模下的必需
+    // ============================================================
+    // 【问题】10 万人在池里，两两比较是 O(n²) = 100 亿次
+    // 【解法】按 MMR 分段（bucket），只在相邻桶里找
+
+    public class SegmentedMatchmaker
+    {
+        private const int BucketSize = 100;   // 每 100 分一个桶
+        private readonly Dictionary&lt;int, List&lt;MatchPlayer&gt;&gt; _buckets = new();
+
+        public void Enqueue(MatchPlayer p)
+        {
+            p.EnqueueAt = DateTime.UtcNow;
+            int bucket = p.Mmr / BucketSize;
+            if (!_buckets.TryGetValue(bucket, out var list))
+            {
+                list = new List&lt;MatchPlayer&gt;();
+                _buckets[bucket] = list;
+            }
+            list.Add(p);
+        }
+
+        // 【关键】只在「自己桶 + 相邻桶」里找
+        public (MatchPlayer A, MatchPlayer B)? TryMatch(int bucketIdx)
+        {
+            // 先看自己桶
+            var result = TryMatchIn(bucketIdx);
+            if (result != null) return result;
+
+            // 再看相邻桶（放宽范围）
+            result = TryMatchIn(bucketIdx - 1);
+            if (result != null) return result;
+
+            return TryMatchIn(bucketIdx + 1);
+        }
+
+        private (MatchPlayer, MatchPlayer)? TryMatchIn(int bucket)
+        {
+            if (!_buckets.TryGetValue(bucket, out var list) || list.Count &lt; 2) return null;
+
+            var a = list[0];
+            var b = list[1];
+            list.RemoveAt(1);
+            list.RemoveAt(0);
+            if (list.Count == 0) _buckets.Remove(bucket);
+            return (a, b);
+        }
+
+        public int TotalInPool =&gt; _buckets.Values.Sum(l =&gt; l.Count);
+        public int BucketCount =&gt; _buckets.Count;
+    }
+
+    // ============================================================
+    // 4. Elo 评分：怎么算「该赢多少分」
+    // ============================================================
+    // 【核心思想】赢强手加分多，赢弱手加分少
+    //   胜率 = 1 / (1 + 10^((对手分 - 自己分)/400))
+
+    public static class EloRating
+    {
+        private const int K = 32;   // 影响因子（越大变化越快）
+
+        // 期望胜率
+        public static double ExpectedScore(int myMmr, int oppMmr)
+        {
+            return 1.0 / (1.0 + Math.Pow(10, (oppMmr - myMmr) / 400.0));
+        }
+
+        // 计算新分数
+        public static (int NewMmr, int Delta) Update(int myMmr, int oppMmr, bool won)
+        {
+            double expected = ExpectedScore(myMmr, oppMmr);
+            double actual = won ? 1.0 : 0.0;
+            int delta = (int)(K * (actual - expected));
+            return (myMmr + delta, delta);
+        }
+    }
+
+    // ============================================================
+    // 5. 组队匹配
+    // ============================================================
+    // 【问题】三人组队，怎么和单人匹配？
+    //   方案1：队伍整体算一个 MMR（取平均或最高）
+    //   方案2：只匹配相同队伍人数
+
+    public class Team
+    {
+        public List&lt;MatchPlayer&gt; Members = new();
+
+        // 【常用】取队伍最高 MMR（防止带小号）
+        public int TeamMmr =&gt; Members.Count &gt; 0 ? Members.Max(m =&gt; m.Mmr) : 0;
+
+        // 或者取平均
+        public int AverageMmr =&gt; Members.Count &gt; 0 ? (int)Members.Average(m =&gt; m.Mmr) : 0;
+
+        public override string ToString() =&gt;
+            $"队伍[{string.Join(", ", Members.Select(m =&gt; m.Name))}] MMR={TeamMmr}";
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 匹配范围随时间放宽 ===");
+            foreach (int sec in new[] { 0, 5, 15, 30, 60 })
+            {
+                int tol = Matchmaker.GetTolerance(sec);
+                var tolStr = tol == int.MaxValue ? "不限" : "±" + tol;
+                Console.WriteLine($"    等待 {sec,2} 秒 -&gt; 可接受 MMR 差 {tolStr}");
+            }
+            Console.WriteLine();
+            Console.WriteLine("  【关键】这是「体验 vs 速度」的平衡");
+            Console.WriteLine("          不给放宽 -&gt; 高分玩家长时间匹配不到");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 基础匹配 ===");
+            var mm = new Matchmaker();
+            var now = DateTime.UtcNow;
+
+            mm.Enqueue(new MatchPlayer { PlayerId = 1, Name = "新手A", Mmr = 1000 });
+            mm.Enqueue(new MatchPlayer { PlayerId = 2, Name = "新手B", Mmr = 1030 });
+            mm.Enqueue(new MatchPlayer { PlayerId = 3, Name = "高手", Mmr = 2000 });
+
+            var m1 = mm.TryMatch();
+            Console.WriteLine($"  【匹配结果】{(m1 != null ? $"{m1.Value.A.Name} vs {m1.Value.B.Name}" : "无匹配")}");
+            Console.WriteLine($"    MMR 差: {(m1 != null ? Math.Abs(m1.Value.A.Mmr - m1.Value.B.Mmr) : 0)}（在 ±50 内）");
+
+            Console.WriteLine();
+            Console.WriteLine("  剩下的高手 MMR=2000 匹配不到:");
+            var m2 = mm.TryMatch();
+            Console.WriteLine($"    【匹配结果】{(m2 == null ? "无匹配（池里只剩1人）" : "匹配成功")}");
+
+            Console.WriteLine();
+            Console.WriteLine("  加入一个 MMR=2100 的玩家，模拟等待后放宽:");
+            mm.Enqueue(new MatchPlayer { PlayerId = 4, Name = "高手2", Mmr = 2100 });
+
+            // 模拟等了 20 秒（放宽到 ±200）
+            foreach (var p in mm.Pool) p.EnqueueAt = now.AddSeconds(-20);
+            var m3 = mm.TryMatch();
+            Console.WriteLine($"    【匹配结果】{(m3 != null ? $"{m3.Value.A.Name} vs {m3.Value.B.Name}" : "无匹配")}");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 分段匹配（大规模）===");
+            var seg = new SegmentedMatchmaker();
+            var rnd = new Random(42);
+
+            // 1000 人随机 MMR
+            for (int i = 1; i &lt;= 1000; i++)
+            {
+                seg.Enqueue(new MatchPlayer { PlayerId = i, Name = $"P{i}", Mmr = rnd.Next(800, 2200) });
+            }
+            Console.WriteLine($"  1000 人入池，分成 {seg.BucketCount} 个桶（每桶 100 分）");
+
+            int matched = 0;
+            for (int round = 0; round &lt; 300; round++)
+            {
+                if (seg.TryMatch(rnd.Next(8, 22)) != null) matched++;
+            }
+            Console.WriteLine($"  匹配 {matched} 场，池里还剩 {seg.TotalInPool} 人");
+            Console.WriteLine();
+            Console.WriteLine("  【为什么分段】");
+            Console.WriteLine("    1000 人两两比较 = 50 万次");
+            Console.WriteLine("    分段后只比相邻桶 = 几千次");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. Elo 评分 ===");
+            var matchups = new[]
+            {
+                (me: 1500, opp: 1500, won: true,  desc: "同分赢了"),
+                (me: 1500, opp: 1500, won: false, desc: "同分输了"),
+                (me: 1500, opp: 2000, won: true,  desc: "赢高手"),
+                (me: 1500, opp: 1000, won: true,  desc: "赢弱手"),
+                (me: 1500, opp: 2000, won: false, desc: "输给高手"),
+            };
+
+            Console.WriteLine($"    {"场景",-14} {"期望胜率",-10} 分数变化");
+            foreach (var m in matchups)
+            {
+                double exp = EloRating.ExpectedScore(m.me, m.opp);
+                var (newMmr, delta) = EloRating.Update(m.me, m.opp, m.won);
+                Console.WriteLine($"    {m.desc,-14} {exp*100,6:F1}%    {delta:+0;-0} -&gt; {newMmr}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键观察】");
+            Console.WriteLine("    · 赢高手 +19（期望胜率只有 6%）");
+            Console.WriteLine("    · 赢弱手 +1（期望胜率 94%，赢了是应该的）");
+            Console.WriteLine("    · 这保证分数能反映真实水平");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 5. 组队匹配 ===");
+            var team1 = new Team
+            {
+                Members = new()
+                {
+                    new MatchPlayer { PlayerId = 10, Name = "A", Mmr = 1200 },
+                    new MatchPlayer { PlayerId = 11, Name = "B", Mmr = 1400 },
+                    new MatchPlayer { PlayerId = 12, Name = "C", Mmr = 1600 },
+                }
+            };
+            Console.WriteLine($"  {team1}");
+            Console.WriteLine($"    最高 MMR: {team1.TeamMmr}（防带小号）");
+            Console.WriteLine($"    平均 MMR: {team1.AverageMmr}");
+            Console.WriteLine();
+            Console.WriteLine("  【选哪个】");
+            Console.WriteLine("    · 取最高 -&gt; 防止高手带小号虐菜");
+            Console.WriteLine("    · 取平均 -&gt; 更公平但容易滥用");
+            Console.WriteLine("    · 实战多用「最高 + 人数加成」");
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Matchmaking.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>等待时间</th><th>可接受 MMR 差</th><th>玩家感受</th></tr></thead>
+  <tbody>
+    <tr><td><strong>0~5 秒</strong></td><td>±50</td><td><em>势均力敌</em></td></tr>
+    <tr><td><strong>5~15 秒</strong></td><td>±100</td><td>能接受</td></tr>
+    <tr><td><strong>15~30 秒</strong></td><td>±200</td><td><em>开始有压力</em></td></tr>
+    <tr><td><strong>30 秒+</strong></td><td><strong>不限</strong></td><td><strong>能玩就行</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="segmented">二、分段匹配：大规模下的必需 ★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">O(n²) 会炸</span>
+  <strong>问题</strong>：10 万人在匹配池里<br>
+  · 两两比较 → <strong>100 亿次</strong><br>
+  · 每秒跑一次 → <em>服务器直接死</em><br><br>
+  <strong>解法：按 MMR 分段（bucket）</strong><br>
+  · 每 100 分一个桶<br>
+  · 只在「自己桶 + 相邻桶」里找<br>
+  · <em>比较次数从 100 亿降到几千</em><br><br>
+  <strong>本页实测</strong>：<br>
+  <code>1000 人入池，分成 14 个桶（每桶 100 分）</code><br>
+  <code>匹配 300 场，池里还剩 400 人</code><br><br>
+  <strong>注意</strong>：<em>分桶后要处理「桶里人数不均」</em>——高分玩家可能一个人一个桶，需要放宽到相邻桶。
+</div>
+
+<h2 id="elo">三、Elo 评分：赢强手加分多 ★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">公式与直觉</span>
+  <strong>期望胜率</strong>：<br>
+  <code>1 / (1 + 10^((对手分 - 自己分) / 400))</code><br><br>
+  <strong>本页实测的五种情况</strong>：<br>
+  <div class="table-wrap">
+  <table>
+  <thead><tr><th>场景</th><th>期望胜率</th><th>分数变化</th></tr></thead>
+  <tbody>
+    <tr><td>同分赢了</td><td>50%</td><td>+16</td></tr>
+    <tr><td>赢高手（1500 vs 2000）</td><td>5.3%</td><td><strong>+30</strong></td></tr>
+    <tr><td>赢弱手（1500 vs 1000）</td><td>94.7%</td><td><strong>+1</strong></td></tr>
+  </tbody>
+  </table>
+  </div>
+  <strong>直觉</strong>：<br>
+  · 赢强手 → <em>意料之外，加分多</em><br>
+  · 赢弱手 → <em>理所当然，加分少</em><br>
+  · <em>这样分数才能反映真实水平</em><br><br>
+  <em>（本页 K = 32；期望胜率 5.3% 时 +30，94.7% 时 +1——<strong>赢弱手几乎不加分</strong>）</em><br><br>
+  <strong>K 值</strong>：<em>决定变化速度</em><br>
+  · 新手用大 K（<em>快速定位</em>）<br>
+  · 老玩家用小 K（<em>稳定</em>）
+</div>
+
+<h2 id="team">四、组队匹配：取最高还是平均</h2>
+
+<div class="callout callout--warn">
+  <span class="callout__title">取平均会被滥用</span>
+  <strong>场景</strong>：一个高手（MMR 2000）带一个新手（MMR 500）<br>
+  · <strong>取平均</strong> = 1250 → <em>匹配到中等对手</em><br>
+  · 结果：<strong>高手在虐菜</strong><br><br>
+  <strong>本页的做法：取最高</strong><br>
+  <code>TeamMmr = Members.Max(m =&gt; m.Mmr)</code><br>
+  → 2000 → <em>匹配到同样是高手带队的队伍</em><br><br>
+  <strong>实战折中</strong>：<em>取最高 + 人数加成</em><br>
+  · 3 人队 vs 3 人队，权重相同<br>
+  · <em>但 3 人队匹配到 1 人队要额外加成</em><br><br>
+  <strong>还要考虑</strong>：<em>队伍人数是否允许不同</em>（<em>大多数游戏要求人数相同</em>）。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="16">
+  <div class="task"><input type="checkbox" id="t-16-1"><label for="t-16-1"><strong>实现放宽策略</strong>：等待时间越久，MMR 容忍度越大。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-2"><label for="t-16-2"><strong>实现基础匹配</strong>：按 MMR 差找对手。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-3"><label for="t-16-3"><strong>实现分段匹配</strong>：1000 人入池，验证匹配效率。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-4"><label for="t-16-4"><strong>实现 Elo</strong>：验证「赢强手加分多、赢弱手加分少」。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-5"><label for="t-16-5"><strong>实现组队匹配</strong>：对比取最高和取平均的差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-16-6"><label for="t-16-6"><strong>回答面试题</strong>：① 匹配快和准怎么平衡？② 为什么要分段？③ 组队匹配取最高还是平均？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出「随时间放宽」的策略及参数</strong>；<br>
+    ② <strong>理解大规模匹配必须分段，否则 O(n²)</strong>；<br>
+    ③ <strong>能用 Elo 公式算分，并解释为什么赢弱手加分少</strong>；<br>
+    ④ <strong>知道组队匹配取最高能防止带小号</strong>；<br>
+    ⑤ 能实现一个可运行的匹配器。<br>
+    <br>
+    <em>第 ② 和 第 ③ 条最实用——**前者是架构问题，后者是面试常问**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="15-battle-server.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">15 战斗服与结算 ★★★</div>
+  </a>
+  <a class="next" href="17-leaderboard.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">17 排行榜 ★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

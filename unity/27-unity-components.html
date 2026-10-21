@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">C# + Unity 路线
+      <a href="index.html">C# + Unity 路线
         <span>从零基础到独立完成商业级项目</span>
       </a>
     </div>
@@ -279,7 +279,7 @@ public class AnimatorOptimized : MonoBehaviour
           <tr><td><code>rolloffMode</code></td><td>枚举</td><td>3D 衰减曲线，<strong>Linear 最可控</strong></td></tr>
           <tr><td><code>minDistance</code></td><td>米</td><td>此距离内保持最大音量，常用 1~3</td></tr>
           <tr><td><code>maxDistance</code></td><td>米</td><td>超出后不再衰减，常用 20~40</td></tr>
-          <tr><td><code>priority</code></td><td>0 ~ 256</td><td><strong>0 是最高优先级</strong>（很多人搞反）</td></tr>
+          <tr><td><code>priority</code></td><td>0 ~ 255</td><td><strong>0 是最高优先级</strong>（很多人搞反）</td></tr>
           <tr><td><code>dopplerLevel</code></td><td>0 ~ 5</td><td><strong>设为 0 关闭多普勒效应</strong></td></tr>
         </tbody>
       </table>
@@ -287,7 +287,7 @@ public class AnimatorOptimized : MonoBehaviour
 
       <div class="callout callout--danger">
         <span class="callout__title">两个反直觉的设计</span>
-        <strong>① priority 数字越小优先级越高。</strong>0 是最高，256 是最低。<em>BGM 应设成较低优先级（如 128），重要音效设 0</em>。<br>
+        <strong>① priority 数字越小优先级越高。</strong>0 是最高，255 是最低。<em>BGM 应设成较低优先级（如 128），重要音效设 0</em>。<br>
         <strong>② dopplerLevel 默认是 1，会产生多普勒效应。</strong>高速移动的物体（子弹、飞车）会因此出现<em>怪异的音调变化</em>。绝大多数游戏应该<strong>直接设为 0</strong>。
       </div>
 
@@ -323,7 +323,7 @@ public class AnimatorOptimized : MonoBehaviour
         <thead><tr><th>属性</th><th>用途</th><th>注意</th></tr></thead>
         <tbody>
           <tr><td><code>enabled</code></td><td>开关渲染</td><td><em>比 SetActive 轻量</em>，组件逻辑仍在运行</td></tr>
-          <tr><td><code>castShadows</code></td><td>是否投射阴影</td><td>关掉能<strong>显著省性能</strong></td></tr>
+          <tr><td><code>shadowCastingMode</code></td><td>是否投射阴影</td><td>关掉能<strong>显著省性能</strong>。<em><code>castShadows</code> 已标记 <code>[Obsolete]</code>（CS0618：Use shadowCastingMode instead）</em></td></tr>
           <tr><td><code>receiveShadows</code></td><td>是否接收阴影</td><td>地面保留，小物件关掉</td></tr>
           <tr><td><code>material</code></td><td>材质实例</td><td><strong>访问会克隆材质</strong>！</td></tr>
           <tr><td><code>sharedMaterial</code></td><td>共享材质</td><td><em>只读用这个，不会克隆</em></td></tr>
@@ -376,15 +376,11 @@ public class AnimatorOptimized : MonoBehaviour
       </div>
 
       <nav class="page-nav">
-        <a href="26-advanced-api.html">
-          <div class="dir">← 实践与参考</div>
-          <div class="title">26 进阶 API 与性能陷阱</div>
-        </a>
-        <a class="next" href="api-reference.html">
-          <div class="dir">参考 →</div>
-          <div class="title"> Unity API 速查</div>
-        </a>
-      </nav>
+  <a href="26-advanced-api.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">26 进阶 API 与性能陷阱</div>
+  </a>
+</nav>
     </main>
   </div>
 </div>

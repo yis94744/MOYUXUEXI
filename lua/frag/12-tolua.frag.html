@@ -4,7 +4,9 @@
 
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
-  [object Object]
+  上一页（11）讲了 xLua 的性能边界。这一页横向对比<em>xLua / ToLua / Puerts / HybridCLR</em>。<br>
+  <strong>关键衔接</strong>：页 09 的<em>热更原理</em>在这里变成选型标准——不管换哪个方案，"清缓存 + 旧引用 + 回滚"这三件事都跑不掉。<br>
+  <strong>下一页</strong>（13）开始搭框架。<em>选型定了，接下来才是怎么把框架搭起来。</em>
 </div>
 
 <h2 id="compare">一、四种方案的对比</h2>
@@ -14,9 +16,9 @@
   <thead><tr><th>方案</th><th>原理</th><th>优势</th><th>劣势</th></tr></thead>
   <tbody>
     <tr><td><strong>xLua</strong></td><td>Lua 虚拟机 + 绑定生成</td><td><em>功能全、社区大、支持热补丁</em></td><td>配置复杂</td></tr>
-    <tr><td><strong>ToLua</strong></td><td>同 xLua（同源）</td><td>更早成熟、文档多</td><td><em>性能略低、维护不如 xLua</em></td></tr>
+    <tr><td><strong>ToLua</strong></td><td>Lua 虚拟机 + 手写/生成 wrap（与 xLua 是<em>同一个思路</em>，不是同一份代码）</td><td>更早成熟、文档多</td><td><em>性能略低、维护不如 xLua</em></td></tr>
     <tr><td><strong>Puerts</strong></td><td><strong>TypeScript / JS</strong></td><td>类型安全、前端友好</td><td>包体大、生态较新</td></tr>
-    <tr><td><strong>HybridCLR</strong></td><td><strong>真正的 C# 热更</strong></td><td><span class="mk mk--yes">不需学新语言</span></td><td><span class="mk mk--no">iOS 有审核风险</span></td></tr>
+    <tr><td><strong>HybridCLR</strong></td><td><strong>真正的 C# 热更</strong>（内置 IL 解释器 + 补充元数据 AOT）</td><td><span class="mk mk--yes">不需学新语言</span></td><td><span class="mk mk--no">iOS 有审核风险、AOT 泛型要额外处理</span></td></tr>
   </tbody>
 </table>
 </div>

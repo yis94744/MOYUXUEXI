@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">Lua 热更新路线
+      <a href="index.html">Lua 热更新路线
         <span>从零基础到独立搭建可上线的热更框架</span>
       </a>
     </div>
@@ -44,7 +44,7 @@
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
   <strong>上一页</strong>（08）讲性能。这一页开始讲<em>热更新的原理</em>——这是 Lua 站在游戏行业的立足点。<br>
-  <strong>关键衔接</strong>：这一页会用到页 03 的<em>require 与模块缓存</em>——热更新的核心就是<em>如何绕过缓存重新加载模块</em>。<br>
+  <strong>关键衔接</strong>：这一页要讲的是 <code>require</code> 的<em>模块缓存</em>（<code>package.loaded</code>）——热更新的核心就是<em>如何绕过缓存重新加载模块</em>。<em>这是本页第一次系统讲到模块，之前八页都在讲语法。</em><br>
   <strong>后三页</strong>（10-12）讲具体的框架（xLua / ToLua）。<em>那些框架的本质就是这一页讲的三件事的工程实现。</em>
 </div>
 
@@ -52,8 +52,7 @@
       <div class="prereq">
         <div class="prereq__label">读这一页之前，建议先掌握</div>
         <div class="prereq__list">
-          <a class="prereq__item" href="09-hotupdate-basics.html#require" data-brief="package.loaded 缓存，热更要清缓存"><span class="prereq__title">require 与模块</span><span class="prereq__page">09-hotupdate-basics</span></a>
-          <a class="prereq__item" href="../unity/21-perf.html#workflow" data-brief="Profiler/Frame Debugger/Memory Profiler 的分工"><span class="prereq__title">性能分析工具</span><span class="prereq__page">21-perf</span></a>
+          <a class="prereq__item" href="08-lua-perf.html#data" data-brief="table.concat 远快于 ..；缓存全局函数的收益取决于调用层级（单层约 1.0~1.3 倍，两层链 2~2.9 倍），缓存全局变量约 2~3.5 倍"><span class="prereq__title">Lua 性能基础</span><span class="prereq__page">08-lua-perf</span></a>
         </div>
         <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
       </div>

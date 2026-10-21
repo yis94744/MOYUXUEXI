@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">C# + Unity 路线
+      <a href="index.html">C# + Unity 路线
         <span>从零基础到独立完成商业级项目</span>
       </a>
     </div>
@@ -253,7 +253,7 @@ public class InputAdapter : MonoBehaviour
     <tr><td><code>rolloffMode</code></td><td>枚举</td><td>3D 衰减曲线，<strong>Linear 最可控</strong></td></tr>
     <tr><td><code>minDistance</code></td><td>米</td><td>此距离内保持最大音量，常用 1~3</td></tr>
     <tr><td><code>maxDistance</code></td><td>米</td><td>超出后不再衰减，常用 20~40</td></tr>
-    <tr><td><code>priority</code></td><td>0 ~ 256</td><td><strong>0 是最高优先级</strong>（很多人搞反）</td></tr>
+    <tr><td><code>priority</code></td><td>0 ~ 255</td><td><strong>0 是最高优先级</strong>（很多人搞反）</td></tr>
     <tr><td><code>dopplerLevel</code></td><td>0 ~ 5</td><td><strong>设为 0 关闭多普勒效应</strong></td></tr>
   </tbody>
 </table>
@@ -261,7 +261,7 @@ public class InputAdapter : MonoBehaviour
 
 <div class="callout callout--danger">
   <span class="callout__title">两个反直觉的设计</span>
-  <strong>① priority 数字越小优先级越高。</strong>0 是最高，256 是最低。<em>BGM 应设成较低优先级（如 128），重要音效设 0。</em><br><br>
+  <strong>① priority 数字越小优先级越高。</strong>0 是最高，255 是最低。<em>BGM 应设成较低优先级（如 128），重要音效设 0。</em><br><br>
   <strong>② dopplerLevel 默认是 1，会产生多普勒效应。</strong>高速移动的物体（子弹、飞车）会因此出现<em>怪异的音调变化</em>。绝大多数游戏应该<strong>直接设为 0</strong>。
 </div>
 

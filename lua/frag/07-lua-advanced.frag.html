@@ -14,7 +14,330 @@
 
 <p>协程<strong>不是线程</strong>，而是<em>可以暂停与恢复的函数</em>。它的价值在于——<strong>用同步的写法表达异步的逻辑</strong>。</p>
 
-<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>07/advanced</code></div>
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  Lua 高级特性：协程、错误处理、GC、环境
+-- ============================================================
+
+print("=== 1. 协程（coroutine）：Lua 的并发原语 ===")
+-- 协程不是线程，而是【可以暂停与恢复的函数】。
+-- 它解决了"状态机要写一堆变量来记住进度"的问题。
+
+local co = coroutine.create(function(a, b)
+  print("  协程开始, 参数:", a, b)
+
+  local c = coroutine.yield(a + b)      -- 暂停，交出控制权
+  print("  协程恢复, 收到:", c)
+
+  local d = coroutine.yield(c * 2)
+  print("  再次恢复, 收到:", d)
+
+  return "完成"
+end)
+
+print("  状态:", coroutine.status(co))                   -- suspended
+print("  第一次 resume:", coroutine.resume(co, 10, 20))  -- true, 30
+print("  状态:", coroutine.status(co))                   -- suspended
+print("  第二次 resume:", coroutine.resume(co, 5))       -- true, 10
+print("  第三次 resume:", coroutine.resume(co, 99))      -- true, "完成"
+print("  状态:", coroutine.status(co))                   -- dead
+
+-- 对已结束的协程 resume
+local ok, err = coroutine.resume(co)
+print("  对已结束的协程 resume:", ok, err)
+
+-- status 的第四个取值 normal：A 里 resume B 时，B 看 A 就是 "normal"
+local A, B
+A = coroutine.create(function() coroutine.resume(B) end)
+B = coroutine.create(function()
+  print("  A resume B 时，B 看 A 的状态:", coroutine.status(A))   -- normal
+end)
+coroutine.resume(A)
+
+print()
+print("=== 2. 用协程写迭代器（最实用的场景）===")
+-- 协程配合 coroutine.wrap 可以写非常优雅的遍历器
+
+-- 用协程生成斐波那契数列（无限序列）
+local function fibGenerator()
+  return coroutine.wrap(function()
+    local a, b = 0, 1
+    while true do
+      coroutine.yield(a)
+      a, b = b, a + b
+    end
+  end)
+end
+
+local fib = fibGenerator()
+local result = {}
+for i = 1, 10 do
+  result[#result + 1] = fib()
+end
+print("  斐波那契前 10 项:", table.concat(result, ", "))
+
+-- 用协程遍历树（比递归+回调更直观）
+local tree = {
+  value = 1,
+  children = {
+    { value = 2, children = { { value = 4 }, { value = 5 } } },
+    { value = 3, children = { { value = 6 } } },
+  }
+}
+
+local function traverse(node)
+  return coroutine.wrap(function()
+    local function walk(n)
+      coroutine.yield(n.value)
+      if n.children then
+        for _, child in ipairs(n.children) do
+          walk(child)
+        end
+      end
+    end
+    walk(node)
+  end)
+end
+
+local values = {}
+for v in traverse(tree) do
+  values[#values + 1] = v
+end
+print("  树遍历结果:", table.concat(values, ", "))
+
+print()
+print("=== 3. 错误处理：pcall / xpcall / error ===")
+
+-- pcall：protected call，捕获异常
+local ok2, err2 = pcall(function()
+  error("出错了")
+end)
+print("  pcall 捕获:", ok2, err2)
+
+-- 【重要】error 的第二个参数决定错误位置信息
+-- level 0：不添加位置信息
+-- level 1（默认）：报错位置是 error 被调用的地方
+-- level 2：报错位置是【调用 error 所在函数】的地方
+local function badFunc()
+  error("内部错误", 2)   -- 报错会指向调用 badFunc 的地方
+end
+local ok3, err3 = pcall(badFunc)
+print("  level 2 的错误信息:", err3)
+
+-- xpcall：带消息处理器（可以获取堆栈）
+local ok4, err4 = xpcall(
+  function() error("带堆栈的错误") end,
+  function(e)
+    return "处理过的: " .. tostring(e)
+  end
+)
+print("  xpcall:", ok4, err4)
+
+-- 【5.2+ 新特性】xpcall 支持额外参数
+local ok5, err5 = xpcall(
+  function(a, b) error("参数是 " .. a .. "," .. b) end,
+  function(e) return e end,
+  "X", "Y"
+)
+print("  xpcall 传参:", ok5, err5)
+
+-- 【错误处理的最佳实践】返回 nil + 错误信息 而不是抛异常
+local function divideSafely(a, b)
+  if b == 0 then
+    return nil, "除数不能为 0"
+  end
+  return a / b
+end
+local r, e = divideSafely(10, 0)
+print("  安全除法:", r, e)
+
+print()
+print("=== 4. assert：条件断言 ===")
+local ok6, err6 = pcall(function()
+  assert(1 == 2, "断言失败的信息")
+end)
+print("  assert 失败:", ok6, err6)
+
+-- assert 的常见用法：校验参数
+local function mustBePositive(n)
+  assert(type(n) == "number", "参数必须是数字")
+  assert(n &gt; 0, "参数必须为正数")
+  return n
+end
+print("  合法参数:", mustBePositive(5))
+local ok7, err7 = pcall(mustBePositive, -1)
+print("  非法参数:", ok7, err7)
+
+print()
+print("=== 5. 垃圾回收与弱表 ===")
+
+-- collectgarbage 的常用操作
+print("  当前内存占用(KB):", math.floor(collectgarbage("count")))
+
+-- 创建大量垃圾
+for i = 1, 10000 do
+  local _ = { i, i + 1 }
+end
+collectgarbage("collect")
+print("  GC 后内存(KB):", math.floor(collectgarbage("count")))
+
+-- 【重要】弱表：对象不被引用时自动回收
+local weakCache = setmetatable({}, { __mode = "v" })
+
+-- 强引用存在时，弱表条目保留
+local strongRef = { name = "被引用" }
+weakCache.a = strongRef
+collectgarbage("collect")
+print("  强引用还在:", weakCache.a ~= nil)
+
+-- 去掉强引用后，弱表条目消失
+strongRef = nil
+collectgarbage("collect")
+print("  强引用移除后:", weakCache.a)
+
+-- 【实战应用】弱表做对象缓存，不会阻止对象被回收
+local function createWeakCache()
+  return setmetatable({}, { __mode = "k" })
+end
+local boundData = createWeakCache()   -- key 是对象，对象没了条目就自动清
+
+print()
+print("=== 6. 环境与模块 ===")
+
+-- _ENV 是 Lua 5.2+ 的机制，取代了旧版的 setfenv/getfenv
+local function sandboxed()
+  -- 通过 _ENV 限制这个函数能访问的全局变量
+  local env = {
+    print = print,
+    result = nil,
+  }
+
+  local f = load([[
+    print("  沙箱内可以调用 print")
+    result = 42
+  ]], "sandbox", "t", env)
+
+  f()
+  return env.result
+end
+print("  沙箱返回值:", sandboxed())
+
+-- 【实战应用】沙箱用于：配置表的限制执行、热更脚本的安全加载
+print("  沙箱的用途: 限制脚本能访问的 API，防止恶意/错误代码破坏环境")
+
+print()
+print("=== 7. 元表高级：__gc 与 __close ===")
+
+-- __gc：对象被回收前调用（需要在元表里【提前】设置）
+local gcLog = {}
+do
+  local mt = {
+    __gc = function(obj)
+      gcLog[#gcLog + 1] = obj.name
+    end
+  }
+  -- 【注意】必须在 setmetatable 时元表就已经有 __gc
+  local a = setmetatable({ name = "objA" }, mt)
+  local b = setmetatable({ name = "objB" }, mt)
+end
+collectgarbage("collect")
+print("  __gc 触发:", table.concat(gcLog, ", "))
+
+-- __close（Lua 5.4）：to-be-closed 变量，离开作用域时自动调用
+do
+  local closer = setmetatable({ name = "资源" }, {
+    __close = function(self, err)
+      print("  __close 被调用:", self.name, "错误:", err)
+    end
+  })
+  local resource &lt;close&gt; = closer
+  print("  to-be-closed 变量已创建")
+end
+print("  离开作用域后 __close 自动触发")
+
+-- 【实战应用】__close 用于自动释放资源（文件句柄、锁）
+-- 相当于 C# 的 using 或 Python 的 with
+
+print()
+print("=== 8. 字符串与模式匹配 ===")
+
+-- Lua 的模式匹配（不是正则，但够用且更快）
+local text = "玩家ID: 12345, 等级: 30, 金币: 9999"
+
+-- 提取所有数字
+local nums = {}
+for n in text:gmatch("%d+") do
+  nums[#nums + 1] = n
+end
+print("  提取的数字:", table.concat(nums, ", "))
+
+-- 捕获组
+local id, level, gold = text:match("ID: (%d+), 等级: (%d+), 金币: (%d+)")
+print("  捕获组:", id, level, gold)
+
+-- gsub 替换
+local masked = text:gsub("%d+", "***")
+print("  替换后:", masked)
+
+-- 【重要】模式的特殊字符需要用 % 转义
+local special = "价格是 99.9 元"
+local price = special:match("(%d+%.?%d*)")    -- . 需要转义成 %.
+print("  提取价格:", price)
+
+-- find 的 plain 参数：第四个参数为 true 时按纯文本查找
+local pos = string.find("a.b.c", ".", 1, true)    -- true = 不用模式
+print("  纯文本查找 . 的位置:", pos)               -- 2
+
+local pos2 = string.find("a.b.c", ".")            -- 不用 true 时 . 匹配任意字符
+print("  模式查找 . 的位置:", pos2)                -- 1
+
+print()
+print("=== 9. 实用工具函数 ===")
+
+-- 深拷贝（处理循环引用）
+local function deepCopy(obj, seen)
+  if type(obj) ~= "table" then return obj end
+  seen = seen or {}
+  if seen[obj] then return seen[obj] end
+
+  local copy = {}
+  seen[obj] = copy
+  for k, v in pairs(obj) do
+    copy[deepCopy(k, seen)] = deepCopy(v, seen)
+  end
+  return setmetatable(copy, getmetatable(obj))
+end
+
+local original = { a = 1, b = { c = 2 } }
+original.self = original                   -- 循环引用
+local copied = deepCopy(original)
+print("  深拷贝:", copied.a, copied.b.c, "循环引用:", copied.self == copied)
+
+-- 表序列化（用于调试输出）
+local function serialize(t, indent)
+  indent = indent or ""
+  if type(t) ~= "table" then
+    if type(t) == "string" then return string.format("%q", t) end
+    return tostring(t)
+  end
+
+  local parts = {}
+  for k, v in pairs(t) do
+    parts[#parts + 1] = indent .. "  [" .. serialize(k) .. "] = " .. serialize(v, indent .. "  ")
+  end
+  return "{\n" .. table.concat(parts, ",\n") .. "\n" .. indent .. "}"
+end
+
+print("  序列化:", serialize({ x = 1, name = "test" }))
+
+-- 参数校验工具
+local function checkArgs(...)
+  local args = { ... }
+  for i, v in ipairs(args) do
+    print(string.format("    参数 %d: %s = %s", i, type(v), tostring(v)))
+  end
+end
+print("  参数校验:")
+checkArgs(1, "str", true, {})</code></pre>
 
 <div class="table-wrap">
 <table>
@@ -23,7 +346,7 @@
     <tr><td><code>coroutine.create</code></td><td>创建协程</td><td>协程对象</td></tr>
     <tr><td><code>coroutine.resume</code></td><td>启动/恢复</td><td><strong>true/false, 返回值</strong></td></tr>
     <tr><td><code>coroutine.yield</code></td><td>暂停并交出值</td><td>—</td></tr>
-    <tr><td><code>coroutine.status</code></td><td>查询状态</td><td><code>suspended</code>/<code>running</code>/<code>dead</code></td></tr>
+    <tr><td><code>coroutine.status</code></td><td>查询状态</td><td><strong>4 种取值</strong>：<code>running</code>（自己）/ <code>suspended</code>（没跑或让出）/ <code>normal</code>（A 里 resume B 时，B 看 A）/ <code>dead</code></td></tr>
     <tr><td><code>coroutine.wrap</code></td><td>包装成函数</td><td><strong>直接调用，出错会抛出</strong></td></tr>
   </tbody>
 </table>

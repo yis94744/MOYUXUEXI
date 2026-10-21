@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">C# + Unity 路线
+      <a href="index.html">C# + Unity 路线
         <span>从零基础到独立完成商业级项目</span>
       </a>
     </div>
@@ -360,7 +360,7 @@ public class CanvasRebuildDemo : MonoBehaviour
 //  每个 Canvas 都会打断合批，产生额外的 Draw Call。
 //  经验值：一个界面拆 2~4 个 Canvas 比较合理。
 //
-//  【补充】Unity 2020+ 的「Nested Canvas」：
+//  【补充】「Nested Canvas」（Unity 2019.1 引入的嵌套 Canvas，至今仍是同一个机制）：
 //  子 Canvas 有自己的网格，但会和父 Canvas 一起渲染。
 //  它比独立 Canvas 轻量，但仍能隔离重建。</code></pre>
 
@@ -387,7 +387,7 @@ public class CanvasRebuildDemo : MonoBehaviour
   </div>
   <strong>但不要拆得太碎。</strong>每个 Canvas 都会<em>打断合批</em>，产生额外的 Draw Call。<br>
   <strong>经验值：一个界面拆 2~4 个 Canvas 比较合理。</strong><br><br>
-  <strong>补充</strong>：Unity 2020+ 的<strong>嵌套 Canvas（Nested Canvas）</strong>有自己的网格，但会和父 Canvas 一起渲染。它比独立 Canvas 轻量，<em>但仍能隔离重建</em>——是拆分的更好选择。
+  <strong>补充</strong>：<strong>嵌套 Canvas（Nested Canvas）</strong>有自己的网格，但会和父 Canvas 一起渲染。它比独立 Canvas 轻量，<em>但仍能隔离重建</em>——是拆分的更好选择。
 </div>
 
 <h2 id="optimize">三、UGUI 优化清单</h2>
@@ -419,14 +419,13 @@ public class CanvasRebuildDemo : MonoBehaviour
 <h2 id="tmp">四、TextMeshPro 的注意事项</h2>
 
 <div class="callout callout--danger">
-  <span class="callout__title">TMP 的 SetText 不解析格式说明符</span>
-  很多人以为 <code>SetText</code> 的数值重载会像 <code>string.Format</code> 那样支持格式串，<strong>但实际上不会</strong>。<br><br>
-  我反汇编了 <code>Unity.TextMeshPro.dll</code> 确认过：<code>SetText</code> 有 20 个重载（含 <code>string</code>、<code>StringBuilder</code>、<code>char[]</code>，以及 1 到 8 个 float 参数的版本）。<br>
-  但在处理 float 参数的实现里，<em>字符常量只有 <code>{</code>（123）和 <code>}</code>（125）</em>——<strong>没有冒号（58）</strong>。<br><br>
-  <strong>所以 <code>SetText("{0:F1}", 3.14159f)</code> 不会被识别为格式串</strong>，冒号后面的内容会被原样输出。<br><br>
+  <span class="callout__title">TMP 的 SetText 只认一小部分格式说明符</span>
+  <code>SetText</code> 的数值重载<strong>不是</strong> <code>string.Format</code> 的等价物——它自己写了一个极简的解析器。<br><br>
+  我读了 <code>TMP_Text.cs</code>（<code>com.unity.textmeshpro</code>）里 8 个 float 参数那个重载的实现确认过：解析器<strong>确实跳过冒号</strong>（<code>if (c == ':') continue;</code>），但冒号之后<em>只认 <code>#</code>（占位）、<code>0</code>（补零位数）、<code>,</code>（千分位）、<code>.</code>（小数位）和 1~9（旧式精度位）</em>。<br><br>
+  也就是说 <code>{0}</code>、<code>{0:00}</code>、<code>{0:000.0}</code>、<code>{0:#,###.0}</code> 都能用（官方注释里的示例就是 <code>SetText("A = {0}, B = {1:00}, C = {2:000.0}", 10.75f, 10.75f, 10.75f)</code>），<strong>但 <code>F1</code> / <code>N2</code> / <code>P0</code> 这类标准 .NET 说明符不行</strong>——字母 <code>F</code> 会被当成普通字符原样写进文本里。<br><br>
   <strong>正确做法</strong>：<br>
-  • 需要格式化就先用 <code>ToString("F1")</code> 转成字符串，再传给 <code>SetText</code>；<br>
-  • 或者直接用 <code>SetText(string)</code> 重载配合插值字符串（<em>但注意插值字符串会产生 GC 分配</em>）。
+  • 会用 <code>SetText("{0:0.0}", hp)</code> 这种 TMP 自己的写法；<br>
+  • 或者先用 <code>ToString("F1")</code> 转成字符串，再传给 <code>SetText(string)</code>（<em>插值字符串会产生 GC 分配</em>）。
 </div>
 
 <div class="callout callout--tip">

@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">Lua 热更新路线
+      <a href="index.html">Lua 热更新路线
         <span>从零基础到独立搭建可上线的热更框架</span>
       </a>
     </div>
@@ -53,8 +53,8 @@
       <div class="prereq">
         <div class="prereq__label">读这一页之前，建议先掌握</div>
         <div class="prereq__list">
-          <a class="prereq__item" href="../unity/05-cs-adv.html#delegate" data-brief="event 是委托的安全封装，订阅必须成对取消否则内存泄漏"><span class="prereq__title">委托与事件</span><span class="prereq__page">05-cs-adv</span></a>
-          <a class="prereq__item" href="../unity/05-cs-adv.html#closure" data-brief="Lambda 捕获外部变量会生成堆对象，每帧执行就是每帧分配"><span class="prereq__title">闭包与捕获</span><span class="prereq__page">05-cs-adv</span></a>
+          <a class="prereq__item" href="../gamedev-csharp-unity/05-cs-adv.html#delegate" data-brief="event 是委托的安全封装，订阅必须成对取消否则内存泄漏"><span class="prereq__title">委托与事件</span><span class="prereq__page">05-cs-adv</span></a>
+          <a class="prereq__item" href="../gamedev-csharp-unity/05-cs-adv.html#closure" data-brief="Lambda 捕获外部变量会生成堆对象，每帧执行就是每帧分配"><span class="prereq__title">闭包与捕获</span><span class="prereq__page">05-cs-adv</span></a>
         </div>
         <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
       </div>
@@ -323,10 +323,11 @@ print("结果一致:", s1 == s2 and s2 == N * 2)</code></pre>
 
 <div class="callout callout--danger">
   <span class="callout__title">闭包的性能陷阱：循环内创建</span>
-  实测数据（Lua 5.4，300 万次循环）：<br>
-  • 循环内每次创建闭包：<strong>0.34 秒</strong><br>
-  • 循环外创建一次复用：<strong>0.07 秒</strong><br>
-  • <strong>相差约 5 倍</strong><br><br>
+  实测数据（Lua 5.4.7，300 万次循环）：<br>
+  • 循环内每次创建闭包：<strong>约 0.22~0.37 秒</strong><br>
+  • 循环外创建一次复用：<strong>约 0.065~0.08 秒</strong><br>
+  • <strong>相差约 3~6 倍</strong>——预热后再测稳定在 <strong>约 3 倍</strong>；<br>
+  &nbsp;&nbsp;首次运行（含 GC 预热）会偏大，<strong>以本页代码块实际打印的倍数与耗时为谁</strong>。<br><br>
   <strong>原因</strong>：每次创建闭包都会<em>分配一个新的函数对象</em>并捕获变量，这有内存分配成本。<br><br>
   <strong>规则</strong>：<em>热路径（Update、循环体）里不要在循环内创建匿名函数</em>。<br>
   把函数提到循环外，或定义成模块级局部函数。

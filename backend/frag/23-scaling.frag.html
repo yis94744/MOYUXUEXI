@@ -1,0 +1,587 @@
+<h1>23 · 扩展性与高可用 ★★</h1>
+
+<p class="lead">这一页讲<strong>怎么从一台机器撑到一百台</strong>。<em>核心前提是「无状态化」</em>，然后用<strong>负载均衡、限流、熔断、分片</strong>组合起来。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（22）部署与运维 —— Linux、Nginx、进程守护、Docker、CI/CD。<br>
+  <strong>这一页</strong>（23）扩展性与高可用 —— 负载均衡、无状态化、分库分表、限流熔断。<br>
+  <strong>下一页</strong>（24）安全与合规 —— SQL 注入、XSS、CSRF、越权、数据加密、隐私合规。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+<h2 id="levels">一、扩展性的三个层次</h2>
+
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace BackendSamples.Scaling
+{
+    // ============================================================
+    // 1. 扩展性的三个层次
+    // ============================================================
+
+    public static class ScalingLevels
+    {
+        public static readonly (string Level, string How, string Limit, string Cost)[] All =
+        {
+            ("垂直扩展", "加 CPU/内存",       "有物理上限",       "高"),
+            ("水平扩展", "加机器",            "【要求无状态】",   "低"),
+            ("架构优化", "缓存/异步/分片",    "复杂",             "中"),
+        };
+
+        public static string Recommend(bool stateful, bool canRefactor)
+        {
+            if (!stateful) return "水平扩展（加机器即可）";
+            if (canRefactor) return "先改造成无状态，再水平扩展";
+            return "垂直扩展 + 架构优化（缓存/异步）";
+        }
+    }
+
+    // ============================================================
+    // 2. 无状态化：水平扩展的前提 ★★★
+    // ============================================================
+    // 【核心问题】Session 存在本机，换一台机器就丢了
+
+    public class StatefulServer
+    {
+        // 【错误】状态存在进程内存
+        private readonly Dictionary&lt;string, long&gt; _sessions = new();
+        public int LocalSessionCount =&gt; _sessions.Count;
+
+        public void Login(string token, long playerId) =&gt; _sessions[token] = playerId;
+
+        public long? GetPlayer(string token) =&gt;
+            _sessions.TryGetValue(token, out long id) ? id : null;
+
+        // 【问题】扩展到 2 台机器后：
+        //   玩家在 A 机登录，请求被负载均衡到 B 机 -&gt; 查不到 session
+    }
+
+    public class StatelessServer
+    {
+        // 【正确】状态放外部存储（Redis）
+        private readonly FakeRedis _redis;
+        public StatelessServer(FakeRedis redis) =&gt; _redis = redis;
+
+        public void Login(string token, long playerId) =&gt; _redis.Set("session:" + token, playerId.ToString());
+
+        public long? GetPlayer(string token)
+        {
+            var v = _redis.Get("session:" + token);
+            return v != null ? long.Parse(v) : null;
+        }
+
+        // 【关键】任何一台机器都能服务任何请求
+    }
+
+    public class FakeRedis
+    {
+        private readonly Dictionary&lt;string, string&gt; _data = new();
+        public void Set(string k, string v) =&gt; _data[k] = v;
+        public string? Get(string k) =&gt; _data.TryGetValue(k, out var v) ? v : null;
+        public int Count =&gt; _data.Count;
+    }
+
+    // ============================================================
+    // 3. 负载均衡算法
+    // ============================================================
+
+    public class LoadBalancer
+    {
+        private readonly List&lt;string&gt; _servers;
+        private int _roundRobinIndex;
+        private readonly Dictionary&lt;string, int&gt; _connCount = new();
+
+        public LoadBalancer(List&lt;string&gt; servers)
+        {
+            _servers = servers;
+            foreach (var s in servers) _connCount[s] = 0;
+        }
+
+        // 【算法1】轮询：简单，不关心服务器负载
+        public string RoundRobin()
+        {
+            var s = _servers[_roundRobinIndex % _servers.Count];
+            _roundRobinIndex++;
+            return s;
+        }
+
+        // 【算法2】最少连接：把请求给当前连接最少的
+        public string LeastConnections()
+        {
+            var s = _servers.OrderBy(x =&gt; _connCount[x]).First();
+            _connCount[s]++;
+            return s;
+        }
+
+        public void Release(string server) =&gt; _connCount[server] = Math.Max(0, _connCount[server] - 1);
+
+        // 【算法3】一致性哈希：同一玩家固定到同一台（有状态服务用）
+        public string ConsistentHash(string key)
+        {
+            // 【简化】用哈希取模
+            int hash = 0;
+            foreach (char c in key) hash = (hash * 31 + c) % 1000000;
+            return _servers[Math.Abs(hash) % _servers.Count];
+        }
+
+        // 【一致性哈希的问题】增加/删除服务器时，大量 key 会重新映射
+        public static string ExplainMigration(int oldCount, int newCount)
+        {
+            double migrated = 1.0 - (double)Math.Min(oldCount, newCount) / Math.Max(oldCount, newCount);
+            return $"从 {oldCount} 台扩到 {newCount} 台，约 {migrated * 100:F0}% 的 key 会迁移";
+        }
+
+        public Dictionary&lt;string, int&gt; Stats =&gt; new(_connCount);
+    }
+
+    // ============================================================
+    // 4. 限流：保护自己不被压垮
+    // ============================================================
+
+    public class RateLimiter
+    {
+        // ---- 算法1：固定窗口（简单但有边界问题）----
+        private DateTime _windowStart = DateTime.UtcNow;
+        private int _windowCount;
+        private readonly int _limitPerWindow;
+        private readonly int _windowSec;
+
+        public RateLimiter(int limitPerWindow, int windowSec = 1)
+        {
+            _limitPerWindow = limitPerWindow;
+            _windowSec = windowSec;
+        }
+
+        public bool TryFixedWindow(DateTime now)
+        {
+            if ((now - _windowStart).TotalSeconds &gt;= _windowSec)
+            {
+                _windowStart = now;
+                _windowCount = 0;
+            }
+
+            if (_windowCount &gt;= _limitPerWindow) return false;
+            _windowCount++;
+            return true;
+        }
+
+        // 【问题】固定窗口的边界：0.9秒发满 + 1.1秒又发满 = 2倍流量
+
+        // ---- 算法2：滑动窗口（更平滑）----
+        private readonly Queue&lt;DateTime&gt; _requests = new();
+
+        public bool TrySlidingWindow(DateTime now)
+        {
+            // 清掉过期的
+            while (_requests.Count &gt; 0 &amp;&amp; (now - _requests.Peek()).TotalSeconds &gt;= _windowSec)
+                _requests.Dequeue();
+
+            if (_requests.Count &gt;= _limitPerWindow) return false;
+            _requests.Enqueue(now);
+            return true;
+        }
+
+        // ---- 算法3：令牌桶（允许突发）----
+        private double _tokens;
+        private DateTime _lastRefill = DateTime.UtcNow;
+        private readonly double _capacity;
+        private readonly double _refillPerSec;
+
+        public RateLimiter(double capacity, double refillPerSec)
+        {
+            _capacity = capacity;
+            _refillPerSec = refillPerSec;
+            _tokens = capacity;
+        }
+
+        public bool TryTokenBucket(DateTime now, int cost = 1)
+        {
+            // 补充令牌
+            var elapsed = (now - _lastRefill).TotalSeconds;
+            _tokens = Math.Min(_capacity, _tokens + elapsed * _refillPerSec);
+            _lastRefill = now;
+
+            if (_tokens &lt; cost) return false;
+            _tokens -= cost;
+            return true;
+        }
+
+        public double RemainingTokens =&gt; _tokens;
+    }
+
+    // ============================================================
+    // 5. 熔断与降级
+    // ============================================================
+
+    public class CircuitBreaker
+    {
+        public enum State { Closed, Open, HalfOpen }
+
+        private State _state = State.Closed;
+        private int _failureCount;
+        private DateTime _openedAt;
+        private readonly int _threshold;
+        private readonly int _openSeconds;
+
+        public CircuitBreaker(int threshold = 5, int openSeconds = 10)
+        {
+            _threshold = threshold;
+            _openSeconds = openSeconds;
+        }
+
+        public State CurrentState =&gt; _state;
+
+        public (bool Allowed, string Reason) TryCall(DateTime now)
+        {
+            switch (_state)
+            {
+                case State.Closed:
+                    return (true, "正常调用");
+
+                case State.Open:
+                    // 熔断中：等一段时间后尝试半开
+                    if ((now - _openedAt).TotalSeconds &gt;= _openSeconds)
+                    {
+                        _state = State.HalfOpen;
+                        return (true, "半开：试探调用");
+                    }
+                    return (false, $"熔断中（{_openSeconds - (now - _openedAt).TotalSeconds:F0}s 后重试）");
+
+                case State.HalfOpen:
+                    return (true, "半开：试探调用");
+
+                default:
+                    return (false, "未知状态");
+            }
+        }
+
+        public void RecordSuccess()
+        {
+            _failureCount = 0;
+            _state = State.Closed;
+        }
+
+        public void RecordFailure(DateTime now)
+        {
+            _failureCount++;
+
+            if (_state == State.HalfOpen || _failureCount &gt;= _threshold)
+            {
+                _state = State.Open;
+                _openedAt = now;
+                _failureCount = 0;
+            }
+        }
+    }
+
+    // ============================================================
+    // 6. 分库分表
+    // ============================================================
+
+    public class Sharding
+    {
+        // 【为什么分】单表 5000 万行后，索引效率急剧下降
+        public static readonly (string Strategy, string How, string Pros, string Cons)[] Strategies =
+        {
+            ("按用户ID取模", "id % N", "分布均匀", "扩容要迁移"),
+            ("按范围",       "id 1-1000万 → 库1", "好扩容", "热点集中"),
+            ("一致性哈希",   "哈希环", "扩容影响小", "实现复杂"),
+            ("按业务",       "玩家/订单/日志分库", "隔离性好", "不能跨库join"),
+        };
+
+        // 【关键问题】分表后怎么查「全服排名」？
+        public static string ExplainCrossShardQuery()
+        {
+            return "各分库分别查前 100 -&gt; 汇总再排 -&gt; 取前 100（两阶段查询）";
+        }
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 扩展性的三个层次 ===");
+            foreach (var (lvl, how, limit, cost) in ScalingLevels.All)
+            {
+                Console.WriteLine($"    {lvl,-12} {how,-16} 上限: {limit,-18} 成本: {cost}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine($"  无状态服务: {ScalingLevels.Recommend(false, true)}");
+            Console.WriteLine($"  有状态服务: {ScalingLevels.Recommend(true, true)}");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 无状态化：Session 存哪 ===");
+            var stateful = new StatefulServer();
+            stateful.Login("token-abc", 1001);
+            Console.WriteLine($"  【错误】Session 存在本机: {stateful.LocalSessionCount} 条");
+            Console.WriteLine($"    扩到 2 台后 -&gt; 玩家请求打到另一台 -&gt; 查不到 session");
+
+            var redis = new FakeRedis();
+            var stateless = new StatelessServer(redis);
+            stateless.Login("token-abc", 1001);
+            Console.WriteLine();
+            Console.WriteLine($"  【正确】Session 存 Redis: {redis.Count} 条");
+            Console.WriteLine($"    任意机器都能查到: playerId={stateless.GetPlayer("token-abc")}");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 负载均衡 ===");
+            var servers = new List&lt;string&gt; { "srv-1", "srv-2", "srv-3" };
+            var lb = new LoadBalancer(servers);
+
+            Console.WriteLine("  【轮询】10 个请求:");
+            var rr = new List&lt;string&gt;();
+            for (int i = 0; i &lt; 10; i++) rr.Add(lb.RoundRobin());
+            Console.WriteLine($"    {string.Join(", ", rr)}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【一致性哈希】同一玩家固定到同一台:");
+            foreach (var pid in new[] { "player-1001", "player-1002", "player-1001" })
+            {
+                Console.WriteLine($"    {pid} -&gt; {lb.ConsistentHash(pid)}");
+            }
+            Console.WriteLine("    【注意】player-1001 两次都到同一台");
+
+            Console.WriteLine();
+            Console.WriteLine($"  【扩容问题】{LoadBalancer.ExplainMigration(3, 4)}");
+            Console.WriteLine("    3 台扩到 4 台，25% 的 key 要迁移");
+            Console.WriteLine("    如果是 3 台扩到 100 台，97% 都要迁移！");
+            Console.WriteLine("    -&gt; 所以要用「一致性哈希环」，只迁移相邻的一段");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 限流算法对比 ===");
+            var now = DateTime.UtcNow;
+
+            // 固定窗口
+            var fw = new RateLimiter(5, 1);
+            int fwPass = 0;
+            for (int i = 0; i &lt; 10; i++) if (fw.TryFixedWindow(now)) fwPass++;
+            Console.WriteLine($"  【固定窗口】限 5 次/秒，10 个请求通过 {fwPass} 个");
+
+            // 滑动窗口
+            var sw = new RateLimiter(5, 1);
+            int swPass = 0;
+            for (int i = 0; i &lt; 10; i++) if (sw.TrySlidingWindow(now)) swPass++;
+            Console.WriteLine($"  【滑动窗口】限 5 次/秒，10 个请求通过 {swPass} 个");
+
+            // 令牌桶
+            var tb = new RateLimiter(5.0, 1.0);
+            int tbPass = 0;
+            for (int i = 0; i &lt; 10; i++) if (tb.TryTokenBucket(now)) tbPass++;
+            Console.WriteLine($"  【令牌桶】容量 5，10 个请求通过 {tbPass} 个");
+
+            Console.WriteLine();
+            Console.WriteLine("  【区别】");
+            Console.WriteLine("    · 固定窗口：简单，但边界处可能有 2 倍突发");
+            Console.WriteLine("    · 滑动窗口：平滑，但要多存请求时间戳");
+            Console.WriteLine("    · 令牌桶：允许突发（桶里攒的令牌），最符合实际需求");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 5. 熔断器 ===");
+            var cb = new CircuitBreaker(threshold: 3, openSeconds: 5);
+            var t0 = DateTime.UtcNow;
+
+            Console.WriteLine("  连续失败 3 次:");
+            for (int i = 0; i &lt; 3; i++)
+            {
+                var (allowed, reason) = cb.TryCall(t0);
+                Console.WriteLine($"    第 {i + 1} 次调用: {reason}");
+                cb.RecordFailure(t0);
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  第 4 次调用（已熔断）:");
+            var (a4, r4) = cb.TryCall(t0.AddSeconds(1));
+            Console.WriteLine($"    {r4}");
+
+            Console.WriteLine();
+            Console.WriteLine("  10 秒后（转半开）:");
+            var (a5, r5) = cb.TryCall(t0.AddSeconds(10));
+            Console.WriteLine($"    {r5}，状态={cb.CurrentState}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【熔断的价值】");
+            Console.WriteLine("    · 下游服务挂了，不要一直重试（会雪崩）");
+            Console.WriteLine("    · 直接返回兜底数据，保护调用方");
+            Console.WriteLine("    · 等下游恢复后自动半开试探");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 6. 分库分表策略 ===");
+            foreach (var (s, how, pros, cons) in Sharding.Strategies)
+            {
+                Console.WriteLine($"    {s,-12} {how,-24} 优点: {pros,-12} 缺点: {cons}");
+            }
+            Console.WriteLine();
+            Console.WriteLine($"  【分表后的跨表查询】{Sharding.ExplainCrossShardQuery()}");
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Scaling.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>层次</th><th>做法</th><th>限制</th></tr></thead>
+  <tbody>
+    <tr><td><strong>垂直</strong></td><td>加 CPU / 内存</td><td><em>有物理上限</em></td></tr>
+    <tr><td><strong>水平</strong></td><td>加机器</td><td><strong>要求无状态</strong></td></tr>
+    <tr><td><strong>架构</strong></td><td>缓存 / 异步 / 分片</td><td>复杂</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="stateless">二、无状态化：水平扩展的前提 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">Session 存本机 = 无法水平扩展</span>
+  <strong>本页实测的对比</strong>：<br><br>
+  <strong>【错误】Session 存进程内存</strong><br>
+  <code>Login("token-abc", 1001) -&gt; 本机 1 条</code><br>
+  <em>扩到 2 台后 → 玩家请求打到另一台 → 查不到 session → 被踢下线</em><br><br>
+  <strong>【正确】Session 存 Redis</strong><br>
+  <code>Login 写入 Redis -&gt; 任意机器都能查到</code><br>
+  <code>GetPlayer("token-abc") = 1001</code><br><br>
+  <strong>除了 Session，还有哪些状态要外置</strong>：<br>
+  · <em>上传的临时文件</em> → 对象存储<br>
+  · <em>缓存的本地数据</em> → Redis<br>
+  · <strong>定时任务的状态</strong> → 数据库（<em>否则每台都跑一遍</em>）<br>
+  · <em>WebSocket 连接</em> → <strong>这个没法外置</strong>（<em>见页 11，网关要特殊处理</em>）
+</div>
+
+<h2 id="lb">三、负载均衡的三种算法 ★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">本页实现的三种</span>
+  <strong>① 轮询（Round Robin）</strong><br>
+  <code>srv-1, srv-2, srv-3, srv-1, srv-2, ...</code><br>
+  · 简单，不关心负载<br>
+  · <em>适合机器性能相同、请求耗时均匀</em><br><br>
+  <strong>② 最少连接</strong><br>
+  · 把请求给当前连接最少的<br>
+  · <em>适合请求耗时差异大</em><br><br>
+  <strong>③ 一致性哈希</strong><br>
+  · <code>player-1001</code> 永远到同一台<br>
+  · <strong>有状态服务必须用这个</strong><br><br>
+  <strong>扩容的代价（本页计算）</strong>：<br>
+  <code>3 台扩到 4 台：约 25% 的 key 会迁移</code><br>
+  <code>3 台扩到 100 台：约 97% 都要迁移！</code><br>
+  <em>→ 本页代码用的是「哈希取模」（<strong>不是</strong>真正的一致性哈希环），所以扩容时几乎全量重映射</em><br>
+  <em>→ 真实系统用「一致性哈希环 + 虚拟节点」，只迁移相邻一段（约 1/N）</em>
+</div>
+
+<h2 id="ratelimit">四、限流的三种算法 ★★</h2>
+
+<div class="callout callout--warn">
+  <span class="callout__title">固定窗口的边界问题</span>
+  <strong>本页实测</strong>：限 5 次/秒，10 个请求<br>
+  · <strong>固定窗口</strong>：通过 5 个<br>
+  · <strong>滑动窗口</strong>：通过 5 个<br>
+  · <strong>令牌桶</strong>：通过 4 个（<em>桶容量 5，但首个请求要先产生令牌</em>）<br>
+  <em>一次突发看不出前两者的差别，但边界场景差别很大</em><br><br>
+  <strong>固定窗口的经典问题</strong>：<br>
+  · 0.9 秒内发 5 次（<em>通过</em>）<br>
+  · 1.0 秒窗口重置<br>
+  · 1.1 秒内又发 5 次（<em>通过</em>）<br>
+  → <strong>0.2 秒内实际通过了 10 次</strong> = 2 倍突发<br><br>
+  <strong>三种算法对比</strong>：<br>
+  <div class="table-wrap">
+  <table>
+  <thead><tr><th>算法</th><th>优点</th><th>缺点</th></tr></thead>
+  <tbody>
+    <tr><td>固定窗口</td><td>最简单</td><td><strong>边界突发</strong></td></tr>
+    <tr><td>滑动窗口</td><td>平滑</td><td>要存时间戳</td></tr>
+    <tr><td>令牌桶</td><td><strong>允许突发</strong></td><td>参数要调</td></tr>
+  </tbody>
+  </table>
+  </div>
+</div>
+
+<h2 id="circuit-breaker">五、熔断器：保护自己 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三个状态的流转</span>
+  <strong>本页实测</strong>：<br>
+  <code>第 1 次调用: 正常调用</code><br>
+  <code>第 2 次调用: 正常调用</code><br>
+  <code>第 3 次调用: 正常调用</code><br>
+  <code>第 4 次调用（已熔断）: 熔断中（4s 后重试）</code><br>
+  <code>10 秒后（转半开）: 半开：试探调用，状态=HalfOpen</code><br><br>
+  <div class="table-wrap">
+  <table>
+  <thead><tr><th>状态</th><th>行为</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Closed</strong></td><td>正常调用，统计失败</td></tr>
+    <tr><td><strong>Open</strong></td><td><strong>直接拒绝</strong>，不调用下游</td></tr>
+    <tr><td><strong>HalfOpen</strong></td><td>放少量请求试探</td></tr>
+  </tbody>
+  </table>
+  </div>
+  <strong>为什么需要熔断</strong>：<br>
+  · 下游挂了 → 调用方<em>一直等待超时</em> → 线程池耗尽<br>
+  · <strong>雪崩</strong>：一个服务挂，拖垮整个系统<br><br>
+  <strong>熔断后做什么</strong>：<br>
+  · 返回<strong>兜底数据</strong>（<em>缓存、默认值</em>）<br>
+  · 或<em>明确告知用户"稍后再试"</em>
+</div>
+
+<h2 id="sharding">六、分库分表</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">什么时候该分</span>
+  <strong>判断标准</strong>：<br>
+  · 单表 <strong>&gt; 5000 万行</strong> → 考虑分表<br>
+  · 单库磁盘 <strong>&gt; 1TB</strong> → 考虑分库<br>
+  · 写入 QPS <strong>&gt; 5000</strong> → 考虑分库<br><br>
+  <strong>四种策略</strong>：<br>
+  · <strong>按 ID 取模</strong>——均匀，但扩容要迁移<br>
+  · <strong>按范围</strong>——好扩容，但热点集中<br>
+  · <strong>一致性哈希</strong>——扩容影响小，实现复杂<br>
+  · <strong>按业务</strong>——隔离性好，<em>但不能跨库 join</em><br><br>
+  <strong>最难的问题</strong>：<em>分表后怎么查「全服排名」？</em><br>
+  → 各分库查前 100 → 汇总再排 → 取前 100（<strong>两阶段查询</strong>）
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="23">
+  <div class="task"><input type="checkbox" id="t-23-1"><label for="t-23-1"><strong>检查你的项目</strong>：有哪些状态存在本机？会不会阻碍水平扩展？</label></div>
+  <div class="task"><input type="checkbox" id="t-23-2"><label for="t-23-2"><strong>实现三种负载均衡</strong>：对比各自适用场景。</label></div>
+  <div class="task"><input type="checkbox" id="t-23-3"><label for="t-23-3"><strong>实现三种限流</strong>：验证固定窗口的边界问题。</label></div>
+  <div class="task"><input type="checkbox" id="t-23-4"><label for="t-23-4"><strong>实现熔断器</strong>：模拟下游故障，观察状态流转。</label></div>
+  <div class="task"><input type="checkbox" id="t-23-5"><label for="t-23-5"><strong>算一次迁移成本</strong>：3 台扩到 10 台，多少 key 要迁移。</label></div>
+  <div class="task"><input type="checkbox" id="t-23-6"><label for="t-23-6"><strong>回答面试题</strong>：① 水平扩展的前提是什么？② 固定窗口限流有什么问题？③ 熔断的三个状态？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道水平扩展的前提是无状态化</strong>；<br>
+    ② <strong>能说出哪些状态必须外置</strong>；<br>
+    ③ <strong>理解三种负载均衡算法及适用场景</strong>；<br>
+    ④ <strong>知道固定窗口的边界问题，会用令牌桶</strong>；<br>
+    ⑤ <strong>能说出熔断三个状态及它解决的问题</strong>。<br>
+    <br>
+    <em>第 ① 和 第 ⑤ 条最关键——**前者决定能不能扩，后者决定挂的时候会不会雪崩**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="22-deploy.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">22 部署与运维 ★★</div>
+  </a>
+  <a class="next" href="24-security.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">24 安全与合规 ★★★</div>
+  </a>
+</nav>

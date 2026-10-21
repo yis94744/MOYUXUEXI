@@ -1,0 +1,404 @@
+<h1>24 · 安全与合规 ★★★</h1>
+
+<p class="lead">安全<strong>不是加个验证码</strong>，而是<em>在每个环节都做对</em>。这一页讲<strong>五个最常见的漏洞</strong>和它们的防御。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（23）扩展性与高可用 —— 负载均衡、无状态化、分库分表、限流熔断。<br>
+  <strong>这一页</strong>（24）安全与合规 —— SQL 注入、XSS、CSRF、越权、数据加密、隐私合规。<br>
+  <strong>下一页</strong>（25）后端性能优化 —— 压测、性能剖析、连接池、异步陷阱、GC 调优。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+<h2 id="top5">一、五大常见漏洞</h2>
+
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+
+namespace BackendSamples.Security
+{
+    // ============================================================
+    // 1. OWASP Top 10 里最常见的三个
+    // ============================================================
+
+    public static class TopVulnerabilities
+    {
+        public static readonly (string Name, string Cause, string Defense)[] All =
+        {
+            ("SQL 注入",       "字符串拼接 SQL",        "参数化查询"),
+            ("XSS",           "未转义用户输入",         "输出编码"),
+            ("越权",          "只校验登录不校验归属",   "每个资源校验 owner"),
+            ("CSRF",          "未校验请求来源",         "Token + SameSite"),
+            ("敏感信息泄露",  "日志/响应含密码",        "脱敏 + 不返回敏感字段"),
+        };
+    }
+
+    // ============================================================
+    // 2. SQL 注入：演示被注入的过程 ★★★
+    // ============================================================
+
+    public class SqlInjectionDemo
+    {
+        // 【模拟】内存数据库
+        private readonly Dictionary&lt;string, string&gt; _users = new()
+        {
+            ["admin"] = "hash_admin_pwd",
+            ["player1"] = "hash_player_pwd",
+        };
+
+        private readonly string _secret = "SECRET_DATA";
+
+        // ---- 【错误】字符串拼接 ----
+        public string Login_Bad(string username, string password)
+        {
+            // 真实代码： "SELECT * FROM users WHERE name='" + username + "' AND pwd='" + password + "'"
+            string sql = $"SELECT * FROM users WHERE name='{username}' AND pwd='{password}'";
+
+            // 【危险】模拟拼接后的 SQL 被解析
+            // 如果 username = "admin' --"，SQL 变成：
+            //   SELECT * FROM users WHERE name='admin' --' AND pwd='...'
+            //   -- 注释掉了后面的密码检查！
+
+            if (username.Contains("'") &amp;&amp; username.Contains("--"))
+            {
+                return $"【被注入】SQL: {sql}\n    结果: 登录成功（绕过了密码校验）\n    泄露数据: {_secret}";
+            }
+
+            var exists = _users.ContainsKey(username) &amp;&amp; _users[username] == password;
+            return exists ? "登录成功" : "用户名或密码错误";
+        }
+
+        // ---- 【正确】参数化查询 ----
+        public string Login_Good(string username, string password)
+        {
+            // 真实代码： command.Parameters.AddWithValue("@name", username)
+            // 参数被当作「数据」而不是「SQL 片段」
+
+            // 即使传 "admin' --"，也只会被当成用户名字面量
+            if (username.Contains("'") || username.Contains("--"))
+            {
+                return $"【安全】参数化查询: 无匹配（'admin\\' --' 被当作字面量）";
+            }
+
+            var exists = _users.ContainsKey(username) &amp;&amp; _users[username] == password;
+            return exists ? "登录成功" : "用户名或密码错误";
+        }
+
+        public static void Run()
+        {
+            var db = new SqlInjectionDemo();
+
+            Console.WriteLine("  正常登录:");
+            Console.WriteLine($"    admin + 正确密码: {db.Login_Good("admin", "hash_admin_pwd")}");
+            Console.WriteLine($"    admin + 错误密码: {db.Login_Good("admin", "wrong")}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【注入攻击】用户名传 \"admin' --\"");
+            Console.WriteLine("    【错误做法】字符串拼接:");
+            Console.WriteLine("      " + db.Login_Bad("admin' --", "anything").Replace("\n", "\n      "));
+
+            Console.WriteLine();
+            Console.WriteLine("    【正确做法】参数化查询:");
+            Console.WriteLine("      " + db.Login_Good("admin' --", "anything"));
+        }
+    }
+
+    // ============================================================
+    // 3. XSS：转义是必须的
+    // ============================================================
+
+    public class XssDemo
+    {
+        // 【错误】直接拼接用户输入到 HTML
+        public static string Render_Bad(string userInput)
+        {
+            return $"&lt;div&gt;{userInput}&lt;/div&gt;";
+        }
+
+        // 【正确】HTML 转义
+        public static string Render_Good(string userInput)
+        {
+            var sb = new StringBuilder();
+            foreach (char c in userInput)
+            {
+                sb.Append(c switch
+                {
+                    '&lt;' =&gt; "&amp;lt;",
+                    '&gt;' =&gt; "&amp;gt;",
+                    '&amp;' =&gt; "&amp;amp;",
+                    '"' =&gt; "&amp;quot;",
+                    '\'' =&gt; "&amp;#39;",
+                    _ =&gt; c.ToString()
+                });
+            }
+            return $"&lt;div&gt;{sb}&lt;/div&gt;";
+        }
+
+        public static void Run()
+        {
+            string attack = "&lt;script&gt;alert('xss')&lt;/script&gt;";
+
+            Console.WriteLine($"  攻击载荷: {attack}");
+            Console.WriteLine();
+            Console.WriteLine($"  【错误】直接渲染:");
+            Console.WriteLine($"    {Render_Bad(attack)}");
+            Console.WriteLine("    -&gt; 浏览器会执行 script，窃取 cookie");
+
+            Console.WriteLine();
+            Console.WriteLine($"  【正确】转义后:");
+            Console.WriteLine($"    {Render_Good(attack)}");
+            Console.WriteLine("    -&gt; 显示成文本，不执行");
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】");
+            Console.WriteLine("    · 输出到 HTML -&gt; HTML 转义");
+            Console.WriteLine("    · 输出到 JS  -&gt; JS 转义");
+            Console.WriteLine("    · 输出到 URL -&gt; URL 编码");
+            Console.WriteLine("    【转义要匹配输出上下文】");
+        }
+    }
+
+    // ============================================================
+    // 4. 敏感信息脱敏
+    // ============================================================
+
+    public static class Masking
+    {
+        public static string MaskPhone(string phone)
+        {
+            if (string.IsNullOrEmpty(phone) || phone.Length &lt; 7) return "***";
+            return phone.Substring(0, 3) + "****" + phone.Substring(phone.Length - 4);
+        }
+
+        public static string MaskEmail(string email)
+        {
+            var at = email.IndexOf('@');
+            if (at &lt;= 1) return "***";
+            return email[0] + "***" + email.Substring(at);
+        }
+
+        public static string MaskIdCard(string id)
+        {
+            if (string.IsNullOrEmpty(id) || id.Length &lt; 8) return "***";
+            return id.Substring(0, 4) + "**********" + id.Substring(id.Length - 4);
+        }
+
+        public static void Run()
+        {
+            Console.WriteLine($"  手机号: {MaskPhone("13812345678")}");
+            Console.WriteLine($"  邮箱:   {MaskEmail("test@example.com")}");
+            Console.WriteLine($"  身份证: {MaskIdCard("110101199001011234")}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【什么时候脱敏】");
+            Console.WriteLine("    · 客服后台展示（客服不该看到完整手机号）");
+            Console.WriteLine("    · 日志（避免日志泄露）");
+            Console.WriteLine("    · 导出报表");
+            Console.WriteLine();
+            Console.WriteLine("  【什么时候不脱敏】");
+            Console.WriteLine("    · 玩家看自己的信息");
+            Console.WriteLine("    · 内部审计（需要完整数据，但要有权限）");
+        }
+    }
+
+    // ============================================================
+    // 5. CSRF：跨站请求伪造
+    // ============================================================
+
+    public class CsrfDemo
+    {
+        // 【问题】用户登录了银行网站，然后访问了恶意网站
+        //   恶意网站用 &lt;img src="bank.com/transfer?to=hacker&amp;amount=1000"&gt;
+        //   浏览器自动带上银行的 cookie -&gt; 转账成功
+
+        public static (bool Allowed, string Reason) CheckRequest(
+            string method, string? csrfToken, string? origin)
+        {
+            // 【防护1】GET 请求不应有副作用
+            if (method == "GET")
+            {
+                // 如果 GET 能改数据，就是设计错误
+                return (false, "GET 请求不应修改数据");
+            }
+
+            // 【防护2】必须带 CSRF Token
+            if (string.IsNullOrEmpty(csrfToken))
+                return (false, "缺少 CSRF Token");
+
+            // 【防护3】校验 Origin / Referer
+            if (!string.IsNullOrEmpty(origin) &amp;&amp; !origin.StartsWith("https://mygame.com"))
+                return (false, "来源不合法: " + origin);
+
+            return (true, "通过");
+        }
+
+        public static void Run()
+        {
+            Console.WriteLine("  模拟三种请求:");
+
+            Console.WriteLine($"    GET /transfer -&gt; {CheckRequest("GET", null, null).Reason}");
+            Console.WriteLine($"    POST 无 token -&gt; {CheckRequest("POST", null, null).Reason}");
+            Console.WriteLine($"    POST 有 token 但来源可疑 -&gt; {CheckRequest("POST", "abc", "https://evil.com").Reason}");
+            Console.WriteLine($"    POST 有 token + 正确来源 -&gt; {CheckRequest("POST", "abc", "https://mygame.com").Reason}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键防护】");
+            Console.WriteLine("    · GET 只读，不修改数据");
+            Console.WriteLine("    · 状态修改用 POST/PUT/DELETE");
+            Console.WriteLine("    · 必须带 CSRF Token");
+            Console.WriteLine("    · Cookie 设 SameSite=Strict");
+        }
+    }
+
+    // ============================================================
+    // 6. 数据加密：什么时候用什么
+    // ============================================================
+
+    public static class Encryption
+    {
+        public static readonly (string Scenario, string Method, string Why)[] All =
+        {
+            ("密码",         "慢哈希 PBKDF2/BCrypt", "单向，不可逆"),
+            ("身份证号",     "对称加密 AES",          "需要还原"),
+            ("传输",         "TLS/HTTPS",             "防窃听"),
+            ("敏感字段存储", "AES + 密钥管理",        "脱裤后无明文"),
+            ("签名防篡改",   "HMAC",                  "不需要还原，只要校验"),
+        };
+
+        public static void Print()
+        {
+            foreach (var (s, m, w) in All)
+                Console.WriteLine($"    {s,-14} {m,-24} {w}");
+        }
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 五大常见漏洞 ===");
+            foreach (var (name, cause, defense) in TopVulnerabilities.All)
+            {
+                Console.WriteLine($"    {name,-14} 成因: {cause,-20} 防御: {defense}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. SQL 注入 ===");
+            SqlInjectionDemo.Run();
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. XSS ===");
+            XssDemo.Run();
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 敏感信息脱敏 ===");
+            Masking.Run();
+
+            Console.WriteLine();
+            Console.WriteLine("=== 5. CSRF 防护 ===");
+            CsrfDemo.Run();
+
+            Console.WriteLine();
+            Console.WriteLine("=== 6. 加密方式选择 ===");
+            Encryption.Print();
+            Console.WriteLine();
+            Console.WriteLine("  【最重要的一条】");
+            Console.WriteLine("    密码只能用「慢哈希」，绝对不能用可逆加密");
+            Console.WriteLine("    -&gt; 因为你能解密，就说明数据库泄露后攻击者也能解密");
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Security.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>漏洞</th><th>成因</th><th>防御</th></tr></thead>
+  <tbody>
+    <tr><td><strong>SQL 注入</strong></td><td>字符串拼接</td><td><strong>参数化查询</strong></td></tr>
+    <tr><td><strong>XSS</strong></td><td>未转义输出</td><td><strong>输出编码</strong></td></tr>
+    <tr><td><strong>越权</strong></td><td>不校验归属</td><td><em>每个资源校验 owner</em></td></tr>
+    <tr><td><strong>CSRF</strong></td><td>不校验来源</td><td><strong>Token + SameSite</strong></td></tr>
+    <tr><td><strong>信息泄露</strong></td><td>响应含敏感字段</td><td><em>脱敏</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="sqli">二、SQL 注入：亲眼看到被注入 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">本页实测的注入过程</span>
+  <strong>正常登录</strong>：<br><code>admin + 正确密码 -&gt; 登录成功</code><br><br><strong>注入攻击</strong>：用户名传 <code>admin</code> 加两个单引号加 <code>--</code><br><strong>【错误】字符串拼接</strong>：<br><code>SELECT * FROM users WHERE name=...</code><br><em>后面的密码检查被注释掉了</em><br><code>【被注入】SQL: SELECT * FROM users WHERE name='admin' --' AND pwd='anything'</code><br><code>    结果: 登录成功（绕过了密码校验）</code><br><code>    泄露数据: SECRET_DATA</code><br><br><strong>【正确】参数化查询</strong>：<br><code>【安全】参数化查询: 无匹配（'admin\' --' 被当作字面量）</code><br><em>整段被当作字面量，不是 SQL 片段</em><br><br><strong>规则</strong>：<em>永远不要拼接 SQL，永远用参数化</em>。
+</div>
+
+<h2 id="xss">三、XSS：转义要匹配上下文 ★★</h2>
+
+<div class="callout callout--warn">
+  <span class="callout__title">本页实测的转义效果</span>
+  <strong>攻击载荷</strong>：<code>script 标签</code><br><br><strong>【错误】直接渲染</strong>：<br><em>浏览器执行 script，窃取 cookie</em><br><br><strong>【正确】HTML 转义</strong>：<br><code>把尖括号、引号转成实体</code><br><em>显示成文本，不执行</em><br><br><strong>关键</strong>：<em>转义要匹配输出上下文</em><br>· 输出到 HTML → HTML 转义<br>· 输出到 JS → JS 转义<br>· 输出到 URL → URL 编码<br><strong>用错转义方式等于没转义。</strong>
+</div>
+
+<h2 id="masking">四、脱敏：什么时候要，什么时候不要</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">本页实测的脱敏</span>
+  <code>手机号: 138****5678</code><br><code>邮箱:   t***@example.com</code><br><code>身份证: 1101**********1234</code><br><br><strong>必须脱敏的场景</strong>：<br>· <strong>客服后台</strong>——<em>客服不该看到完整手机号</em><br>· <strong>日志</strong>——<em>避免日志泄露</em><br>· <strong>导出报表</strong><br><br><strong>不该脱敏的场景</strong>：<br>· 玩家看自己的信息<br>· 内部审计（<em>但要有权限</em>）
+</div>
+
+<h2 id="csrf-encryption">五、CSRF 与加密选择</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">CSRF：借用户的身份发请求</span>
+  <strong>攻击原理</strong>：<br>① 用户登录了游戏官网<br>② 访问了恶意网站<br>③ 恶意网站构造一个请求到游戏接口<br>④ 浏览器<strong>自动带上 cookie</strong> → 发奖给了黑客<br><br><strong>本页实测的三道防线</strong>：<br><code>GET /transfer -&gt; GET 请求不应修改数据</code><br><code>POST 无 token -&gt; 缺少 CSRF Token</code><br><code>POST 来源可疑 -&gt; 来源不合法</code><br><code>POST 全部正确 -&gt; 通过</code><br><br><strong>关键</strong>：<em>GET 只读，修改必须用 POST</em>。
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">密码只能用慢哈希 ★★★</span>
+  <div class="table-wrap"><table><thead><tr><th>场景</th><th>用什么</th><th>为什么</th></tr></thead><tbody><tr><td><strong>密码</strong></td><td><strong>慢哈希 PBKDF2</strong></td><td>单向，不可逆</td></tr><tr><td>身份证号</td><td>对称加密 AES</td><td>需要还原</td></tr><tr><td>传输</td><td><strong>TLS/HTTPS</strong></td><td>防窃听</td></tr><tr><td>签名防篡改</td><td>HMAC</td><td>只要校验</td></tr></tbody></table></div><strong>最重要的一条</strong>：<br><em>密码只能用「慢哈希」，绝对不能用可逆加密</em>。<br><strong>因为</strong>：<em>你能解密，就说明数据库泄露后攻击者也能解密</em>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="24">
+  <div class="task"><input type="checkbox" id="t-24-1"><label for="t-24-1"><strong>复现 SQL 注入</strong>：用字符串拼接，观察绕过登录。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-2"><label for="t-24-2"><strong>修复注入</strong>：改成参数化查询，验证注入失效。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-3"><label for="t-24-3"><strong>复现 XSS</strong>：直接渲染脚本标签，观察执行。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-4"><label for="t-24-4"><strong>做转义</strong>：实现 HTML 转义，验证不执行。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-5"><label for="t-24-5"><strong>做脱敏</strong>：手机号、邮箱、身份证。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-6"><label for="t-24-6"><strong>做 CSRF 防护</strong>：校验 Token 和 Origin。</label></div>
+  <div class="task"><input type="checkbox" id="t-24-7"><label for="t-24-7"><strong>回答面试题</strong>：① SQL 注入怎么防？② XSS 为什么要按上下文转义？③ 密码为什么不能用可逆加密？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出五大漏洞及防御方式</strong>；<br>
+    ② <strong>能复现 SQL 注入并修复</strong>；<br>
+    ③ <strong>知道 XSS 转义要匹配输出上下文</strong>；<br>
+    ④ <strong>知道什么时候该脱敏、什么时候不该</strong>；<br>
+    ⑤ <strong>能说出密码必须用慢哈希的原因</strong>。<br>
+    <br>
+    <em>这一页是**上线前的必读**——任何一个漏洞都可能让整个系统崩掉。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="23-scaling.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">23 扩展性与高可用 ★★</div>
+  </a>
+  <a class="next" href="25-perf.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">25 后端性能优化 ★★</div>
+  </a>
+</nav>

@@ -1,0 +1,173 @@
+<h1>32 · 速查手册</h1>
+
+<p class="lead">这一页是<strong>查手册</strong>——不需要背，用到时回来查。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（31）客户端转后端的思维转换 —— 从 Unity 主程到后端：优势、盲区、如何快速上手。<br>
+  <strong>这一页</strong>（32）速查手册 —— 常用命令、HTTP 状态码、SQL 语法、坑位速查。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+<h2 id="http">一、HTTP 状态码</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>码</th><th>含义</th><th>什么时候用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>200</strong></td><td>成功</td><td>正常返回</td></tr>
+    <tr><td><strong>201</strong></td><td>已创建</td><td>POST 创建资源</td></tr>
+    <tr><td><strong>204</strong></td><td>成功无内容</td><td>DELETE</td></tr>
+    <tr><td><strong>400</strong></td><td>参数错误</td><td><em>客户端问题</em></td></tr>
+    <tr><td><strong>401</strong></td><td>未认证</td><td><strong>Token 失效</strong></td></tr>
+    <tr><td><strong>403</strong></td><td>无权限</td><td><em>已登录但没权限</em></td></tr>
+    <tr><td><strong>404</strong></td><td>不存在</td><td>资源找不到</td></tr>
+    <tr><td><strong>409</strong></td><td>冲突</td><td><em>重复提交</em></td></tr>
+    <tr><td><strong>429</strong></td><td>太频繁</td><td><strong>限流</strong></td></tr>
+    <tr><td><strong>500</strong></td><td>服务器错误</td><td><em>代码 bug</em></td></tr>
+    <tr><td><strong>503</strong></td><td>不可用</td><td><strong>熔断/维护</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">业务失败用 200 还是 4xx</span>
+  <strong>推荐</strong>：<br>
+  · <em>协议层错误</em>（参数、认证）→ <strong>4xx</strong><br>
+  · <em>业务失败</em>（金币不足）→ <strong>200 + code</strong><br><br>
+  <strong>因为</strong>：「金币不足」<em>不是接口出错，是正常业务结果</em>。<br>
+  <em>关键不是选哪个，而是团队统一。</em>
+</div>
+
+<h2 id="errors">二、错误码分段</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>段</th><th>含义</th><th>客户端行为</th></tr></thead>
+  <tbody>
+    <tr><td><code>0</code></td><td>成功</td><td>—</td></tr>
+    <tr><td><code>1xxx</code></td><td>参数错误</td><td><strong>不要重试</strong></td></tr>
+    <tr><td><code>2xxx</code></td><td>认证/权限</td><td>跳登录</td></tr>
+    <tr><td><code>3xxx</code></td><td>业务错误</td><td>提示用户</td></tr>
+    <tr><td><code>4xxx</code></td><td>系统错误</td><td><em>可以重试</em></td></tr>
+    <tr><td><code>5xxx</code></td><td>第三方</td><td>稍后重试</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="commands">三、常用命令</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>命令</th><th>作用</th></tr></thead>
+  <tbody>
+    <tr><td><code>dotnet new web -n X</code></td><td>创建 Web 项目</td></tr>
+    <tr><td><code>dotnet run</code></td><td>运行</td></tr>
+    <tr><td><code>dotnet watch run</code></td><td>热重载</td></tr>
+    <tr><td><code>dotnet build</code></td><td>编译</td></tr>
+    <tr><td><code>dotnet publish -c Release</code></td><td>发布</td></tr>
+    <tr><td><code>dotnet ef migrations add X</code></td><td>创建迁移</td></tr>
+    <tr><td><code>dotnet ef database update</code></td><td>应用迁移</td></tr>
+    <tr><td><code>dotnet ef dbcontext script</code></td><td>生成 SQL</td></tr>
+    <tr><td><code>dotnet dev-certs https --trust</code></td><td>信任开发证书</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="efcore">四、EF Core 查询要点</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>场景</th><th>写法</th></tr></thead>
+  <tbody>
+    <tr><td><strong>避免 N+1</strong></td><td><code>.Include(x =&gt; x.Items)</code></td></tr>
+    <tr><td><strong>只读查询</strong></td><td><code>.AsNoTracking()</code></td></tr>
+    <tr><td><strong>分页</strong></td><td><code>.Skip(n).Take(m)</code></td></tr>
+    <tr><td><strong>条件更新</strong></td><td><code>ExecuteUpdate</code></td></tr>
+    <tr><td><strong>批量删除</strong></td><td><code>ExecuteDelete</code></td></tr>
+    <tr><td><strong>事务</strong></td><td><code>BeginTransaction()</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">两个必知的坑</span>
+  <strong>① AsNoTracking 只读查询必加</strong><br>
+  <em>不加会追踪每个实体</em> → 内存暴涨、变慢。<br><br>
+  <strong>② 循环里访问导航属性 = N+1</strong><br>
+  <code>foreach (var p in players) { p.Items }</code><br>
+  <em>每次都会查一次数据库</em> → 用 <code>Include</code> 或一次性取回。
+</div>
+
+<h2 id="redis">五、Redis 常用操作</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>场景</th><th>命令</th></tr></thead>
+  <tbody>
+    <tr><td><strong>缓存</strong></td><td><code>SET k v EX 300</code> / <code>GET k</code></td></tr>
+    <tr><td><strong>分布式锁</strong></td><td><code>SET k token NX EX 30</code></td></tr>
+    <tr><td><strong>计数器</strong></td><td><code>INCR k</code></td></tr>
+    <tr><td><strong>Hash</strong></td><td><code>HSET k f v</code> / <code>HGET k f</code></td></tr>
+    <tr><td><strong>排行榜</strong></td><td><code>ZADD rank score member</code></td></tr>
+    <tr><td><strong>取前N</strong></td><td><code>ZREVRANGE rank 0 99</code></td></tr>
+    <tr><td><strong>查排名</strong></td><td><code>ZREVRANK rank member</code></td></tr>
+    <tr><td><strong>去重集合</strong></td><td><code>SADD s v</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="pitfalls">六、常见坑速查</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>坑</th><th>症状</th><th>解决</th></tr></thead>
+  <tbody>
+    <tr><td><strong>先读后写</strong></td><td>并发扣钱出错</td><td><em>条件 UPDATE</em></td></tr>
+    <tr><td><strong>忘记幂等</strong></td><td>重复发奖</td><td><strong>业务唯一键</strong></td></tr>
+    <tr><td><strong>N+1 查询</strong></td><td>接口慢</td><td><code>Include</code></td></tr>
+    <tr><td><strong>没加索引</strong></td><td>查询慢</td><td><em>高频字段建索引</em></td></tr>
+    <tr><td><strong>foreach 访问导航属性</strong></td><td>N+1</td><td><em>预先加载</em></td></tr>
+    <tr><td><strong>分页不夹紧</strong></td><td>全表扫描</td><td><strong>size 上限</strong></td></tr>
+    <tr><td><strong>async void</strong></td><td>异常丢失</td><td><code>async Task</code></td></tr>
+    <tr><td><strong>.Result 死锁</strong></td><td>卡死</td><td><em>async 一路到底</em></td></tr>
+    <tr><td><strong>DbContext Singleton</strong></td><td>数据错乱</td><td><strong>Scoped</strong></td></tr>
+    <tr><td><strong>缓存无上限</strong></td><td>内存 OOM</td><td><em>TTL + 淘汰</em></td></tr>
+    <tr><td><strong>忘记 unload 缓存</strong></td><td>读到旧数据</td><td><em>写时删缓存</em></td></tr>
+    <tr><td><strong>字符串拼 SQL</strong></td><td>注入</td><td><strong>参数化</strong></td></tr>
+    <tr><td><strong>liveness 查数据库</strong></td><td>雪崩重启</td><td><em>分开探针</em></td></tr>
+    <tr><td><strong>锁不校验 token</strong></td><td>删别人的锁</td><td><em>校验 owner</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="32">
+  <div class="task"><input type="checkbox" id="t-32-1"><label for="t-32-1"><strong>收藏这一页</strong>：遇到问题时先来查。</label></div>
+  <div class="task"><input type="checkbox" id="t-32-2"><label for="t-32-2"><strong>验证一个坑</strong>：挑一个坑，亲手复现一次。</label></div>
+  <div class="task"><input type="checkbox" id="t-32-3"><label for="t-32-3"><strong>补进自己的清单</strong>：把项目里踩过的坑加进来。</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 知道 HTTP 状态码的用法；<br>
+    ② 知道错误码分段规则；<br>
+    ③ 记得常用命令；<br>
+    ④ <strong>知道最常见的 14 个坑</strong>。<br>
+    <br>
+    <em>这一页不需要背——**收藏起来，用到时回来查**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="31-client-to-server.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">31 客户端转后端的思维转换 ★★★</div>
+  </a>
+  <a class="next" href="index.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">返回路线总览</div>
+  </a>
+</nav>

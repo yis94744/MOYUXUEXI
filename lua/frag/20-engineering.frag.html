@@ -4,7 +4,9 @@
 
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
-  [object Object]
+  上一页（19）讲性能。这一页讲<em>怎么让团队持续写出不坏掉的代码</em>。<br>
+  <strong>关键衔接</strong>：页 07 的<em><code>_ENV</code> 沙箱</em>、页 15/17 的<em>状态残留</em>在这一页变成规范和工具。<br>
+  <strong>下一页</strong>（21）安全与加密。<em>工程化解决"我们自己别写错"，安全解决"别人别乱来"。</em>
 </div>
 
 <h2 id="convention">一、Lua 代码规范</h2>
@@ -31,9 +33,17 @@
   · 热更时全局变量状态残留（<em>→ 页 15、17 的老问题</em>）<br>
   · <strong>在沙箱环境下会直接报错</strong>（因为全局表被限制了）<br><br>
   <strong>防护手段</strong>：<br>
-  ① <strong>用静态检查工具</strong>（如 luacheck）<br>
-  ② <strong>在模块顶部加保护</strong>：<code>local _ENV = ...</code>（谨慎使用）<br>
+  ① <strong>用静态检查工具</strong>（如 luacheck）——<em>这才是主力手段</em>，在 CI 里把
+     <code>W111</code>（setting a non-standard global）当错误<br>
+  ② <strong>调试期给 <code>_G</code> 挂 <code>__newindex</code> 拦截</strong>：
+     <code>setmetatable(_G, { __newindex = function(_, k) error("禁止写全局: "..tostring(k), 2) end })</code>
+     ——注意<strong>只能在调试构建里开</strong>，它会拖慢所有全局写入，而且会误伤那些故意写全局的第三方库<br>
   ③ <strong>代码 review 时重点看这个</strong><br><br>
+  <strong>注意</strong>：常见写法里流传的 <code>local _ENV = ...</code> <em>并不能起到防护作用</em>——
+  模块被 <code>require</code> 时 <code>...</code> 是<strong>模块名字符串</strong>，
+  把它赋给 <code>_ENV</code> 之后，模块里任何全局读写都会变成"对字符串取下标"而直接报错：
+  <code>attempt to index a string value (local '_ENV')</code>。
+  真要限制环境，应该用 <code>load(代码, 名字, "t", 环境表)</code>（见页 07），而不是改模块自己的 <code>_ENV</code>。<br><br>
   <em>建议：在 CI 里跑 luacheck，把"未声明的全局变量"作为错误。</em>
 </div>
 

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>01 岗位与行业现实 — Unity 游戏后端 + 全栈开发路线｜从客户端主程延伸为能独立扛服务的全栈工程师</title>
+<meta name="description" content="游戏后端 vs Web 后端 vs 全栈：分工、薪资、技能要求">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">Unity 游戏后端 + 全栈开发路线
+        <span>从客户端主程延伸为能独立扛服务的全栈工程师</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>01 · 岗位与行业现实</h1>
+
+<p class="lead">先搞清楚<strong>你要转的是什么</strong>。游戏后端、Web 后端、全栈是三个<em>要求不同的方向</em>——薪资、门槛、发展路径都不同。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>路线总览 —— 整条路线的结构、两段式设计与学习节奏。<br>
+  <strong>这一页</strong>（01）岗位与行业现实 —— 游戏后端 vs Web 后端 vs 全栈：分工、薪资、技能要求。<br>
+  <strong>下一页</strong>（02）环境搭建与第一个 API —— 装 .NET SDK、跑起第一个 Web API、理解请求响应。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+<h2 id="paths">一、三条路径对比</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方向</th><th>做什么</th><th>门槛</th><th>你的优势</th></tr></thead>
+  <tbody>
+    <tr><td><strong>游戏后端</strong></td><td>战斗服、匹配、排行、跨服</td><td><span class="mk mk--warn">中（需懂游戏架构）</span></td><td><strong>懂玩法，最稀缺</strong></td></tr>
+    <tr><td><strong>Web 后端</strong></td><td>业务系统、中台、CRUD</td><td><span class="mk mk--yes">低</span></td><td><em>要补业务领域知识</em></td></tr>
+    <tr><td><strong>全栈</strong></td><td>一个人从前端到部署</td><td><span class="mk mk--no">高（面广）</span></td><td><strong>能独立扛项目</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">我的建议：先游戏后端，再全栈</span>
+  <strong>不要一上来就急着做「全栈」</strong>——<em>全栈的前提是有一项擅长</em>。<br><br>
+  <strong>现实路径</strong>：<br>
+  ① <strong>先补后端基础</strong>（03-10 页）——<em>不管走哪条路都要</em><br>
+  ② <strong>做游戏后端</strong>（11-19 页）——<em>你的差异化优势在这</em><br>
+  ③ <strong>补全栈能力</strong>（20-24 页）——<em>能独立做运营后台就够了</em><br><br>
+  <em>「全栈」不是「什么都懂一点」，而是「能一个人把项目做完」。</em>
+</div>
+
+<h2 id="salary">二、薪资与需求（参考）</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>岗位</th><th>国内需求</th><th>薪资水平</th><th>备注</th></tr></thead>
+  <tbody>
+    <tr><td><strong>游戏后端</strong></td><td>中</td><td><span class="mk mk--yes">较高</span></td><td><em>大厂需求稳定</em></td></tr>
+    <tr><td><strong>Web 后端</strong></td><td><strong>很大</strong></td><td>中等</td><td><em>竞争激烈</em></td></tr>
+    <tr><td><strong>全栈</strong></td><td>中（<em>创业公司多</em>）</td><td>看能力</td><td><strong>小团队刚需</strong></td></tr>
+    <tr><td><strong>客户端主程</strong></td><td>中</td><td><em>较高</em></td><td>你现在的定位</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">一个现实提醒</span>
+  <strong>转后端不会立刻涨薪</strong>——<em>前期大概率是平薪甚至降薪</em>。<br><br>
+  <strong>原因</strong>：<br>
+  · 你的<strong>后端经验是零</strong>——<em>面试官按初级后端评估</em><br>
+  · 游戏客户端的经验<em>不能直接折算成后端年限</em><br>
+  · 但<strong>懂游戏业务</strong>这一点确实稀缺<br><br>
+  <strong>什么时候值得转</strong>：<br>
+  · 想做<em>技术负责人</em>（必须懂前后端）<br>
+  · 想<em>自己接项目</em>或创业<br>
+  · 客户端<em>遇到天花板</em>，想拓宽能力<br><br>
+  <em>如果只是「听说后端工资高」，建议先了解清楚再做决定。</em>
+</div>
+
+<h2 id="inventory">三、你的能力盘点</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>你可能已经有的</th><th>需要补的</th></tr></thead>
+  <tbody>
+    <tr><td><strong>C# 语言</strong>（扎实）</td><td><em>ASP.NET Core 框架</em></td></tr>
+    <tr><td><strong>网络编程概念</strong></td><td><em>HTTP/REST 规范</em></td></tr>
+    <tr><td><strong>性能调优直觉</strong></td><td><em>数据库与 SQL</em></td></tr>
+    <tr><td><strong>游戏业务理解</strong></td><td><em>缓存与消息队列</em></td></tr>
+    <tr><td><strong>工程化意识</strong></td><td><strong>部署与运维</strong></td></tr>
+    <tr><td><strong>调试能力</strong></td><td><em>分布式问题排查</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">一个容易忽略的盲区</span>
+  <strong>客户端和后端最大的思维差异：客户端「可以重启」，后端「不能」。</strong><br><br>
+  · 客户端崩了 → <em>玩家重进游戏</em><br>
+  · 后端崩了 → <strong>所有玩家掉线 + 数据可能损坏</strong><br><br>
+  <strong>这带来几个必须改的习惯</strong>：<br>
+  · <strong>所有操作要幂等</strong>——<em>重复请求不能重复扣钱</em><br>
+  · <strong>所有状态要能恢复</strong>——<em>进程崩了要能从数据库恢复</em><br>
+  · <strong>边界条件要防御</strong>——<em>客户端传什么都得校验</em><br><br>
+  <em>这些在客户端是「最好有」，在后端是「必须有」。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="01">
+  <div class="task"><input type="checkbox" id="t-01-1"><label for="t-01-1"><strong>看招聘网站</strong>：搜「游戏后端」「.NET 后端」「全栈」，统计岗位数与要求。</label></div>
+  <div class="task"><input type="checkbox" id="t-01-2"><label for="t-01-2"><strong>对比你的技能</strong>：把招聘要求里你不会的标出来。<em>那份清单就是你的学习重点。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-01-3"><label for="t-01-3"><strong>确定目标</strong>：游戏后端 / Web 后端 / 全栈？<em>写下来，后面按这个方向深入。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-01-4"><label for="t-01-4"><strong>回答开放题</strong>：① 你为什么想转后端？② 你项目里最想自己实现的后端功能是什么？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出三条路径的差异与门槛</strong>；<br>
+    ② 知道转后端<em>前期可能不涨薪</em>；<br>
+    ③ 知道「全栈」= <em>能一个人把项目做完</em>，不是什么都懂一点；<br>
+    ④ <strong>盘点了自己的能力，列出待补项</strong>；<br>
+    ⑤ 明确了目标方向。<br>
+    <br>
+    <em>这一页的标准很低——**只要能回答「转什么、为什么转」就够了**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="index.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">路线总览</div>
+  </a>
+  <a class="next" href="02-setup.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">02 环境搭建与第一个 API</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

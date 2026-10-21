@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10 日志、监控与可观测性 — Unity 游戏后端 + 全栈开发路线｜从客户端主程延伸为能独立扛服务的全栈工程师</title>
+<meta name="description" content="结构化日志、链路追踪、指标、告警">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">Unity 游戏后端 + 全栈开发路线
+        <span>从客户端主程延伸为能独立扛服务的全栈工程师</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>10 · 日志、监控与可观测性</h1>
+
+<p class="lead">线上出问题时，<strong>你唯一的线索就是日志和监控</strong>。<em>没有可观测性，等于闭着眼睛运维</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（09）消息队列与异步 —— RabbitMQ/Kafka、削峰、最终一致、幂等消费。<br>
+  <strong>这一页</strong>（10）日志、监控与可观测性 —— 结构化日志、链路追踪、指标、告警。<br>
+  <strong>下一页</strong>（11）游戏后端全景 —— 登录服/网关/战斗服/世界服的分工与演进。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="10-logging-monitor.html#levels" data-brief="Trace~Fatal；低级别生产关闭"><span class="prereq__title">日志分级</span><span class="prereq__page">10-logging-monitor</span></a>
+          <a class="prereq__item" href="10-logging-monitor.html#structured" data-brief="用字段而非拼字符串，可查询可聚合"><span class="prereq__title">结构化日志</span><span class="prereq__page">10-logging-monitor</span></a>
+          <a class="prereq__item" href="10-logging-monitor.html#metrics" data-brief="看 P99 不看平均；Counter/Gauge/Histogram"><span class="prereq__title">P99 与指标</span><span class="prereq__page">10-logging-monitor</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="levels">一、日志分级：什么该记</h2>
+
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+
+namespace BackendSamples.Logging
+{
+    // ============================================================
+    // 1. 日志分级：什么该记，什么不该记
+    // ============================================================
+
+    public enum LogLevel
+    {
+        Trace = 0,    // 极详细（每帧、每次循环）
+        Debug = 1,    // 调试信息
+        Info = 2,     // 关键流程（登录、下单）
+        Warn = 3,     // 可疑但不致命
+        Error = 4,    // 错误
+        Fatal = 5,    // 致命（进程要挂）
+    }
+
+    public static class LevelGuide
+    {
+        public static readonly (LogLevel Level, string When, string Example)[] All =
+        {
+            (LogLevel.Trace, "开发期追踪细节", "收到请求 header: ..."),
+            (LogLevel.Debug, "开发期调试", "计算伤害: base=100, crit=1.5"),
+            (LogLevel.Info, "生产环境保留", "玩家 1001 登录成功"),
+            (LogLevel.Warn, "可疑，需关注", "缓存未命中率 85%"),
+            (LogLevel.Error, "业务失败", "支付回调验签失败"),
+            (LogLevel.Fatal, "进程级故障", "数据库连接池耗尽"),
+        };
+    }
+
+    // ============================================================
+    // 2. 结构化日志：不要拼字符串
+    // ============================================================
+    // 【错误】log.Info($"玩家 {id} 买了 {item}")
+    //   问题：无法按 id 查询、无法聚合统计
+    // 【正确】log.Info("item_purchased", new { playerId = id, itemId = item })
+    //   好处：可以按字段查询和聚合
+
+    public class StructuredLog
+    {
+        public DateTime Time;
+        public LogLevel Level;
+        public string Event;
+        public Dictionary&lt;string, object&gt; Fields = new();
+        public string? TraceId;
+
+        public string ToJson()
+        {
+            var fields = string.Join(",", Fields.Select(kv =&gt;
+                $"\"{kv.Key}\":{(kv.Value is string s ? "\"" + s + "\"" : kv.Value)}"));
+            return $"{{\"time\":\"{Time:O}\",\"level\":\"{Level}\",\"event\":\"{Event}\"" +
+                   (TraceId != null ? $",\"traceId\":\"{TraceId}\"" : "") +
+                   (fields.Length &gt; 0 ? "," + fields : "") + "}";
+        }
+
+        public override string ToString() =&gt; ToJson();
+    }
+
+    public class Logger
+    {
+        private readonly List&lt;StructuredLog&gt; _logs = new();
+        private readonly LogLevel _minLevel;
+        private readonly string _traceId;
+
+        public Logger(LogLevel minLevel = LogLevel.Info, string traceId = "")
+        {
+            _minLevel = minLevel;
+            _traceId = traceId;
+        }
+
+        public void Log(LogLevel level, string evt, Dictionary&lt;string, object&gt;? fields = null)
+        {
+            if (level &lt; _minLevel) return;   // 【关键】低于阈值的直接丢弃（省 IO）
+
+            _logs.Add(new StructuredLog
+            {
+                Time = DateTime.UtcNow,
+                Level = level,
+                Event = evt,
+                Fields = fields ?? new(),
+                TraceId = string.IsNullOrEmpty(_traceId) ? null : _traceId,
+            });
+        }
+
+        public void Info(string evt, Dictionary&lt;string, object&gt;? f = null) =&gt; Log(LogLevel.Info, evt, f);
+        public void Warn(string evt, Dictionary&lt;string, object&gt;? f = null) =&gt; Log(LogLevel.Warn, evt, f);
+        public void Error(string evt, Dictionary&lt;string, object&gt;? f = null) =&gt; Log(LogLevel.Error, evt, f);
+
+        public IReadOnlyList&lt;StructuredLog&gt; Logs =&gt; _logs;
+        public int Count =&gt; _logs.Count;
+
+        // 按事件统计（这就是结构化日志的价值）
+        public Dictionary&lt;string, int&gt; GroupByEvent() =&gt;
+            _logs.GroupBy(l =&gt; l.Event).ToDictionary(g =&gt; g.Key, g =&gt; g.Count());
+    }
+
+    // ============================================================
+    // 3. 链路追踪：一次请求的完整路径
+    // ============================================================
+    // 【问题】一个请求经过 5 个服务，出问题时不知道慢在哪
+    // 【方案】每个请求分配 traceId，全链路传递
+
+    public class Span
+    {
+        public string Name = "";
+        public long StartMs;
+        public long DurationMs;
+        public string TraceId = "";
+        public string? ParentSpanId;
+        public string SpanId = Guid.NewGuid().ToString("N").Substring(0, 8);
+
+        public override string ToString() =&gt;
+            $"[{TraceId.Substring(0, 8)}/{SpanId}] {Name,-22} {DurationMs,5}ms";
+    }
+
+    public class Tracer
+    {
+        private readonly List&lt;Span&gt; _spans = new();
+        private readonly Stack&lt;Span&gt; _stack = new();
+        public string TraceId = Guid.NewGuid().ToString("N");
+
+        public void Begin(string name)
+        {
+            var s = new Span
+            {
+                Name = name,
+                TraceId = TraceId,
+                StartMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                ParentSpanId = _stack.Count &gt; 0 ? _stack.Peek().SpanId : null,
+            };
+            _stack.Push(s);
+        }
+
+        public void End()
+        {
+            if (_stack.Count == 0) return;
+            var s = _stack.Pop();
+            s.DurationMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - s.StartMs;
+            _spans.Add(s);
+        }
+
+        public IReadOnlyList&lt;Span&gt; Spans =&gt; _spans.OrderBy(s =&gt; s.StartMs).ToList();
+
+        public long TotalMs =&gt; _spans.Where(s =&gt; s.ParentSpanId == null).Sum(s =&gt; s.DurationMs);
+    }
+
+    // ============================================================
+    // 4. 关键指标（Metrics）
+    // ============================================================
+    // 【三类指标】
+    //   Counter  计数器（只增不减）：请求总数、错误数
+    //   Gauge    瞬时值（可增可减）：在线人数、队列长度
+    //   Histogram 分布（P50/P95/P99）：响应耗时
+
+    public class Metrics
+    {
+        private readonly Dictionary&lt;string, long&gt; _counters = new();
+        private readonly Dictionary&lt;string, double&gt; _gauges = new();
+        private readonly Dictionary&lt;string, List&lt;double&gt;&gt; _histograms = new();
+
+        public void Inc(string name, long delta = 1)
+        {
+            _counters.TryGetValue(name, out long v);
+            _counters[name] = v + delta;
+        }
+
+        public void SetGauge(string name, double value) =&gt; _gauges[name] = value;
+
+        public void Observe(string name, double value)
+        {
+            if (!_histograms.TryGetValue(name, out var list))
+            {
+                list = new List&lt;double&gt;();
+                _histograms[name] = list;
+            }
+            list.Add(value);
+        }
+
+        public long GetCounter(string name) =&gt; _counters.TryGetValue(name, out var v) ? v : 0;
+        public double GetGauge(string name) =&gt; _gauges.TryGetValue(name, out var v) ? v : 0;
+
+        // 【关键】P99 比分均值更有价值
+        public (double P50, double P95, double P99, double Max) Percentiles(string name)
+        {
+            if (!_histograms.TryGetValue(name, out var list) || list.Count == 0)
+                return (0, 0, 0, 0);
+
+            var sorted = list.OrderBy(x =&gt; x).ToList();
+            return (
+                sorted[(int)(sorted.Count * 0.50)],
+                sorted[(int)(sorted.Count * 0.95)],
+                sorted[Math.Min((int)(sorted.Count * 0.99), sorted.Count - 1)],
+                sorted[^1]
+            );
+        }
+
+        public IEnumerable&lt;string&gt; AllNames =&gt;
+            _counters.Keys.Concat(_gauges.Keys).Concat(_histograms.Keys).Distinct();
+    }
+
+    // ============================================================
+    // 5. 告警：什么值得报警
+    // ============================================================
+
+    public static class AlertRules
+    {
+        public static readonly (string Name, string Condition, string Why)[] All =
+        {
+            ("错误率", "5xx 占比 &gt; 1%（持续5分钟）", "真实故障"),
+            ("P99 延迟", "&gt; 1s（持续5分钟）", "用户可感知的卡顿"),
+            ("连接池", "使用率 &gt; 90%", "即将耗尽"),
+            ("队列积压", "&gt; 10000 条", "消费跟不上"),
+            ("CPU", "&gt; 85%（持续10分钟）", "容量不足"),
+            ("磁盘", "&gt; 90%", "写入会失败"),
+        };
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 日志分级 ===");
+            foreach (var (lv, when, ex) in LevelGuide.All)
+            {
+                Console.WriteLine($"    {lv,-7} {when,-18} {ex}");
+            }
+            Console.WriteLine();
+            Console.WriteLine("  【重要】低级别日志不要在生产开启");
+            Console.WriteLine("          字符串拼接本身就有开销");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 结构化日志 ===");
+            var logger = new Logger(LogLevel.Info, "abc123def456");
+
+            logger.Info("player_login", new() { ["playerId"] = 1001, ["ip"] = "1.2.3.4" });
+            logger.Info("player_login", new() { ["playerId"] = 1002, ["ip"] = "5.6.7.8" });
+            logger.Warn("cache_miss_rate_high", new() { ["rate"] = 0.85 });
+            logger.Error("payment_verify_failed", new() { ["orderId"] = "ORD-001" });
+
+            Console.WriteLine("  日志输出（JSON 格式）:");
+            foreach (var l in logger.Logs)
+            {
+                Console.WriteLine($"    {l.ToJson()}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  按事件聚合（这是结构化日志的价值）:");
+            foreach (var kv in logger.GroupByEvent())
+            {
+                Console.WriteLine($"    {kv.Key}: {kv.Value} 次");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  对比字符串拼接日志:");
+            Console.WriteLine($"    log.Info(\"玩家 \" + id + \" 登录\")  -&gt; 无法按 id 查询");
+            Console.WriteLine($"    结构化日志  -&gt; 可按 playerId 字段过滤、聚合、告警");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 链路追踪 ===");
+            var tracer = new Tracer();
+            tracer.Begin("HTTP /api/buy");
+            System.Threading.Thread.Sleep(3);
+
+            tracer.Begin("auth");
+            System.Threading.Thread.Sleep(1);
+            tracer.End();
+
+            tracer.Begin("load_player");
+            System.Threading.Thread.Sleep(5);
+            tracer.End();
+
+            tracer.Begin("deduct_gold");
+            System.Threading.Thread.Sleep(2);
+            tracer.End();
+
+            tracer.Begin("publish_event");
+            System.Threading.Thread.Sleep(1);
+            tracer.End();
+
+            tracer.End();
+
+            Console.WriteLine($"  TraceId: {tracer.TraceId.Substring(0, 8)}");
+            foreach (var s in tracer.Spans)
+            {
+                var indent = s.ParentSpanId == null ? "" : "  └─ ";
+                Console.WriteLine($"    {indent}{s}");
+            }
+            Console.WriteLine($"  总耗时: {tracer.TotalMs} ms");
+            Console.WriteLine();
+            Console.WriteLine("  【价值】一眼看出哪一步慢");
+            Console.WriteLine("          本例最慢是 load_player（5ms）");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 指标 ===");
+            var metrics = new Metrics();
+
+            // 模拟 100 次请求
+            var rnd = new Random(42);
+            for (int i = 0; i &lt; 100; i++)
+            {
+                metrics.Inc("http_requests_total");
+                double elapsed = rnd.Next(1, 100) + (i % 10 == 0 ? rnd.Next(500, 1500) : 0);
+                metrics.Observe("http_request_duration_ms", elapsed);
+                if (elapsed &gt; 1000) metrics.Inc("http_errors_total");
+            }
+            metrics.SetGauge("online_players", 1523);
+            metrics.SetGauge("queue_length", 342);
+
+            Console.WriteLine($"  计数器 http_requests_total = {metrics.GetCounter("http_requests_total")}");
+            Console.WriteLine($"  计数器 http_errors_total   = {metrics.GetCounter("http_errors_total")}");
+            Console.WriteLine($"  瞬时值 online_players      = {metrics.GetGauge("online_players"):F0}");
+            Console.WriteLine($"  瞬时值 queue_length        = {metrics.GetGauge("queue_length"):F0}");
+
+            var (p50, p95, p99, max) = metrics.Percentiles("http_request_duration_ms");
+            Console.WriteLine();
+            Console.WriteLine("  耗时分布:");
+            Console.WriteLine($"    P50 = {p50:F0} ms   （一半请求快于此）");
+            Console.WriteLine($"    P95 = {p95:F0} ms   （95% 请求快于此）");
+            Console.WriteLine($"    P99 = {p99:F0} ms   （99% 请求快于此）");
+            Console.WriteLine($"    Max = {max:F0} ms");
+            Console.WriteLine();
+            Console.WriteLine("  【关键】看 P99 而不是平均值");
+            Console.WriteLine("          平均值会被少数快请求拉低，掩盖长尾问题");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 5. 告警规则 ===");
+            foreach (var (name, cond, why) in AlertRules.All)
+            {
+                Console.WriteLine($"    {name,-10} {cond,-28} {why}");
+            }
+            Console.WriteLine();
+            Console.WriteLine("  【告警设计原则】");
+            Console.WriteLine("    · 只报「需要人处理」的（否则会被忽略）");
+            Console.WriteLine("    · 加持续时间（避免瞬时抖动误报）");
+            Console.WriteLine("    · 每条告警都要有处理手册");
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Logging.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>级别</th><th>什么时候用</th><th>生产环境</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Trace</strong></td><td>开发期追踪细节</td><td><span class="mk mk--no">关闭</span></td></tr>
+    <tr><td><strong>Debug</strong></td><td>开发期调试</td><td><span class="mk mk--no">关闭</span></td></tr>
+    <tr><td><strong>Info</strong></td><td>关键流程（登录、下单）</td><td><span class="mk mk--yes">保留</span></td></tr>
+    <tr><td><strong>Warn</strong></td><td>可疑但非致命</td><td><span class="mk mk--yes">保留</span></td></tr>
+    <tr><td><strong>Error</strong></td><td>业务失败</td><td><span class="mk mk--yes">保留</span></td></tr>
+    <tr><td><strong>Fatal</strong></td><td>进程级故障</td><td><span class="mk mk--yes">保留 + 告警</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="structured">二、结构化日志：不要拼字符串 ★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">字符串拼接日志的问题</span>
+  <strong>错误做法</strong>：<br>
+  <code>log.Info($"玩家 {id} 买了 {itemId}，花费 {price}")</code><br>
+  → 输出：<code>玩家 1001 买了 5001，花费 300</code><br><br>
+  <strong>问题</strong>：<br>
+  · 想查「所有买了 5001 的玩家」→ <em>只能文本搜索，慢且不准</em><br>
+  · 想统计「平均花费」→ <em>要正则解析</em><br>
+  · 字段顺序变了 → <em>解析全崩</em><br><br>
+  <strong>正确做法：结构化</strong><br>
+  <code>log.Info("item_purchased", new { playerId, itemId, price })</code><br>
+  → 输出 JSON：<code>{"event":"item_purchased","playerId":1001,...}</code><br><br>
+  <strong>本页实测</strong>：能按 event 聚合成<br>
+  <code>player_login: 2 次</code><br>
+  <code>cache_miss_rate_high: 1 次</code><br>
+  <em>这是字符串日志做不到的。</em>
+</div>
+
+<h2 id="tracing">三、链路追踪：一次请求的完整路径 ★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">traceId 的价值</span>
+  <strong>问题</strong>：一个请求经过 5 个服务，出问题时<br>
+  · 不知道<strong>慢在哪一步</strong><br>
+  · 不知道<strong>哪个服务报的错</strong><br>
+  · 日志散落各处，<em>拼不起来</em><br><br>
+  <strong>方案</strong>：每个请求分配 <code>traceId</code>，<em>全链路传递</em>。<br><br>
+  <strong>本页实测输出</strong>：<br>
+  <code>TraceId: aa575c4d</code><br>
+  <code>[aa575c4d/ca9080cd] HTTP /api/buy&nbsp;&nbsp;&nbsp;&nbsp;76ms</code><br>
+  <code>&nbsp;&nbsp;└─ [aa575c4d/2cf0aa88] auth&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;15ms</code><br>
+  <code>&nbsp;&nbsp;└─ [aa575c4d/5d9c1f8f] load_player&nbsp;16ms</code>  ← 与 deduct_gold 几乎并列<br>
+  <code>&nbsp;&nbsp;└─ [aa575c4d/6c45c18a] deduct_gold&nbsp;15ms</code><br>
+  <code>&nbsp;&nbsp;└─ [aa575c4d/5f326e0d] publish_event&nbsp;15ms</code><br><br>
+  <strong>一眼看出</strong>：<em>load_player 与 deduct_gold 几乎并列最慢（16ms / 15ms）</em>。<br>
+  没有追踪的话，只能<em>加日志重新部署再观察</em>。
+</div>
+
+<h2 id="metrics">四、指标：看 P99 而不是平均值 ★★★</h2>
+
+<div class="callout callout--warn">
+  <span class="callout__title">平均值会骗人</span>
+  <strong>问题</strong>：100 个请求，99 个耗时 10ms，1 个耗时 2000ms<br>
+  · <strong>平均值</strong> = <code>(99×10 + 2000) / 100 ≈ 30ms</code> → <em>看起来很好</em><br>
+  · <strong>但那个 2000ms 的请求</strong>：<em>玩家已经骂娘了</em><br><br>
+  <strong>本页实测输出</strong>：<br>
+  <code>P50 = 50 ms&nbsp;&nbsp;&nbsp;一半请求快于此</code><br>
+  <code>P95 = 1161 ms 95% 请求快于此</code><br>
+  <code>P99 = 1336 ms 99% 请求快于此</code><br>
+  <code>Max = 1336 ms</code><br><br>
+  <strong>看 P99 能发现长尾问题</strong>，平均值会掩盖它。<br><br>
+  <strong>三类指标</strong>：<br>
+  · <strong>Counter</strong>（只增）：请求总数、错误数<br>
+  · <strong>Gauge</strong>（可增减）：在线人数、队列长度<br>
+  · <strong>Histogram</strong>（分布）：响应耗时
+</div>
+
+<h2 id="alerts">五、告警：只报需要人处理的</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">告警疲劳是真实问题</span>
+  <strong>常见错误</strong>：<br>
+  · CPU 超过 50% 就告警 → <em>一天几百条</em><br>
+  · 每个错误都告警 → <em>没人看</em><br>
+  · 没有持续时间判断 → <em>瞬时抖动也报</em><br><br>
+  <strong>正确的告警设计</strong>：<br>
+  · <strong>只报「需要人处理」的</strong><br>
+  · <strong>加持续时间</strong>（<em>持续 5 分钟才报</em>）<br>
+  · <strong>每条告警配处理手册</strong>（<em>收到后第一步做什么</em>）<br><br>
+  <strong>推荐的六条基础告警</strong>：<br>
+  · 错误率 &gt; 1%（持续5分钟）<br>
+  · P99 延迟 &gt; 1s<br>
+  · 连接池使用率 &gt; 90%<br>
+  · 队列积压 &gt; 10000<br>
+  · CPU &gt; 85%（持续10分钟）<br>
+  · 磁盘 &gt; 90%
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="10">
+  <div class="task"><input type="checkbox" id="t-10-1"><label for="t-10-1"><strong>实现分级日志</strong>：低于阈值的直接丢弃，验证不输出。</label></div>
+  <div class="task"><input type="checkbox" id="t-10-2"><label for="t-10-2"><strong>改结构化</strong>：把字符串日志改成 JSON 带字段。</label></div>
+  <div class="task"><input type="checkbox" id="t-10-3"><label for="t-10-3"><strong>按事件聚合</strong>：统计每种 event 出现次数。</label></div>
+  <div class="task"><input type="checkbox" id="t-10-4"><label for="t-10-4"><strong>实现链路追踪</strong>：给一次请求加 Begin/End，输出各段耗时。</label></div>
+  <div class="task"><input type="checkbox" id="t-10-5"><label for="t-10-5"><strong>统计 P99</strong>：收集 100 次请求耗时，算 P50/P95/P99。</label></div>
+  <div class="task"><input type="checkbox" id="t-10-6"><label for="t-10-6"><strong>对比平均值</strong>：同一个数据集，看平均值和 P99 的差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-10-7"><label for="t-10-7"><strong>回答面试题</strong>：① 为什么用结构化日志？② 为什么看 P99 而不是平均值？③ 告警为什么要加持续时间？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出六个日志级别及生产环境的取舍</strong>；<br>
+    ② <strong>知道结构化日志比字符串日志强在哪</strong>；<br>
+    ③ <strong>能实现链路追踪，定位最慢的一步</strong>；<br>
+    ④ <strong>理解 P99 比平均值更能反映真实体验</strong>；<br>
+    ⑤ 知道告警要加持续时间、只报需要处理的。<br>
+    <br>
+    <em>第 ④ 条最反直觉也最重要——**很多人第一次听说"别用平均值"时会惊讶**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="09-message-queue.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">09 消息队列与异步 ★★</div>
+  </a>
+  <a class="next" href="11-game-backend-overview.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">11 游戏后端全景 ★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

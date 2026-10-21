@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>27 架构与设计模式 — Unity 游戏后端 + 全栈开发路线｜从客户端主程延伸为能独立扛服务的全栈工程师</title>
+<meta name="description" content="分层、领域模型、微服务与单体取舍、事件驱动">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">Unity 游戏后端 + 全栈开发路线
+        <span>从客户端主程延伸为能独立扛服务的全栈工程师</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>27 · 架构与设计模式 ★★</h1>
+
+<p class="lead">架构的本质是<strong>控制依赖方向</strong>。<em>依赖乱了，改一处崩一片</em>。这一页讲分层、依赖倒置、事件驱动、领域模型。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（26）测试与质量 —— 单元测试、集成测试、契约测试、压测脚本。<br>
+  <strong>这一页</strong>（27）架构与设计模式 —— 分层、领域模型、微服务与单体取舍、事件驱动。<br>
+  <strong>下一页</strong>（28）AI 辅助后端开发 —— 用 AI 写 CRUD、生成测试、审查 SQL 的边界。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="27-architecture.html#layering" data-brief="上层依赖下层；下层不能反向依赖"><span class="prereq__title">分层与依赖方向</span><span class="prereq__page">27-architecture</span></a>
+          <a class="prereq__item" href="27-architecture.html#event" data-brief="发事件而非直接调用，新增功能不改业务代码"><span class="prereq__title">事件驱动解耦</span><span class="prereq__page">27-architecture</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="layering">一、分层的本质：依赖方向 ★★★</h2>
+
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace BackendSamples.Architecture
+{
+    // ============================================================
+    // 1. 分层的本质：依赖方向
+    // ============================================================
+    // 【核心】依赖只能从上往下，不能反过来
+
+    public static class Layering
+    {
+        public static readonly (string Layer, string Responsibility, string Example)[] All =
+        {
+            ("表现层",  "接收请求、参数校验、返回响应", "Controller / API"),
+            ("应用层",  "编排业务流程",                 "Service / UseCase"),
+            ("领域层",  "业务规则、不依赖外部",         "Entity / Domain"),
+            ("基础设施", "数据库、缓存、外部服务",      "Repository / Client"),
+        };
+
+        public static string ExplainRule() =&gt;
+            "上层依赖下层；下层【不能】依赖上层（否则改一处崩一片）";
+
+        // 【检验方法】能不能单独编译领域层
+        public static string HowToVerify() =&gt;
+            "把领域层单独拎出来编译 —— 如果必须带上 Web 框架，说明方向错了";
+    }
+
+    // ============================================================
+    // 2. 依赖倒置：用接口切断依赖
+    // ============================================================
+    // 【问题】领域层直接用 SqlClient -&gt; 领域层依赖数据库
+
+    // ---- 【错误】领域层直接依赖具体实现 ----
+    public class BadOrderService
+    {
+        // 【问题】这里直接 new 具体实现
+        // 领域层就被绑死在某个数据库上了
+        private readonly List&lt;string&gt; _fakeDb = new();
+
+        public void CreateOrder(string order)
+        {
+            // 真实代码: new SqlConnection(...).Execute(...)
+            _fakeDb.Add(order);
+        }
+    }
+
+    // ---- 【正确】依赖接口 ----
+    public interface IOrderRepository
+    {
+        void Save(string order);
+        string? Find(string id);
+    }
+
+    public class InMemoryOrderRepo : IOrderRepository
+    {
+        private readonly Dictionary&lt;string, string&gt; _data = new();
+        public void Save(string order) =&gt; _data[order] = order;
+        public string? Find(string id) =&gt; _data.TryGetValue(id, out var v) ? v : null;
+    }
+
+    public class GoodOrderService
+    {
+        private readonly IOrderRepository _repo;
+
+        // 【关键】依赖接口，不依赖具体实现
+        public GoodOrderService(IOrderRepository repo) =&gt; _repo = repo;
+
+        public void CreateOrder(string order) =&gt; _repo.Save(order);
+        public string? GetOrder(string id) =&gt; _repo.Find(id);
+    }
+
+    // ============================================================
+    // 3. 单体 vs 微服务
+    // ============================================================
+
+    public static class MonolithVsMicro
+    {
+        public static readonly (string Aspect, string Monolith, string Microservice)[] All =
+        {
+            ("开发速度",   "快（一个项目）",       "慢（多项目+通信）"),
+            ("部署",       "简单（一个包）",       "复杂（编排）"),
+            ("扩展",       "整体扩",               "按服务扩"),
+            ("技术栈",     "统一",                 "可异构"),
+            ("故障隔离",   "差（一个挂了全挂）",   "好"),
+            ("调试",       "简单（一个进程）",     "难（跨服务追踪）"),
+            ("团队要求",   "低",                   "高（要有运维能力）"),
+        };
+
+        public static string Recommend(int teamSize, int dau)
+        {
+            if (teamSize &lt;= 5) return "单体（模块化）";
+            if (teamSize &lt;= 20 &amp;&amp; dau &lt; 1000000) return "单体 + 少量拆分（网关/战斗服）";
+            return "微服务（但要先有 DevOps 能力）";
+        }
+    }
+
+    // ============================================================
+    // 4. 事件驱动：解耦的利器
+    // ============================================================
+    // 【问题】下单后要做 5 件事，直接调用会耦合
+
+    public class EventBus
+    {
+        private readonly Dictionary&lt;string, List&lt;Action&lt;object&gt;&gt;&gt; _handlers = new();
+
+        public void Subscribe(string eventName, Action&lt;object&gt; handler)
+        {
+            if (!_handlers.TryGetValue(eventName, out var list))
+            {
+                list = new List&lt;Action&lt;object&gt;&gt;();
+                _handlers[eventName] = list;
+            }
+            list.Add(handler);
+        }
+
+        public void Publish(string eventName, object data)
+        {
+            if (!_handlers.TryGetValue(eventName, out var list)) return;
+            // 【关键】快照，防止回调中修改订阅
+            foreach (var h in list.ToList()) h(data);
+        }
+
+        public int HandlerCount(string eventName) =&gt;
+            _handlers.TryGetValue(eventName, out var l) ? l.Count : 0;
+    }
+
+    // ---- 【耦合】直接调用 ----
+    public class CoupledOrderService
+    {
+        public void CreateOrder(string order)
+        {
+            // 【问题】新增一件事就要改这里
+            SendEmail(order);
+            UpdateInventory(order);
+            AddPoints(order);
+            NotifyWarehouse(order);
+            WriteLog(order);
+        }
+
+        private void SendEmail(string o) { }
+        private void UpdateInventory(string o) { }
+        private void AddPoints(string o) { }
+        private void NotifyWarehouse(string o) { }
+        private void WriteLog(string o) { }
+    }
+
+    // ---- 【解耦】发事件 ----
+    public class DecoupledOrderService
+    {
+        private readonly EventBus _bus;
+        public DecoupledOrderService(EventBus bus) =&gt; _bus = bus;
+
+        public void CreateOrder(string order)
+        {
+            // 【关键】只发事件，不关心谁处理
+            _bus.Publish("order.created", order);
+        }
+    }
+
+    // ============================================================
+    // 5. 领域模型：贫血 vs 充血
+    // ============================================================
+
+    // ---- 贫血模型（只有数据没有行为）----
+    public class AnemicPlayer
+    {
+        public int Gold;
+        public int Level;
+    }
+
+    public class AnemicService
+    {
+        // 【问题】业务规则散落在各个 Service 里
+        public void AddGold(AnemicPlayer p, int amount)
+        {
+            if (amount &lt;= 0) throw new ArgumentException("金额非法");
+            p.Gold += amount;
+        }
+    }
+
+    // ---- 充血模型（数据和行为在一起）----
+    public class RichPlayer
+    {
+        public int Gold { get; private set; }
+        public int Level { get; private set; }
+
+        public RichPlayer(int gold, int level)
+        {
+            Gold = gold;
+            Level = level;
+        }
+
+        // 【关键】规则封装在实体里，不可能被绕过
+        public void AddGold(int amount)
+        {
+            if (amount &lt;= 0) throw new ArgumentException("金额必须大于 0");
+            if (amount &gt; 1000000) throw new ArgumentException("单次超过上限");
+            Gold += amount;
+        }
+
+        public bool TrySpend(int amount)
+        {
+            if (amount &lt;= 0) return false;
+            if (Gold &lt; amount) return false;
+            Gold -= amount;
+            return true;
+        }
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 分层与依赖方向 ===");
+            foreach (var (layer, resp, ex) in Layering.All)
+            {
+                Console.WriteLine($"    {layer,-10} {resp,-32} {ex}");
+            }
+            Console.WriteLine();
+            Console.WriteLine($"  【规则】{Layering.ExplainRule()}");
+            Console.WriteLine($"  【检验】{Layering.HowToVerify()}");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 依赖倒置 ===");
+            Console.WriteLine("  【错误】领域层直接 new 具体实现:");
+            var bad = new BadOrderService();
+            bad.CreateOrder("订单A");
+            Console.WriteLine("    领域层被绑死在某个数据库上，换库要改代码");
+
+            Console.WriteLine();
+            Console.WriteLine("  【正确】依赖接口:");
+            IOrderRepository repo = new InMemoryOrderRepo();
+            var good = new GoodOrderService(repo);
+            good.CreateOrder("订单B");
+            Console.WriteLine($"    保存成功，查询: {good.GetOrder("订单B")}");
+            Console.WriteLine("    换数据库只需换实现，Service 不用改");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 单体 vs 微服务 ===");
+            Console.WriteLine($"    {"方面",-12} {"单体",-22} 微服务");
+            foreach (var (aspect, mono, micro) in MonolithVsMicro.All)
+            {
+                Console.WriteLine($"    {aspect,-12} {mono,-22} {micro}");
+            }
+            Console.WriteLine();
+            foreach (var (team, dau) in new[] { (3, 50000), (15, 500000), (50, 5000000) })
+            {
+                Console.WriteLine($"    {team,2} 人 / {dau,8} DAU -&gt; {MonolithVsMicro.Recommend(team, dau)}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 事件驱动解耦 ===");
+            var bus = new EventBus();
+
+            // 五个独立的订阅者
+            bus.Subscribe("order.created", o =&gt; Console.WriteLine($"    [邮件] 发送订单确认: {o}"));
+            bus.Subscribe("order.created", o =&gt; Console.WriteLine($"    [库存] 扣减库存: {o}"));
+            bus.Subscribe("order.created", o =&gt; Console.WriteLine($"    [积分] 增加积分: {o}"));
+            bus.Subscribe("order.created", o =&gt; Console.WriteLine($"    [仓库] 通知发货: {o}"));
+            bus.Subscribe("order.created", o =&gt; Console.WriteLine($"    [日志] 记录: {o}"));
+
+            Console.WriteLine($"  订阅者数量: {bus.HandlerCount("order.created")}");
+            Console.WriteLine();
+            Console.WriteLine("  下单:");
+
+            var orderSvc = new DecoupledOrderService(bus);
+            orderSvc.CreateOrder("订单-001");
+
+            Console.WriteLine();
+            Console.WriteLine("  【价值】新增一件事");
+            Console.WriteLine("    · 耦合做法: 改 CreateOrder 方法");
+            Console.WriteLine("    · 事件做法: 加一个 Subscribe，不改业务代码");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 5. 贫血 vs 充血模型 ===");
+            Console.WriteLine("  【贫血】规则在 Service 里，容易被绕过:");
+            var anemic = new AnemicPlayer { Gold = 100, Level = 1 };
+            anemic.Gold = -999;   // 【危险】直接改字段，绕过所有规则
+            Console.WriteLine($"    直接改字段 -&gt; 金币变成 {anemic.Gold}（没有校验）");
+
+            Console.WriteLine();
+            Console.WriteLine("  【充血】规则在实体里，绕不过:");
+            var rich = new RichPlayer(100, 1);
+            try
+            {
+                rich.AddGold(-999);
+            }
+            catch (ArgumentException ex)
+            {
+                Console.WriteLine($"    尝试加 -999 -&gt; {ex.Message}");
+            }
+            try
+            {
+                rich.AddGold(2000000);
+            }
+            catch (ArgumentException ex)
+            {
+                Console.WriteLine($"    尝试加 200 万 -&gt; {ex.Message}");
+            }
+            rich.AddGold(500);
+            Console.WriteLine($"    正常加 500 -&gt; 金币 {rich.Gold}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【结论】");
+            Console.WriteLine("    · 贫血模型：简单，但规则容易漏");
+            Console.WriteLine("    · 充血模型：规则集中，但要求理解领域");
+            Console.WriteLine("    · 游戏后端建议：核心实体（玩家/订单）用充血");
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Architecture.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>层</th><th>职责</th><th>例子</th></tr></thead>
+  <tbody>
+    <tr><td><strong>表现层</strong></td><td>接请求、校验、返回</td><td>Controller</td></tr>
+    <tr><td><strong>应用层</strong></td><td>编排流程</td><td>Service</td></tr>
+    <tr><td><strong>领域层</strong></td><td><strong>业务规则</strong></td><td>Entity</td></tr>
+    <tr><td><strong>基础设施</strong></td><td>数据库、缓存</td><td>Repository</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="di">二、依赖倒置：用接口切断依赖 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">错误 vs 正确的依赖方向</span>
+  <strong>【错误】领域层直接依赖数据库</strong><br>
+  <code>class OrderService { SqlConnection conn = new(...); }</code><br>
+  <em>→ 领域层绑死在某个数据库上，换库要改代码，测试要连真库</em><br><br>
+  <strong>【正确】依赖接口</strong><br>
+  <code>class OrderService { IOrderRepository repo; }</code><br>
+  · 换数据库只需<strong>换实现</strong><br>
+  · 测试时<strong>注入 Fake</strong><br><br>
+  <strong>本页实测</strong>：<br>
+  <code>IOrderRepository repo = new InMemoryOrderRepo();</code><br>
+  <code>var good = new GoodOrderService(repo);</code><br>
+  <code>保存成功，查询: 订单B</code><br><br>
+  <strong>检验方法</strong>：<em>把领域层单独拎出来编译</em>——<br>
+  如果必须带上 Web 框架，说明方向错了。
+</div>
+
+<h2 id="monolith">三、单体 vs 微服务：不要过早拆分 ★★</h2>
+
+<div class="callout callout--warn">
+  <span class="callout__title">本页给出的决策表</span>
+  <div class="table-wrap">
+  <table>
+  <thead><tr><th>团队/规模</th><th>建议</th></tr></thead>
+  <tbody>
+    <tr><td>≤5 人</td><td><strong>单体（模块化）</strong></td></tr>
+    <tr><td>≤20 人 + &lt;100万 DAU</td><td>单体 + 少量拆分（<em>网关/战斗服</em>）</td></tr>
+    <tr><td>50 人 + 500万 DAU</td><td>微服务（<em>但先有 DevOps 能力</em>）</td></tr>
+  </tbody>
+  </table>
+  </div>
+  <strong>本页对比的七个方面</strong>：<br>
+  · <strong>开发速度</strong>：单体快（<em>一个项目</em>）<br>
+  · <strong>部署</strong>：单体简单（<em>一个包</em>）<br>
+  · <strong>故障隔离</strong>：微服务好<br>
+  · <strong>调试</strong>：单体简单（<em>一个进程</em>）<br><br>
+  <strong>结论</strong>：<em>微服务的收益在「大规模团队 + 高并发」，代价是运维复杂度</em>。<br>
+  <strong>小团队上微服务 = 自杀</strong>。
+</div>
+
+<h2 id="event">四、事件驱动：解耦的利器 ★★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">本页实测的对比</span>
+  <strong>【耦合】下单后直接调 5 个方法</strong><br>
+  <code>SendEmail(); UpdateInventory(); AddPoints(); ...</code><br>
+  <em>→ 新增一件事就要改 CreateOrder</em><br><br>
+  <strong>【解耦】只发事件</strong><br>
+  <code>_bus.Publish("order.created", order);</code><br><br>
+  <strong>本页实测输出</strong>：<br>
+  <code>订阅者数量: 5</code><br>
+  <code>[邮件] 发送订单确认: 订单-001</code><br>
+  <code>[库存] 扣减库存: 订单-001</code><br>
+  <code>[积分] 增加积分: 订单-001</code><br>
+  <code>[仓库] 通知发货: 订单-001</code><br>
+  <code>[日志] 记录: 订单-001</code><br><br>
+  <strong>价值</strong>：<em>新增一件事只需加一个 Subscribe，不改业务代码</em>。<br><br>
+  <strong>注意</strong>：<em>本地事件和消息队列的区别</em>（<em>页 09</em>）——<br>
+  本地事件是<strong>同步</strong>的，消息队列是<strong>异步</strong>的。
+</div>
+
+<h2 id="domain">五、贫血 vs 充血模型 ★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">本页实测的差别</span>
+  <strong>【贫血】规则在 Service 里</strong><br>
+  <code>class AnemicPlayer { public int Gold; }</code><br>
+  <code>anemic.Gold = -999;  // 直接改字段，绕过所有规则</code><br>
+  <code>直接改字段 -&gt; 金币变成 -999（没有校验）</code><br><br>
+  <strong>【充血】规则在实体里</strong><br>
+  <code>rich.AddGold(-999);</code><br>
+  <code>-&gt; 金额必须大于 0</code><br>
+  <code>rich.AddGold(2000000);</code><br>
+  <code>-&gt; 单次超过上限</code><br>
+  <code>rich.AddGold(500);</code><br>
+  <code>-&gt; 金币 600</code><br><br>
+  <strong>结论</strong>：<br>
+  · 贫血：简单，但<strong>规则容易漏</strong><br>
+  · 充血：规则集中，但<strong>要求理解领域</strong><br>
+  · <strong>游戏后端建议</strong>：<em>核心实体（玩家/订单）用充血</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="27">
+  <div class="task"><input type="checkbox" id="t-27-1"><label for="t-27-1"><strong>画依赖图</strong>：你的项目各层怎么依赖？有没有反向依赖？</label></div>
+  <div class="task"><input type="checkbox" id="t-27-2"><label for="t-27-2"><strong>验证可独立编译</strong>：把领域层单独拎出来，能编译吗？</label></div>
+  <div class="task"><input type="checkbox" id="t-27-3"><label for="t-27-3"><strong>改依赖倒置</strong>：把一个直接 new 的依赖改成注入接口。</label></div>
+  <div class="task"><input type="checkbox" id="t-27-4"><label for="t-27-4"><strong>对比单体与微服务</strong>：按你的团队规模，该选哪个？</label></div>
+  <div class="task"><input type="checkbox" id="t-27-5"><label for="t-27-5"><strong>做事件解耦</strong>：把一处直接调用改成发事件。</label></div>
+  <div class="task"><input type="checkbox" id="t-27-6"><label for="t-27-6"><strong>改充血模型</strong>：把散在 Service 里的规则收进实体。</label></div>
+  <div class="task"><input type="checkbox" id="t-27-7"><label for="t-27-7"><strong>回答面试题</strong>：① 依赖方向为什么重要？② 什么时候该上微服务？③ 贫血和充血的区别？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道分层的本质是控制依赖方向</strong>；<br>
+    ② <strong>会用依赖倒置切断对数据库的直接依赖</strong>；<br>
+    ③ <strong>能按团队规模判断该不该上微服务</strong>；<br>
+    ④ <strong>能用事件解耦「一件事触发多件事」</strong>；<br>
+    ⑤ <strong>知道核心实体该用充血模型</strong>。<br>
+    <br>
+    <em>第 ① 和 第 ④ 条最关键——**前者是架构思维，后者是实战中最常用的解耦手段**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="26-testing.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">26 测试与质量 ★</div>
+  </a>
+  <a class="next" href="28-ai.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">28 AI 辅助后端开发</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

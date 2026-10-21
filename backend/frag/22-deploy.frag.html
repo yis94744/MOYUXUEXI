@@ -1,0 +1,442 @@
+<h1>22 · 部署与运维 ★★</h1>
+
+<p class="lead">这一页讲<strong>怎么把代码变成线上服务</strong>。<em>核心是三件事：部署形态、发布策略、健康检查</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（21）运营后台实战 —— 从零做一个 GM 后台：列表、筛选、权限、导出。<br>
+  <strong>这一页</strong>（22）部署与运维 —— Linux、Nginx、进程守护、Docker、CI/CD。<br>
+  <strong>下一页</strong>（23）扩展性与高可用 —— 负载均衡、无状态化、分库分表、限流熔断。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+<h2 id="modes">一、三种部署形态</h2>
+
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace BackendSamples.Deploy
+{
+    // ============================================================
+    // 1. 部署的三种形态
+    // ============================================================
+
+    public static class DeployModes
+    {
+        public static readonly (string Mode, string How, string Pros, string Cons)[] All =
+        {
+            ("直接在服务器跑", "dotnet publish + systemd", "简单、无额外依赖", "环境不一致"),
+            ("Docker",         "镜像 + 容器",             "环境一致、好回滚", "要学 Docker"),
+            ("PaaS / 云托管",  "上传代码，平台托管",       "省运维",           "贵、受制于人"),
+        };
+
+        public static string Recommend(int teamSize, bool hasOps)
+        {
+            if (teamSize &lt;= 2 &amp;&amp; !hasOps) return "PaaS（省时间）";
+            if (teamSize &lt;= 10) return "Docker + 单机/少量机器";
+            return "K8s（规模化）";
+        }
+    }
+
+    // ============================================================
+    // 2. 发布的原子性：不能出现「一半新一半旧」
+    // ============================================================
+
+    public class DeploySimulator
+    {
+        public class Version
+        {
+            public string Tag = "";
+            public bool Healthy;
+            public DateTime DeployedAt = DateTime.UtcNow;
+            public int RequestCount;
+        }
+
+        private readonly List&lt;Version&gt; _history = new();
+
+        public DeploySimulator()
+        {
+            // 【关键】初始版本也要进历史，否则第一次部署后「回滚」找不到 v1.0
+            var initial = new Version { Tag = "v1.0", Healthy = true };
+            _history.Add(initial);
+            Current = initial;
+        }
+
+        public Version Current { get; private set; } = new Version { Tag = "(未初始化)", Healthy = false };
+
+        public (bool Ok, string Msg) Deploy(string tag, bool healthy)
+        {
+            Console.WriteLine($"    部署 {tag}...");
+
+            var newV = new Version { Tag = tag, Healthy = healthy };
+
+            if (!healthy)
+            {
+                // 【关键】健康检查失败，不切换
+                Console.WriteLine($"    健康检查失败，保持 {Current.Tag}");
+                _history.Add(newV);
+                return (false, "部署失败，已回滚");
+            }
+
+            var old = Current;
+            Current = newV;
+            _history.Add(newV);
+            Console.WriteLine($"    健康检查通过，{old.Tag} -&gt; {newV.Tag}");
+            return (true, "部署成功");
+        }
+
+        public (bool Ok, string Msg) Rollback()
+        {
+            // 找「当前版本之前」最近的一个健康版本
+            int idx = _history.FindLastIndex(v =&gt; v.Tag == Current.Tag);
+            var prev = idx &gt; 0
+                ? _history.Take(idx).LastOrDefault(v =&gt; v.Healthy)
+                : null;
+            if (prev == null) return (false, "没有可回滚的版本");
+
+            var old = Current;
+            Current = prev;
+            Console.WriteLine($"    回滚: {old.Tag} -&gt; {prev.Tag}");
+            return (true, "回滚成功");
+        }
+
+        public IReadOnlyList&lt;Version&gt; History =&gt; _history;
+    }
+
+    // ============================================================
+    // 3. 滚动发布 vs 蓝绿 vs 金丝雀
+    // ============================================================
+
+    public static class ReleaseStrategy
+    {
+        public static readonly (string Name, string How, string Pros, string Cons)[] All =
+        {
+            ("滚动发布", "逐台替换",       "资源省",             "【新老版本共存】"),
+            ("蓝绿部署", "两套环境切换",   "回滚快",             "要双倍资源"),
+            ("金丝雀",   "先放 1% 流量",   "风险最小",           "要多监控"),
+        };
+
+        // 模拟金丝雀
+        public class CanaryRelease
+        {
+            private Version? _stable;
+            private Version? _canary;
+            private int _canaryPercent;
+            private readonly Random _rnd = new(42);
+
+            public class Version { public string Tag = ""; public int Errors; public int Total; }
+
+            public void Start(string stableTag, string canaryTag, int canaryPercent)
+            {
+                _stable = new Version { Tag = stableTag };
+                _canary = new Version { Tag = canaryTag };
+                _canaryPercent = canaryPercent;
+                Console.WriteLine($"    金丝雀发布: {stableTag} 为主，{canaryTag} 接收 {canaryPercent}% 流量");
+            }
+
+            public string Route()
+            {
+                var v = _rnd.Next(100) &lt; _canaryPercent ? _canary! : _stable!;
+                v.Total++;
+                return v.Tag;
+            }
+
+            public void RecordError(string tag)
+            {
+                if (tag == _canary!.Tag) _canary.Errors++;
+                else _stable!.Errors++;
+            }
+
+            // 【关键】对比错误率
+            public (bool ShouldPromote, string Reason) Evaluate()
+            {
+                double stableRate = _stable!.Total == 0 ? 0 : (double)_stable.Errors / _stable.Total;
+                double canaryRate = _canary!.Total == 0 ? 0 : (double)_canary.Errors / _canary.Total;
+
+                Console.WriteLine($"    稳定版: {_stable.Total} 请求, {_stable.Errors} 错误 ({stableRate * 100:F1}%)");
+                Console.WriteLine($"    金丝雀: {_canary.Total} 请求, {_canary.Errors} 错误 ({canaryRate * 100:F1}%)");
+
+                // 【规则】金丝雀错误率不能明显高于稳定版
+                if (canaryRate &gt; stableRate * 2 + 0.01)
+                    return (false, $"金丝雀错误率 {canaryRate * 100:F1}% 过高，建议回滚");
+
+                return (true, "错误率正常，可以逐步放量");
+            }
+        }
+    }
+
+    // ============================================================
+    // 4. 健康检查：部署的基础
+    // ============================================================
+
+    public class HealthChecker
+    {
+        public class CheckResult
+        {
+            public string Name = "";
+            public bool Ok;
+            public string Detail = "";
+        }
+
+        // 【区分】存活探针 vs 就绪探针
+        //   liveness  -- 进程还活着吗？（挂了就重启）
+        //   readiness -- 能接流量吗？（依赖还没就绪就不接）
+
+        public List&lt;CheckResult&gt; RunChecks()
+        {
+            var results = new List&lt;CheckResult&gt;();
+
+            // 检查数据库
+            results.Add(new CheckResult
+            {
+                Name = "database",
+                Ok = true,
+                Detail = "连接正常，延迟 2ms",
+            });
+
+            // 检查 Redis
+            results.Add(new CheckResult
+            {
+                Name = "redis",
+                Ok = true,
+                Detail = "连接正常",
+            });
+
+            // 检查磁盘
+            var diskFreePercent = 35;   // 模拟
+            results.Add(new CheckResult
+            {
+                Name = "disk",
+                Ok = diskFreePercent &gt; 10,
+                Detail = $"剩余 {diskFreePercent}%",
+            });
+
+            // 检查依赖服务
+            results.Add(new CheckResult
+            {
+                Name = "payment_service",
+                Ok = true,
+                Detail = "响应 45ms",
+            });
+
+            return results;
+        }
+
+        public bool IsHealthy(List&lt;CheckResult&gt; results) =&gt; results.All(r =&gt; r.Ok);
+    }
+
+    // ============================================================
+    // 5. CI/CD：自动化流水线
+    // ============================================================
+
+    public static class Pipeline
+    {
+        public static readonly (string Stage, string What, string FailAction)[] All =
+        {
+            ("1. 构建",     "编译 + 单测",         "阻止发布"),
+            ("2. 静态扫描", "代码规范、安全漏洞",  "严重问题阻止"),
+            ("3. 打包",     "生成镜像/产物",       "阻止发布"),
+            ("4. 部署测试", "部署到测试环境",      "阻止发布"),
+            ("5. 集成测试", "端到端测试",          "阻止发布"),
+            ("6. 部署生产", "灰度发布",            "自动回滚"),
+            ("7. 监控",     "错误率、延迟",        "异常告警"),
+        };
+
+        public static void Print()
+        {
+            foreach (var (stage, what, fail) in All)
+            {
+                Console.WriteLine($"    {stage,-12} {what,-24} 失败: {fail}");
+            }
+        }
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 部署形态选择 ===");
+            foreach (var (mode, how, pros, cons) in DeployModes.All)
+            {
+                Console.WriteLine($"    {mode,-16} {how,-28} 优点: {pros}");
+            }
+            Console.WriteLine();
+            foreach (var (size, ops) in new[] { (1, false), (5, true), (50, true) })
+            {
+                Console.WriteLine($"    {size,2} 人团队 / {(ops ? "有运维" : "无运维")} -&gt; {DeployModes.Recommend(size, ops)}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 部署的原子性 ===");
+            var dep = new DeploySimulator();
+            Console.WriteLine($"  当前版本: {dep.Current.Tag}");
+
+            Console.WriteLine();
+            Console.WriteLine("  部署 v1.1（健康）:");
+            var (ok1, msg1) = dep.Deploy("v1.1", healthy: true);
+            Console.WriteLine($"    结果: {msg1}");
+
+            Console.WriteLine();
+            Console.WriteLine("  部署 v1.2（不健康）:");
+            var (ok2, msg2) = dep.Deploy("v1.2", healthy: false);
+            Console.WriteLine($"    结果: {msg2}，当前版本仍是 {dep.Current.Tag}");
+
+            Console.WriteLine();
+            Console.WriteLine("  回滚:");
+            var (ok3, msg3) = dep.Rollback();
+            Console.WriteLine($"    结果: {msg3}，当前版本 {dep.Current.Tag}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】部署失败必须自动保持旧版本");
+            Console.WriteLine("          不能出现「一半新一半旧」");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 三种发布策略 ===");
+            foreach (var (name, how, pros, cons) in ReleaseStrategy.All)
+            {
+                Console.WriteLine($"    {name,-10} {how,-16} 优点: {pros,-14} 缺点: {cons}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  金丝雀演练（1% 流量）:");
+            var canary = new ReleaseStrategy.CanaryRelease();
+            canary.Start("v2.0", "v2.1", 10);
+
+            var rnd = new Random(42);
+            for (int i = 0; i &lt; 100; i++)
+            {
+                var tag = canary.Route();
+                // 模拟：金丝雀版本有 5% 错误率，稳定版 1%
+                double errRate = tag == "v2.1" ? 0.05 : 0.01;
+                if (rnd.NextDouble() &lt; errRate) canary.RecordError(tag);
+            }
+
+            var (promote, reason) = canary.Evaluate();
+            Console.WriteLine($"    决策: {(promote ? "继续放量" : "回滚")} — {reason}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【金丝雀的价值】");
+            Console.WriteLine("    · 只有 10% 用户受影响");
+            Console.WriteLine("    · 能在扩大影响前发现问题");
+            Console.WriteLine("    · 大厂的标准做法");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 健康检查 ===");
+            var hc = new HealthChecker();
+            var checks = hc.RunChecks();
+
+            Console.WriteLine("  各类检查:");
+            foreach (var c in checks)
+            {
+                var mark = c.Ok ? "[OK]" : "[FAIL]";
+                Console.WriteLine($"    {mark,-7} {c.Name,-18} {c.Detail}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine($"  整体健康: {hc.IsHealthy(checks)}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【两类探针的区别】");
+            Console.WriteLine("    liveness  -&gt; 进程活着吗？挂了就重启");
+            Console.WriteLine("    readiness -&gt; 能接流量吗？依赖没就绪就不接");
+            Console.WriteLine("    【常见错误】把 liveness 做成检查数据库");
+            Console.WriteLine("      -&gt; 数据库抖动会导致所有 pod 被重启");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 5. CI/CD 流水线 ===");
+            Pipeline.Print();
+
+            Console.WriteLine();
+            Console.WriteLine("  【最小可用 CI】");
+            Console.WriteLine("    1. push 触发构建");
+            Console.WriteLine("    2. 跑单元测试");
+            Console.WriteLine("    3. 打包镜像");
+            Console.WriteLine("    4. 部署到测试环境");
+            Console.WriteLine("    5. 手动点「发布生产」");
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Deploy.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>形态</th><th>做法</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>直接跑</strong></td><td>publish + systemd</td><td><em>简单项目</em></td></tr>
+    <tr><td><strong>Docker</strong></td><td>镜像 + 容器</td><td><strong>推荐</strong></td></tr>
+    <tr><td><strong>PaaS</strong></td><td>平台托管</td><td><em>小团队省时间</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="atomic">二、部署必须原子 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">本页实测的部署流程</span>
+  <strong>正确流程</strong>：<br><code>当前版本: v1.0</code><br><code>部署 v1.1（健康）-&gt; v1.0 -&gt; v1.1</code><br><code>部署 v1.2（不健康）-&gt; 健康检查失败，保持 v1.1</code><br><code>回滚: v1.1 -&gt; v1.0，结果: 回滚成功，当前版本 v1.0</code><br><br><strong>关键点</strong>：<br>① <strong>先启动新版本，健康检查通过后才切流量</strong><br>② 健康检查失败 → <em>不切换，旧版本继续服务</em><br>③ <strong>保留旧版本</strong>（<em>随时能回滚</em>）<br><br><strong>反例</strong>：<em>先停旧版本，再启动新版本</em> → <strong>中间有一段服务不可用</strong>。
+</div>
+
+<h2 id="strategies">三、三种发布策略 ★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">对比与选择</span>
+  <div class="table-wrap"><table><thead><tr><th>策略</th><th>做法</th><th>优缺点</th></tr></thead><tbody><tr><td><strong>滚动发布</strong></td><td>逐台替换</td><td>资源省，但<strong>新老版本共存</strong></td></tr><tr><td><strong>蓝绿部署</strong></td><td>两套环境切换</td><td>回滚快，但要双倍资源</td></tr><tr><td><strong>金丝雀</strong></td><td>先放 1~10% 流量</td><td><strong>风险最小</strong>，大厂标配</td></tr></tbody></table></div><strong>本页实测的金丝雀逻辑</strong>（<em>10% 流量给金丝雀，注入故障</em>）：<br><code>稳定版: 80 请求, 0 错误 (0.0%)</code><br><code>金丝雀: 20 请求, 14 错误 (70.0%)</code><br><code>决策: 回滚 — 金丝雀错误率 70.0% 过高，建议回滚</code><br><br><strong>判断规则</strong>：<em>金丝雀错误率超过稳定版的 2 倍就回滚</em><br><strong>价值</strong>：<em>只有 10% 用户受影响，能在扩大影响前发现问题</em>。
+</div>
+
+<h2 id="health">四、健康检查：两类探针别搞混 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">liveness vs readiness</span>
+  <div class="table-wrap"><table><thead><tr><th>探针</th><th>回答的问题</th><th>失败后的动作</th></tr></thead><tbody><tr><td><strong>liveness</strong></td><td>进程还活着吗？</td><td><strong>重启容器</strong></td></tr><tr><td><strong>readiness</strong></td><td>能接流量吗？</td><td><em>摘掉流量，不重启</em></td></tr></tbody></table></div><strong>本页实测的检查项</strong>：<br><code>[OK] database&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;连接正常，延迟 2ms</code><br><code>[OK] redis&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;连接正常</code><br><code>[OK] disk&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;剩余 35%</code><br><code>[OK] payment_service 响应 45ms</code><br><code>整体健康: True</code><br><br><strong>最经典的错误</strong>：<em>把 liveness 做成检查数据库</em><br>→ 数据库抖动一下 → <strong>所有 pod 全部被重启</strong> → <em>雪崩</em><br><br><strong>正确做法</strong>：<br>· <strong>liveness</strong> 只检查<em>自己能响应</em>（<em>HTTP 200</em>）<br>· <strong>readiness</strong> 才检查<em>依赖是否就绪</em>
+</div>
+
+<h2 id="cicd">五、CI/CD 流水线</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">七个阶段</span>
+  <div class="table-wrap"><table><thead><tr><th>阶段</th><th>做什么</th><th>失败怎么办</th></tr></thead><tbody><tr><td>1. 构建</td><td>编译 + 单测</td><td><strong>阻止发布</strong></td></tr><tr><td>2. 静态扫描</td><td>规范、安全漏洞</td><td>严重问题阻止</td></tr><tr><td>3. 打包</td><td>生成镜像</td><td>阻止</td></tr><tr><td>4. 部署测试</td><td>测试环境</td><td>阻止</td></tr><tr><td>5. 集成测试</td><td>端到端</td><td>阻止</td></tr><tr><td>6. 部署生产</td><td>灰度</td><td><strong>自动回滚</strong></td></tr><tr><td>7. 监控</td><td>错误率、延迟</td><td>告警</td></tr></tbody></table></div><strong>最小可用 CI</strong>（<em>一天能搭好</em>）：<br>① push 触发构建<br>② 跑单元测试<br>③ 打包镜像<br>④ 部署测试环境<br>⑤ <strong>手动点「发布生产」</strong><br><br><em>先跑通这五步，再考虑自动化灰度。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="22">
+  <div class="task"><input type="checkbox" id="t-22-1"><label for="t-22-1"><strong>对比部署形态</strong>：你的项目适合哪种？</label></div>
+  <div class="task"><input type="checkbox" id="t-22-2"><label for="t-22-2"><strong>实现原子部署</strong>：健康检查通过才切流量。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-3"><label for="t-22-3"><strong>做金丝雀</strong>：1% 流量先试，对比错误率。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-4"><label for="t-22-4"><strong>写健康检查</strong>：区分 liveness 和 readiness。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-5"><label for="t-22-5"><strong>搭最小 CI</strong>：push 到部署测试环境。</label></div>
+  <div class="task"><input type="checkbox" id="t-22-6"><label for="t-22-6"><strong>回答面试题</strong>：① 什么是原子部署？② liveness 和 readiness 的区别？③ 金丝雀发布的价值？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出三种部署形态的取舍</strong>；<br>
+    ② <strong>知道部署必须原子（健康检查通过才切）</strong>；<br>
+    ③ <strong>能说出三种发布策略的优缺点</strong>；<br>
+    ④ <strong>能区分 liveness 和 readiness，并知道经典错误</strong>；<br>
+    ⑤ 能搭出一个最小可用的 CI。<br>
+    <br>
+    <em>第 ② 和 第 ④ 条最关键——**前者防止发布事故，后者防止误重启雪崩**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="21-admin-panel.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">21 运营后台实战 ★★</div>
+  </a>
+  <a class="next" href="23-scaling.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">23 扩展性与高可用 ★★</div>
+  </a>
+</nav>

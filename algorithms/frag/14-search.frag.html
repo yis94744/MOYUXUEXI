@@ -4,7 +4,10 @@
 
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
-  [object Object]
+  <strong>上一页</strong>（13）讲"怎么排"。这一页讲<em>"排好之后怎么查"</em>——以及不排序时怎么用索引把 O(n) 变成 O(1)。<br>
+  <strong>关键衔接</strong>：索引思想直接复用到<em>配置表加载（05）、任务事件索引（22）、红点聚合（21）</em>；Trie 的部分见页 08。<br>
+  <strong>下一页</strong>（15）动态规划。<em>从"查找"转向"在解空间里找最优"。</em><br>
+  <strong>验证方式</strong>：本页"遍历 vs 索引"的对比在 1000 条配置、10000 次查询下实测，差距是数量级级别的。
 </div>
 
 <h2 id="methods">一、四种查找方式的选择</h2>
@@ -43,12 +46,13 @@
   <code>for _, item in ipairs(configs) do</code><br>
   <code>&nbsp;&nbsp;if item.id == target then return item end</code><br>
   <code>end</code><br>
-  <em>10000 次查询实测 0.1590 秒</em><br><br>
+  <em>10000 次查询实测约 0.16~0.19 秒</em><br><br>
   <strong>优化后</strong>（建立索引）：<br>
   <code>byId[item.id] = item</code>  -- 加载时建一次<br>
   <code>return byId[target]</code>  -- 查询 O(1)<br>
-  <em>10000 次查询实测 0.0010 秒</em><br><br>
-  <strong>实测快 159 倍</strong>！<br><br>
+  <em>10000 次查询实测不到 0.001 秒（低于 <code>os.clock</code> 的分辨率，测不出具体值）</em><br><br>
+  <strong>实测快 150 倍以上</strong>（遍历法 0.16~0.19 秒；索引法低到无法直接计时）。<br>
+  <em>这里要说得准确一点：索引法的耗时已经落到计时精度以下，所以"159 倍"是下限估计，实际差距只会更大，但无法精确测出。</em><br><br>
   <strong>关键点</strong>：<em>索引要在加载时<strong>建一次</strong>，而不是每次查询都建</em>。<br>
   这是"用内存换时间"最典型的应用。
 </div>
@@ -104,14 +108,14 @@
   <div class="task"><input type="checkbox" id="t-14-3"><label for="t-14-3"><strong>验证二分的前提</strong>：故意用无序数组做二分，观察错误结果。</label></div>
   <div class="task"><input type="checkbox" id="t-14-4"><label for="t-14-4"><strong>实现 Trie 过滤</strong>：用页 08 的 Trie 做敏感词过滤，对比 <code>string.find</code> 循环的速度。</label></div>
   <div class="task"><input type="checkbox" id="t-14-5"><label for="t-14-5"><strong>做多字段索引</strong>：给配置表建立多个索引，体会"用内存换时间"。</label></div>
-  <div class="task"><input type="checkbox" id="t-14-6"><label for="t-14-6"><strong>回答面试题</strong>：① 二分查找有哪些易错点？② 索引为什么能快 100 倍？③ 敏感词过滤该用什么算法？</label></div>
+  <div class="task"><input type="checkbox" id="t-14-6"><label for="t-14-6"><strong>回答面试题</strong>：① 二分查找有哪些易错点？② 索引为什么能把 O(n) 变成 O(1)？③ 敏感词过滤该用什么算法？</label></div>
 </div>
 
 <div class="milestone">
   <p class="mb0">
     <strong>本章过关标准</strong>：<br>
     ① <strong>知道二分查找的六个易错点</strong>；<br>
-    ② <strong>能实测出"索引比遍历快 100 倍以上"</strong>；<br>
+    ② <strong>能实测出"索引比遍历快两个数量级"</strong>；<br>
     ③ 知道要建哪些索引（看业务代码怎么查）；<br>
     ④ 知道索引要在加载时建一次，不是每次查都建；<br>
     ⑤ <strong>知道敏感词过滤要用 Trie，而不是 string.find 循环</strong>。<br>

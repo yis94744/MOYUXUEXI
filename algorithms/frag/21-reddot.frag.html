@@ -14,7 +14,340 @@
 
 <p>先用最直观的方式实现一遍，看看问题出在哪里。</p>
 
-<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>21/reddot</code></div>
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  红点系统：从朴素实现到百万级节点优化 ★★★
+-- ============================================================
+--  红点是手游里最容易被低估的系统：
+--    看起来只是「显示一个小圆点」，
+--    但在大型项目里，红点节点的数量可以达到【几十万个】，
+--    而且每次条件变化都可能触发全树重算。
+--
+--  这一份代码用 Lua 演示全部核心原理（C# 实现思路完全一致）。
+
+print("=== 1. 朴素实现：每次查询都递归重算 ===")
+-- 问题：每次 UI 刷新都从根节点往下递归，节点多时会卡
+
+local SimpleRedDot = {}
+
+function SimpleRedDot.createSimple()
+  local tree = {
+    name = "root",
+    selfVisible = false,      -- 节点自身是否满足显示条件
+    children = {},
+  }
+
+  -- 添加节点
+  local function addNode(parent, node)
+    node.children = node.children or {}
+    parent.children[#parent.children + 1] = node
+    return node
+  end
+
+  -- 【朴素查询】每次都递归全树
+  local function isVisible(node)
+    if node.selfVisible then return true end
+    for _, child in ipairs(node.children) do
+      if isVisible(child) then return true end
+    end
+    return false
+  end
+
+  -- 构建一棵测试树：3 层，每层 10 个子节点
+  local function buildTree(parent, depth)
+    if depth == 0 then return 0 end
+    local count = 0
+    for i = 1, 10 do
+      local child = addNode(parent, { name = parent.name .. "." .. i, selfVisible = false })
+      count = count + 1 + buildTree(child, depth - 1)
+    end
+    return count
+  end
+
+  local total = buildTree(tree, 3)
+
+  -- 模拟：只有最底层一个节点是亮的
+  local function setLeafVisible(node, depth)
+    if depth == 0 then node.selfVisible = true return true end
+    for _, child in ipairs(node.children) do
+      if setLeafVisible(child, depth - 1) then return true end
+    end
+    return false
+  end
+  setLeafVisible(tree, 3)
+
+  -- 测性能：反复查询根节点
+  local N = 20000
+  local t1 = os.clock()
+  local result
+  for i = 1, N do
+    result = isVisible(tree)
+  end
+  local simpleTime = os.clock() - t1
+
+  print(string.format("  节点总数: %d", total))
+  print(string.format("  查询 %d 次耗时: %.4f 秒", N, simpleTime))
+  print(string.format("  单次查询: %.1f 微秒", simpleTime / N * 1000000))
+  print("  【问题】每次查询都遍历全树，节点越多越慢")
+
+  return tree, total, simpleTime
+end
+
+local simpleTree, simpleTotal, simpleTime = SimpleRedDot.createSimple()
+
+print()
+print("=== 2. 优化一：脏标记 + 缓存 ===")
+-- 核心思路：
+--   节点状态变化时，只向上标记父节点「需要重算」，
+--   查询时如果缓存有效就直接返回缓存值。
+--   这是【空间换时间】的经典应用。
+
+local DirtyRedDot = {}
+
+function DirtyRedDot.create()
+  local tree = {
+    name = "root",
+    selfVisible = false,
+    children = {},
+    cachedVisible = false,     -- 缓存的可见性
+    dirty = true,              -- 是否需要重算
+    parent = nil,
+  }
+
+  local function addNode(parent, node)
+    node.children = node.children or {}
+    node.parent = parent
+    node.cachedVisible = false
+    node.dirty = true
+    parent.children[#parent.children + 1] = node
+    return node
+  end
+
+  -- 【关键】向上标记脏，而不是向下重算
+  local function markDirtyUpward(node)
+    local cur = node
+    while cur do
+      if cur.dirty then break end        -- 已经是脏的，祖先肯定也脏，可以提前退出
+      cur.dirty = true
+      cur = cur.parent
+    end
+  end
+
+  -- 设置节点自身状态（触发向上标脏）
+  local function setSelfVisible(node, visible)
+    if node.selfVisible == visible then return end
+    node.selfVisible = visible
+    markDirtyUpward(node)
+  end
+
+  -- 【惰性求值】只在需要时重算，且只算脏的那些
+  local recalcCount = 0
+  local function isVisible(node)
+    if not node.dirty then
+      return node.cachedVisible          -- 缓存有效，O(1) 返回
+    end
+
+    recalcCount = recalcCount + 1
+    local result = node.selfVisible
+    if not result then
+      for _, child in ipairs(node.children) do
+        if isVisible(child) then
+          result = true
+          break
+        end
+      end
+    end
+
+    node.cachedVisible = result
+    node.dirty = false
+    return result
+  end
+
+  -- 构建同样的树
+  local function buildTree(parent, depth)
+    if depth == 0 then return 0 end
+    local count = 0
+    for i = 1, 10 do
+      local child = addNode(parent, { name = parent.name .. "." .. i })
+      count = count + 1 + buildTree(child, depth - 1)
+    end
+    return count
+  end
+
+  local total = buildTree(tree, 3)
+
+  local function getLeaf(node, depth)
+    if depth == 0 then return node end
+    return getLeaf(node.children[1], depth - 1)
+  end
+
+  setSelfVisible(getLeaf(tree, 3), true)
+
+  local N = 20000
+  local t1 = os.clock()
+  local result
+  for i = 1, N do
+    result = isVisible(tree)
+  end
+  local dirtyTime = os.clock() - t1
+
+  print(string.format("  节点总数: %d", total))
+  print(string.format("  查询 %d 次耗时: %.4f 秒", N, dirtyTime))
+  print(string.format("  单次查询: %.1f 微秒", dirtyTime / N * 1000000))
+  print(string.format("  实际重算次数: %d（其余命中缓存）", recalcCount))
+  print(string.format("  相比朴素实现快 %.0f 倍", simpleTime / dirtyTime))
+
+  return { tree = tree, setSelfVisible = setSelfVisible, isVisible = isVisible, getLeaf = getLeaf }
+end
+
+local dirty = DirtyRedDot.create()
+
+print()
+print("=== 3. 优化二：批量更新的合并 ===")
+-- 如果一帧内改了 1000 个节点，逐个标脏会重复走同一条路径。
+-- 用「脏集合 + 统一提交」把重复工作合并。
+
+local BatchRedDot = {}
+
+function BatchRedDot.create()
+  local pendingSet = {}       -- 待处理的节点集合
+  local pendingCount = 0
+
+  local function markDirty(node)
+    if node.dirty then return end      -- 已标过，跳过（这就是合并的效果）
+    node.dirty = true
+    pendingSet[node] = true
+    pendingCount = pendingCount + 1
+  end
+
+  local function flush()
+    -- 统一向上传播（去重后的节点）
+    for node in pairs(pendingSet) do
+      local cur = node.parent
+      while cur and not cur.dirty do
+        cur.dirty = true
+        cur = cur.parent
+      end
+    end
+    pendingSet = {}
+    pendingCount = 0
+  end
+
+  return { markDirty = markDirty, flush = flush, getPendingCount = function() return pendingCount end }
+end
+
+local batch = BatchRedDot.create()
+
+-- 构建一个测试场景：1000 个节点同时变化
+local nodes = {}
+for i = 1, 1000 do
+  nodes[i] = { dirty = false, parent = nil }
+end
+-- 让它们共享部分父节点（模拟真实树结构）
+local sharedParent = { dirty = false, parent = nil }
+for i = 1, 500 do nodes[i].parent = sharedParent end
+
+local t2 = os.clock()
+for i = 1, 1000 do
+  batch.markDirty(nodes[i])
+end
+local markTime = os.clock() - t2
+
+print(string.format("  标记 1000 个节点耗时: %.6f 秒", markTime))
+print(string.format("  实际入队数量: %d", batch.getPendingCount()))
+batch.flush()
+print("  提交后：共享父节点只被传播一次（去重生效）")
+
+print()
+print("=== 4. 优化三：分层刷新与限制深度 ===")
+-- 大型项目里，红点树可能有 5~6 层、几十万节点。
+-- 关键优化：只重算「可见且展开」的分支。
+
+local function explainLazyExpansion()
+  print("  原理：红点树的完整结构很大，但玩家同时能看到的只有展开的分支。")
+  print("  做法：")
+  print("    1. 给每个节点记录「是否被 UI 引用」（引用计数）")
+  print("    2. 只有被引用的节点才参与重算")
+  print("    3. 未展开的分支用「聚合值」直接返回，不递归")
+  print()
+  print("  效果：假设 10 万节点里只有 200 个被引用，")
+  print("        重算规模从 10 万降到 200，提升 500 倍。")
+end
+explainLazyExpansion()
+
+print()
+print("=== 5. 优化四：非整型红点的增量计数 ===")
+-- 当红点还显示数量（如「3 个未领奖励」）时，
+-- 聚合不再用「或」而是用「求和」，可以维护增量计数。
+
+local CounterRedDot = {}
+
+function CounterRedDot.create()
+  local tree = { count = 0, selfCount = 0, children = {}, parent = nil }
+
+  local function addChild(parent, node)
+    node.children = node.children or {}
+    node.parent = parent
+    node.count = node.count or 0          -- 聚合值（含自身与全部子孙）
+    node.selfCount = node.selfCount or 0  -- 仅自身
+    parent.children[#parent.children + 1] = node
+    return node
+  end
+
+  -- 增量更新：只加差值，不重算全树
+  local function addCount(node, delta)
+    if delta == 0 then return end
+    node.selfCount = node.selfCount + delta
+
+    -- 【关键】向上累加，O(树高) 而不是 O(节点数)
+    local cur = node
+    while cur do
+      cur.count = cur.count + delta
+      cur = cur.parent
+    end
+  end
+
+  return { tree = tree, addChild = addChild, addCount = addCount }
+end
+
+local counter = CounterRedDot.create()
+local c1 = counter.addChild(counter.tree, {})
+local c2 = counter.addChild(c1, {})
+local c3 = counter.addChild(c2, {})
+
+counter.addCount(c3, 3)
+counter.addCount(c2, 2)
+
+print(string.format("  叶子节点 count = %d", c3.count))
+print(string.format("  中间节点 count = %d", c2.count))
+print(string.format("  根节点 count = %d", counter.tree.count))
+print("  【关键】更新是 O(树高) 而不是 O(节点数)——与节点总数无关")
+print("  适用：计数类红点（可累加）；不适用：布尔类红点（需用脏标记方案）")
+
+print()
+print("=== 6. 四种方案对比总结 ===")
+local solutions = {
+  { name = "朴素递归",    complexity = "O(N)",       usage = "节点数 &lt; 100" },
+  { name = "脏标记+缓存", complexity = "O(1) 查询",  usage = "通用方案，最常用" },
+  { name = "批量合并",    complexity = "O(变化数)",  usage = "一帧内大量变化" },
+  { name = "增量计数",    complexity = "O(树高)",    usage = "计数类红点" },
+}
+print(string.format("  %-16s %-16s %s", "方案", "复杂度", "适用场景"))
+print("  " .. string.rep("-", 62))
+for _, s in ipairs(solutions) do
+  print(string.format("  %-16s %-16s %s", s.name, s.complexity, s.usage))
+end
+
+print()
+print("=== 7. 实战中的组合方案 ===")
+print("  真实项目通常是【组合使用】：")
+print("    · 树结构 + 脏标记      -&gt; 解决通用场景")
+print("    · 批量合并            -&gt; 解决一帧内大量变化")
+print("    · UI 引用计数         -&gt; 只算可见分支")
+print("    · 分层 Canvas         -&gt; 红点 UI 单独一层（见 Unity UI 页）")
+print("    · 计数类走增量         -&gt; 避免整树重算")
+print()
+print("  面试时的加分点：能说出「不同红点类型用不同聚合策略」，")
+print("  而不是只会一个递归全树。")</code></pre>
 
 <div class="callout callout--danger">
   <span class="callout__title">朴素实现的问题：O(N) 查询</span>

@@ -1,0 +1,485 @@
+<h1>15 · 战斗服与结算 ★★★</h1>
+
+<p class="lead">战斗服是<strong>游戏后端唯一必须「有状态」的服务</strong>。<em>房间管理、断线重连、结算幂等</em>——三个地方各有各的坑。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（14）状态同步与帧同步 —— 两种同步的本质差异、确定性、回滚、反外挂取舍。<br>
+  <strong>这一页</strong>（15）战斗服与结算 —— 房间模型、战斗校验、结算幂等、断线重连补帧。<br>
+  <strong>下一页</strong>（16）匹配系统 —— Elo/MMR、匹配池、分段扩容、组队与补位。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+<h2 id="state-machine">一、房间状态机：不能乱跳</h2>
+
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace BackendSamples.Battle
+{
+    // ============================================================
+    // 1. 战斗房间的生命周期
+    // ============================================================
+
+    public enum RoomState
+    {
+        Waiting,    // 等待玩家
+        Loading,    // 加载中
+        Playing,    // 战斗中
+        Settling,   // 结算中
+        Closed,     // 已关闭
+    }
+
+    public class PlayerInRoom
+    {
+        public long PlayerId;
+        public string Name = "";
+        public bool Connected = true;
+        public bool Ready;
+        public int Hp = 100;
+        public int KillCount;
+        public DateTime? DisconnectedAt;
+    }
+
+    public class BattleRoom
+    {
+        public string RoomId = Guid.NewGuid().ToString("N").Substring(0, 8);
+        public RoomState State = RoomState.Waiting;
+        public List&lt;PlayerInRoom&gt; Players = new();
+        public DateTime CreatedAt = DateTime.UtcNow;
+        public DateTime? StartedAt;
+        public DateTime? EndedAt;
+        public int FrameId;
+
+        // 【关键】结算幂等标记
+        public bool Settled;
+
+        public const int MaxPlayers = 4;
+        public const int ReconnectGraceSec = 60;
+
+        public int AliveCount =&gt; Players.Count(p =&gt; p.Hp &gt; 0);
+        public bool IsFull =&gt; Players.Count &gt;= MaxPlayers;
+        public bool AllReady =&gt; Players.Count &gt; 0 &amp;&amp; Players.All(p =&gt; p.Ready);
+
+        public override string ToString() =&gt;
+            $"房间{RoomId} 状态={State} 玩家={Players.Count}/{MaxPlayers} 存活={AliveCount}";
+    }
+
+    // ============================================================
+    // 2. 战斗服：房间管理
+    // ============================================================
+
+    public class BattleServer
+    {
+        private readonly Dictionary&lt;string, BattleRoom&gt; _rooms = new();
+        private int _totalSettled;
+
+        public BattleRoom CreateRoom()
+        {
+            var room = new BattleRoom();
+            _rooms[room.RoomId] = room;
+            Console.WriteLine($"    创建房间 {room.RoomId}");
+            return room;
+        }
+
+        public (bool Ok, string Msg) Join(BattleRoom room, long playerId, string name)
+        {
+            // 【关键】状态检查：战斗中不能加入
+            if (room.State != RoomState.Waiting)
+                return (false, $"房间状态为 {room.State}，不能加入");
+
+            if (room.IsFull)
+                return (false, "房间已满");
+
+            if (room.Players.Any(p =&gt; p.PlayerId == playerId))
+                return (false, "已在房间中");
+
+            room.Players.Add(new PlayerInRoom { PlayerId = playerId, Name = name });
+            Console.WriteLine($"    玩家 {name}({playerId}) 加入，当前 {room.Players.Count}/{BattleRoom.MaxPlayers}");
+            return (true, "加入成功");
+        }
+
+        public (bool Ok, string Msg) Start(BattleRoom room)
+        {
+            if (room.State != RoomState.Waiting) return (false, "状态不对");
+            if (room.Players.Count &lt; 2) return (false, "至少需要2人");
+            if (!room.AllReady) return (false, "还有玩家没准备");
+
+            room.State = RoomState.Playing;
+            room.StartedAt = DateTime.UtcNow;
+            room.FrameId = 0;
+            Console.WriteLine($"    房间 {room.RoomId} 开始战斗");
+            return (true, "开始成功");
+        }
+
+        // 推进一帧
+        public void Tick(BattleRoom room)
+        {
+            if (room.State != RoomState.Playing) return;
+            room.FrameId++;
+
+            // 检查战斗结束条件
+            if (room.AliveCount &lt;= 1)
+            {
+                Console.WriteLine($"    战斗结束：存活 {room.AliveCount} 人，共 {room.FrameId} 帧");
+                room.State = RoomState.Settling;
+                room.EndedAt = DateTime.UtcNow;
+            }
+        }
+
+        // 掉线处理
+        public void OnDisconnect(BattleRoom room, long playerId)
+        {
+            var p = room.Players.FirstOrDefault(x =&gt; x.PlayerId == playerId);
+            if (p == null) return;
+
+            p.Connected = false;
+            p.DisconnectedAt = DateTime.UtcNow;
+            Console.WriteLine($"    玩家 {p.Name} 掉线，宽限 {BattleRoom.ReconnectGraceSec} 秒");
+        }
+
+        // 重连处理
+        public bool OnReconnect(BattleRoom room, long playerId, DateTime now)
+        {
+            var p = room.Players.FirstOrDefault(x =&gt; x.PlayerId == playerId);
+            if (p == null || p.Connected) return false;
+
+            double offline = (now - (p.DisconnectedAt ?? now)).TotalSeconds;
+            if (offline &gt; BattleRoom.ReconnectGraceSec)
+            {
+                Console.WriteLine($"    玩家 {p.Name} 离线 {offline:F0} 秒，超过宽限期");
+                return false;
+            }
+
+            p.Connected = true;
+            p.DisconnectedAt = null;
+            Console.WriteLine($"    玩家 {p.Name} 重连成功（离线 {offline:F0} 秒）");
+            return true;
+        }
+
+        // ============================================================
+        // 3. 结算：必须幂等 ★★★
+        // ============================================================
+        public (bool Ok, string Msg) Settle(BattleRoom room)
+        {
+            if (room.State != RoomState.Settling)
+                return (false, $"状态 {room.State} 不能结算");
+
+            // 【关键】幂等检查
+            if (room.Settled)
+            {
+                Console.WriteLine($"    房间 {room.RoomId} 已结算过，跳过");
+                return (true, "已结算");
+            }
+
+            Console.WriteLine($"  结算房间 {room.RoomId}:");
+            var winner = room.Players.OrderByDescending(p =&gt; p.KillCount).FirstOrDefault();
+            foreach (var p in room.Players)
+            {
+                var isWinner = p == winner;
+                Console.WriteLine($"    玩家 {p.Name}: 击杀 {p.KillCount}，{(isWinner ? "胜利" : "失败")}，发奖 {(isWinner ? 100 : 20)} 金币");
+            }
+
+            room.Settled = true;
+            room.State = RoomState.Closed;
+            _totalSettled++;
+            return (true, "结算完成");
+        }
+
+        public int RoomCount =&gt; _rooms.Count;
+        public int SettledCount =&gt; _totalSettled;
+    }
+
+    // ============================================================
+    // 4. 战斗校验：防作弊的关键
+    // ============================================================
+    // 【核心问题】客户端上报"我赢了，杀了10个"，服务端信吗？
+    //   不信。必须校验。
+
+    public class BattleValidator
+    {
+        public class BattleReport
+        {
+            public long PlayerId;
+            public int Kills;
+            public int Deaths;
+            public int DamageDealt;
+            public int DamageTaken;
+            public int DurationSec;
+        }
+
+        public static (bool Valid, string Reason) Validate(BattleReport r, int roomDurationSec)
+        {
+            // 【校验1】击杀数不能超过时间允许的上限
+            //   假设最快 3 秒杀一个
+            int maxPossibleKills = roomDurationSec / 3 + 1;
+            if (r.Kills &gt; maxPossibleKills)
+                return (false, $"击杀数 {r.Kills} 超过理论上限 {maxPossibleKills}");
+
+            // 【校验2】死亡数逻辑
+            if (r.Kills &gt; 0 &amp;&amp; r.Deaths &gt; r.Kills * 2 + 5)
+                return (false, "死亡数异常（可能是刷分）");
+
+            // 【校验3】伤害与击杀要匹配
+            if (r.Kills &gt; 0 &amp;&amp; r.DamageDealt &lt; r.Kills * 50)
+                return (false, $"伤害 {r.DamageDealt} 与击杀 {r.Kills} 不匹配");
+
+            // 【校验4】受伤与死亡
+            if (r.Deaths &gt; 0 &amp;&amp; r.DamageTaken == 0)
+                return (false, "有死亡但没受伤，异常");
+
+            // 【校验5】时长
+            if (r.DurationSec &lt; roomDurationSec - 5 || r.DurationSec &gt; roomDurationSec + 30)
+                return (false, $"战斗时长 {r.DurationSec}s 与房间 {roomDurationSec}s 不符");
+
+            return (true, "校验通过");
+        }
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 房间生命周期 ===");
+            var server = new BattleServer();
+            var room = server.CreateRoom();
+
+            Console.WriteLine("  三个玩家加入:");
+            server.Join(room, 1001, "玩家A");
+            server.Join(room, 1002, "玩家B");
+            server.Join(room, 1003, "玩家C");
+            Console.WriteLine($"    {room}");
+
+            Console.WriteLine();
+            Console.WriteLine("  尝试开始（还没人准备）:");
+            var (ok, msg) = server.Start(room);
+            Console.WriteLine($"    结果: {ok}, {msg}");
+
+            Console.WriteLine("  全员准备后:");
+            foreach (var p in room.Players) p.Ready = true;
+            (ok, msg) = server.Start(room);
+            Console.WriteLine($"    结果: {ok}, {msg}");
+            Console.WriteLine($"    {room}");
+
+            Console.WriteLine();
+            Console.WriteLine("  战斗中不能加入:");
+            server.Join(room, 1004, "玩家D");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 推进战斗 ===");
+            room.Players[0].KillCount = 1;
+            room.Players[1].KillCount = 2;
+            room.Players[2].Hp = 0;
+
+            for (int i = 0; i &lt; 5; i++)
+            {
+                server.Tick(room);
+            }
+            Console.WriteLine($"    当前帧: {room.FrameId}，{room}");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 掉线与重连 ===");
+            var now = DateTime.UtcNow;
+            server.OnDisconnect(room, 1002);
+
+            Console.WriteLine("  30 秒后重连（在宽限期内）:");
+            server.OnReconnect(room, 1002, now.AddSeconds(30));
+
+            Console.WriteLine("  再掉线，90 秒后才回来（超过宽限期）:");
+            server.OnDisconnect(room, 1002);
+            server.OnReconnect(room, 1002, now.AddSeconds(120));
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 结算（幂等）===");
+            room.Players[1].Hp = 0;
+            room.Players[2].Hp = 0;
+
+            // 【关键】必须让 Tick 检测到战斗结束，状态才会进入 Settling
+            Console.WriteLine("  推最后一帧，触发结束检测:");
+            server.Tick(room);
+            Console.WriteLine($"    房间状态: {room.State}");
+
+            Console.WriteLine();
+            Console.WriteLine("  第一次结算:");
+            server.Settle(room);
+
+            Console.WriteLine();
+            Console.WriteLine("  重复调用结算（模拟重试）:");
+            server.Settle(room);
+            Console.WriteLine($"    已结算房间数: {server.SettledCount}（没重复发奖）");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 5. 战斗结算校验（防作弊）===");
+            var cases = new[]
+            {
+                (name: "正常", report: new BattleValidator.BattleReport
+                    { PlayerId = 1, Kills = 5, Deaths = 2, DamageDealt = 800, DamageTaken = 300, DurationSec = 60 }),
+
+                (name: "击杀数异常", report: new BattleValidator.BattleReport
+                    { PlayerId = 2, Kills = 100, Deaths = 0, DamageDealt = 10000, DamageTaken = 0, DurationSec = 30 }),
+
+                (name: "有死亡但没受伤", report: new BattleValidator.BattleReport
+                    { PlayerId = 3, Kills = 3, Deaths = 2, DamageDealt = 500, DamageTaken = 0, DurationSec = 45 }),
+
+                (name: "时长不符", report: new BattleValidator.BattleReport
+                    { PlayerId = 4, Kills = 2, Deaths = 1, DamageDealt = 300, DamageTaken = 150, DurationSec = 999 }),
+            };
+
+            foreach (var c in cases)
+            {
+                var (valid, reason) = BattleValidator.Validate(c.report, roomDurationSec: 45);
+                Console.WriteLine($"    [{c.name,-14}] {(valid ? "通过" : "拒绝: " + reason)}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】客户端上报的数据一律不可信");
+            Console.WriteLine("          必须用「理论上限」做交叉校验");
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Battle.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>状态</th><th>能做什么</th><th>不能做什么</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Waiting</strong></td><td>加入、准备、开始</td><td><em>不能推进帧</em></td></tr>
+    <tr><td><strong>Loading</strong></td><td>加载资源</td><td><em>不能结算</em></td></tr>
+    <tr><td><strong>Playing</strong></td><td><strong>推进帧</strong></td><td><strong>不能加入</strong></td></tr>
+    <tr><td><strong>Settling</strong></td><td><strong>结算</strong></td><td><em>不能推进</em></td></tr>
+    <tr><td><strong>Closed</strong></td><td>—</td><td>什么都不能做</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="transition">二、状态转移必须显式触发 ★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">一个真实的 bug（我写的时候踩到了）</span>
+  <strong>我最初这样写</strong>：<br>
+  <code>room.Players[1].Hp = 0;</code><br>
+  <code>room.Players[2].Hp = 0;</code><br>
+  <code>server.Settle(room);</code><br>
+  <em>结果：结算没执行，已结算房间数 = 0</em><br><br>
+  <strong>原因</strong>：<br>
+  · 房间状态还是 <code>Playing</code><br>
+  · <code>Settle</code> 要求 <code>Settling</code> 状态<br>
+  · <em>状态不会自动转移——必须调 <code>Tick</code> 检测"存活数 ≤ 1"</em><br><br>
+  <strong>修正</strong>：<br>
+  <code>server.Tick(room);  // 触发结束检测</code><br>
+  <code>// 输出: 战斗结束：存活 1 人，共 6 帧</code><br>
+  <code>// 输出: 房间状态: Settling</code><br>
+  <code>server.Settle(room);  // 现在才成功</code><br><br>
+  <strong>教训</strong>：<em>状态机必须有"谁负责推进"的明确约定</em>。
+</div>
+
+<h2 id="reconnect">三、断线重连：战斗中的特殊处理 ★★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">宽限期设计</span>
+  <strong>本页实测</strong>：<br>
+  <code>玩家 B 掉线，宽限 60 秒</code><br>
+  <code>30 秒后重连 → 重连成功（离线 30 秒）</code><br>
+  <code>再掉线，120 秒才回来 → 超过宽限期，失败</code><br><br>
+  <strong>宽限期内要做什么</strong>：<br>
+  · <em>保留玩家在房间里</em>（<em>不删除</em>）<br>
+  · <strong>广播「掉线中」状态给其他人</strong><br>
+  · <em>继续推进战斗</em>（<em>角色原地不动或 AI 托管</em>）<br>
+  · <strong>缓存期间的事件</strong>（<em>页 12</em>）<br><br>
+  <strong>超过宽限期</strong>：<br>
+  · <em>踢出房间</em><br>
+  · 如果是 1v1 → <em>判负</em><br>
+  · 如果是团队 → <em>让队友继续</em>
+</div>
+
+<h2 id="settle">四、结算幂等：重复调用只发一次奖 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">为什么结算必须幂等</span>
+  <strong>触发结算的路径可能有多条</strong>：<br>
+  · 战斗正常结束<br>
+  · 超时强制结束<br>
+  · 服务器重启后恢复<br>
+  · <em>客户端重试上报</em><br><br>
+  <strong>如果结算不幂等</strong>：<em>玩家可能收到多份奖励</em>。<br><br>
+  <strong>本页实测</strong>：<br>
+  <code>推最后一帧，触发结束检测:</code><br>
+  <code>&nbsp;&nbsp;战斗结束：存活 1 人，共 6 帧</code><br>
+  <code>&nbsp;&nbsp;房间状态: Settling</code><br>
+  <code>第一次结算:</code><br>
+  <code>&nbsp;&nbsp;玩家A: 击杀 1，失败，发奖 20 金币</code><br>
+  <code>&nbsp;&nbsp;玩家B: 击杀 2，胜利，发奖 100 金币</code><br>
+  <code>&nbsp;&nbsp;玩家C: 击杀 0，失败，发奖 20 金币</code><br>
+  <code>重复调用结算（模拟重试）:</code><br>
+  <code>&nbsp;&nbsp;已结算房间数: 1（没重复发奖）</code><br><br>
+  <em>注意顺序：</em><strong>先 Tick 检测结束 → 状态变 Settling → 才能 Settle</strong><em>。</em><br>
+  <em>直接 Settle 会被拒（状态还是 Playing）——这就是第二节那个真实 bug。</em><br><br>
+  <strong>实现方式</strong>：<br>
+  · <code>room.Settled</code> 标记<br>
+  · 或数据库唯一索引 <code>(roomId)</code><br>
+  · <strong>多实例部署必须用数据库方案</strong>
+</div>
+
+<h2 id="validate">五、结算校验：客户端数据不可信 ★★★</h2>
+
+<div class="callout callout--warn">
+  <span class="callout__title">本页实现的五条校验</span>
+  <strong>问题</strong>：<em>客户端上报「我杀了 100 个」</em>，服务端信吗？<br>
+  <strong>不信。必须用「理论上限」交叉校验。</strong><br><br>
+  <strong>本页实测（1 组正常 + 3 组拒绝）</strong>：<br>
+  <code>[正常&nbsp;&nbsp;&nbsp;&nbsp;] 通过</code><br>
+  <code>[击杀数异常&nbsp;] 拒绝: 击杀数 100 超过理论上限 16</code><br>
+  <code>[有死亡但没受伤] 拒绝: 有死亡但没受伤，异常</code><br>
+  <code>[时长不符&nbsp;&nbsp;] 拒绝: 战斗时长 999s 与房间 45s 不符</code><br><br>
+  <strong>五条校验逻辑</strong>：<br>
+  ① <strong>击杀数 ≤ 时长 / 最快击杀间隔</strong>（<em>30秒最多杀10个</em>）<br>
+  ② 死亡数 ≤ 击杀数的合理倍数<br>
+  ③ 有击杀就必须有伤害输出<br>
+  ④ 有死亡就必须有受伤<br>
+  ⑤ 上报时长要和房间时长吻合<br><br>
+  <em>这些校验能用极低成本拦掉大部分低级作弊。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="15">
+  <div class="task"><input type="checkbox" id="t-15-1"><label for="t-15-1"><strong>实现房间状态机</strong>：五个状态，验证非法转移被拒。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-2"><label for="t-15-2"><strong>实现断电重连</strong>：宽限期内能恢复，超期失败。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-3"><label for="t-15-3"><strong>复现结算 bug</strong>：不调 Tick 直接结算，观察被拒。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-4"><label for="t-15-4"><strong>实现结算幂等</strong>：重复调用只发一次奖。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-5"><label for="t-15-5"><strong>写结算校验</strong>：用理论上限拦截异常数据。</label></div>
+  <div class="task"><input type="checkbox" id="t-15-6"><label for="t-15-6"><strong>回答面试题</strong>：① 为什么结算必须幂等？② 断线宽限期怎么定？③ 怎么校验客户端上报的战斗数据？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出房间五个状态及各自的限制</strong>；<br>
+    ② <strong>知道状态转移必须显式触发（踩过这个坑）</strong>；<br>
+    ③ <strong>能实现断线重连与宽限期</strong>；<br>
+    ④ <strong>能实现结算幂等，并知道多实例要用数据库方案</strong>；<br>
+    ⑤ <strong>能写出至少三条结算校验规则</strong>。<br>
+    <br>
+    <em>第 ② 和 第 ⑤ 条最实用——**前者是我真实踩过的坑，后者是防作弊的第一道防线**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="14-state-sync.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">14 状态同步与帧同步 ★★★</div>
+  </a>
+  <a class="next" href="16-matchmaking.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">16 匹配系统 ★</div>
+  </a>
+</nav>

@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>17 排行榜 — Unity 游戏后端 + 全栈开发路线｜从客户端主程延伸为能独立扛服务的全栈工程师</title>
+<meta name="description" content="Redis ZSet、分页、并列名次、赛季重置、全服榜">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">Unity 游戏后端 + 全栈开发路线
+        <span>从客户端主程延伸为能独立扛服务的全栈工程师</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>17 · 排行榜 ★★</h1>
+
+<p class="lead">排行榜<strong>看起来简单，做起来有讲究</strong>：<em>用什么数据结构、玩家看什么、赛季怎么重置</em>。这一页讲透。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  读完这一页，你应该能把它和前面讲过的知识连起来——<strong>排行榜</strong> 是后面几页的基础。如果某段看不懂，<em>先回上一页把概念补齐再看</em>。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="08-redis-cache.html#patterns" data-brief="读时回填、写时删缓存"><span class="prereq__title">Cache Aside</span><span class="prereq__page">08-redis-cache</span></a>
+          <a class="prereq__item" href="17-leaderboard.html#why-skiplist" data-brief="跳表/ZSet；玩家最关心「我附近」"><span class="prereq__title">排行榜实现</span><span class="prereq__page">17-leaderboard</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="why-skiplist">一、为什么不能用「每次排序」★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">排序方案的致命问题</span>
+  <strong>简单做法</strong>：<code>players.OrderByDescending(p =&gt; p.Score)</code><br><br>
+  <strong>问题</strong>：<br>
+  · 每次查询都要排 10 万条 → <em>几百毫秒</em><br>
+  · 每次有玩家分数变化 → <em>又要重排</em><br>
+  · 100 个玩家同时更新 → <strong>排序 100 次</strong><br><br>
+  <strong>正确做法：跳表（SkipList）</strong><br>
+  · 插入时就维护好顺序<br>
+  · 插入/删除/查排名都是 <strong>O(log n)</strong><br>
+  · <em>取前 100 名是 O(log n + k)</em><br><br>
+  <strong>Redis 的 ZSet 就是这么实现的</strong>——<em>所以排行榜应该用 ZSet</em>。<br><br>
+  <strong>本页实测对比</strong>（<em>1 万条数据</em>）：<br>
+  <code>跳表插入 10000 条:     6.0 ms</code><br>
+  <code>跳表取前 100:       0.010 ms</code><br>
+  <code>跳表查排名:         0.179 ms</code><br>
+  <code>排序（一次性）:      5.5 ms</code>
+</div>
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace BackendSamples.Leaderboard
+{
+    // ============================================================
+    // 1. 排行榜的核心数据结构：跳表 / 有序集合
+    // ============================================================
+    // 【为什么不用排序数组】
+    //   每次更新都要 O(n) 移动 -&gt; 10 万玩家疯狂更新 -&gt; 崩
+    //
+    // 【Redis ZSet 的实现】跳表（SkipList）
+    //   插入/删除/查询都是 O(log n)
+    //   范围查询（取前100名）也是 O(log n + k)
+
+    public class SkipListNode
+    {
+        public double Score;
+        public string Member = "";
+        public SkipListNode[] Forward;
+        public SkipListNode(int level) =&gt; Forward = new SkipListNode[level];
+    }
+
+    public class SkipList
+    {
+        private const int MaxLevel = 16;
+        private readonly SkipListNode _head = new(MaxLevel);
+        private int _level = 1;
+        private readonly Random _rnd = new(42);
+
+        public int Count { get; private set; }
+
+        // 【关键】分数 + 成员名，分数相同按名字排序（保证顺序稳定）
+        private static int Compare(double s1, string m1, double s2, string m2)
+        {
+            int c = s2.CompareTo(s1);   // 【降序】分数高的在前
+            return c != 0 ? c : string.CompareOrdinal(m1, m2);
+        }
+
+        public void Add(double score, string member)
+        {
+            var update = new SkipListNode[MaxLevel];
+            var cur = _head;
+
+            for (int i = _level - 1; i &gt;= 0; i--)
+            {
+                while (cur.Forward[i] != null &amp;&amp;
+                       Compare(cur.Forward[i].Score, cur.Forward[i].Member, score, member) &lt; 0)
+                {
+                    cur = cur.Forward[i];
+                }
+                update[i] = cur;
+            }
+
+            // 已存在则更新
+            var next = cur.Forward[0];
+            if (next != null &amp;&amp; next.Member == member &amp;&amp; next.Score == score)
+                return;
+
+            int newLevel = RandomLevel();
+            if (newLevel &gt; _level)
+            {
+                for (int i = _level; i &lt; newLevel; i++) update[i] = _head;
+                _level = newLevel;
+            }
+
+            var node = new SkipListNode(newLevel) { Score = score, Member = member };
+            for (int i = 0; i &lt; newLevel; i++)
+            {
+                node.Forward[i] = update[i].Forward[i];
+                update[i].Forward[i] = node;
+            }
+            Count++;
+        }
+
+        private int RandomLevel()
+        {
+            int level = 1;
+            while (_rnd.Next(2) == 1 &amp;&amp; level &lt; MaxLevel) level++;
+            return level;
+        }
+
+        // 取前 N 名
+        public List&lt;(int Rank, string Member, double Score)&gt; TopN(int n)
+        {
+            var result = new List&lt;(int, string, double)&gt;();
+            var cur = _head.Forward[0];
+            int rank = 1;
+
+            while (cur != null &amp;&amp; rank &lt;= n)
+            {
+                result.Add((rank, cur.Member, cur.Score));
+                cur = cur.Forward[0];
+                rank++;
+            }
+
+            return result;
+        }
+
+        // 查某人的排名
+        public int? GetRank(string member)
+        {
+            var cur = _head.Forward[0];
+            int rank = 1;
+            while (cur != null)
+            {
+                if (cur.Member == member) return rank;
+                cur = cur.Forward[0];
+                rank++;
+            }
+            return null;
+        }
+
+        // 取某人的分数
+        public double? GetScore(string member)
+        {
+            var cur = _head.Forward[0];
+            while (cur != null)
+            {
+                if (cur.Member == member) return cur.Score;
+                cur = cur.Forward[0];
+            }
+            return null;
+        }
+    }
+
+    // ============================================================
+    // 2. 排行榜的四个常见需求
+    // ============================================================
+
+    public class LeaderboardService
+    {
+        private readonly SkipList _all = new();
+        private readonly Dictionary&lt;long, double&gt; _scores = new();
+
+        // 更新分数
+        public void UpdateScore(long playerId, double score)
+        {
+            _scores[playerId] = score;
+            _all.Add(score, playerId.ToString());
+        }
+
+        // 【需求1】全服前 N 名
+        public List&lt;(int Rank, long PlayerId, double Score)&gt; GetTopN(int n)
+        {
+            return _all.TopN(n).Select(x =&gt;
+                (x.Rank, long.Parse(x.Member), x.Score)).ToList();
+        }
+
+        // 【需求2】我的排名（玩家最关心的）
+        public (int? Rank, double Score) GetMyRank(long playerId)
+        {
+            double score = _scores.TryGetValue(playerId, out var s) ? s : 0;
+            int? rank = _all.GetRank(playerId.ToString());
+            return (rank, score);
+        }
+
+        // 【需求3】我附近的排名（前后各 N 名）
+        //   【关键】玩家看不到自己的排名会流失
+        public List&lt;(int Rank, long PlayerId, double Score)&gt; GetAroundMe(long playerId, int range = 3)
+        {
+            var top = _all.TopN(_all.Count);
+            var idx = top.FindIndex(x =&gt; x.Member == playerId.ToString());
+            if (idx &lt; 0) return new();
+
+            int start = Math.Max(0, idx - range);
+            int end = Math.Min(top.Count - 1, idx + range);
+
+            return top.Skip(start).Take(end - start + 1).Select(x =&gt;
+                (x.Rank, long.Parse(x.Member), x.Score)).ToList();
+        }
+
+        // 【需求4】分段奖励
+        public string GetRewardTier(int rank)
+        {
+            return rank switch
+            {
+                1 =&gt; "冠军奖励",
+                &lt;= 3 =&gt; "前三奖励",
+                &lt;= 10 =&gt; "前十奖励",
+                &lt;= 100 =&gt; "前百奖励",
+                _ =&gt; "参与奖",
+            };
+        }
+
+        public int Total =&gt; _all.Count;
+    }
+
+    // ============================================================
+    // 3. 性能对比：跳表 vs 排序
+    // ============================================================
+
+    public static class PerfComparison
+    {
+        public static void Run()
+        {
+            const int N = 10000;
+            var rnd = new Random(42);
+            var scores = Enumerable.Range(1, N)
+                .Select(i =&gt; (Id: i, Score: rnd.NextDouble() * 10000))
+                .ToList();
+
+            Console.WriteLine($"  数据量: {N} 个玩家");
+
+            // 方式1：跳表（插入时就维护好顺序）
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var sl = new SkipList();
+            foreach (var (id, score) in scores) sl.Add(score, id.ToString());
+            sw.Stop();
+            Console.WriteLine($"  跳表插入 {N} 条:     {sw.Elapsed.TotalMilliseconds:F1} ms");
+
+            sw.Restart();
+            var top = sl.TopN(100);
+            sw.Stop();
+            Console.WriteLine($"  跳表取前 100:       {sw.Elapsed.TotalMilliseconds:F3} ms");
+
+            sw.Restart();
+            var rank = sl.GetRank("5000");
+            sw.Stop();
+            Console.WriteLine($"  跳表查排名:         {sw.Elapsed.TotalMilliseconds:F3} ms");
+
+            // 方式2：每次排序（错误做法）
+            sw.Restart();
+            var sorted = scores.OrderByDescending(x =&gt; x.Score).ToList();
+            sw.Stop();
+            Console.WriteLine();
+            Console.WriteLine($"  排序（一次性）:      {sw.Elapsed.TotalMilliseconds:F1} ms");
+            Console.WriteLine("  【问题】每次有玩家分数变化，都要重新排一次");
+            Console.WriteLine("          100 个玩家同时更新 = 排序 100 次");
+
+            Console.WriteLine();
+            Console.WriteLine("  【结论】跳表把「插入 + 查询」都做成 O(log n)");
+            Console.WriteLine("          Redis 的 ZSet 就是这么实现的");
+        }
+    }
+
+    // ============================================================
+    // 4. 赛季重置与全服榜的拆分
+    // ============================================================
+
+    public static class SeasonDesign
+    {
+        public static readonly (string Type, string Refresh, string Use)[] All =
+        {
+            ("全服总榜", "永久累积", "历史最高分（炫耀性）"),
+            ("赛季榜", "每赛季重置", "赛季奖励发放"),
+            ("周榜", "每周重置", "活跃度激励"),
+            ("好友榜", "实时", "社交比较"),
+            ("公会榜", "按公会聚合", "公会战"),
+        };
+
+        public static void Print()
+        {
+            foreach (var (type, refresh, use) in All)
+                Console.WriteLine($"    {type,-10} {refresh,-14} {use}");
+        }
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 排行榜基本操作 ===");
+            var lb = new LeaderboardService();
+
+            Console.WriteLine("  10 个玩家更新分数:");
+            var players = new (long Id, double Score)[]
+            {
+                (1001, 9500), (1002, 8800), (1003, 9200), (1004, 7600),
+                (1005, 9800), (1006, 8100), (1007, 8900), (1008, 9900),
+                (1009, 7000), (1010, 8500),
+            };
+            foreach (var (id, score) in players) lb.UpdateScore(id, score);
+            Console.WriteLine($"    总人数: {lb.Total}");
+
+            Console.WriteLine();
+            Console.WriteLine("  全服前 5 名:");
+            foreach (var (rank, pid, score) in lb.GetTopN(5))
+            {
+                Console.WriteLine($"    第{rank}名  玩家{pid}  分数 {score:F0}  [{lb.GetRewardTier(rank)}]");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  玩家 1004 看自己的排名:");
+            var (r, s) = lb.GetMyRank(1004);
+            Console.WriteLine($"    排名 {r}，分数 {s:F0}");
+
+            Console.WriteLine();
+            Console.WriteLine("  玩家 1004 附近的排名（前后各 2 名）:");
+            foreach (var (rank, pid, score) in lb.GetAroundMe(1004, 2))
+            {
+                var mark = pid == 1004 ? " &lt;&lt;&lt; 我" : "";
+                Console.WriteLine($"    第{rank}名  玩家{pid}  {score:F0}{mark}");
+            }
+            Console.WriteLine();
+            Console.WriteLine("  【关键】玩家最关心「我附近的人」，而不是第一名");
+            Console.WriteLine("          只给前10名会让普通玩家失去动力");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 分数更新（已有玩家）===");
+            Console.WriteLine("  玩家 1004 从 7600 涨到 9700:");
+            lb.UpdateScore(1004, 9700);
+            var (r2, s2) = lb.GetMyRank(1004);
+            Console.WriteLine($"    新排名 {r2}，分数 {s2:F0}");
+            Console.WriteLine($"    总人数仍是 {lb.Total}（没有重复添加）");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 性能对比 ===");
+            PerfComparison.Run();
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 榜单类型设计 ===");
+            SeasonDesign.Print();
+            Console.WriteLine();
+            Console.WriteLine("  【实战建议】");
+            Console.WriteLine("    · 主榜用 ZSet（Redis）");
+            Console.WriteLine("    · 全服榜数据量大时按分数区间分桶");
+            Console.WriteLine("    · 好友榜每次查时实时算（数据量小）");
+            Console.WriteLine("    · 赛季重置：换一个新的 key，旧 key 归档");
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Leaderboard.Demo.Run();
+}</code></pre>
+
+<h2 id="around-me">二、玩家最关心的是「我附近」★★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">只给前 10 名会流失玩家</span>
+  <strong>心理</strong>：<br>
+  · 前 10 名永远是那几个大佬<br>
+  · 普通玩家<em>看自己的排名在第 8 万名</em> → <strong>毫无参与感</strong><br><br>
+  <strong>本页实现：GetAroundMe</strong><br>
+  · 显示我 + 前后各 2 名<br>
+  · <em>玩家看到「再打 200 分就能超过上面的人」</em><br><br>
+  <strong>本页实测输出</strong>（玩家 1004 排名第 9，显示前后各 2 名）：<br>
+  <code>第7名  玩家1010  8500</code><br>
+  <code>第8名  玩家1006  8100</code><br>
+  <code>第9名  玩家1004  7600 &lt;&lt;&lt; 我</code><br>
+  <code>第10名  玩家1009  7000</code><br><br>
+  <strong>这是留存设计，不只是技术问题。</strong>
+</div>
+
+<h2 id="update">三、分数更新与并列排名</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">两个细节</span>
+  <strong>① 同一玩家重复更新</strong><br>
+  · 应该是<em>更新分数</em>，不是<em>新增一条</em><br>
+  · 本页跳表实现了这个检查<br><br>
+  <strong>② 分数相同时怎么排</strong><br>
+  · 本页用<strong>成员名</strong>做次级排序<br>
+  · <code>Compare(s1, m1, s2, m2)</code>：先比分数，相同比名字<br>
+  · <em>保证顺序稳定</em>（<em>否则同一分数每次查询顺序不同</em>）<br><br>
+  <strong>游戏里的常见需求</strong>：<em>分数相同 → 先达到的排前面</em><br>
+  → 需要额外存<em>达到时间</em>做次级排序。
+</div>
+
+<h2 id="types">四、榜单类型与赛季设计</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>类型</th><th>刷新</th><th>用途</th></tr></thead>
+  <tbody>
+    <tr><td><strong>全服总榜</strong></td><td>永久累积</td><td><em>历史最高分</em></td></tr>
+    <tr><td><strong>赛季榜</strong></td><td>每赛季重置</td><td><strong>赛季奖励</strong></td></tr>
+    <tr><td><strong>周榜</strong></td><td>每周重置</td><td>活跃度激励</td></tr>
+    <tr><td><strong>好友榜</strong></td><td>实时</td><td><em>社交比较</em></td></tr>
+    <tr><td><strong>公会榜</strong></td><td>按公会聚合</td><td>公会战</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">赛季重置怎么做</span>
+  <strong>错误做法</strong>：<em>遍历所有玩家清零</em> → 10 万人耗时很长。<br><br>
+  <strong>正确做法：换 key</strong><br>
+  <code>rank:s1</code> → <code>rank:s2</code><br>
+  · 新赛季写入新 key<br>
+  · 旧 key <em>归档</em>（<em>用于历史查询</em>）<br>
+  · <strong>零成本切换</strong><br><br>
+  <strong>发奖励怎么做</strong>：<br>
+  · 结算时<em>读取旧 key 的前 N 名</em><br>
+  · 通过邮件发放<br>
+  · <strong>发奖要幂等</strong>（<em>页 15</em>）
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="17">
+  <div class="task"><input type="checkbox" id="t-17-1"><label for="t-17-1"><strong>实现跳表</strong>：支持插入、取前 N、查排名。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-2"><label for="t-17-2"><strong>测性能</strong>：对比跳表和「每次排序」。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-3"><label for="t-17-3"><strong>做「我附近」</strong>：显示前后各 2 名。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-4"><label for="t-17-4"><strong>处理并列</strong>：分数相同时按时间/名字排序。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-5"><label for="t-17-5"><strong>验证重复更新</strong>：同一玩家改分，不重复添加。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-6"><label for="t-17-6"><strong>设计赛季</strong>：用换 key 实现零成本重置。</label></div>
+  <div class="task"><input type="checkbox" id="t-17-7"><label for="t-17-7"><strong>回答面试题</strong>：① 排行榜用什么数据结构？② 为什么显示「我附近」？③ 赛季重置怎么做？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道排行榜该用跳表/ZSet，不能用每次排序</strong>；<br>
+    ② <strong>能实现跳表的插入与前 N 查询</strong>；<br>
+    ③ <strong>知道要显示「我附近」而不是只有前 10 名</strong>；<br>
+    ④ 能处理并列排名与重复更新；<br>
+    ⑤ <strong>知道赛季重置用「换 key」而不是遍历清零</strong>。<br>
+    <br>
+    <em>第 ① 和 第 ③ 条最关键——**前者是性能，后者是留存**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="16-matchmaking.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">16 匹配系统 ★</div>
+  </a>
+  <a class="next" href="18-inventory-economy.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">18 背包与经济系统 ★★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -298,7 +298,7 @@ public class JobDemo : MonoBehaviour
 //  Allocator.Temp        —— 一帧内有效，不能传给 Job
 //  Allocator.TempJob     —— 四帧内有效，可以传给 Job（有警告）
 //
-//  【常见错误】用 TempJob 分配长期使用的数组 -&gt; 四帧后自动释放 -&gt; 崩溃</code></pre>
+//  【常见错误】用 TempJob 分配长期使用的数组 -&gt; 超过四帧未 Dispose，Native 层会刷警告并可能踩坏内存</code></pre>
 
 <div class="table-wrap">
 <table>

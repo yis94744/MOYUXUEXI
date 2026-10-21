@@ -1,11 +1,19 @@
       <h1>知识点索引</h1>
-      <p class="lead">这一页是<strong>全部四个站点的知识点总目录</strong>。在任何页面遇到不熟的概念，都可以回到这里查找。</p>
-      <div class="callout callout--tip">
-        <span class="callout__title">跨站跳转说明</span>
-        这一份索引汇总了 <strong>C# + Unity</strong>、<strong>C++ + Unreal</strong>、<strong>Lua 热更</strong>、<strong>游戏算法</strong> 四个站点的知识点。
-        点击<em>其他站点</em>的条目时会跳转到那个站点——<strong>这是有意设计的，方便你交叉查阅</strong>。
+      <p class="lead">全部五个站点共 <strong>242 个知识点</strong>的总目录。遇到不熟的用顶部搜索（<span class="mono">/</span>）。</p>
+      <h2 id="kg1">AI 时代</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="23-ai.html#workflow">
+          <div class="kp-index__title">AI 辅助开发</div>
+          <div class="kp-index__brief">AI 编程助手的真实效果、失效场景、版权红线</div>
+          <div class="kp-index__page">23-ai.html</div>
+        </a>
+        <a class="kp-index__item" href="23-ai.html#npc">
+          <div class="kp-index__title">AI NPC 架构</div>
+          <div class="kp-index__brief">LLM 驱动 NPC 的四步循环、延迟与成本控制、安全防护</div>
+          <div class="kp-index__page">23-ai.html</div>
+        </a>
       </div>
-      <h2 id="kg1">C# 语言</h2>
+      <h2 id="kg2">C# 语言</h2>
       <div class="kp-index">
         <a class="kp-index__item" href="03-cs-basic.html#value-ref">
           <div class="kp-index__title">值类型与引用类型</div>
@@ -148,55 +156,143 @@
           <div class="kp-index__page">08-cs-async.html</div>
         </a>
       </div>
-      <h2 id="kg2">数学与图形</h2>
+      <h2 id="kg3">C++ 语言</h2>
       <div class="kp-index">
-        <a class="kp-index__item" href="09-math.html#vector">
-          <div class="kp-index__title">向量运算</div>
-          <div class="kp-index__brief">位置/方向/速度都是向量；sqrMagnitude 比 Distance 快</div>
-          <div class="kp-index__page">09-math.html</div>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/03-cpp-basic.html#difference">
+          <div class="kp-index__title">C++ 编译模型</div>
+          <div class="kp-index__brief">声明与定义分离、编译/链接/运行时三类错误</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
         </a>
-        <a class="kp-index__item" href="09-math.html#dot-cross">
-          <div class="kp-index__title">点积与叉积</div>
-          <div class="kp-index__brief">点积判断前后与夹角，叉积判断左右；视野检测的标准做法</div>
-          <div class="kp-index__page">09-math.html</div>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/03-cpp-basic.html#header">
+          <div class="kp-index__title">头文件规范</div>
+          <div class="kp-index__brief">头文件保护、前向声明、禁止 using namespace</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
         </a>
-        <a class="kp-index__item" href="09-math.html#quaternion">
-          <div class="kp-index__title">四元数</div>
-          <div class="kp-index__brief">轴加角表示旋转；a*b 表示先 b 后 a，从右往左读</div>
-          <div class="kp-index__page">09-math.html</div>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/04-cpp-memory.html#raii">
+          <div class="kp-index__title">RAII</div>
+          <div class="kp-index__brief">资源绑定对象生命周期，构造获取、析构释放</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
         </a>
-        <a class="kp-index__item" href="09-math.html#interp">
-          <div class="kp-index__title">插值与缓动</div>
-          <div class="kp-index__brief">帧率无关的平滑：MoveTowards/SmoothDamp/Exp 逼近</div>
-          <div class="kp-index__page">09-math.html</div>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/04-cpp-memory.html#raii">
+          <div class="kp-index__title">智能指针</div>
+          <div class="kp-index__brief">unique/shared/weak，循环引用的陷阱与解法</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
         </a>
-        <a class="kp-index__item" href="10-graphics.html#pipeline">
-          <div class="kp-index__title">渲染管线</div>
-          <div class="kp-index__brief">应用/几何/像素/后处理四阶段，性能瓶颈各在哪里</div>
-          <div class="kp-index__page">10-graphics.html</div>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/05-cpp-oop.html#vtable">
+          <div class="kp-index__title">虚函数与多态</div>
+          <div class="kp-index__brief">vtable 原理、虚析构、对象切片的坑</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
         </a>
-        <a class="kp-index__item" href="10-graphics.html#spaces">
-          <div class="kp-index__title">坐标空间变换</div>
-          <div class="kp-index__brief">模型到世界到观察到裁剪到屏幕，MVP 矩阵从右往左应用</div>
-          <div class="kp-index__page">10-graphics.html</div>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/05-cpp-oop.html#value-semantics">
+          <div class="kp-index__title">对象切片</div>
+          <div class="kp-index__brief">值语义持有基类会导致多态失效</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
         </a>
-        <a class="kp-index__item" href="10-graphics.html#batching">
-          <div class="kp-index__title">Draw Call 与合批</div>
-          <div class="kp-index__brief">静态/动态/SRP Batcher/GPU Instancing，合批失败的常见原因</div>
-          <div class="kp-index__page">10-graphics.html</div>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/06-cpp-template.html#difference">
+          <div class="kp-index__title">C++ 模板</div>
+          <div class="kp-index__brief">编译期代码生成、代码膨胀、错误信息解读</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
         </a>
-        <a class="kp-index__item" href="10-graphics.html#shader">
-          <div class="kp-index__title">Shader 基础</div>
-          <div class="kp-index__brief">ShaderLab 结构、顶点/片元着色器、兰伯特光照公式</div>
-          <div class="kp-index__page">10-graphics.html</div>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/07-cpp-modern.html#cpp11">
+          <div class="kp-index__title">现代 C++ 特性</div>
+          <div class="kp-index__brief">auto、范围 for、lambda、nullptr、移动语义</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
         </a>
-        <a class="kp-index__item" href="10-graphics.html#urp">
-          <div class="kp-index__title">URP 渲染管线</div>
-          <div class="kp-index__brief">Built-in/URP/HDRP 的选型，迁移成本与判断方法</div>
-          <div class="kp-index__page">10-graphics.html</div>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/08-cpp-concurrency.html#threads">
+          <div class="kp-index__title">C++ 并发</div>
+          <div class="kp-index__brief">线程、原子、数据竞争与死锁</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/09-cpp-build.html#unreal-build">
+          <div class="kp-index__title">C++ 构建系统</div>
+          <div class="kp-index__brief">UBT 用 C# 写、.Build.cs 模块依赖</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
         </a>
       </div>
-      <h2 id="kg3">Unity 引擎</h2>
+      <h2 id="kg4">Lua 语言</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../gamedev-lua-hotupdate/03-lua-basic.html#types">
+          <div class="kp-index__title">Lua 基础语法</div>
+          <div class="kp-index__brief">索引从 1 开始、只有 nil 和 false 是假值</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-lua-hotupdate/04-lua-table.html#table-basic">
+          <div class="kp-index__title">Lua table</div>
+          <div class="kp-index__brief"># 对含 nil 的表不可靠，用 select 计数</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-lua-hotupdate/04-lua-table.html#metatable">
+          <div class="kp-index__title">元表</div>
+          <div class="kp-index__brief">__index 两种形式、__newindex、运算符重载</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-lua-hotupdate/06-lua-oop.html#oop">
+          <div class="kp-index__title">Lua 实现类</div>
+          <div class="kp-index__brief">__index 链实现继承</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-lua-hotupdate/15-framework-oop.html#super-trap">
+          <div class="kp-index__title">super 无限递归</div>
+          <div class="kp-index__brief">self.super 查到的是实例的类，三级继承必崩</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-lua-hotupdate/07-lua-advanced.html#coroutine">
+          <div class="kp-index__title">协程</div>
+          <div class="kp-index__brief">resume 与 wrap 的错误处理差异，写迭代器</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-lua-hotupdate/07-lua-advanced.html#error">
+          <div class="kp-index__title">Lua 错误处理</div>
+          <div class="kp-index__brief">error 的 level 参数、xpcall 抓堆栈</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-lua-hotupdate/07-lua-advanced.html#gc">
+          <div class="kp-index__title">GC 与弱表</div>
+          <div class="kp-index__brief">弱表做缓存，不阻止对象被回收</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-lua-hotupdate/07-lua-advanced.html#sandbox">
+          <div class="kp-index__title">环境与沙箱</div>
+          <div class="kp-index__brief">_ENV 与 load 的第四参数做沙箱</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-lua-hotupdate/08-lua-perf.html#data">
+          <div class="kp-index__title">Lua 性能基础</div>
+          <div class="kp-index__brief">table.concat 快 17~30 倍，缓存全局函数无收益</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-lua-hotupdate/09-hotupdate-basics.html#require">
+          <div class="kp-index__title">require 与模块</div>
+          <div class="kp-index__brief">package.loaded 缓存，热更要清缓存</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-lua-hotupdate/11-xlua-advanced.html#cost">
+          <div class="kp-index__title">xLua 跨语言边界</div>
+          <div class="kp-index__brief">调用开销 5~20 倍，核心是减少调用次数</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-lua-hotupdate/13-framework-design.html#module">
+          <div class="kp-index__title">模块管理器</div>
+          <div class="kp-index__brief">注册/初始化/逆序销毁</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-lua-hotupdate/13-framework-design.html#event">
+          <div class="kp-index__title">事件系统</div>
+          <div class="kp-index__brief">快照遍历 + 队列化派发，防止回调中修改列表</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-lua-hotupdate/16-framework-ui.html#stack">
+          <div class="kp-index__title">UI 界面栈</div>
+          <div class="kp-index__brief">三种界面类型、返回键、订阅自动取消</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-lua-hotupdate/09-hotupdate-basics.html#require">
+          <div class="kp-index__title">热更新原理</div>
+          <div class="kp-index__brief">清 package.loaded + 重新 require，旧引用问题</div>
+          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
+        </a>
+      </div>
+      <h2 id="kg5">Unity 引擎</h2>
       <div class="kp-index">
         <a class="kp-index__item" href="11-unity-core.html#lifecycle">
           <div class="kp-index__title">生命周期与执行顺序</div>
@@ -374,7 +470,723 @@
           <div class="kp-index__page">19-unity-editor.html</div>
         </a>
       </div>
-      <h2 id="kg4">通用能力</h2>
+      <h2 id="kg6">Unreal 引擎</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/12-ue-cpp.html#macros">
+          <div class="kp-index__title">Unreal 宏系统</div>
+          <div class="kp-index__brief">UCLASS/UPROPERTY/UFUNCTION 与 UHT</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/12-ue-cpp.html#gc">
+          <div class="kp-index__title">UPROPERTY 与 GC</div>
+          <div class="kp-index__brief">最大作用是防 GC 回收，漏写会导致指针变 nullptr</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/12-ue-cpp.html#naming">
+          <div class="kp-index__title">UE 命名约定</div>
+          <div class="kp-index__brief">A/U/F/I/T/E 前缀是编译要求不是风格问题</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/13-ue-framework.html#classes">
+          <div class="kp-index__title">Gameplay 框架</div>
+          <div class="kp-index__brief">Actor/Pawn/Controller/GameMode/GameState</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/13-ue-framework.html#lifecycle">
+          <div class="kp-index__title">Actor 生命周期</div>
+          <div class="kp-index__brief">Constructor/BeginPlay/Tick/EndPlay 的顺序与禁忌</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/14-ue-blueprint.html#boundary">
+          <div class="kp-index__title">C++ 与蓝图边界</div>
+          <div class="kp-index__brief">按「多久变一次」划分，蓝图慢 10~40 倍</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/14-ue-blueprint.html#expose">
+          <div class="kp-index__title">暴露给蓝图</div>
+          <div class="kp-index__brief">BlueprintCallable/NativeEvent 与 _Implementation 后缀</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/15-ue-gas.html#should-use">
+          <div class="kp-index__title">GAS 技能系统</div>
+          <div class="kp-index__brief">先判断要不要用，五个核心概念与 GameplayTag</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/16-ue-anim.html#animbp">
+          <div class="kp-index__title">UE 动画系统</div>
+          <div class="kp-index__brief">状态机、Blend Space、Anim Notify 做攻击判定</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/17-ue-render.html#ue5">
+          <div class="kp-index__title">Nanite 与 Lumen</div>
+          <div class="kp-index__brief">Nanite 的三个限制、Lumen 的性能代价</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/18-ue-niagara.html#niagara">
+          <div class="kp-index__title">Niagara 特效</div>
+          <div class="kp-index__brief">CPU/GPU 粒子选择、特效的性能预算</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/18-ue-niagara.html#physics">
+          <div class="kp-index__title">Chaos 物理</div>
+          <div class="kp-index__brief">刚体/破碎/布料，物理的性能陷阱</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/19-ue-network.html#model">
+          <div class="kp-index__title">网络复制</div>
+          <div class="kp-index__brief">服务器权威、三种 RPC、客户端预测</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/20-ue-ui.html#umg">
+          <div class="kp-index__title">UMG 性能陷阱</div>
+          <div class="kp-index__brief">每帧重绘是最大陷阱，要用 Invalidation Box</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/20-ue-ui.html#audio">
+          <div class="kp-index__title">UE 音频</div>
+          <div class="kp-index__brief">Concurrency 并发限制、Sound Class 音量分组</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/21-ue-editor.html#tools">
+          <div class="kp-index__title">编辑器扩展</div>
+          <div class="kp-index__brief">Editor Utility Widget 是最容易上手的</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/22-patterns.html#subsystem">
+          <div class="kp-index__title">Subsystem</div>
+          <div class="kp-index__brief">替代手写单例，引擎管理生命周期</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/22-patterns.html#component">
+          <div class="kp-index__title">UE 接口</div>
+          <div class="kp-index__brief">用接口替代 Cast 到具体类</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/23-perf.html#workflow">
+          <div class="kp-index__title">UE 性能排查</div>
+          <div class="kp-index__brief">PIE 数据不可信，stat unit 怎么读</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/24-engineering.html#vcs">
+          <div class="kp-index__title">UE 版本控制</div>
+          <div class="kp-index__brief">.uasset 必须 LFS 且无法合并</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-cpp-unreal/24-engineering.html#build">
+          <div class="kp-index__title">UE 打包</div>
+          <div class="kp-index__brief">四种配置、BuildCookRun 的五个阶段</div>
+          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
+        </a>
+      </div>
+      <h2 id="kg7">全栈能力</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/20-fullstack-frontend.html#choice">
+          <div class="kp-index__title">前端选型</div>
+          <div class="kp-index__brief">小后台用 Razor；不要为了先进引入整套前端工程</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/20-fullstack-frontend.html#paging-api">
+          <div class="kp-index__title">分页接口设计</div>
+          <div class="kp-index__brief">一次返回 items+total+page+size</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/21-admin-panel.html#roles">
+          <div class="kp-index__title">GM 权限模型</div>
+          <div class="kp-index__brief">Viewer/Operator/Admin/SuperAdmin 四级</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/21-admin-panel.html#grant">
+          <div class="kp-index__title">GM 发奖四道防线</div>
+          <div class="kp-index__brief">权限/校验/幂等/审计</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/21-admin-panel.html#batch">
+          <div class="kp-index__title">批量操作</div>
+          <div class="kp-index__brief">先预览再执行；分批 + 容忍部分失败</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/22-deploy.html#atomic">
+          <div class="kp-index__title">原子部署</div>
+          <div class="kp-index__brief">健康检查通过才切流量；保留旧版本可回滚</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/22-deploy.html#strategies">
+          <div class="kp-index__title">发布策略</div>
+          <div class="kp-index__brief">滚动/蓝绿/金丝雀；金丝雀风险最小</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/22-deploy.html#health">
+          <div class="kp-index__title">健康检查</div>
+          <div class="kp-index__brief">liveness 重启 vs readiness 摘流量</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/23-scaling.html#stateless">
+          <div class="kp-index__title">无状态化</div>
+          <div class="kp-index__brief">水平扩展的前提；Session 存 Redis</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/23-scaling.html#lb">
+          <div class="kp-index__title">负载均衡</div>
+          <div class="kp-index__brief">轮询/最少连接/一致性哈希</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/23-scaling.html#ratelimit">
+          <div class="kp-index__title">限流算法</div>
+          <div class="kp-index__brief">固定窗口有边界突发；令牌桶允许突发</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/23-scaling.html#circuit-breaker">
+          <div class="kp-index__title">熔断器</div>
+          <div class="kp-index__brief">Closed/Open/HalfOpen；防止雪崩</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/24-security.html#sqli">
+          <div class="kp-index__title">SQL 注入</div>
+          <div class="kp-index__brief">永远参数化，不要拼接 SQL</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/24-security.html#xss">
+          <div class="kp-index__title">XSS 与转义</div>
+          <div class="kp-index__brief">转义要匹配输出上下文</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/24-security.html#masking">
+          <div class="kp-index__title">敏感信息脱敏</div>
+          <div class="kp-index__brief">客服后台/日志要脱敏，玩家看自己要完整</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+      </div>
+      <h2 id="kg8">后端基础</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/03-http-basics.html#response">
+          <div class="kp-index__title">HTTP 与 REST</div>
+          <div class="kp-index__brief">统一响应 code/msg/data、状态码语义、错误码分段</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/03-http-basics.html#idempotency">
+          <div class="kp-index__title">幂等设计</div>
+          <div class="kp-index__brief">重复调用只生效一次；「已处理」要返回成功</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/04-aspnet-core.html#di">
+          <div class="kp-index__title">依赖注入</div>
+          <div class="kp-index__brief">依赖接口不依赖实现，便于替换与测试</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/04-aspnet-core.html#lifetime">
+          <div class="kp-index__title">三种生命周期</div>
+          <div class="kp-index__brief">Singleton/Scoped/Transient；DbContext 必须 Scoped</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/04-aspnet-core.html#middleware">
+          <div class="kp-index__title">中间件</div>
+          <div class="kp-index__brief">请求管道的每一环，可短路；顺序决定行为</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/04-aspnet-core.html#config">
+          <div class="kp-index__title">配置系统</div>
+          <div class="kp-index__brief">json -> json.{Env} -> 环境变量 -> 命令行，后者覆盖前者</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/05-routing-modelbind.html#sources">
+          <div class="kp-index__title">参数来源与绑定</div>
+          <div class="kp-index__brief">Route/Query/Body/Header/Form 五个来源</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/05-routing-modelbind.html#validation">
+          <div class="kp-index__title">参数校验</div>
+          <div class="kp-index__brief">客户端可绕过一切前端校验，服务端必须再校验</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/05-routing-modelbind.html#paging">
+          <div class="kp-index__title">分页边界</div>
+          <div class="kp-index__brief">size 上限、page 不能为 0</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/06-auth.html#password">
+          <div class="kp-index__title">密码存储</div>
+          <div class="kp-index__brief">慢哈希 + 盐；不能用可逆加密</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/06-auth.html#jwt">
+          <div class="kp-index__title">JWT</div>
+          <div class="kp-index__brief">三段结构；Payload 只是 Base64 不是加密</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/06-auth.html#dual-token">
+          <div class="kp-index__title">双 Token 机制</div>
+          <div class="kp-index__brief">access 短 + refresh 长，refresh 一次性</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/06-auth.html#authz">
+          <div class="kp-index__title">越权防护</div>
+          <div class="kp-index__brief">水平/垂直越权；必须校验资源归属</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/07-database.html#nplus1">
+          <div class="kp-index__title">N+1 查询</div>
+          <div class="kp-index__brief">1 次主表 + N 次关联；用 Include 或一次性取回</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/07-database.html#index">
+          <div class="kp-index__title">索引</div>
+          <div class="kp-index__brief">O(n) 变 O(1)；代价是存储和写入变慢</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/07-database.html#transaction">
+          <div class="kp-index__title">事务</div>
+          <div class="kp-index__brief">要么全成功要么全回滚；事务要短</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/07-database.html#migration">
+          <div class="kp-index__title">数据库迁移</div>
+          <div class="kp-index__brief">结构变更进版本库；生产用 script 审核</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/08-redis-cache.html#patterns">
+          <div class="kp-index__title">Cache Aside</div>
+          <div class="kp-index__brief">读时回填、写时删缓存</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/08-redis-cache.html#three-problems">
+          <div class="kp-index__title">穿透/击穿/雪崩</div>
+          <div class="kp-index__brief">不存在/热点过期/集体过期；三种解法</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/08-redis-cache.html#distributed-lock">
+          <div class="kp-index__title">分布式锁</div>
+          <div class="kp-index__brief">SET NX EX；释放必须校验 token</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/09-message-queue.html#semantics">
+          <div class="kp-index__title">投递语义</div>
+          <div class="kp-index__brief">AtMostOnce/AtLeastOnce/ExactlyOnce；业务选 AtLeastOnce</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/09-message-queue.html#idempotent">
+          <div class="kp-index__title">幂等消费</div>
+          <div class="kp-index__brief">记录已处理消息 ID；重复返回成功</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/09-message-queue.html#retry">
+          <div class="kp-index__title">重试与死信队列</div>
+          <div class="kp-index__brief">不能无限重试；失败进死信人工处理</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/09-message-queue.html#eventual">
+          <div class="kp-index__title">最终一致性</div>
+          <div class="kp-index__brief">同步扣钱 + 异步发货，短暂不一致可接受</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/10-logging-monitor.html#levels">
+          <div class="kp-index__title">日志分级</div>
+          <div class="kp-index__brief">Trace~Fatal；低级别生产关闭</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/10-logging-monitor.html#structured">
+          <div class="kp-index__title">结构化日志</div>
+          <div class="kp-index__brief">用字段而非拼字符串，可查询可聚合</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/10-logging-monitor.html#tracing">
+          <div class="kp-index__title">链路追踪</div>
+          <div class="kp-index__brief">traceId 全链路传递，定位哪一步慢</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/10-logging-monitor.html#metrics">
+          <div class="kp-index__title">P99 与指标</div>
+          <div class="kp-index__brief">看 P99 不看平均；Counter/Gauge/Histogram</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+      </div>
+      <h2 id="kg9">后端工程</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/25-perf.html#layers">
+          <div class="kp-index__title">优化五层</div>
+          <div class="kp-index__brief">架构>数据库>算法>代码>参数</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/25-perf.html#pool">
+          <div class="kp-index__title">连接池</div>
+          <div class="kp-index__brief">避免握手开销；池满要等待不能无限建</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/25-perf.html#boxing">
+          <div class="kp-index__title">装箱开销</div>
+          <div class="kp-index__brief">List<object> 有堆分配；用泛型零装箱</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/25-perf.html#async">
+          <div class="kp-index__title">异步陷阱</div>
+          <div class="kp-index__brief">async void 抓不到异常；.Result 会死锁</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/26-testing.html#pyramid">
+          <div class="kp-index__title">测试金字塔</div>
+          <div class="kp-index__brief">单元 70% / 集成 20% / 端到端 10%</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/26-testing.html#testability">
+          <div class="kp-index__title">可测试性</div>
+          <div class="kp-index__brief">依赖注入 + 假时钟；不要内部 new 或 DateTime.Now</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/27-architecture.html#layering">
+          <div class="kp-index__title">分层与依赖方向</div>
+          <div class="kp-index__brief">上层依赖下层；下层不能反向依赖</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/27-architecture.html#event">
+          <div class="kp-index__title">事件驱动解耦</div>
+          <div class="kp-index__brief">发事件而非直接调用，新增功能不改业务代码</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/27-architecture.html#domain">
+          <div class="kp-index__title">贫血 vs 充血</div>
+          <div class="kp-index__brief">规则收进实体，绕不过；核心实体推荐充血</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/28-ai.html#boundary">
+          <div class="kp-index__title">AI 辅助后端</div>
+          <div class="kp-index__brief">AI 易犯并发/幂等/边界三错，必须人工审查</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+      </div>
+      <h2 id="kg10">实践与参考</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="24-projects.html#projects">
+          <div class="kp-index__title">实战项目集</div>
+          <div class="kp-index__brief">从入门到作品级的十项目，含验收标准</div>
+          <div class="kp-index__page">24-projects.html</div>
+        </a>
+        <a class="kp-index__item" href="25-interview.html#questions">
+          <div class="kp-index__title">面试与求职</div>
+          <div class="kp-index__brief">四级理解标准、高频题分类、项目深挖准备</div>
+          <div class="kp-index__page">25-interview.html</div>
+        </a>
+        <a class="kp-index__item" href="25-interview.html#portfolio">
+          <div class="kp-index__title">作品集与资源</div>
+          <div class="kp-index__brief">怎么把项目包装成能打动面试官的作品</div>
+          <div class="kp-index__page">25-interview.html</div>
+        </a>
+      </div>
+      <h2 id="kg11">性能工程</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../gamedev-algorithms/26-perf-patterns.html#counter">
+          <div class="kp-index__title">性能模式库</div>
+          <div class="kp-index__brief">六种模式，三个可能反而更慢的反例</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/27-cache-lru.html#policies">
+          <div class="kp-index__title">缓存与 LRU</div>
+          <div class="kp-index__brief">四种淘汰策略，LRU 要哈希表+双向链表</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/28-bitwise.html#value">
+          <div class="kp-index__title">位运算</div>
+          <div class="kp-index__brief">价值在省空间不是省时间</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/29-serialize.html#safety">
+          <div class="kp-index__title">存档与序列化</div>
+          <div class="kp-index__brief">向后兼容、原子写入、备份</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/30-debug-tools.html#tools">
+          <div class="kp-index__title">调试工具</div>
+          <div class="kp-index__brief">时间线录制用环形缓冲，日志要条件包裹</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+      </div>
+      <h2 id="kg12">数学与图形</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="09-math.html#vector">
+          <div class="kp-index__title">向量运算</div>
+          <div class="kp-index__brief">位置/方向/速度都是向量；sqrMagnitude 比 Distance 快</div>
+          <div class="kp-index__page">09-math.html</div>
+        </a>
+        <a class="kp-index__item" href="09-math.html#dot-cross">
+          <div class="kp-index__title">点积与叉积</div>
+          <div class="kp-index__brief">点积判断前后与夹角，叉积判断左右；视野检测的标准做法</div>
+          <div class="kp-index__page">09-math.html</div>
+        </a>
+        <a class="kp-index__item" href="09-math.html#quaternion">
+          <div class="kp-index__title">四元数</div>
+          <div class="kp-index__brief">轴加角表示旋转；a*b 表示先 b 后 a，从右往左读</div>
+          <div class="kp-index__page">09-math.html</div>
+        </a>
+        <a class="kp-index__item" href="09-math.html#interp">
+          <div class="kp-index__title">插值与缓动</div>
+          <div class="kp-index__brief">帧率无关的平滑：MoveTowards/SmoothDamp/Exp 逼近</div>
+          <div class="kp-index__page">09-math.html</div>
+        </a>
+        <a class="kp-index__item" href="10-graphics.html#pipeline">
+          <div class="kp-index__title">渲染管线</div>
+          <div class="kp-index__brief">应用/几何/像素/后处理四阶段，性能瓶颈各在哪里</div>
+          <div class="kp-index__page">10-graphics.html</div>
+        </a>
+        <a class="kp-index__item" href="10-graphics.html#spaces">
+          <div class="kp-index__title">坐标空间变换</div>
+          <div class="kp-index__brief">模型到世界到观察到裁剪到屏幕，MVP 矩阵从右往左应用</div>
+          <div class="kp-index__page">10-graphics.html</div>
+        </a>
+        <a class="kp-index__item" href="10-graphics.html#batching">
+          <div class="kp-index__title">Draw Call 与合批</div>
+          <div class="kp-index__brief">静态/动态/SRP Batcher/GPU Instancing，合批失败的常见原因</div>
+          <div class="kp-index__page">10-graphics.html</div>
+        </a>
+        <a class="kp-index__item" href="10-graphics.html#shader">
+          <div class="kp-index__title">Shader 基础</div>
+          <div class="kp-index__brief">ShaderLab 结构、顶点/片元着色器、兰伯特光照公式</div>
+          <div class="kp-index__page">10-graphics.html</div>
+        </a>
+        <a class="kp-index__item" href="10-graphics.html#urp">
+          <div class="kp-index__title">URP 渲染管线</div>
+          <div class="kp-index__brief">Built-in/URP/HDRP 的选型，迁移成本与判断方法</div>
+          <div class="kp-index__page">10-graphics.html</div>
+        </a>
+      </div>
+      <h2 id="kg13">核心算法</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../gamedev-algorithms/10-graph.html#traversal">
+          <div class="kp-index__title">图与遍历</div>
+          <div class="kp-index__brief">BFS 用队列找最短，DFS 用栈判连通</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/11-pathfinding.html#heuristic">
+          <div class="kp-index__title">A* 寻路</div>
+          <div class="kp-index__brief">启发函数减少 60% 扩展，h 高估会非最优</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/12-spatial.html#grid">
+          <div class="kp-index__title">空间划分</div>
+          <div class="kp-index__brief">格子 < 半径会静默漏检（33/167）</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/13-sorting.html#no-sort">
+          <div class="kp-index__title">排序与选择</div>
+          <div class="kp-index__brief">Top-K 快 8.4 倍、快速选择 O(n)、小数组用插入</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/14-search.html#index">
+          <div class="kp-index__title">查找与索引</div>
+          <div class="kp-index__brief">索引比遍历快 159 倍，二分有六个易错点</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/15-dynamic-programming.html#do-you-need">
+          <div class="kp-index__title">动态规划与贪心</div>
+          <div class="kp-index__brief">游戏里 DP 用得不多，贪心更适合</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+      </div>
+      <h2 id="kg14">游戏 AI</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../gamedev-algorithms/16-state-machine.html#five">
+          <div class="kp-index__title">状态机</div>
+          <div class="kp-index__brief">状态数 > 10 时转移爆炸，要换行为树</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/17-behavior-tree.html#status">
+          <div class="kp-index__title">行为树</div>
+          <div class="kp-index__brief">六种节点、与状态机的选择依据</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/18-decision-tree.html#utility">
+          <div class="kp-index__title">决策树与效用</div>
+          <div class="kp-index__brief">效用评分让 AI 决策更平滑</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/19-goap-planner.html#when">
+          <div class="kp-index__title">GOAP</div>
+          <div class="kp-index__brief">规划器本质是 A*，代价是可预测性</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/20-boids-flock.html#three-rules">
+          <div class="kp-index__title">Boids 群体</div>
+          <div class="kp-index__brief">分离/对齐/聚合三条规则，必须用空间划分优化</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+      </div>
+      <h2 id="kg15">游戏后端</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/11-game-backend-overview.html#layers">
+          <div class="kp-index__title">游戏后端分层</div>
+          <div class="kp-index__brief">网关/登录/大厅/战斗/世界/匹配/排行</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/11-game-backend-overview.html#stateful">
+          <div class="kp-index__title">有状态 vs 无状态</div>
+          <div class="kp-index__brief">无状态可随便扩；有状态要路由到固定实例</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/11-game-backend-overview.html#gateway">
+          <div class="kp-index__title">网关职责</div>
+          <div class="kp-index__brief">连接管理、路由、鉴权、主动推送</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/12-long-short-connection.html#sticky">
+          <div class="kp-index__title">粘包与拆包</div>
+          <div class="kp-index__brief">TCP 是字节流；用长度前缀定义消息边界</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/12-long-short-connection.html#heartbeat">
+          <div class="kp-index__title">心跳与超时</div>
+          <div class="kp-index__brief">对端断网不会立刻发现；应用层自己做心跳</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/12-long-short-connection.html#reconnect">
+          <div class="kp-index__title">断线重连</div>
+          <div class="kp-index__brief">战斗中断线走会话恢复，不是重新登录</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/13-protocol-design.html#field-number">
+          <div class="kp-index__title">字段编号</div>
+          <div class="kp-index__brief">用编号代替字段名，省 57% 带宽</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/13-protocol-design.html#compatibility">
+          <div class="kp-index__title">协议向前兼容</div>
+          <div class="kp-index__brief">字段编号永不复用；跳过未知字段</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/14-state-sync.html#comparison">
+          <div class="kp-index__title">两种同步对比</div>
+          <div class="kp-index__brief">状态同步传结果，帧同步传操作</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/14-state-sync.html#determinism">
+          <div class="kp-index__title">确定性</div>
+          <div class="kp-index__brief">浮点/随机/遍历顺序三个不确定，帧同步必须解决</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/14-state-sync.html#prediction">
+          <div class="kp-index__title">客户端预测</div>
+          <div class="kp-index__brief">本地立即执行 + 服务器校正；预测错会「回拉」</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/15-battle-server.html#state-machine">
+          <div class="kp-index__title">房间状态机</div>
+          <div class="kp-index__brief">Waiting/Loading/Playing/Settling/Closed</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/15-battle-server.html#settle">
+          <div class="kp-index__title">结算幂等</div>
+          <div class="kp-index__brief">触发路径有多条，必须防止重复发奖</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/15-battle-server.html#validate">
+          <div class="kp-index__title">战斗校验</div>
+          <div class="kp-index__brief">用理论上限交叉校验客户端上报数据</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/16-matchmaking.html#tradeoff">
+          <div class="kp-index__title">匹配策略</div>
+          <div class="kp-index__brief">随时间放宽 MMR 范围；分段匹配避免 O(n²)</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/16-matchmaking.html#elo">
+          <div class="kp-index__title">Elo 评分</div>
+          <div class="kp-index__brief">赢强手加分多，赢弱手加分少</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/17-leaderboard.html#why-skiplist">
+          <div class="kp-index__title">排行榜实现</div>
+          <div class="kp-index__brief">跳表/ZSet；玩家最关心「我附近」</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/18-inventory-economy.html#concurrency">
+          <div class="kp-index__title">并发扣减</div>
+          <div class="kp-index__brief">加锁/乐观锁/条件 UPDATE/队列串行化</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/18-inventory-economy.html#flow">
+          <div class="kp-index__title">道具流水</div>
+          <div class="kp-index__brief">每笔变更留痕，可对账可追溯</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/19-anticheat.html#authority">
+          <div class="kp-index__title">服务端权威</div>
+          <div class="kp-index__brief">改了会影响他人或经济的，必须在服务端算</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-backend-fullstack/19-anticheat.html#speed">
+          <div class="kp-index__title">速度校验</div>
+          <div class="kp-index__brief">距离/时间差，留容差但不给外挂空间</div>
+          <div class="kp-index__page">↗ gamedev-backend-fullstack</div>
+        </a>
+      </div>
+      <h2 id="kg16">算法基础</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../gamedev-algorithms/02-complexity.html#budget">
+          <div class="kp-index__title">复杂度直觉</div>
+          <div class="kp-index__brief">每帧 16.7ms，单系统 1~2ms 预算</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/03-array-list.html#ring-apps">
+          <div class="kp-index__title">数组与环形缓冲</div>
+          <div class="kp-index__brief">环形缓冲索引环绕、三个经典应用</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/04-linked-stack-queue.html#linked-list">
+          <div class="kp-index__title">链表、栈与队列</div>
+          <div class="kp-index__brief">游戏里为什么少用链表；队列不该用 remove(t,1)</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/05-hash.html#load">
+          <div class="kp-index__title">哈希表</div>
+          <div class="kp-index__brief">负载因子、浮点不能做 key、索引优化</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/06-tree-basic.html#trees-in-games">
+          <div class="kp-index__title">树结构</div>
+          <div class="kp-index__brief">游戏里的九种树、BST 退化</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/07-heap-priority.html#topk">
+          <div class="kp-index__title">堆与优先队列</div>
+          <div class="kp-index__brief">Top-K 用最小堆，建堆是 O(n)</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/08-trie.html#problem">
+          <div class="kp-index__title">Trie 与敏感词</div>
+          <div class="kp-index__brief">O(文本长) 而非 O(词数×文本长)</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/09-union-find.html#optimizations">
+          <div class="kp-index__title">并查集</div>
+          <div class="kp-index__brief">路径压缩 + 按秩合并，朴素版慢 8 倍</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+      </div>
+      <h2 id="kg17">系统设计</h2>
+      <div class="kp-index">
+        <a class="kp-index__item" href="../gamedev-algorithms/21-reddot.html#basic">
+          <div class="kp-index__title">红点系统</div>
+          <div class="kp-index__brief">脏标记向上传播，避免每帧遍历</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/22-quest-achievement.html#tracking">
+          <div class="kp-index__title">任务与成就</div>
+          <div class="kp-index__brief">事件驱动代替轮询，进度要持久化</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/23-buff-skill.html#buff">
+          <div class="kp-index__title">Buff 与技能</div>
+          <div class="kp-index__brief">四种叠加规则，控制类必须设上限</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/24-inventory-drop.html#weighted-random">
+          <div class="kp-index__title">背包与掉落</div>
+          <div class="kp-index__brief">权重是相对值，前缀和+二分优化</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+        <a class="kp-index__item" href="../gamedev-algorithms/25-time-scheduler.html#problems">
+          <div class="kp-index__title">定时器调度</div>
+          <div class="kp-index__brief">五个实战问题，标记删除防泄漏</div>
+          <div class="kp-index__page">↗ gamedev-algorithms</div>
+        </a>
+      </div>
+      <h2 id="kg18">通用能力</h2>
       <div class="kp-index">
         <a class="kp-index__item" href="20-patterns.html#five">
           <div class="kp-index__title">单例</div>
@@ -451,446 +1263,6 @@
           <div class="kp-index__brief">单元测试、自动化构建、多平台打包上架</div>
           <div class="kp-index__page">22-network-eng.html</div>
         </a>
-      </div>
-      <h2 id="kg5">AI 时代</h2>
-      <div class="kp-index">
-        <a class="kp-index__item" href="23-ai.html#workflow">
-          <div class="kp-index__title">AI 辅助开发</div>
-          <div class="kp-index__brief">AI 编程助手的真实效果、失效场景、版权红线</div>
-          <div class="kp-index__page">23-ai.html</div>
-        </a>
-        <a class="kp-index__item" href="23-ai.html#npc">
-          <div class="kp-index__title">AI NPC 架构</div>
-          <div class="kp-index__brief">LLM 驱动 NPC 的四步循环、延迟与成本控制、安全防护</div>
-          <div class="kp-index__page">23-ai.html</div>
-        </a>
-      </div>
-      <h2 id="kg6">实践与参考</h2>
-      <div class="kp-index">
-        <a class="kp-index__item" href="24-projects.html#projects">
-          <div class="kp-index__title">实战项目集</div>
-          <div class="kp-index__brief">从入门到作品级的十项目，含验收标准</div>
-          <div class="kp-index__page">24-projects.html</div>
-        </a>
-        <a class="kp-index__item" href="25-interview.html#questions">
-          <div class="kp-index__title">面试与求职</div>
-          <div class="kp-index__brief">四级理解标准、高频题分类、项目深挖准备</div>
-          <div class="kp-index__page">25-interview.html</div>
-        </a>
-        <a class="kp-index__item" href="25-interview.html#portfolio">
-          <div class="kp-index__title">作品集与资源</div>
-          <div class="kp-index__brief">怎么把项目包装成能打动面试官的作品</div>
-          <div class="kp-index__page">25-interview.html</div>
-        </a>
-      </div>
-      <h2 id="kg7">C++ 语言</h2>
-      <div class="kp-index">
-        <a class="kp-index__item" href="../unreal/03-cpp-basic.html#difference">
-          <div class="kp-index__title">C++ 编译模型</div>
-          <div class="kp-index__brief">声明与定义分离、编译/链接/运行时三类错误</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/03-cpp-basic.html#header">
-          <div class="kp-index__title">头文件规范</div>
-          <div class="kp-index__brief">头文件保护、前向声明、禁止 using namespace</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/04-cpp-memory.html#raii">
-          <div class="kp-index__title">RAII</div>
-          <div class="kp-index__brief">资源绑定对象生命周期，构造获取、析构释放</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/04-cpp-memory.html#raii">
-          <div class="kp-index__title">智能指针</div>
-          <div class="kp-index__brief">unique/shared/weak，循环引用的陷阱与解法</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/05-cpp-oop.html#vtable">
-          <div class="kp-index__title">虚函数与多态</div>
-          <div class="kp-index__brief">vtable 原理、虚析构、对象切片的坑</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/05-cpp-oop.html#value-semantics">
-          <div class="kp-index__title">对象切片</div>
-          <div class="kp-index__brief">值语义持有基类会导致多态失效</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/06-cpp-template.html#difference">
-          <div class="kp-index__title">C++ 模板</div>
-          <div class="kp-index__brief">编译期代码生成、代码膨胀、错误信息解读</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/07-cpp-modern.html#cpp11">
-          <div class="kp-index__title">现代 C++ 特性</div>
-          <div class="kp-index__brief">auto、范围 for、lambda、nullptr、移动语义</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/08-cpp-concurrency.html#threads">
-          <div class="kp-index__title">C++ 并发</div>
-          <div class="kp-index__brief">线程、原子、数据竞争与死锁</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/09-cpp-build.html#unreal-build">
-          <div class="kp-index__title">C++ 构建系统</div>
-          <div class="kp-index__brief">UBT 用 C# 写、.Build.cs 模块依赖</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-      </div>
-      <h2 id="kg8">Unreal 引擎</h2>
-      <div class="kp-index">
-        <a class="kp-index__item" href="../unreal/12-ue-cpp.html#macros">
-          <div class="kp-index__title">Unreal 宏系统</div>
-          <div class="kp-index__brief">UCLASS/UPROPERTY/UFUNCTION 与 UHT</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/12-ue-cpp.html#gc">
-          <div class="kp-index__title">UPROPERTY 与 GC</div>
-          <div class="kp-index__brief">最大作用是防 GC 回收，漏写会导致指针变 nullptr</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/12-ue-cpp.html#naming">
-          <div class="kp-index__title">UE 命名约定</div>
-          <div class="kp-index__brief">A/U/F/I/T/E 前缀是编译要求不是风格问题</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/13-ue-framework.html#classes">
-          <div class="kp-index__title">Gameplay 框架</div>
-          <div class="kp-index__brief">Actor/Pawn/Controller/GameMode/GameState</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/13-ue-framework.html#lifecycle">
-          <div class="kp-index__title">Actor 生命周期</div>
-          <div class="kp-index__brief">Constructor/BeginPlay/Tick/EndPlay 的顺序与禁忌</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/14-ue-blueprint.html#boundary">
-          <div class="kp-index__title">C++ 与蓝图边界</div>
-          <div class="kp-index__brief">按「多久变一次」划分，蓝图慢 10~40 倍</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/14-ue-blueprint.html#expose">
-          <div class="kp-index__title">暴露给蓝图</div>
-          <div class="kp-index__brief">BlueprintCallable/NativeEvent 与 _Implementation 后缀</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/15-ue-gas.html#should-use">
-          <div class="kp-index__title">GAS 技能系统</div>
-          <div class="kp-index__brief">先判断要不要用，五个核心概念与 GameplayTag</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/16-ue-anim.html#animbp">
-          <div class="kp-index__title">UE 动画系统</div>
-          <div class="kp-index__brief">状态机、Blend Space、Anim Notify 做攻击判定</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/17-ue-render.html#ue5">
-          <div class="kp-index__title">Nanite 与 Lumen</div>
-          <div class="kp-index__brief">Nanite 的三个限制、Lumen 的性能代价</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/18-ue-niagara.html#niagara">
-          <div class="kp-index__title">Niagara 特效</div>
-          <div class="kp-index__brief">CPU/GPU 粒子选择、特效的性能预算</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/18-ue-niagara.html#physics">
-          <div class="kp-index__title">Chaos 物理</div>
-          <div class="kp-index__brief">刚体/破碎/布料，物理的性能陷阱</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/19-ue-network.html#model">
-          <div class="kp-index__title">网络复制</div>
-          <div class="kp-index__brief">服务器权威、三种 RPC、客户端预测</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/20-ue-ui.html#umg">
-          <div class="kp-index__title">UMG 性能陷阱</div>
-          <div class="kp-index__brief">每帧重绘是最大陷阱，要用 Invalidation Box</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/20-ue-ui.html#audio">
-          <div class="kp-index__title">UE 音频</div>
-          <div class="kp-index__brief">Concurrency 并发限制、Sound Class 音量分组</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/21-ue-editor.html#tools">
-          <div class="kp-index__title">编辑器扩展</div>
-          <div class="kp-index__brief">Editor Utility Widget 是最容易上手的</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/22-patterns.html#subsystem">
-          <div class="kp-index__title">Subsystem</div>
-          <div class="kp-index__brief">替代手写单例，引擎管理生命周期</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/22-patterns.html#component">
-          <div class="kp-index__title">UE 接口</div>
-          <div class="kp-index__brief">用接口替代 Cast 到具体类</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/23-perf.html#workflow">
-          <div class="kp-index__title">UE 性能排查</div>
-          <div class="kp-index__brief">PIE 数据不可信，stat unit 怎么读</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/24-engineering.html#vcs">
-          <div class="kp-index__title">UE 版本控制</div>
-          <div class="kp-index__brief">.uasset 必须 LFS 且无法合并</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-        <a class="kp-index__item" href="../unreal/24-engineering.html#build">
-          <div class="kp-index__title">UE 打包</div>
-          <div class="kp-index__brief">四种配置、BuildCookRun 的五个阶段</div>
-          <div class="kp-index__page">↗ gamedev-cpp-unreal</div>
-        </a>
-      </div>
-      <h2 id="kg9">Lua 语言</h2>
-      <div class="kp-index">
-        <a class="kp-index__item" href="../lua/03-lua-basic.html#types">
-          <div class="kp-index__title">Lua 基础语法</div>
-          <div class="kp-index__brief">索引从 1 开始、只有 nil 和 false 是假值</div>
-          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
-        </a>
-        <a class="kp-index__item" href="../lua/04-lua-table.html#table-basic">
-          <div class="kp-index__title">Lua table</div>
-          <div class="kp-index__brief"># 对含 nil 的表不可靠，用 select 计数</div>
-          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
-        </a>
-        <a class="kp-index__item" href="../lua/04-lua-table.html#metatable">
-          <div class="kp-index__title">元表</div>
-          <div class="kp-index__brief">__index 两种形式、__newindex、运算符重载</div>
-          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
-        </a>
-        <a class="kp-index__item" href="../lua/06-lua-oop.html#oop">
-          <div class="kp-index__title">Lua 实现类</div>
-          <div class="kp-index__brief">__index 链实现继承</div>
-          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
-        </a>
-        <a class="kp-index__item" href="../lua/15-framework-oop.html#super-trap">
-          <div class="kp-index__title">super 无限递归</div>
-          <div class="kp-index__brief">self.super 查到的是实例的类，三级继承必崩</div>
-          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
-        </a>
-        <a class="kp-index__item" href="../lua/07-lua-advanced.html#coroutine">
-          <div class="kp-index__title">协程</div>
-          <div class="kp-index__brief">resume 与 wrap 的错误处理差异，写迭代器</div>
-          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
-        </a>
-        <a class="kp-index__item" href="../lua/07-lua-advanced.html#error">
-          <div class="kp-index__title">Lua 错误处理</div>
-          <div class="kp-index__brief">error 的 level 参数、xpcall 抓堆栈</div>
-          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
-        </a>
-        <a class="kp-index__item" href="../lua/07-lua-advanced.html#gc">
-          <div class="kp-index__title">GC 与弱表</div>
-          <div class="kp-index__brief">弱表做缓存，不阻止对象被回收</div>
-          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
-        </a>
-        <a class="kp-index__item" href="../lua/07-lua-advanced.html#sandbox">
-          <div class="kp-index__title">环境与沙箱</div>
-          <div class="kp-index__brief">_ENV 与 load 的第四参数做沙箱</div>
-          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
-        </a>
-        <a class="kp-index__item" href="../lua/08-lua-perf.html#data">
-          <div class="kp-index__title">Lua 性能基础</div>
-          <div class="kp-index__brief">table.concat 快 17~30 倍，缓存全局函数无收益</div>
-          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
-        </a>
-        <a class="kp-index__item" href="../lua/09-hotupdate-basics.html#require">
-          <div class="kp-index__title">require 与模块</div>
-          <div class="kp-index__brief">package.loaded 缓存，热更要清缓存</div>
-          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
-        </a>
-        <a class="kp-index__item" href="../lua/11-xlua-advanced.html#cost">
-          <div class="kp-index__title">xLua 跨语言边界</div>
-          <div class="kp-index__brief">调用开销 5~20 倍，核心是减少调用次数</div>
-          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
-        </a>
-        <a class="kp-index__item" href="../lua/13-framework-design.html#module">
-          <div class="kp-index__title">模块管理器</div>
-          <div class="kp-index__brief">注册/初始化/逆序销毁</div>
-          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
-        </a>
-        <a class="kp-index__item" href="../lua/13-framework-design.html#event">
-          <div class="kp-index__title">事件系统</div>
-          <div class="kp-index__brief">快照遍历 + 队列化派发，防止回调中修改列表</div>
-          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
-        </a>
-        <a class="kp-index__item" href="../lua/16-framework-ui.html#stack">
-          <div class="kp-index__title">UI 界面栈</div>
-          <div class="kp-index__brief">三种界面类型、返回键、订阅自动取消</div>
-          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
-        </a>
-        <a class="kp-index__item" href="../lua/09-hotupdate-basics.html#require">
-          <div class="kp-index__title">热更新原理</div>
-          <div class="kp-index__brief">清 package.loaded + 重新 require，旧引用问题</div>
-          <div class="kp-index__page">↗ gamedev-lua-hotupdate</div>
-        </a>
-      </div>
-      <h2 id="kg10">算法基础</h2>
-      <div class="kp-index">
-        <a class="kp-index__item" href="../algorithms/02-complexity.html#budget">
-          <div class="kp-index__title">复杂度直觉</div>
-          <div class="kp-index__brief">每帧 16.7ms，单系统 1~2ms 预算</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/03-array-list.html#ring-apps">
-          <div class="kp-index__title">数组与环形缓冲</div>
-          <div class="kp-index__brief">环形缓冲索引环绕、三个经典应用</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/04-linked-stack-queue.html#linked-list">
-          <div class="kp-index__title">链表、栈与队列</div>
-          <div class="kp-index__brief">游戏里为什么少用链表；队列不该用 remove(t,1)</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/05-hash.html#load">
-          <div class="kp-index__title">哈希表</div>
-          <div class="kp-index__brief">负载因子、浮点不能做 key、索引优化</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/06-tree-basic.html#trees-in-games">
-          <div class="kp-index__title">树结构</div>
-          <div class="kp-index__brief">游戏里的九种树、BST 退化</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/07-heap-priority.html#topk">
-          <div class="kp-index__title">堆与优先队列</div>
-          <div class="kp-index__brief">Top-K 用最小堆，建堆是 O(n)</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/08-trie.html#problem">
-          <div class="kp-index__title">Trie 与敏感词</div>
-          <div class="kp-index__brief">O(文本长) 而非 O(词数×文本长)</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/09-union-find.html#optimizations">
-          <div class="kp-index__title">并查集</div>
-          <div class="kp-index__brief">路径压缩 + 按秩合并，朴素版慢 8 倍</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-      </div>
-      <h2 id="kg11">核心算法</h2>
-      <div class="kp-index">
-        <a class="kp-index__item" href="../algorithms/10-graph.html#traversal">
-          <div class="kp-index__title">图与遍历</div>
-          <div class="kp-index__brief">BFS 用队列找最短，DFS 用栈判连通</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/11-pathfinding.html#heuristic">
-          <div class="kp-index__title">A* 寻路</div>
-          <div class="kp-index__brief">启发函数减少 60% 扩展，h 高估会非最优</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/12-spatial.html#grid">
-          <div class="kp-index__title">空间划分</div>
-          <div class="kp-index__brief">格子 < 半径会静默漏检（33/167）</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/13-sorting.html#no-sort">
-          <div class="kp-index__title">排序与选择</div>
-          <div class="kp-index__brief">Top-K 快 8.4 倍、快速选择 O(n)、小数组用插入</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/14-search.html#index">
-          <div class="kp-index__title">查找与索引</div>
-          <div class="kp-index__brief">索引比遍历快 159 倍，二分有六个易错点</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/15-dynamic-programming.html#do-you-need">
-          <div class="kp-index__title">动态规划与贪心</div>
-          <div class="kp-index__brief">游戏里 DP 用得不多，贪心更适合</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-      </div>
-      <h2 id="kg12">游戏 AI</h2>
-      <div class="kp-index">
-        <a class="kp-index__item" href="../algorithms/16-state-machine.html#five">
-          <div class="kp-index__title">状态机</div>
-          <div class="kp-index__brief">状态数 > 10 时转移爆炸，要换行为树</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/17-behavior-tree.html#status">
-          <div class="kp-index__title">行为树</div>
-          <div class="kp-index__brief">六种节点、与状态机的选择依据</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/18-decision-tree.html#utility">
-          <div class="kp-index__title">决策树与效用</div>
-          <div class="kp-index__brief">效用评分让 AI 决策更平滑</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/19-goap-planner.html#when">
-          <div class="kp-index__title">GOAP</div>
-          <div class="kp-index__brief">规划器本质是 A*，代价是可预测性</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/20-boids-flock.html#three-rules">
-          <div class="kp-index__title">Boids 群体</div>
-          <div class="kp-index__brief">分离/对齐/聚合三条规则，必须用空间划分优化</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-      </div>
-      <h2 id="kg13">系统设计</h2>
-      <div class="kp-index">
-        <a class="kp-index__item" href="../algorithms/21-reddot.html#basic">
-          <div class="kp-index__title">红点系统</div>
-          <div class="kp-index__brief">脏标记向上传播，避免每帧遍历</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/22-quest-achievement.html#tracking">
-          <div class="kp-index__title">任务与成就</div>
-          <div class="kp-index__brief">事件驱动代替轮询，进度要持久化</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/23-buff-skill.html#buff">
-          <div class="kp-index__title">Buff 与技能</div>
-          <div class="kp-index__brief">四种叠加规则，控制类必须设上限</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/24-inventory-drop.html#weighted-random">
-          <div class="kp-index__title">背包与掉落</div>
-          <div class="kp-index__brief">权重是相对值，前缀和+二分优化</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/25-time-scheduler.html#problems">
-          <div class="kp-index__title">定时器调度</div>
-          <div class="kp-index__brief">五个实战问题，标记删除防泄漏</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-      </div>
-      <h2 id="kg14">性能工程</h2>
-      <div class="kp-index">
-        <a class="kp-index__item" href="../algorithms/26-perf-patterns.html#counter">
-          <div class="kp-index__title">性能模式库</div>
-          <div class="kp-index__brief">六种模式，三个可能反而更慢的反例</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/27-cache-lru.html#policies">
-          <div class="kp-index__title">缓存与 LRU</div>
-          <div class="kp-index__brief">四种淘汰策略，LRU 要哈希表+双向链表</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/28-bitwise.html#value">
-          <div class="kp-index__title">位运算</div>
-          <div class="kp-index__brief">价值在省空间不是省时间</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/29-serialize.html#safety">
-          <div class="kp-index__title">存档与序列化</div>
-          <div class="kp-index__brief">向后兼容、原子写入、备份</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-        <a class="kp-index__item" href="../algorithms/30-debug-tools.html#tools">
-          <div class="kp-index__title">调试工具</div>
-          <div class="kp-index__brief">时间线录制用环形缓冲，日志要条件包裹</div>
-          <div class="kp-index__page">↗ gamedev-algorithms</div>
-        </a>
-      </div>
-      <div class="milestone">
-        <p class="mb0">
-          <strong>自测方法</strong>：随机挑 10 个知识点，<em>不看内容</em>说清它的原理和典型陷阱。能说清 8 个以上说明基础扎实。
-        </p>
       </div>
       <nav class="page-nav">
         <a href="index.html">

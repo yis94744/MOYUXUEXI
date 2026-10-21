@@ -1,0 +1,106 @@
+<h1>29 · 实战项目集</h1>
+
+<p class="lead">这一页给出<strong>五个由浅入深的后端项目</strong>。它们不是练习题，而是<em>能写进简历的完整作品</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（28）AI 辅助后端开发 —— 用 AI 写 CRUD、生成测试、审查 SQL 的边界。<br>
+  <strong>这一页</strong>（29）实战项目集 —— 五个由浅入深的后端项目，能写进简历。<br>
+  <strong>下一页</strong>（30）面试题库 —— 后端高频题，标注考点与出处。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+<h2 id="projects">一、五个项目（难度递增）</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>#</th><th>项目</th><th>核心能力</th><th>相关页</th><th>时长</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><strong>游戏配置管理后台</strong></td><td>CRUD + 分页 + 权限</td><td>20, 21</td><td>1 周</td></tr>
+    <tr><td>2</td><td><strong>玩家数据服务</strong></td><td>数据库 + 缓存 + 事务</td><td>07, 08, 18</td><td>2 周</td></tr>
+    <tr><td>3</td><td><strong>登录与账号系统</strong></td><td>JWT + 刷新 + 防刷</td><td>06, 19</td><td>1.5 周</td></tr>
+    <tr><td>4</td><td><strong>排行榜服务</strong></td><td>Redis ZSet + 分页 + 赛季</td><td>08, 17</td><td>1.5 周</td></tr>
+    <tr><td>5</td><td><strong>小型对战服务器</strong></td><td><strong>长连接 + 房间 + 同步</strong></td><td>11-15</td><td>4 周</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三个必须避免的坑</span>
+  <strong>① 只做 CRUD，不做防护</strong><br>
+  很多人做后台只有增删改查，<em>没有权限、没有审计</em>。<strong>这些才是体现工程能力的地方。</strong><br><br>
+  <strong>② 直接上微服务</strong><br>
+  <em>三张表的项目拆成五个服务</em> → 折腾一周还没跑起来。<br><br>
+  <strong>③ 不做压测</strong><br>
+  <em>接口"能用"和"能扛"是两回事</em>。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">怎么让项目值得写进简历</span>
+  <strong>不是「我做了个后台」，而是：</strong><br>
+  · "<em>实现了游戏配置管理后台，支持 6 种配置表、三级权限、全操作审计</em>"<br>
+  · "<em>用 Redis ZSet 实现全服排行榜，10 万玩家下 P99 查询 5ms</em>"<br>
+  · "<em>实现了带幂等的发奖接口，压测 5000 QPS 无重复发放</em>"<br><br>
+  <strong>区别在于：量化 + 技术决策 + 解决的问题。</strong>
+</div>
+
+<h2 id="skeleton">二、每个项目都该有的骨架</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>要素</th><th>为什么</th><th>要求</th></tr></thead>
+  <tbody>
+    <tr><td><strong>分层结构</strong></td><td>展示架构能力</td><td><em>Controller / Service / Repository</em></td></tr>
+    <tr><td><strong>统一响应</strong></td><td>展示规范意识</td><td><strong>code/msg/data</strong></td></tr>
+    <tr><td><strong>错误处理</strong></td><td>展示健壮性</td><td><em>全局异常中间件</em></td></tr>
+    <tr><td><strong>日志</strong></td><td>展示可维护性</td><td><strong>结构化日志</strong></td></tr>
+    <tr><td><strong>测试</strong></td><td>展示质量意识</td><td><em>至少核心逻辑有单测</em></td></tr>
+    <tr><td><strong>README</strong></td><td>展示表达力</td><td><strong>架构图 + 关键决策</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">为什么这些"骨架"重要</span>
+  <strong>因为面试官会问</strong>：<br>
+  · "你的异常怎么统一处理？" → <em>全局中间件</em><br>
+  · "怎么排查线上问题？" → <em>结构化日志 + traceId</em><br>
+  · "改代码怎么保证不出错？" → <em>单元测试</em><br><br>
+  <em>这些问题答不好，会立刻暴露"只写过 demo"。</em><br>
+  <strong>而这些骨架本身不难</strong>——每个半天就能搭好。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="29">
+  <div class="task"><input type="checkbox" id="t-29-1"><label for="t-29-1"><strong>选两个项目</strong>：一个快的、一个有挑战的。</label></div>
+  <div class="task"><input type="checkbox" id="t-29-2"><label for="t-29-2"><strong>先搭骨架</strong>：分层、统一响应、日志、异常处理。</label></div>
+  <div class="task"><input type="checkbox" id="t-29-3"><label for="t-29-3"><strong>再写业务</strong>：不要一上来就写复杂逻辑。</label></div>
+  <div class="task"><input type="checkbox" id="t-29-4"><label for="t-29-4"><strong>加防护</strong>：权限、幂等、参数校验。</label></div>
+  <div class="task"><input type="checkbox" id="t-29-5"><label for="t-29-5"><strong>做压测</strong>：记录 QPS 和 P99。</label></div>
+  <div class="task"><input type="checkbox" id="t-29-6"><label for="t-29-6"><strong>写 README</strong>：架构图 + 技术决策 + 数据。</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>有一个能完整跑起来的后端项目</strong>；<br>
+    ② 有分层结构和统一响应格式；<br>
+    ③ <strong>有权限、幂等、参数校验</strong>；<br>
+    ④ <strong>有压测数据（QPS 和 P99）</strong>；<br>
+    ⑤ 有 README 说明架构和关键决策。<br>
+    <br>
+    <em>第 ③ 和 第 ④ 条是简历上的硬通货——**它们证明你写的是"能上线的代码"**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="28-ai.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">28 AI 辅助后端开发</div>
+  </a>
+  <a class="next" href="30-interview.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">30 面试题库 ★★</div>
+  </a>
+</nav>

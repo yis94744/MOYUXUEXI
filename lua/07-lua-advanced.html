@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">Lua 热更新路线
+      <a href="index.html">Lua 热更新路线
         <span>从零基础到独立搭建可上线的热更框架</span>
       </a>
     </div>
@@ -93,6 +93,14 @@ print("  状态:", coroutine.status(co))                   -- dead
 -- 对已结束的协程 resume
 local ok, err = coroutine.resume(co)
 print("  对已结束的协程 resume:", ok, err)
+
+-- status 的第四个取值 normal：A 里 resume B 时，B 看 A 就是 "normal"
+local A, B
+A = coroutine.create(function() coroutine.resume(B) end)
+B = coroutine.create(function()
+  print("  A resume B 时，B 看 A 的状态:", coroutine.status(A))   -- normal
+end)
+coroutine.resume(A)
 
 print()
 print("=== 2. 用协程写迭代器（最实用的场景）===")
@@ -387,7 +395,7 @@ checkArgs(1, "str", true, {})</code></pre>
     <tr><td><code>coroutine.create</code></td><td>创建协程</td><td>协程对象</td></tr>
     <tr><td><code>coroutine.resume</code></td><td>启动/恢复</td><td><strong>true/false, 返回值</strong></td></tr>
     <tr><td><code>coroutine.yield</code></td><td>暂停并交出值</td><td>—</td></tr>
-    <tr><td><code>coroutine.status</code></td><td>查询状态</td><td><code>suspended</code>/<code>running</code>/<code>dead</code></td></tr>
+    <tr><td><code>coroutine.status</code></td><td>查询状态</td><td><strong>4 种取值</strong>：<code>running</code>（自己）/ <code>suspended</code>（没跑或让出）/ <code>normal</code>（A 里 resume B 时，B 看 A）/ <code>dead</code></td></tr>
     <tr><td><code>coroutine.wrap</code></td><td>包装成函数</td><td><strong>直接调用，出错会抛出</strong></td></tr>
   </tbody>
 </table>

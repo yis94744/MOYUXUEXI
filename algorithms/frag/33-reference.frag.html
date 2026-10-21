@@ -4,7 +4,10 @@
 
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
-  [object Object]
+  <strong>这一页是手册，不是教程</strong>——不需要从头读到尾，遇到问题时回来查。<br>
+  <strong>关键衔接</strong>：数据结构表对应<em>页 03-09</em>，算法表对应<em>页 07-14</em>，性能模式表对应<em>页 26-30</em>；<em>知识点索引页（kp-index）</em>提供按关键词反查。<br>
+  <strong>重点看"什么时候用"那一列</strong>——复杂度表谁都能背，选型判断才是经验。<br>
+  <strong>用法</strong>：先看"三个最容易想当然的选择"和"四个别急着优化的信号"，这两块最能避免实际踩坑。
 </div>
 
 <h2 id="structures">一、数据结构速查</h2>
@@ -15,13 +18,13 @@
   <tbody>
     <tr><td><strong>数组</strong></td><td>O(1)</td><td>O(n)</td><td>O(n)</td><td><em>随机访问、遍历</em></td></tr>
     <tr><td><strong>动态数组</strong></td><td>O(1)</td><td>摊销 O(1)</td><td>O(n)</td><td><strong>不确定大小</strong></td></tr>
-    <tr><td><strong>环形缓冲</strong></td><td>O(1)</td><td>O(1)</td><td>O(1)</td><td><strong>固定队列、零分配</strong></td></tr>
-    <tr><td><strong>链表</strong></td><td>O(n)</td><td>O(1)</td><td>O(1)</td><td><em>频繁中间增删</em></td></tr>
+    <tr><td><strong>环形缓冲</strong></td><td>不支持随机查</td><td>O(1)</td><td>O(1)</td><td><strong>固定队列、零分配</strong></td></tr>
+    <tr><td><strong>链表</strong></td><td>O(n)</td><td>O(1)（已知位置）</td><td>O(1)（已知位置）</td><td><em>频繁中间增删</em></td></tr>
     <tr><td><strong>栈</strong></td><td>—</td><td>O(1)</td><td>O(1)</td><td><strong>UI 栈、撤销</strong></td></tr>
     <tr><td><strong>队列</strong></td><td>—</td><td>O(1)</td><td>O(1)</td><td><strong>事件队列、BFS</strong></td></tr>
     <tr><td><strong>哈希表</strong></td><td><strong>O(1)</strong></td><td>O(1)</td><td>O(1)</td><td><strong>精确查找</strong></td></tr>
     <tr><td><strong>堆</strong></td><td>O(1) 堆顶</td><td>O(log n)</td><td>O(log n)</td><td><strong>优先队列、Top-K</strong></td></tr>
-    <tr><td><strong>BST</strong></td><td>O(log n)</td><td>O(log n)</td><td>O(log n)</td><td><em>范围查询</em></td></tr>
+    <tr><td><strong>BST</strong></td><td>O(log n) 平均 / O(n) 退化</td><td>O(log n) 平均</td><td>O(log n) 平均</td><td><em>范围查询（需平衡树）</em></td></tr>
     <tr><td><strong>Trie</strong></td><td>O(m)</td><td>O(m)</td><td>O(m)</td><td><strong>前缀匹配</strong></td></tr>
     <tr><td><strong>并查集</strong></td><td>≈O(1)</td><td>≈O(1)</td><td>—</td><td><strong>连通性</strong></td></tr>
   </tbody>
@@ -100,16 +103,17 @@
 <div class="callout callout--warn">
   <span class="callout__title">三个"可能反而更慢"的模式</span>
   <strong>本站在实测中发现的三个反例</strong>：<br><br>
-  <strong>① 对象池</strong>——实测 <strong>0.93x（更慢）</strong><br>
-  <em>小对象的分配成本很低，而池的管理有开销。</em><br>
+  <strong>① 对象池</strong>——实测 <strong>0.93x ~ 1.26x（落在噪声范围内，无稳定收益）</strong><br>
+  <em>小对象的分配成本很低，而池的 get/release 有函数调用与表操作开销。</em><br>
   真正的收益是<em>减少 GC 导致的帧抖动</em>——<strong>微基准测不出来</strong>。<br><br>
-  <strong>② 三角函数查表</strong>——实测 <strong>0.89x（更慢）</strong><br>
-  <em>现代 CPU 的 sin 是一条指令。</em><br>
-  查表的收益在<strong>没有硬件浮点的老设备</strong>上才明显。<br><br>
-  <strong>③ Lua 里缓存全局函数</strong>——实测 <strong>1.00x（无收益）</strong><br>
-  <em>Lua 5.4 用数组存全局变量，访问本身就是 O(1)。</em><br>
-  这和 LuaJIT 时代、以及很多博客的说法相反。<br><br>
-  <strong>结论：<em>这三个反例都指向同一条原则——先测量，再优化。</em></strong>
+  <strong>② 三角函数查表</strong>——实测 <strong>0.85x 左右（稳定更慢）</strong><br>
+  <em>现代 CPU 的 sin 是一条指令，而查表要做取模 + 浮点转整数 + 表查找。</em><br>
+  查表的收益在<strong>没有硬件浮点的老设备</strong>、或<strong>计算远比 sin 复杂</strong>时才明显。<br><br>
+  <strong>③ Lua 里用位运算代替布尔字段</strong>——实测 <strong>0.78~0.80x（更慢）</strong><br>
+  <em>Lua 5.4 的表字段访问是高度优化的哈希查找，而位运算要走内部函数。</em><br>
+  位运算的价值在<strong>省内存与省带宽</strong>（一个 int 存 32 个标志），不在速度；<em>在 C# 里它两者兼得</em>。<br><br>
+  <strong>结论：<em>这三个反例都指向同一条原则——先测量，再优化。</em></strong><br>
+  <em>"反例"的正确读法：不是"这些手段一定有害"，而是"它们没有传说中那么必然有效"。</em>
 </div>
 
 <h2 id="checklist">四、快速判断清单</h2>
@@ -148,7 +152,7 @@
 <div class="tasks" data-page="33">
   <div class="task"><input type="checkbox" id="t-33-1"><label for="t-33-1"><strong>收藏这一页</strong>：遇到问题时先来这里找方案。</label></div>
   <div class="task"><input type="checkbox" id="t-33-2"><label for="t-33-2"><strong>验证查表</strong>：随便挑一个算法，在对应页面看它的实测数据。</label></div>
-  <div class="task"><input type="checkbox" id="t-33-3"><label for="t-33-3"><strong>记住三个反例</strong>：对象池、三角函数查表、缓存全局函数——<em>它们都说明"先测量"的重要性</em>。</label></div>
+  <div class="task"><input type="checkbox" id="t-33-3"><label for="t-33-3"><strong>记住三个反例</strong>：对象池、三角函数查表、位运算——<em>它们都说明"先测量"的重要性</em>。</label></div>
   <div class="task"><input type="checkbox" id="t-33-4"><label for="t-33-4"><strong>用判断清单</strong>：拿你项目里的一个性能问题，按四步清单分析一遍。</label></div>
   <div class="task"><input type="checkbox" id="t-33-5"><label for="t-33-5"><strong>回答开放题</strong>：① 你觉得哪个"想当然"的优化最坑？② 你踩过哪些性能陷阱？</label></div>
 </div>

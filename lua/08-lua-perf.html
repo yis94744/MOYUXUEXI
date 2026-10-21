@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">Lua 热更新路线
+      <a href="index.html">Lua 热更新路线
         <span>从零基础到独立搭建可上线的热更框架</span>
       </a>
     </div>
@@ -53,8 +53,8 @@
       <div class="prereq">
         <div class="prereq__label">读这一页之前，建议先掌握</div>
         <div class="prereq__list">
-          <a class="prereq__item" href="08-lua-perf.html#data" data-brief="table.concat 快 17~30 倍，缓存全局函数无收益"><span class="prereq__title">Lua 性能基础</span><span class="prereq__page">08-lua-perf</span></a>
-          <a class="prereq__item" href="../unity/21-perf.html#workflow" data-brief="Profiler/Frame Debugger/Memory Profiler 的分工"><span class="prereq__title">性能分析工具</span><span class="prereq__page">21-perf</span></a>
+          <a class="prereq__item" href="08-lua-perf.html#data" data-brief="table.concat 远快于 ..；缓存全局函数的收益取决于调用层级（单层约 1.0~1.3 倍，两层链 2~2.9 倍），缓存全局变量约 2~3.5 倍"><span class="prereq__title">Lua 性能基础</span><span class="prereq__page">08-lua-perf</span></a>
+          <a class="prereq__item" href="../gamedev-csharp-unity/21-perf.html#workflow" data-brief="Profiler/Frame Debugger/Memory Profiler 的分工"><span class="prereq__title">性能分析工具</span><span class="prereq__page">21-perf</span></a>
         </div>
         <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
       </div>
@@ -132,9 +132,13 @@ local tl2 = bench("l", useLocalFn)
 print(string.format("  全局 table.insert: %.4f 秒", tg2))
 print(string.format("  局部 insert:       %.4f 秒", tl2))
 print()
-print("  【实测结论 —— 在 Lua 5.4 下，缓存全局函数【没有明显收益】】")
-print("  原因：Lua 5.4 的全局表查找已经高度优化（用数组存全局变量，O(1) 索引），")
-print("        和局部变量访问的差距远小于 LuaJIT 时代。")
+print("  【实测结论】在 Lua 5.4 下，缓存【单层】全局函数收益很小（本机约 1.0~1.1 倍），")
+print("  但缓存全局【变量】收益明显（本机约 3 倍，见第 1 节）。")
+print("  【注意】如果是两层链（如 math.floor），差距会到 2.5~2.9 倍——")
+print("          但那是因为要走两次表查找，不是缓存本身有多神。")
+print("  原因：全局变量存在 _G 这个普通 table 里，每次读写都是【一次哈希查找】")
+print("        （字符串键走 luaH_getstr，不是数组索引）；而局部变量是寄存器/栈槽访问。")
+print("        函数调用本身的开销会摊薄这一点，所以缓存全局函数看起来收益小。")
 print()
 print("  【那什么时候还有用？】")
 print("    · 在 LuaJIT 下差异明显（JIT 会为局部变量生成寄存器访问）")
@@ -311,18 +315,21 @@ end)
 print(string.format("  for i=1,#t:      %.4f 秒", tLen))
 print(string.format("  缓存长度:        %.4f 秒", tCachedLen))
 print(string.format("  ipairs:          %.4f 秒", tIpairs))
+print(string.format("  缓存长度相对差异: %+.1f%%", (tCachedLen - tLen) / tLen * 100))
 print()
 print("  【实测结论 —— 和常见说法不同】")
-print("  · 缓存长度确实有收益（约 3~4%）")
-print("  · 【但 ipairs 反而慢得多（约 2.6 倍）】")
+print("  · 【数字 for 里写 #arr 并不需要额外缓存】：Lua 5.4 的数值 for")
+print("    在循环开始前就求值一次上限表达式（forprep），循环体内不会重算 #arr。")
+print("    验证：给表挂 __len 计数器，for i=1,#arr 循环 20 万次只会调用 1 次 __len。")
+print("    （注意：while i &lt;= #arr 这种写法才会每次都重算，那里缓存才有收益）")
+print("  · 【但 ipairs 确实慢得多（本机实测约 2.5~2.6 倍）】")
 print()
 print("  原因：ipairs 每次迭代都要调用迭代器函数（一次函数调用开销），")
 print("        而数字 for 循环是虚拟机原生指令，没有函数调用。")
 print()
 print("  【实战建议】")
-print("    热路径用【数字 for + 缓存长度】：")
-print("      local n = #arr")
-print("      for i = 1, n do ... end")
+print("    热路径用【数字 for】：")
+print("      for i = 1, #arr do ... end     -- 上限只求值一次，无需手动缓存")
 print("    可读性优先时用 ipairs（非热路径无所谓）")
 
 print()
@@ -388,8 +395,8 @@ print("  " .. string.rep("-", 70))
 
 local optimizations = {
   { "局部化变量与函数",     "1.2~3 倍",   "所有热循环（最优先）" },
-  { "table.concat 拼接",    "10~50 倍",   "循环内拼接字符串" },
-  { "缓存表长度",           "1.2~2 倍",   "大表的嵌套循环" },
+  { "table.concat 拼接",    "17~33 倍",   "循环内拼接字符串" },
+  { "缓存表长度",           "仅 while 有效", "while i&lt;=#t 这类写法" },
   { "避免循环内建闭包",     "2~5 倍",     "热路径的回调" },
   { "返回多值代替返回表",   "2~5 倍",     "高频调用的小函数" },
   { "复用表代替新建",       "看场景",     "大表 + 高频调用" },
@@ -406,7 +413,8 @@ print("=== 10. 三条最重要的原则 ===")
 print()
 print("  【原则一】先测量，再优化")
 print("    不要凭直觉。本文件里就有一个反例：")
-print("    「表复用」在元素少时反而更慢（清空成本 &gt; 分配成本）。")
+print("    「缓存表长度」在数字 for 里根本没有收益（上限只求值一次），")
+print("    真正的瓶颈另有其处。")
 print()
 print("  【原则二】优化热路径，不是全部代码")
 print("    80% 的时间花在 20% 的代码上。")
@@ -426,14 +434,14 @@ print("    · 永远：优化后再测一次，确认真的变快了")</code></p
 <table>
   <thead><tr><th>优化手段</th><th>实测收益</th><th>结论</th></tr></thead>
   <tbody>
-    <tr><td><strong>table.concat 代替 ..</strong></td><td><span class="mk mk--yes">快 17~30 倍</span></td><td><strong>最值得做</strong></td></tr>
+    <tr><td><strong>table.concat 代替 ..</strong></td><td><span class="mk mk--yes">快 17~33 倍</span></td><td><strong>最值得做</strong><br><em>倍数随拼接次数增长</em></td></tr>
     <tr><td><strong>元表 __index 写回缓存</strong></td><td><span class="mk mk--yes">快 4 倍</span></td><td>频繁访问必做</td></tr>
     <tr><td><strong>返回多值代替返回表</strong></td><td><span class="mk mk--yes">快 4.3 倍</span></td><td>高频小函数必做</td></tr>
     <tr><td><strong>避免循环内建闭包</strong></td><td><span class="mk mk--yes">快 3.8 倍</span></td><td>热路径必做</td></tr>
     <tr><td><strong>局部变量代替全局</strong></td><td><span class="mk mk--yes">快 2 倍</span></td><td><strong>最基础的优化</strong></td></tr>
-    <tr><td><strong>缓存表长度</strong></td><td><span class="mk mk--warn">快 3~4%</span></td><td>收益有限</td></tr>
-    <tr><td>缓存全局函数到局部</td><td><span class="mk mk--no">1.0 倍</span></td><td><strong>Lua 5.4 下无收益</strong></td></tr>
-    <tr><td>ipairs 代替数字 for</td><td><span class="mk mk--no">慢 2.6 倍</span></td><td><strong>反而更慢</strong></td></tr>
+    <tr><td><strong>缓存表长度</strong></td><td><span class="mk mk--no">数字 for 里无收益</span></td><td><strong>只对 <code>while</code> 有效</strong></td></tr>
+    <tr><td>缓存全局函数到局部</td><td><span class="mk mk--warn">1.0~1.4 倍</span></td><td><strong>取决于调用层级</strong>（详见反例一）</td></tr>
+    <tr><td>ipairs 代替数字 for</td><td><span class="mk mk--no">慢 2.5~2.7 倍</span></td><td><strong>反而更慢</strong></td></tr>
     <tr><td>表复用代替新建</td><td><span class="mk mk--warn">看场景</span></td><td>小表时无收益</td></tr>
   </tbody>
 </table>
@@ -442,10 +450,10 @@ print("    · 永远：优化后再测一次，确认真的变快了")</code></p
 <h2 id="counter">二、两个反直觉的实测结论 ★★★</h2>
 
 <div class="callout callout--danger">
-  <span class="callout__title">反例一：缓存全局函数在 Lua 5.4 下没有收益</span>
+  <span class="callout__title">反例一：缓存全局函数的收益被高估了</span>
   <strong>常见说法</strong>：「把 <code>table.insert</code> 缓存成 <code>local insert = table.insert</code> 会快很多」。<br>
-  <strong>实测结果</strong>：<em>两者耗时完全相同（1.00 倍）</em>。<br><br>
-  <strong>为什么</strong>：Lua 5.4 用<strong>数组存全局变量</strong>（不是哈希表），全局访问本身就是 O(1) 索引——<em>和局部变量访问的差距远小于 LuaJIT 时代</em>。<br><br>
+  <strong>实测结果</strong>：<em>收益远小于常见说法，且<b>取决于调用层级</b></em>。<br><br><div class="table-wrap"><table><thead><tr><th>写法</th><th>实测倍数</th><th>说明</th></tr></thead><tbody><tr><td><code>local insert = table.insert</code> 后调用 <code>insert(arr, i)</code></td><td><strong>1.0~1.1 倍</strong></td><td>单层全局，几乎无收益</td></tr><tr><td>直接调用 <code>table.insert(arr, i)</code></td><td>基准</td><td>两次表查找（<code>_G.table</code> → <code>.insert</code>）</td></tr><tr><td><code>math.floor(i)</code> vs 缓存后调用</td><td><strong>1.2~1.4 倍</strong></td><td>连调用一起测</td></tr><tr><td>只取值不调用，两层链 <code>math.floor</code></td><td><strong>2.0~2.9 倍</strong></td><td>差距全来自「两次表查找」</td></tr><tr><td>只取值不调用，单层 <code>G_FUNC</code></td><td><strong>约 1.0~1.3 倍</strong></td><td>单层全局本身就很快</td></tr></tbody></table></div><strong>为什么倍数差这么多</strong>：<em>2.5~2.9 倍那个数字，差距来自「<code>math.floor</code> 要走<strong>两次</strong>表查找」</em>——先查 <code>_G.math</code>，再查 <code>.floor</code>。<br>而<strong>单层全局</strong>（如你自己定义的 <code>G_CONFIG</code>）只有一次查找，缓存后<em>只快几十个百分点</em>。<br><br>
+  <strong>为什么</strong>：全局变量存放在 <code>_G</code> 这个<strong>普通 table</strong> 里，每次访问是一次<strong>字符串键哈希查找</strong>（<code>luaH_getstr</code>），<em>不是数组索引</em>。真正让差距变小的是：<strong>函数调用本身的开销摊薄了这次查找的占比</strong>——所以缓存「全局函数」收益很小（本机实测约 1.1 倍），而缓存「全局变量」收益明显（本机实测约 3~4 倍，见第 1 节与验算）。<br><br>
   <strong>那什么时候还有用？</strong><br>
   · 在 <strong>LuaJIT</strong> 下差异明显（JIT 为局部变量生成寄存器访问）<br>
   · 极热循环（每帧几百万次调用）<br>
@@ -456,13 +464,14 @@ print("    · 永远：优化后再测一次，确认真的变快了")</code></p
 <div class="callout callout--danger">
   <span class="callout__title">反例二：ipairs 比数字 for 慢得多</span>
   <strong>常见说法</strong>：「遍历数组用 <code>ipairs</code>，比 <code>for i = 1, #t</code> 更快（因为缓存了长度）」。<br>
-  <strong>实测结果</strong>：<em>ipairs 慢了 2.6 倍</em>。<br><br>
+  <strong>实测结果</strong>：<em>ipairs 慢了 2.5~2.7 倍</em>（多次测量区间）。<br><br>
   <strong>为什么</strong>：<code>ipairs</code> 每次迭代都要<strong>调用一次迭代器函数</strong>——一次函数调用的开销。而数字 for 循环是<em>虚拟机原生指令，没有函数调用</em>。<br><br>
   <strong>正确的热路径写法</strong>：<br>
-  <code>local n = #arr</code><br>
-  <code>for i = 1, n do ... end</code><br><br>
-  <em>缓存长度确实有收益（3~4%），但要配合数字 for 使用，而不是 ipairs。</em><br><br>
-  <strong>实战建议</strong>：非热路径用 <code>ipairs</code>（可读性好）；热路径用<em>数字 for + 缓存长度</em>。
+  <code>for i = 1, #arr do ... end</code><br><br>
+  <strong>顺带纠正另一个流传很广的说法</strong>：在<strong>数字 for</strong> 里写 <code>for i = 1, #t</code> <strong>不需要</strong>手动把 <code>#t</code> 缓存成局部变量——Lua 5.4 的数值 for 在循环开始前只求值<strong>一次</strong>上限表达式（<code>forprep</code>），循环体内不会重算 <code>#t</code>。<br>
+  <em>验证方法</em>：给表挂一个 <code>__len</code> 计数器，<code>for i = 1, #arr</code> 跑 20 万次，<code>__len</code> 只会被调用 <strong>1 次</strong>；而 <code>while i &lt;= #t</code> 会调用 20 万次。<br>
+  <em>所以「缓存长度」只在 <code>while i &lt;= #t</code> 这类写法里才有收益（本机实测约 1.4 倍）。</em><br><br>
+  <strong>实战建议</strong>：非热路径用 <code>ipairs</code>（可读性好）；热路径用<em>数字 for</em>——<code>for i = 1, #t</code> 就已经够了。
 </div>
 
 <h2 id="decision">三、优化决策表</h2>
@@ -472,12 +481,12 @@ print("    · 永远：优化后再测一次，确认真的变快了")</code></p
 <table>
   <thead><tr><th>优先级</th><th>优化项</th><th>收益</th><th>工作量</th><th>什么时候做</th></tr></thead>
   <tbody>
-    <tr><td><strong>1</strong></td><td>字符串拼接改 table.concat</td><td>17~30 倍</td><td>小</td><td><strong>所有循环内拼接</strong></td></tr>
+    <tr><td><strong>1</strong></td><td>字符串拼接改 table.concat</td><td>17~33 倍</td><td>小</td><td><strong>所有循环内拼接</strong>（次数越多差距越大）</td></tr>
     <tr><td><strong>2</strong></td><td>局部变量化</td><td>2 倍</td><td>小</td><td><strong>所有热循环</strong></td></tr>
     <tr><td><strong>3</strong></td><td>避免循环内建闭包</td><td>3.8 倍</td><td>小</td><td>热路径回调</td></tr>
     <tr><td><strong>4</strong></td><td>返回多值代替返回表</td><td>4.3 倍</td><td>小</td><td>高频小函数</td></tr>
     <tr><td><strong>5</strong></td><td>__index 写回缓存</td><td>4 倍</td><td>中</td><td>频繁访问动态字段</td></tr>
-    <tr><td><strong>6</strong></td><td>缓存表长度</td><td>3~4%</td><td>小</td><td>大表嵌套循环</td></tr>
+    <tr><td><strong>6</strong></td><td>缓存表长度</td><td>仅 <code>while</code> 有效</td><td>小</td><td><code>while i &lt;= #t</code> 的循环</td></tr>
     <tr><td><strong>7</strong></td><td>对象池</td><td>GC 层面</td><td>中</td><td>频繁创建销毁</td></tr>
     <tr><td><strong>8</strong></td><td>表复用</td><td>看场景</td><td>中</td><td><em>先测再说</em></td></tr>
   </tbody>
@@ -515,7 +524,7 @@ print("    · 永远：优化后再测一次，确认真的变快了")</code></p
   <p class="mb0">
     <strong>本章过关标准</strong>：<br>
     ① 能说出至少五项 Lua 性能优化手段及其收益；<br>
-    ② <strong>知道 Lua 5.4 下"缓存全局函数"没有明显收益</strong>，以及原因；<br>
+    ② <strong>知道"缓存全局函数"的收益取决于调用层级</strong>（单层约 1.0~1.3 倍，两层链约 2.0~2.9 倍），以及原因；<br>
     ③ <strong>知道 ipairs 比数字 for 慢，热路径应该怎么写</strong>；<br>
     ④ 能复述"先测量再优化"的流程；<br>
     ⑤ 有一次真实的 Lua 性能优化经历，并能说出实测数字。<br>

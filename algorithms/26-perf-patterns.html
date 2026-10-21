@@ -51,7 +51,7 @@
 <div class="callout callout--danger">
   <span class="callout__title">先看一个重要说明：本页有"反直觉"的实测结论</span>
   很多人相信"对象池一定更快""查表一定比计算快""位运算一定比布尔变量快"。<br>
-  <strong>但本页的实测数据表明：在 Lua 5.4 下，这三个说法都站不住脚。</strong><br><br>
+  <strong>但本页的实测数据表明：在 Lua 5.4 下，这三个说法都<em>没有稳定成立</em></strong>——其中两个确实明显更慢，一个只是落在噪声里。<br><br>
   这正是这一页最有价值的地方——<em>它会告诉你哪些"优化常识"其实需要验证</em>。<br>
   <strong>记住那条最重要的原则：先测，再优化。</strong>
 </div>
@@ -59,7 +59,7 @@
 <pre class="mono code-block" data-lang="lua"><code>-- ============================================================
 --  性能优化模式库：12 个可复用的优化手段 ★★
 -- ============================================================
---  这一份不是"算法"，而是"工程手段"。
+--  这一份不是"算法「，而是」工程手段「。
 --  它们比算法更常用——因为 90% 的性能问题不是算法复杂度，而是「用错了方式」。
 
 print("=== 模式 1：对象池（Object Pool）===")
@@ -662,11 +662,13 @@ end</code></pre>
         <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
       </div>
 
-<h2 id="counter">一、三个被实测推翻的"常识" ★★★</h2>
+<h2 id="counter">一、三个需要亲自验证的"常识" ★★★</h2>
 
 <div class="callout callout--danger">
-  <span class="callout__title">反例一：对象池并没有更快</span>
-  <strong>实测结果</strong>：200000 次创建 vs 200000 次池复用——<em>对象池反而略慢（0.93x）</em>。<br><br>
+  <span class="callout__title">反例一：对象池不一定更快</span>
+  <strong>实测结果</strong>：200000 次创建 vs 200000 次池复用——<em>对象池并没有稳定胜出</em>，比值在 <strong>0.93x ~ 1.26x</strong> 之间随机波动（本机连跑 3 次的比值分别是 1.18x、1.26x、1.06x）。<br><br>
+  <strong>结论要说得准确一点</strong>：不是"对象池一定更慢"，而是<em>"在这个微基准里，对象池的收益落在噪声范围内"</em>——它既没有稳定变快，也没有稳定变慢。<br>
+  <em>所以"用对象池一定更快"这个说法<strong>不成立</strong>，但"用对象池一定更慢"同样不成立。</em><br><br>
   <strong>为什么</strong>：测试里的"对象"是一个只有 5 个字段的小表，<em>创建它的成本本身就极低</em>。而对象池的 <code>get</code>/<code>release</code> 有函数调用和表操作开销，两者大致相抵。<br><br>
   <strong>那为什么还要用对象池？</strong>真正的原因不是"建对象慢"，而是：<br>
   ① <strong>GC 压力</strong>——200000 个短命对象会让 GC 频繁触发，而 <em>GC 停顿体现在帧率抖动上，微基准测不出来</em>；<br>
@@ -677,7 +679,7 @@ end</code></pre>
 
 <div class="callout callout--danger">
   <span class="callout__title">反例二：三角函数查表反而更慢</span>
-  <strong>实测结果</strong>：直接算 <code>math.sin</code> 100 万次用 0.054 秒；查表用 0.061 秒——<em>查表慢了</em>。<br><br>
+  <strong>实测结果</strong>：直接算 <code>math.sin</code> 100 万次用 0.052~0.058 秒；查表用 0.066~0.075 秒——<em>查表稳定慢 15%~30%（约 0.85x）</em>。<br><br>
   <strong>为什么</strong>：现代 CPU 的 <code>sin</code> 已经被优化得很好（甚至用 SIMD 指令），而查表需要：<em>取模运算 → 浮点转整数 → 表查找 → 边界检查</em>，这些加起来超过了一次硬件 sin 计算。<br><br>
   <strong>那什么时候查表有价值？</strong><br>
   ① 计算<strong>非常复杂</strong>时（不是 sin 这种单指令操作）——<em>复杂伤害公式、多层嵌套属性计算</em>；<br>
@@ -688,7 +690,7 @@ end</code></pre>
 
 <div class="callout callout--danger">
   <span class="callout__title">反例三：位运算在 Lua 里没有速度优势</span>
-  <strong>实测结果</strong>：布尔字段 0.053 秒，位掩码 0.065 秒——<em>位运算更慢（0.82x）</em>。<br><br>
+  <strong>实测结果</strong>：布尔字段 0.055~0.060 秒，位掩码 0.070~0.071 秒——<em>位运算稳定更慢约 20%（0.78~0.80x）</em>。<br><br>
   <strong>为什么</strong>：Lua 5.4 的位运算通过内部函数实现，而表字段访问是<em>高度优化的哈希查找</em>，两者性能接近。<br><br>
   <strong>但位运算仍有不可替代的价值</strong>（这些优势都不是速度）：<br>
   ① <strong>省内存</strong>——一个 int 存 32 个布尔标志；<br>
@@ -704,10 +706,10 @@ end</code></pre>
 <table>
   <thead><tr><th>模式</th><th>实测效果</th><th>为什么有效</th></tr></thead>
   <tbody>
-    <tr><td><strong>缓存（Memoization）</strong></td><td><span class="mk mk--yes">快 76 倍</span></td><td>把 O(n) 计算变成 O(1) 查表</td></tr>
-    <tr><td><strong>字符串用 table.concat</strong></td><td><span class="mk mk--yes">快 16.5 倍</span></td><td>避免每次拼接都重新分配整串</td></tr>
-    <tr><td><strong>平方距离代替开方</strong></td><td><span class="mk mk--yes">快 3.9 倍</span></td><td>省掉 sqrt 运算</td></tr>
-    <tr><td><strong>局部变量缓存</strong></td><td><span class="mk mk--yes">快 3.1 倍</span></td><td>寄存器访问 vs 多级表查找</td></tr>
+    <tr><td><strong>缓存（Memoization）</strong></td><td><span class="mk mk--yes">快 70~83 倍</span></td><td>把 O(n) 计算变成 O(1) 查表</td></tr>
+    <tr><td><strong>字符串用 table.concat</strong></td><td><span class="mk mk--yes">快 16~22 倍</span></td><td>避免每次拼接都重新分配整串</td></tr>
+    <tr><td><strong>平方距离代替开方</strong></td><td><span class="mk mk--yes">快 3.4~4.2 倍</span></td><td>省掉 sqrt 运算</td></tr>
+    <tr><td><strong>局部变量缓存</strong></td><td><span class="mk mk--yes">快 3.1~3.9 倍</span></td><td>寄存器访问 vs 多级表查找</td></tr>
     <tr><td><strong>哈希表代替线性查找</strong></td><td><span class="mk mk--yes">快数百倍</span></td><td>O(1) vs O(n)</td></tr>
     <tr><td><strong>批处理</strong></td><td>固定开销减少 N 倍</td><td>摊薄每次操作的固定成本</td></tr>
     <tr><td><strong>分帧</strong></td><td>避免单帧卡顿</td><td>把工作摊到多帧</td></tr>
@@ -718,7 +720,7 @@ end</code></pre>
 
 <div class="callout callout--tip">
   <span class="callout__title">注意"缓存"的适用条件</span>
-  实测中缓存快了 76 倍——但这是因为<strong>只有 100 个不同的 key 被查询了 10000 次</strong>（命中率 99%）。<br><br>
+  实测中缓存快了 70~83 倍——但这是因为<strong>只有 100 个不同的 key 被查询了 10000 次</strong>（命中率 99%）。<br><br>
   <strong>如果 key 每次都不同</strong>（比如用对象实例做 key），那么：<br>
   • 缓存永远不命中<br>
   • 却要为每次查询付出<em>写入缓存的开销</em><br>

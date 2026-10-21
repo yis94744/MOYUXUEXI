@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">Lua 热更新路线
+      <a href="index.html">Lua 热更新路线
         <span>从零基础到独立搭建可上线的热更框架</span>
       </a>
     </div>
@@ -43,7 +43,9 @@
 
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
-  [object Object]
+  上一页（15）讲了 class 系统。<em>UI 框架是 class 系统最大的用户。</em><br>
+  <strong>关键衔接</strong>：页 13 的<em>事件系统</em>在这一页会被"按所有者批量取消订阅"这个需求倒逼着扩展——<em>这正是框架设计要提前想清楚依赖关系的原因</em>。<br>
+  <strong>下一页</strong>（17）热更与版本管理。
 </div>
 
 
@@ -52,7 +54,6 @@
         <div class="prereq__list">
           <a class="prereq__item" href="13-framework-design.html#module" data-brief="注册/初始化/逆序销毁"><span class="prereq__title">模块管理器</span><span class="prereq__page">13-framework-design</span></a>
           <a class="prereq__item" href="13-framework-design.html#event" data-brief="快照遍历 + 队列化派发，防止回调中修改列表"><span class="prereq__title">事件系统</span><span class="prereq__page">13-framework-design</span></a>
-          <a class="prereq__item" href="16-framework-ui.html#stack" data-brief="三种界面类型、返回键、订阅自动取消"><span class="prereq__title">UI 界面栈</span><span class="prereq__page">16-framework-ui</span></a>
         </div>
         <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
       </div>
@@ -265,13 +266,33 @@ function UIManager:open(name, ...)
 
   -- 【关键】全屏界面：隐藏栈顶的界面
   if view.viewType == ViewType.FULL then
+    -- 【重要】如果这个界面已经躺在栈里（只是被上层盖住了），
+    -- 说明玩家是在"回退"到它，而不是"新开"它 —— 必须先把上面几层关掉，
+    -- 否则同一个界面会被重复压栈，返回键的层级就全乱了。
+    for i = #self.stack, 1, -1 do
+      if self.stack[i] == view then
+        while #self.stack &gt; i do
+          local above = table.remove(self.stack)
+          if above.isOpen then
+            above.isOpen = false
+            above:onClose()
+            self:_log("[退回] 关闭上层 " .. above.name)
+          end
+        end
+        break
+      end
+    end
+
     local top = self.stack[#self.stack]
-    if top and top.isOpen then
+    if top and top ~= view and top.isOpen then
       top.isOpen = false
       top:onClose()
       self:_log("[隐藏] " .. top.name .. "（被 " .. name .. " 覆盖）")
     end
-    self.stack[#self.stack + 1] = view
+    -- 已经在栈里就不再 push
+    if self.stack[#self.stack] ~= view then
+      self.stack[#self.stack + 1] = view
+    end
   elseif view.viewType == ViewType.POPUP then
     -- 弹窗不入栈，单独管理
     self.popups[#self.popups + 1] = view
@@ -507,7 +528,46 @@ print("    · ViewBase:onClose 自动批量取消")
 print("    · 业务代码不需要手动管理")
 
 print()
-print("=== 8. 统计信息 ===")
+print("=== 8. 【边界】重复打开一个已经压在栈里的界面 ===")
+print()
+print("  场景：主界面 -&gt; 背包，然后从背包里点「回主城」（又 open 了一次主界面）")
+print("  错误实现会让主界面被重复压栈，栈深度虚增、返回键层级错乱。")
+print()
+
+local ui2 = UIManager.new(EventManager.new())
+local M2 = class("M2", ViewBase)
+local superM2 = M2.super
+function M2:ctor() superM2.ctor(self, "主城", ViewType.FULL) end
+function M2:onCreate() end
+function M2:onOpen() end
+function M2:onRefresh() end
+
+local B2 = class("B2", ViewBase)
+local superB2 = B2.super
+function B2:ctor() superB2.ctor(self, "行囊", ViewType.FULL) end
+function B2:onCreate() end
+function B2:onOpen() end
+function B2:onRefresh() end
+
+ui2:register(M2.new())
+ui2:register(B2.new())
+
+ui2:open("主城")
+ui2:open("行囊")
+print("    打开主城+行囊后，栈深度 =", #ui2.stack)
+
+ui2:open("主城")    -- 回主城
+local names = {}
+for i, v in ipairs(ui2.stack) do names[i] = v.name end
+print("    再点一次主城后，栈深度 =", #ui2.stack, "，栈 =", table.concat(names, " -&gt; "))
+print("    【正确】栈里只剩一层（行囊被退回时关掉了），主城没有重复项")
+
+local dup = 0
+for _, v in ipairs(ui2.stack) do if v.name == "主城" then dup = dup + 1 end end
+print("    主城在栈里出现次数 =", dup, "（应为 1）")
+
+print()
+print("=== 9. 统计信息 ===")
 local created, opened = 0, 0
 for _, v in pairs(ui.views) do
   created = created + 1
@@ -523,7 +583,7 @@ print()
 ui:destroyAll()
 
 print()
-print("=== 9. UI 框架的六个设计要点 ===")
+print("=== 10. UI 框架的六个设计要点 ===")
 print()
 print(string.format("  %-22s %-24s %s", "要点", "做法", "解决的问题"))
 print("  " .. string.rep("-", 78))
@@ -570,6 +630,19 @@ end</code></pre>
   · <code>Push</code>——打开新界面（旧界面可能隐藏但保留）<br>
   · <code>Pop</code>——返回上一级<br>
   · <code>Replace</code>——替换当前界面（不增加层级）
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">栈最容易写错的一处：重复压栈</span>
+  <strong>场景</strong>：主界面 → 背包，然后从背包里点「回主城」——<em>又 open 了一次主界面</em>。<br><br>
+  <strong>天真的实现</strong>（只看 <code>view.isOpen</code>）：主界面此刻是<em>关闭</em>状态（被背包盖住时已经 OnClose 过），
+  于是它被<strong>再压一次栈</strong>，栈变成 <code>[主城, 行囊, 主城]</code>。<br>
+  <strong>后果</strong>：栈深度虚增、返回键的层级全乱、同一个界面的 OnCreate 只会跑一次但 OnOpen 会被跑两轮
+  （订阅如果没清干净就会<em>重复注册</em>）。<br><br>
+  <strong>正确做法</strong>：open 之前先<strong>在栈里找一遍</strong>——<br>
+  · 找到了 → 把它在栈里的<em>上层全部弹出并关闭</em>，然后恢复它，<strong>不要再 push</strong><br>
+  · 没找到 → 才走正常的压栈流程<br><br>
+  <em>本页代码样本的第 8 段就是这段逻辑的实测演示（修复后栈里不会出现重复项）。</em>
 </div>
 
 <div class="callout callout--danger">

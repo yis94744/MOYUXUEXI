@@ -12,7 +12,141 @@
 
 <h2 id="table-basic">一、table 基础 ★</h2>
 
-<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>04/table-basic</code></div>
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  table：Lua 唯一的数据结构
+-- ============================================================
+--  Lua 没有数组、字典、类、模块的概念，
+--  所有这些都是用 table 实现的。理解 table 就理解了 Lua 的一半。
+
+print("=== 1. 两种初始化方式 ===")
+-- 数组式（隐式索引 1,2,3...）
+local arr = { "a", "b", "c" }
+print("数组:", arr[1], arr[2], arr[3])
+
+-- 字典式（显式键）
+local dict = { name = "张三", age = 25, ["key with space"] = "支持带空格的键" }
+print("字典:", dict.name, dict["age"], dict["key with space"])
+
+-- 混合式
+local mixed = { "first", "second", name = "混合", [10] = "十" }
+print("混合:", mixed[1], mixed[2], mixed.name, mixed[10])
+
+print()
+print("=== 2. 索引从 1 开始，不是 0 ===")
+-- 【高频错误点】这是 Lua 与几乎所有其他语言最大的差异
+local t = { "a", "b", "c" }
+print("t[0] =", t[0])          -- nil（不存在！）
+print("t[1] =", t[1])          -- "a"
+print("#t   =", #t)            -- 3
+
+print()
+print("=== 3. 长度运算符 # 的真相 ===")
+local seq = { 1, 2, 3, 4, 5 }
+print("连续数组 #:", #seq)               -- 5
+
+-- 【重要】# 只对「序列」可靠。有空洞的表长度是未定义的
+local hole = { 1, 2, nil, 4 }
+print("有空洞的表 #:", #hole)           -- 结果不确定（可能是 4，也可能是 2）
+print("空洞表用 select 数:", select("#", table.unpack(hole, 1, 4)))
+
+-- 安全做法：自己数
+local function countSafe(tbl)
+  local n = 0
+  for _ in pairs(tbl) do n = n + 1 end
+  return n
+end
+print("安全计数:", countSafe(hole))
+
+print()
+print("=== 4. 表的增删改查 ===")
+local list = {}
+
+-- 尾部添加
+table.insert(list, "A")
+table.insert(list, "B")
+print("insert 后:", #list, list[1], list[2])
+
+-- 指定位置插入（后续元素后移）
+table.insert(list, 1, "ZERO")
+print("头插后:", #list, list[1], list[2], list[3])
+
+-- 删除并返回
+local removed = table.remove(list)
+print("remove 返回:", removed, "剩余:", #list)
+
+-- 指定位置删除
+local removedFirst = table.remove(list, 1)
+print("头删返回:", removedFirst, "剩余:", #list)
+
+-- 清空：三种方式
+list = {}                          -- 最快，推荐
+-- for i = #list, 1, -1 do table.remove(list) end
+-- list[1] = nil                      -- 错误！不会真正清空
+
+print()
+print("=== 5. 遍历：pairs 与 ipairs 的区别 ===")
+local data = { 10, 20, 30, name = "test", [100] = "hundred" }
+
+print("-- ipairs（只遍历连续整数键，遇到第一个 nil 停止）")
+for i, v in ipairs(data) do
+  print("   i=" .. i .. " v=" .. tostring(v))
+end
+
+print("-- pairs（遍历所有键，顺序不确定）")
+for k, v in pairs(data) do
+  print("   k=" .. tostring(k) .. " v=" .. tostring(v))
+end
+
+print()
+print("=== 6. 表是引用类型 ===")
+local a = { 1, 2, 3 }
+local b = a               -- 不是复制！b 和 a 指向同一个表
+b[1] = 999
+print("修改 b 影响 a:", a[1])            -- 999
+
+local c = a               -- 浅拷贝的正确写法
+local copy = {}
+for k, v in pairs(c) do copy[k] = v end
+copy[1] = 111
+print("浅拷贝互不影响:", a[1], copy[1])   -- 999  111
+
+print()
+print("=== 7. table 库常用函数 ===")
+local nums = { 5, 2, 8, 1, 9, 3 }
+
+-- 排序（默认升序）
+table.sort(nums)
+print("排序后:", table.concat(nums, ", "))
+
+-- 自定义排序（降序）
+table.sort(nums, function(x, y) return x &gt; y end)
+print("降序:", table.concat(nums, ", "))
+
+-- 拼接
+print("拼接:", table.concat(nums, "-"))
+
+-- 解包（5.2+ 用 table.unpack）
+print("unpack:", table.unpack({ "a", "b", "c" }))
+
+-- 打包（5.2+）
+local packed = table.pack(1, 2, 3, nil, 5)
+print("pack 后 n =", packed.n)
+
+print()
+print("=== 8. 性能：预分配大小 ===")
+-- Lua 的 table 会自动扩容，但扩容有成本。
+-- 已知大小时用 table.new（LuaJIT 扩展）或在循环外创建。
+local bigTable = {}
+local start = os.clock()
+for i = 1, 500000 do
+  bigTable[i] = i
+end
+print(string.format("插入 50 万次耗时: %.3f 秒", os.clock() - start))
+print("验证:", bigTable[500000])
+
+-- 【最佳实践】复用表而不是反复创建
+-- 差的写法：每次调用都建新表
+-- 好的写法：传一个「输出表」进来，或使用对象池</code></pre>
 
 <div class="callout callout--danger">
   <span class="callout__title">反直觉之三：索引从 1 开始</span>
@@ -37,7 +171,204 @@
 
 <p>元表让一个普通 table 可以<strong>"重载"运算符、定义缺失行为、实现继承</strong>。Lua 的面向对象就是用元表实现的。</p>
 
-<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>04/metatable</code></div>
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  元表（metatable）：Lua 最强大的机制 ★★★
+-- ============================================================
+--  元表让一个普通的 table 能够"重载"运算符、定义缺失行为、
+--  实现面向对象。Lua 的 OOP 就是用元表实现的。
+--  理解元表 = 理解 Lua 的全部魔法。
+
+print("=== 1. setmetatable / getmetatable ===")
+local t = {}
+local mt = {}
+setmetatable(t, mt)
+print("getmetatable(t) == mt :", getmetatable(t) == mt)
+
+-- 保护元表：加了 __metatable 字段后就取不到了
+setmetatable(t, { __metatable = "locked" })
+print("被保护的元表:", getmetatable(t))          -- "locked"
+
+print()
+print("=== 2. __index：访问不存在的键时触发 ===")
+-- 这是【最重要的元方法】，OOP 继承就靠它
+
+-- 形式一：__index 是表 —— 去那个表里找
+local base = { greeting = "hello" }
+local derived = setmetatable({}, { __index = base })
+print("derived.greeting =", derived.greeting)     -- hello（从 base 查到的）
+print("rawget 绕过 __index:", rawget(derived, "greeting"))  -- nil
+
+-- 形式二：__index 是函数 —— 自定义查找逻辑
+local dynamic = setmetatable({}, {
+  __index = function(tbl, key)
+    return "动态生成:" .. tostring(key)
+  end
+})
+print(dynamic.anything)              -- "动态生成:anything"
+print(dynamic.foo)                   -- "动态生成:foo"
+
+-- 缓存优化：查到后写回表，下次就不走 __index 了
+local cached = setmetatable({}, {
+  __index = function(tbl, key)
+    local v = "计算出的" .. tostring(key)
+    rawset(tbl, key, v)              -- 写回，后续直接命中
+    return v
+  end
+})
+print("首次（走 __index 计算）:", cached.expensive)
+print("rawget 直接取（能看到已写回）:", rawget(cached, "expensive"))
+print("二次访问（命中缓存，不走 __index）:", cached.expensive)
+
+print()
+print("=== 3. __newindex：写入新键时触发 ===")
+local log = {}
+local readonly = setmetatable({}, {
+  __newindex = function(tbl, key, value)
+    log[#log + 1] = string.format("尝试写入 %s = %s", tostring(key), tostring(value))
+    rawset(tbl, key, value)          -- 想真正写入必须用 rawset
+  end
+})
+readonly.name = "测试"
+readonly.value = 123
+print("写入日志:")
+for _, line in ipairs(log) do print("  " .. line) end
+
+-- 只读表（禁止写入）
+local locked = setmetatable({ fixed = 1 }, {
+  __newindex = function()
+    error("该表是只读的", 2)          -- 层级 2 让报错指向调用方
+  end
+})
+print("读取只读表:", locked.fixed)
+local ok, err = pcall(function() locked.newKey = 1 end)
+print("写入只读表:", ok, err)
+
+print()
+print("=== 4. 运算符重载 ===")
+local Vector = {}
+Vector.__index = Vector
+
+function Vector.new(x, y)
+  return setmetatable({ x = x, y = y }, Vector)
+end
+
+-- 算术运算符
+Vector.__add = function(a, b) return Vector.new(a.x + b.x, a.y + b.y) end
+Vector.__sub = function(a, b) return Vector.new(a.x - b.x, a.y - b.y) end
+Vector.__mul = function(a, b)
+  if type(b) == "number" then return Vector.new(a.x * b, a.y * b) end
+  return a.x * b.x + a.y * b.y            -- 点积
+end
+Vector.__unm = function(a) return Vector.new(-a.x, -a.y) end   -- 一元负号
+
+-- 比较运算符
+Vector.__eq = function(a, b) return a.x == b.x and a.y == b.y end
+Vector.__lt = function(a, b) return (a.x * a.x + a.y * a.y) &lt; (b.x * b.x + b.y * b.y) end
+-- 【重要】Lua 5.4 起，__le【不会】再从 __lt 自动推导——必须显式定义 __le，
+-- 否则 a &lt;= b 会报 "attempt to compare two table values"（5.3 及更早会自动推导）。
+Vector.__le = function(a, b) return (a.x * a.x + a.y * a.y) &lt;= (b.x * b.x + b.y * b.y) end
+
+-- 长度与字符串
+Vector.__len = function(a) return 2 end
+Vector.__tostring = function(a)
+  return string.format("Vec(%g, %g)", a.x, a.y)
+end
+
+local v1 = Vector.new(1, 2)
+local v2 = Vector.new(3, 4)
+
+print("加法 v1+v2 =", tostring(v1 + v2))
+print("减法 v2-v1 =", tostring(v2 - v1))
+print("数乘 v1*3  =", tostring(v1 * 3))
+print("点积 v1*v2 =", v1 * v2)
+print("取负 -v1   =", tostring(-v1))
+print("相等 v1==v1:", v1 == Vector.new(1, 2))
+print("小于 v1&lt;v2 :", v1 &lt; v2)
+print("小于等于 v1&lt;=v2:", v1 &lt;= v2)          -- 显式 __le，5.4 不会从 __lt 推导
+print("#v1        =", #v1)
+
+-- 演示：只定义 __lt、不定义 __le 时，a &lt;= b 在 5.4 会报错
+local onlyLt = setmetatable({ v = 1 }, { __lt = function(a, b) return a.v &lt; b.v end })
+local okLe, errLe = pcall(function()
+  return onlyLt &lt;= setmetatable({ v = 2 }, getmetatable(onlyLt))
+end)
+print("只定义 __lt 时 a&lt;=b:", okLe, errLe)
+
+print()
+print("=== 5. __call：让表可以像函数一样调用 ===")
+local callable = setmetatable({ name = "调用器" }, {
+  __call = function(self, arg)
+    return self.name .. " 收到: " .. tostring(arg)
+  end
+})
+print(callable("参数"))
+print(callable("另一个参数"))
+
+print()
+print("=== 6. __concat 与 .. 运算 ===")
+local concatDemo = setmetatable({ v = "值" }, {
+  __concat = function(a, b)
+    local sa = type(a) == "table" and a.v or tostring(a)
+    local sb = type(b) == "table" and b.v or tostring(b)
+    return sa .. "|" .. sb
+  end
+})
+print("表 .. 字符串:", concatDemo .. "尾部")
+print("字符串 .. 表:", "头部" .. concatDemo)
+
+print()
+print("=== 7. __gc 与 __mode（弱表）===")
+-- __mode 实现弱表：键或值不被强引用时自动回收
+local weakValues = setmetatable({}, { __mode = "v" })
+weakValues.a = {}
+weakValues.b = {}
+collectgarbage("collect")
+print("弱值表在 GC 后:", weakValues.a, weakValues.b)   -- 可能为 nil（被回收）
+
+local strong = {}
+local weakKeys = setmetatable({}, { __mode = "k" })
+weakKeys[strong] = "值"
+collectgarbage("collect")
+print("强引用还在，弱键表条目保留:", weakKeys[strong] ~= nil)
+
+print()
+print("=== 8. 元方法完整清单 ===")
+local methods = {
+  "【算术】__add __sub __mul __div __mod __pow __unm __idiv",
+  "【位运算】__band __bor __bxor __bnot __shl __shr",
+  "【比较】__eq __lt __le",
+  "【其它运算】__concat __len __call",
+  "【访问】__index __newindex",
+  "【GC】__gc __close __mode",
+  "【调试】__tostring __name __metatable __pairs",
+}
+for _, m in ipairs(methods) do print("  " .. m) end
+
+print()
+print("=== 9. 性能提醒：__index 有成本 ===")
+-- 每次访问缺失的键都会触发函数调用。
+-- 热路径上频繁访问不存在的字段会明显变慢。
+local N = 200000
+
+local plain = { x = 1 }
+local withMeta = setmetatable({ x = 1 }, { __index = function() return nil end })
+
+local t1 = os.clock()
+for i = 1, N do local _ = plain.x end
+local plainTime = os.clock() - t1
+
+local t2 = os.clock()
+for i = 1, N do local _ = withMeta.x end      -- 存在，不走 __index
+local metaTime = os.clock() - t2
+
+print(string.format("访问已有字段: 普通 %.4f / 元表 %.4f", plainTime, metaTime))
+
+local t3 = os.clock()
+for i = 1, N do local _ = withMeta.missing end  -- 不存在，走 __index 函数
+local missTime = os.clock() - t3
+
+print(string.format("访问缺失字段（触发 __index）: %.4f 秒", missTime))
+print(string.format("触发元方法比直接命中慢约 %.1f 倍", missTime / plainTime))</code></pre>
 
 <div class="callout callout--tip">
   <span class="callout__title">__index 的两种形式（必须理解）</span>
@@ -72,7 +403,7 @@
     <tr><td colspan="2"><em>（位运算：<code>__band</code> <code>__bor</code> <code>__bxor</code> <code>__bnot</code> <code>__shl</code> <code>__shr</code>）</em></td></tr>
     <tr><td rowspan="3"><strong>比较</strong></td><td><code>__eq</code></td><td><code>a == b</code>（<em>两边都是 table 时才触发</em>）</td></tr>
     <tr><td><code>__lt</code></td><td><code>a &lt; b</code></td></tr>
-    <tr><td><code>__le</code></td><td><code>a &lt;= b</code>（Lua 会自动用 <code>not (b &lt; a)</code> 推导）</td></tr>
+    <tr><td><code>__le</code></td><td><code>a &lt;= b</code>（<strong>5.4 起必须显式定义</strong>；5.1~5.3 才会用 <code>not (b &lt; a)</code> 自动推导）</td></tr>
     <tr><td rowspan="3"><strong>其它运算</strong></td><td><code>__concat</code></td><td><code>a .. b</code></td></tr>
     <tr><td><code>__len</code></td><td><code>#a</code></td></tr>
     <tr><td><code>__call</code></td><td><code>a(...)</code> 像函数一样调用</td></tr>

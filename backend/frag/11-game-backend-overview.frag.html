@@ -1,0 +1,418 @@
+<h1>11 · 游戏后端全景 ★★</h1>
+
+<p class="lead">游戏后端和 Web 后端<strong>最大的区别是「有状态服务」</strong>。<em>战斗服一旦挂了，上面的玩家全部掉线</em>——这让扩展方式完全不同。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（10）日志、监控与可观测性 —— 结构化日志、链路追踪、指标、告警。<br>
+  <strong>这一页</strong>（11）游戏后端全景 —— 登录服/网关/战斗服/世界服的分工与演进。<br>
+  <strong>下一页</strong>（12）长连接与短连接 —— TCP/UDP/WebSocket、心跳、断线重连、粘包拆包。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+<h2 id="layers">一、游戏后端的典型分层</h2>
+
+<p>按<strong>「有状态/无状态」</strong>和<strong>「压力特征」</strong>拆服务——<em>这是游戏后端和 Web 后端最大的差别</em>。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace BackendSamples.Overview
+{
+    // ============================================================
+    // 1. 游戏后端的典型分层
+    // ============================================================
+    // 【核心原则】按「有状态/无状态」和「压力特征」拆服务
+    //   无状态服务（登录、好友、商城）-&gt; 随便横向扩
+    //   有状态服务（战斗、房间）-&gt; 需要特定玩家路由到特定实例
+
+    public enum ServerType
+    {
+        Gateway,      // 网关：维持长连接，转发消息
+        Login,        // 登录：验证、发 token
+        Lobby,        // 大厅：好友、聊天、邮件
+        Battle,       // 战斗：房间、帧同步/状态同步
+        World,        // 世界：地图、NPC、跨服
+        Match,        // 匹配：组队、段位
+        Rank,         // 排行：榜单
+        Gm,           // 后台：运营工具
+    }
+
+    public static class ServerRole
+    {
+        public static readonly (ServerType Type, string Name, bool Stateful, string Responsibility)[] All =
+        {
+            (ServerType.Gateway, "网关服",      false, "维持连接、协议编解码、限流、消息转发"),
+            (ServerType.Login,   "登录服",      false, "账号验证、签发 token、防重放"),
+            (ServerType.Lobby,   "大厅服",      false, "好友、聊天、邮件、公会（可无状态）"),
+            (ServerType.Battle,  "战斗服",      true,  "房间管理、战斗逻辑、结算（有状态）"),
+            (ServerType.World,   "世界服",      true,  "大地图、NPC、视野同步（有状态）"),
+            (ServerType.Match,   "匹配服",      false, "匹配池、组队（需要共享状态走 Redis）"),
+            (ServerType.Rank,    "排行服",      false, "榜单查询、赛季结算"),
+            (ServerType.Gm,      "运营后台",    false, "发奖、封号、数据查询"),
+        };
+    }
+
+    // ============================================================
+    // 2. 有状态 vs 无状态：扩展方式的根本差异
+    // ============================================================
+
+    public class ScalingExplainer
+    {
+        public static string HowToScale(bool stateful)
+        {
+            return stateful
+                ? "不能随意扩：玩家必须路由到固定实例（一致性哈希/房间分配）"
+                : "直接加机器，负载均衡器轮询即可";
+        }
+
+        public static string FailureImpact(bool stateful)
+        {
+            return stateful
+                ? "实例挂了 = 该实例上的玩家掉线（需要重连恢复）"
+                : "实例挂了 = 请求失败，重试到另一台即可";
+        }
+    }
+
+    // ============================================================
+    // 3. 网关的核心职责（本页重点）
+    // ============================================================
+    // 【为什么需要网关】
+    //   客户端只连一个地址，后端可以随便拆服务
+    //   【关键】网关是唯一有长连接的地方
+
+    public class GatewayService
+    {
+        // 连接表：连接ID -&gt; 玩家信息
+        private readonly Dictionary&lt;string, long&gt; _connToPlayer = new();
+        private readonly Dictionary&lt;long, string&gt; _playerToConn = new();
+
+        // 路由表：消息类型 -&gt; 目标服务
+        private readonly Dictionary&lt;string, ServerType&gt; _routes = new()
+        {
+            ["login.req"]   = ServerType.Login,
+            ["lobby.msg"]   = ServerType.Lobby,
+            ["battle.op"]   = ServerType.Battle,
+            ["match.join"]  = ServerType.Match,
+            ["rank.query"]  = ServerType.Rank,
+        };
+
+        public int ConnectCount =&gt; _connToPlayer.Count;
+
+        public void OnConnect(string connId)
+        {
+            _connToPlayer[connId] = 0;   // 0 = 未登录
+        }
+
+        public void OnDisconnect(string connId)
+        {
+            if (_connToPlayer.TryGetValue(connId, out long pid) &amp;&amp; pid &gt; 0)
+                _playerToConn.Remove(pid);
+            _connToPlayer.Remove(connId);
+        }
+
+        public void BindPlayer(string connId, long playerId)
+        {
+            _connToPlayer[connId] = playerId;
+            _playerToConn[playerId] = connId;
+        }
+
+        // 【网关核心】把消息路由到对应的后端服务
+        public ServerType? Route(string connId, string msgType)
+        {
+            if (!_connToPlayer.ContainsKey(connId))
+            {
+                Console.WriteLine($"    未知连接: {connId}");
+                return null;
+            }
+
+            // 【重要】除登录外，其他消息都要求已登录
+            long pid = _connToPlayer[connId];
+            if (pid == 0 &amp;&amp; msgType != "login.req")
+            {
+                Console.WriteLine($"    未登录连接尝试发 {msgType}，拒绝");
+                return null;
+            }
+
+            if (!_routes.TryGetValue(msgType, out var target))
+            {
+                Console.WriteLine($"    未知消息类型: {msgType}");
+                return null;
+            }
+
+            return target;
+        }
+
+        // 给指定玩家推送（战斗服需要主动推消息）
+        public string? GetConnOfPlayer(long playerId) =&gt;
+            _playerToConn.TryGetValue(playerId, out var c) ? c : null;
+
+        public bool PushToPlayer(long playerId, string message)
+        {
+            var conn = GetConnOfPlayer(playerId);
+            if (conn == null) return false;   // 不在线
+            Console.WriteLine($"    推送给 {playerId}（连接 {conn}）: {message}");
+            return true;
+        }
+    }
+
+    // ============================================================
+    // 4. 拆服务的时机：不要一开始就微服务
+    // ============================================================
+
+    public static class SplitTiming
+    {
+        public static readonly (string Stage, string Architecture, string Why)[] All =
+        {
+            ("原型/小项目", "单体（一个进程）", "开发快、部署简单"),
+            ("上线初期", "单体 + 分模块", "还能扛，先不拆"),
+            ("玩家增长", "网关 + 登录 + 业务", "登录压力和无状态业务分离"),
+            ("需要实时对战", "独立战斗服", "战斗有状态，不能和业务混"),
+            ("多区服/跨服", "世界服 + 跨服路由", "玩家分布在不同区"),
+            ("大规模", "微服务 + 消息队列", "各服务独立扩缩容"),
+        };
+    }
+
+    // ============================================================
+    // 5. 一个真实的请求链路
+    // ============================================================
+
+    public class RequestFlow
+    {
+        public static void SimulateBuyItem(GatewayService gw, string connId, long playerId, int itemId)
+        {
+            Console.WriteLine("  客户端 -&gt; 网关:");
+            var target = gw.Route(connId, "lobby.msg");
+            if (target == null) return;
+            Console.WriteLine($"    路由到: {target}");
+
+            Console.WriteLine("  大厅服 -&gt; 校验:");
+            Console.WriteLine("    ① token 有效? ✓");
+            Console.WriteLine("    ② 背包有空位? ✓");
+            Console.WriteLine("    ③ 金币足够? ✓");
+
+            Console.WriteLine("  大厅服 -&gt; 数据库（扣金币，事务内）:");
+            Console.WriteLine("    UPDATE player SET gold = gold - 300 WHERE id = ? AND gold &gt;= 300");
+
+            Console.WriteLine("  大厅服 -&gt; 消息队列（异步发道具）:");
+            Console.WriteLine("    publish item.grant {playerId, itemId}");
+
+            Console.WriteLine("  大厅服 -&gt; 网关 -&gt; 客户端:");
+            gw.PushToPlayer(playerId, $"{{\"code\":0,\"itemId\":{itemId}}}");
+        }
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 游戏后端的分层 ===");
+            Console.WriteLine($"    {"服务",-12} {"有状态",-8} 职责");
+            foreach (var (type, name, stateful, resp) in ServerRole.All)
+            {
+                var sf = stateful ? "是" : "否";
+                Console.WriteLine($"    {name,-12} {sf,-8} {resp}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】有状态的服务不能随便扩");
+            foreach (var (type, name, stateful, _) in ServerRole.All.Where(x =&gt; x.Stateful))
+            {
+                Console.WriteLine($"    {name}: {ScalingExplainer.HowToScale(true)}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 网关的路由与鉴权 ===");
+            var gw = new GatewayService();
+
+            Console.WriteLine("  连接 1 接入:");
+            gw.OnConnect("conn-1");
+            Console.WriteLine($"    当前连接数: {gw.ConnectCount}");
+
+            Console.WriteLine("  未登录时发战斗消息:");
+            gw.Route("conn-1", "battle.op");
+
+            Console.WriteLine("  登录后重试:");
+            gw.BindPlayer("conn-1", 1001);
+            var t = gw.Route("conn-1", "battle.op");
+            Console.WriteLine($"    路由到: {t}");
+
+            Console.WriteLine();
+            Console.WriteLine("  未知消息类型:");
+            gw.Route("conn-1", "unknown.msg");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 服务端主动推送 ===");
+            Console.WriteLine("  战斗服需要把结果推给玩家:");
+            bool ok = gw.PushToPlayer(1001, "{\"battleResult\":\"win\"}");
+            Console.WriteLine($"    玩家在线: {ok}");
+
+            Console.WriteLine("  推给不在线的玩家 9999:");
+            bool ok2 = gw.PushToPlayer(9999, "{\"msg\":\"hello\"}");
+            Console.WriteLine($"    结果: {ok2}（不在线）");
+            Console.WriteLine("  【关键】网关维护 玩家ID -&gt; 连接ID 的映射");
+            Console.WriteLine("          这样后端服务不用关心连接细节");
+
+            Console.WriteLine();
+            Console.WriteLine("  连接断开:");
+            gw.OnDisconnect("conn-1");
+            Console.WriteLine($"    当前连接数: {gw.ConnectCount}");
+            Console.WriteLine($"    玩家 1001 还能被推送吗: {gw.PushToPlayer(1001, "x")}");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 完整请求链路 ===");
+            var gw2 = new GatewayService();
+            gw2.OnConnect("conn-2");
+            gw2.BindPlayer("conn-2", 2002);
+            RequestFlow.SimulateBuyItem(gw2, "conn-2", 2002, 5001);
+
+            Console.WriteLine();
+            Console.WriteLine("=== 5. 什么时候拆服务 ===");
+            foreach (var (stage, arch, why) in SplitTiming.All)
+            {
+                Console.WriteLine($"    {stage,-14} {arch,-22} {why}");
+            }
+            Console.WriteLine();
+            Console.WriteLine("  【血的教训】不要一开始就微服务");
+            Console.WriteLine("    · 单体能支撑到几十万 DAU");
+            Console.WriteLine("    · 拆早了：运维复杂度 &gt; 收益");
+            Console.WriteLine("    · 先分模块（清晰的边界），需要时再拆进程");
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Overview.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>服务</th><th>有无状态</th><th>职责</th></tr></thead>
+  <tbody>
+    <tr><td><strong>网关服</strong></td><td><span class="mk mk--yes">无</span></td><td><em>维持长连接、路由、限流</em></td></tr>
+    <tr><td><strong>登录服</strong></td><td><span class="mk mk--yes">无</span></td><td>验证、发 token</td></tr>
+    <tr><td><strong>大厅服</strong></td><td><span class="mk mk--yes">无</span></td><td>好友、聊天、邮件</td></tr>
+    <tr><td><strong>战斗服</strong></td><td><span class="mk mk--no">有</span></td><td><strong>房间管理、战斗逻辑</strong></td></tr>
+    <tr><td><strong>世界服</strong></td><td><span class="mk mk--no">有</span></td><td><em>大地图、NPC、视野</em></td></tr>
+    <tr><td><strong>匹配服</strong></td><td><span class="mk mk--yes">无</span></td><td>匹配池（状态在 Redis）</td></tr>
+    <tr><td><strong>排行服</strong></td><td><span class="mk mk--yes">无</span></td><td>榜单</td></tr>
+    <tr><td><strong>运营后台</strong></td><td><span class="mk mk--yes">无</span></td><td>发奖、封号</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="stateful">二、有状态 vs 无状态：扩展方式的根本差异 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">为什么这个区分如此重要</span>
+  <div class="table-wrap">
+  <table>
+  <thead><tr><th></th><th>无状态</th><th>有状态</th></tr></thead>
+  <tbody>
+    <tr><td><strong>怎么扩容</strong></td><td>直接加机器，负载均衡轮询</td><td><strong>必须把玩家路由到固定实例</strong></td></tr>
+    <tr><td><strong>实例挂了</strong></td><td>请求失败，重试到别处</td><td><strong>该实例上的玩家全部掉线</strong></td></tr>
+    <tr><td><strong>能否热更新</strong></td><td>可以，滚动重启</td><td><em>不行，玩家正在战斗</em></td></tr>
+  </tbody>
+  </table>
+  </div>
+  <strong>所以设计原则是</strong>：<br>
+  · <strong>尽量把服务做成无状态</strong>（<em>状态放 Redis/数据库</em>）<br>
+  · <strong>有状态的服务要尽量小</strong>（<em>只放不得不放的，比如战斗房间</em>）<br>
+  · 有状态服务要有<strong>重连恢复机制</strong>（<em>页 12</em>）
+</div>
+
+<h2 id="gateway">三、网关的四个职责 ★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">网关是唯一持有长连接的地方</span>
+  <strong>本页实测的功能</strong>：<br>
+  ① <strong>连接管理</strong>——连接ID ↔ 玩家ID 映射<br>
+  ② <strong>路由</strong>——按消息类型转发到对应服务<br>
+  ③ <strong>鉴权</strong>——未登录连接只能发 <code>login.req</code><br>
+  ④ <strong>主动推送</strong>——战斗服让网关推消息给玩家<br><br>
+  <strong>本页输出验证</strong>：<br>
+  <code>未登录时发战斗消息 -&gt; 拒绝</code><br>
+  <code>登录后 -&gt; 路由到 Battle</code><br>
+  <code>战斗服推送 -&gt; 玩家在线: True</code><br>
+  <code>推给不在线的玩家 -&gt; False</code><br><br>
+  <strong>价值</strong>：<em>后端服务不需要关心连接细节</em>——<strong>它们只需说"推给玩家 1001"</strong>。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">网关容易成为瓶颈</span>
+  <strong>问题</strong>：所有流量都过网关<br>
+  · 单机连接数有上限（<em>几万到几十万</em>）<br>
+  · 消息转发是纯 CPU 开销<br><br>
+  <strong>优化</strong>：<br>
+  · <strong>网关无状态化</strong>——玩家重连可以连到任意网关<br>
+  · <strong>多网关实例</strong> + 一致性哈希（<em>同一玩家尽量连同一台，减少跨网关转发</em>）<br>
+  · <strong>只做转发，不做业务</strong>（<em>业务放后端服务</em>）
+</div>
+
+<h2 id="split">四、什么时候拆服务</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>阶段</th><th>架构</th><th>原因</th></tr></thead>
+  <tbody>
+    <tr><td><strong>原型</strong></td><td>单体</td><td><em>开发快</em></td></tr>
+    <tr><td><strong>上线初期</strong></td><td>单体 + 分模块</td><td>还能扛</td></tr>
+    <tr><td><strong>玩家增长</strong></td><td>网关 + 登录 + 业务</td><td>分离压力</td></tr>
+    <tr><td><strong>实时对战</strong></td><td>独立战斗服</td><td><strong>有状态必须独立</strong></td></tr>
+    <tr><td><strong>多区服</strong></td><td>世界服 + 跨服路由</td><td>玩家分布</td></tr>
+    <tr><td><strong>大规模</strong></td><td>微服务 + MQ</td><td>独立扩缩容</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">不要一开始就微服务</span>
+  <strong>血的教训</strong>：<br>
+  · 单体能支撑到<strong>几十万 DAU</strong><br>
+  · 拆早了：<em>运维复杂度 &gt; 收益</em><br>
+  · 团队小的时候，微服务会拖死进度<br><br>
+  <strong>正确做法</strong>：<em>先在代码层面分模块（清晰的边界），需要时再拆进程</em>。<br>
+  <strong>判断信号</strong>：<br>
+  · 某个模块的<em>压力特征明显不同</em>（如登录峰值）<br>
+  · 某个模块<em>经常独立上线</em><br>
+  · 某个模块<em>需要不同的技术栈</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="11">
+  <div class="task"><input type="checkbox" id="t-11-1"><label for="t-11-1"><strong>画出你的分层</strong>：把你要做的游戏拆成服务，标注哪些有状态。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-2"><label for="t-11-2"><strong>实现网关路由</strong>：按消息类型转发，验证未登录被拦截。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-3"><label for="t-11-3"><strong>实现主动推送</strong>：维护 玩家ID→连接ID 映射，验证离线返回失败。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-4"><label for="t-11-4"><strong>设计拆服务时机</strong>：列出你的项目什么时候该拆，为什么。</label></div>
+  <div class="task"><input type="checkbox" id="t-11-5"><label for="t-11-5"><strong>回答面试题</strong>：① 有状态和无状态服务怎么扩容？② 网关的职责是什么？③ 为什么不建议一开始就微服务？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出游戏后端的八类服务及有无状态</strong>；<br>
+    ② <strong>理解有状态服务为什么不能随便扩容</strong>；<br>
+    ③ <strong>能实现网关的路由 + 鉴权 + 主动推送</strong>；<br>
+    ④ 知道网关会成为瓶颈及优化方向；<br>
+    ⑤ 能判断什么时候该拆服务。<br>
+    <br>
+    <em>第 ② 和 第 ③ 条最重要——**前者是架构思维，后者是网关的核心价值**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="10-logging-monitor.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">10 日志、监控与可观测性</div>
+  </a>
+  <a class="next" href="12-long-short-connection.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">12 长连接与短连接 ★★★</div>
+  </a>
+</nav>

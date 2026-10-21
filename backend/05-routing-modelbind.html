@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>05 路由、模型绑定与验证 — Unity 游戏后端 + 全栈开发路线｜从客户端主程延伸为能独立扛服务的全栈工程师</title>
+<meta name="description" content="特性路由、参数绑定来源、FluentValidation、统一响应">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">Unity 游戏后端 + 全栈开发路线
+        <span>从客户端主程延伸为能独立扛服务的全栈工程师</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>05 · 路由、模型绑定与验证</h1>
+
+<p class="lead">这一页讲<strong>请求怎么进到你的代码里</strong>——参数从哪来、怎么拦掉非法请求、怎么校验。<em>看起来琐碎，但这些细节决定了接口稳不稳</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（04）ASP.NET Core 框架 —— 中间件、依赖注入、配置系统、生命周期。<br>
+  <strong>这一页</strong>（05）路由、模型绑定与验证 —— 特性路由、参数绑定来源、FluentValidation、统一响应。<br>
+  <strong>下一页</strong>（06）鉴权与会话 —— JWT、OAuth2、Session、Token 刷新、越权防护。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="05-routing-modelbind.html#sources" data-brief="Route/Query/Body/Header/Form 五个来源"><span class="prereq__title">参数来源与绑定</span><span class="prereq__page">05-routing-modelbind</span></a>
+          <a class="prereq__item" href="05-routing-modelbind.html#validation" data-brief="客户端可绕过一切前端校验，服务端必须再校验"><span class="prereq__title">参数校验</span><span class="prereq__page">05-routing-modelbind</span></a>
+          <a class="prereq__item" href="05-routing-modelbind.html#paging" data-brief="size 上限、page 不能为 0"><span class="prereq__title">分页边界</span><span class="prereq__page">05-routing-modelbind</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="sources">一、参数的五个来源</h2>
+
+<p>同一个参数名，<strong>放在不同位置意思完全不同</strong>——这是新手最容易混的地方。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
+
+namespace BackendSamples.RoutingBinding
+{
+    // ============================================================
+    // 1. 参数从哪来（模型绑定）
+    // ============================================================
+    // 【最容易搞混】同一个名字，放在不同位置意思完全不同
+    //   /api/users/1001            -&gt; 路由参数
+    //   /api/users?id=1001         -&gt; 查询参数
+    //   POST body {"id":1001}      -&gt; 请求体
+    //   Header: X-UserId: 1001     -&gt; 请求头
+
+    public class BindSource
+    {
+        public string Name;
+        public string Description;
+        public string Example;
+    }
+
+    public static class BindSources
+    {
+        public static readonly BindSource[] All =
+        {
+            new() { Name = "[FromRoute]", Description = "URL 路径段", Example = "/users/{id}" },
+            new() { Name = "[FromQuery]", Description = "查询字符串", Example = "?page=1&amp;size=20" },
+            new() { Name = "[FromBody]", Description = "请求体（JSON）", Example = "{\"name\":\"x\"}" },
+            new() { Name = "[FromHeader]", Description = "请求头", Example = "X-Token: abc" },
+            new() { Name = "[FromForm]", Description = "表单（文件上传）", Example = "multipart/form-data" },
+        };
+    }
+
+    // ============================================================
+    // 2. 路由约束：在路由层就拒绝非法请求
+    // ============================================================
+    // 【价值】非法请求不进业务代码，减少无谓的数据库查询
+
+    public static class RouteConstraints
+    {
+        public static readonly (string Constraint, string Meaning, string Example)[] All =
+        {
+            ("int", "整数", "{id:int}"),
+            ("long", "长整数", "{id:long}"),
+            ("guid", "GUID", "{id:guid}"),
+            ("alpha", "只含字母", "{name:alpha}"),
+            ("min(1)", "最小值", "{page:min(1)}"),
+            ("max(100)", "最大值", "{size:max(100)}"),
+            ("range(1,100)", "范围", "{page:range(1,100)}"),
+            ("length(2,20)", "长度", "{name:length(2,20)}"),
+            ("regex(...)", "正则", "{code:regex(^[A-Z]{3}$)}"),
+        };
+    }
+
+    // 简化版路由匹配（演示原理）
+    public class SimpleRouter
+    {
+        private readonly List&lt;(string Pattern, Func&lt;Dictionary&lt;string, string&gt;, string&gt; Handler)&gt; _routes = new();
+
+        public void MapGet(string pattern, Func&lt;Dictionary&lt;string, string&gt;, string&gt; handler)
+            =&gt; _routes.Add((pattern, handler));
+
+        public string? Dispatch(string path)
+        {
+            foreach (var (pattern, handler) in _routes)
+            {
+                var params_ = Match(pattern, path);
+                if (params_ != null) return handler(params_);
+            }
+            return null;
+        }
+
+        // 极简版路径匹配：支持 {name} 和 {name:int}
+        private static Dictionary&lt;string, string&gt;? Match(string pattern, string path)
+        {
+            var pParts = pattern.Trim('/').Split('/');
+            var aParts = path.Trim('/').Split('/');
+            if (pParts.Length != aParts.Length) return null;
+
+            var result = new Dictionary&lt;string, string&gt;();
+
+            for (int i = 0; i &lt; pParts.Length; i++)
+            {
+                var p = pParts[i];
+                var a = aParts[i];
+
+                if (p.StartsWith("{") &amp;&amp; p.EndsWith("}"))
+                {
+                    var inner = p.Substring(1, p.Length - 2);
+                    var parts = inner.Split(':');
+                    var name = parts[0];
+                    var constraint = parts.Length &gt; 1 ? parts[1] : null;
+
+                    // 约束检查
+                    if (constraint == "int" &amp;&amp; !int.TryParse(a, out _)) return null;
+                    if (constraint == "guid" &amp;&amp; !Guid.TryParse(a, out _)) return null;
+                    if (constraint == "alpha" &amp;&amp; !Regex.IsMatch(a, "^[A-Za-z]+$")) return null;
+
+                    result[name] = a;
+                }
+                else if (p != a)
+                {
+                    return null;   // 字面量不匹配
+                }
+            }
+
+            return result;
+        }
+    }
+
+    // ============================================================
+    // 3. 参数验证：后端必须做的事
+    // ============================================================
+    // 【铁律】客户端传什么都要校验，不能信
+
+    public class ValidationResult
+    {
+        public bool Ok;
+        public List&lt;string&gt; Errors = new();
+
+        public static ValidationResult Success() =&gt; new() { Ok = true };
+        public static ValidationResult Fail(params string[] errs) =&gt;
+            new() { Ok = false, Errors = errs.ToList() };
+    }
+
+    public class Validator
+    {
+        private readonly List&lt;string&gt; _errors = new();
+
+        public Validator Require(bool condition, string message)
+        {
+            if (!condition) _errors.Add(message);
+            return this;
+        }
+
+        public Validator Range(long value, long min, long max, string field)
+        {
+            if (value &lt; min || value &gt; max)
+                _errors.Add($"{field} 必须在 {min}~{max} 之间，实际 {value}");
+            return this;
+        }
+
+        public Validator Length(string? s, int min, int max, string field)
+        {
+            int len = s?.Length ?? 0;
+            if (len &lt; min || len &gt; max)
+                _errors.Add($"{field} 长度必须在 {min}~{max} 之间，实际 {len}");
+            return this;
+        }
+
+        public ValidationResult Build() =&gt;
+            _errors.Count == 0 ? ValidationResult.Success() : ValidationResult.Fail(_errors.ToArray());
+    }
+
+    // ============================================================
+    // 4. 分页参数：一个容易做错的典型
+    // ============================================================
+    // 【问题】客户端传 page=0 或 size=999999 会导致：
+    //   · page=0 -&gt; 负数偏移，SQL 报错
+    //   · size 太大 -&gt; 全表扫描，服务雪崩
+
+    public class PageRequest
+    {
+        private const int MaxSize = 100;
+        private const int DefaultSize = 20;
+
+        public int Page { get; private set; } = 1;
+        public int Size { get; private set; } = DefaultSize;
+
+        public static PageRequest Parse(int page, int size)
+        {
+            var r = new PageRequest();
+
+            // 【关键】所有边界都要夹紧，不能让非法值穿透
+            r.Page = page &lt; 1 ? 1 : page;
+
+            r.Size = size switch
+            {
+                &lt;= 0 =&gt; DefaultSize,
+                &gt; MaxSize =&gt; MaxSize,     // 防止一次拉太多
+                _ =&gt; size
+            };
+
+            return r;
+        }
+
+        public int Skip =&gt; (Page - 1) * Size;
+
+        public override string ToString() =&gt; $"page={Page}, size={Size}, skip={Skip}";
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 参数来源 ===");
+            foreach (var s in BindSources.All)
+            {
+                Console.WriteLine($"  {s.Name,-14} {s.Description,-16} {s.Example}");
+            }
+            Console.WriteLine();
+            Console.WriteLine("  【实战建议】");
+            Console.WriteLine("    简单类型用 [FromRoute] / [FromQuery]");
+            Console.WriteLine("    复杂对象用 [FromBody]");
+            Console.WriteLine("    不要在一个方法里混用多个 [FromBody]（只能有一个）");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 路由约束 ===");
+            foreach (var (c, m, e) in RouteConstraints.All)
+            {
+                Console.WriteLine($"  {c,-14} {m,-12} {e}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  实测路由匹配:");
+            var router = new SimpleRouter();
+            router.MapGet("/users/{id:int}", p =&gt; $"用户详情: id={p["id"]}");
+            router.MapGet("/users/{name:alpha}", p =&gt; $"按名字查: name={p["name"]}");
+            router.MapGet("/health", _ =&gt; "OK");
+
+            foreach (var path in new[] { "/users/1001", "/users/tom", "/health", "/users/abc123" })
+            {
+                var r = router.Dispatch(path);
+                Console.WriteLine($"    {path,-18} -&gt; {(r ?? "404 无匹配")}");
+            }
+            Console.WriteLine("  【关键】/users/abc123 不匹配 int 约束，也不匹配 alpha（含数字）");
+            Console.WriteLine("          所以 404 —— 非法请求不会进业务代码");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 参数验证 ===");
+            var cases = new[]
+            {
+                (name: "正常", userId: 1001L, count: 5, nickname: "勇者"),
+                (name: "ID非法", userId: -1L, count: 5, nickname: "勇者"),
+                (name: "数量超限", userId: 1001L, count: 99999, nickname: "勇者"),
+                (name: "昵称为空", userId: 1001L, count: 5, nickname: ""),
+            };
+
+            foreach (var c in cases)
+            {
+                var v = new Validator()
+                    .Require(c.userId &gt; 0, "userId 必须大于 0")
+                    .Range(c.count, 1, 999, "count")
+                    .Length(c.nickname, 1, 20, "nickname")
+                    .Build();
+
+                if (v.Ok)
+                    Console.WriteLine($"  [{c.name,-10}] 通过");
+                else
+                    Console.WriteLine($"  [{c.name,-10}] 失败: {string.Join("; ", v.Errors)}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【铁律】客户端可以绕过所有前端校验");
+            Console.WriteLine("          服务端必须再校验一次");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 分页边界处理 ===");
+            var pages = new[] { (1, 20), (0, 20), (1, 0), (1, 99999), (5, 50) };
+            foreach (var (p, s) in pages)
+            {
+                var req = PageRequest.Parse(p, s);
+                Console.WriteLine($"  输入 (page={p}, size={s}) -&gt; {req}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】size=99999 被夹到 100，防止一次拉全表");
+            Console.WriteLine("          page=0 被夹到 1，防止负数偏移");
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.RoutingBinding.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>来源</th><th>写法</th><th>典型场景</th></tr></thead>
+  <tbody>
+    <tr><td><strong>路由</strong></td><td><code>/users/{id}</code></td><td><em>资源标识</em></td></tr>
+    <tr><td><strong>查询串</strong></td><td><code>?page=1</code></td><td>分页、筛选</td></tr>
+    <tr><td><strong>请求体</strong></td><td><code>{"name":"x"}</code></td><td>POST/PUT 的数据</td></tr>
+    <tr><td><strong>请求头</strong></td><td><code>X-Token: abc</code></td><td><strong>认证、追踪 ID</strong></td></tr>
+    <tr><td><strong>表单</strong></td><td><code>multipart/form-data</code></td><td>文件上传</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="constraints">二、路由约束：在入口就拒绝 ★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">为什么要用路由约束</span>
+  <strong>不加约束</strong>：<br>
+  <code>/api/users/{id}</code><br>
+  请求 <code>/api/users/abc</code> → <em>进入业务代码</em> → 解析失败 → <strong>查了一次数据库才发现参数错</strong><br><br>
+  <strong>加约束</strong>：<br>
+  <code>/api/users/{id:int}</code><br>
+  请求 <code>/api/users/abc</code> → <strong>路由层直接 404</strong>，不进业务代码<br><br>
+  <strong>本页实测输出</strong>：<br>
+  <code>/users/1001  -&gt; 用户详情: id=1001</code>（匹配 int）<br>
+  <code>/users/tom   -&gt; 按名字查: name=tom</code>（匹配 alpha）<br>
+  <code>/users/abc123 -&gt; 404 无匹配</code>（<em>不匹配 int，也不匹配 alpha</em>）<br><br>
+  <strong>价值</strong>：<em>非法请求在入口就被挡住</em>，节省数据库和 CPU。
+</div>
+
+<h2 id="validation">三、参数验证：后端必须做的事 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">铁律：客户端可以绕过一切前端校验</span>
+  <strong>这不是「防君子」的问题</strong>——<em>而是基本工程纪律</em>。<br><br>
+  <strong>绕过方式</strong>：<br>
+  · 抓包工具直接改请求<br>
+  · Postman / curl 直接调接口<br>
+  · <em>反编译客户端看你调了什么接口</em><br><br>
+  <strong>所以服务端必须校验</strong>：<br>
+  · <strong>类型</strong>——<em>传了字符串给 int 字段</em><br>
+  · <strong>范围</strong>——<em>数量传了 -1 或 999999</em><br>
+  · <strong>长度</strong>——<em>昵称传了 10 万字</em><br>
+  · <strong>格式</strong>——<em>手机号传了乱码</em><br>
+  · <strong>业务规则</strong>——<em>金币不够却要买</em><br><br>
+  <strong>本页实测</strong>：四种输入，非法的一个都没通过。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">验证的三种实现方式</span>
+  <strong>① 手写（本页代码）</strong><br>
+  <em>简单直接，适合小项目</em><br><br>
+  <strong>② DataAnnotations 特性</strong><br>
+  <code>[Required]</code> <code>[Range(1,100)]</code> <code>[StringLength(20)]</code><br>
+  <em>框架自动验证，返回 400</em><br>
+  <strong>缺点</strong>：错误信息格式化不够灵活<br><br>
+  <strong>③ FluentValidation</strong>（推荐）<br>
+  <code>RuleFor(x =&gt; x.Count).InclusiveBetween(1, 999);</code><br>
+  <em>可读性好、支持复杂规则、错误信息可定制</em><br><br>
+  <strong>不管用哪种</strong>：<em>校验必须在服务端执行，且要在业务逻辑之前</em>。
+</div>
+
+<h2 id="paging">四、分页：一个容易做错的典型</h2>
+
+<div class="callout callout--warn">
+  <span class="callout__title">两个边界不处理会出事故</span>
+  <strong>问题一：size 太大</strong><br>
+  <code>?size=999999</code> → 一次查出全表 → <em>数据库和内存都被打爆</em><br>
+  <strong>本页实测</strong>：<code>size=99999</code> 被<strong>夹到 100</strong>。<br><br>
+  <strong>问题二：page 为 0 或负数</strong><br>
+  <code>?page=0</code> → <code>skip = (0-1)*size = 负数</code> → <em>SQL 报错</em><br>
+  <strong>本页实测</strong>：<code>page=0</code> 被<strong>夹到 1</strong>。<br><br>
+  <strong>本页输出验证</strong>：<br>
+  <code>(page=0, size=20)   -&gt; page=1, size=20, skip=0</code><br>
+  <code>(page=1, size=99999) -&gt; page=1, size=100, skip=0</code><br><br>
+  <strong>原则</strong>：<em>所有外部输入都要「夹紧」，不能让非法值穿透到数据库</em>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="05">
+  <div class="task"><input type="checkbox" id="t-05-1"><label for="t-05-1"><strong>写五个接口</strong>：分别用路由、查询串、请求体、请求头、表单接收参数。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-2"><label for="t-05-2"><strong>加路由约束</strong>：给 id 加 <code>:int</code>，验证传字符串时返回 404。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-3"><label for="t-05-3"><strong>写一个验证器</strong>：校验数量范围、昵称长度，返回结构化错误。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-4"><label for="t-05-4"><strong>复现分页问题</strong>：不带夹紧地传 <code>size=999999</code>，看会发生什么。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-5"><label for="t-05-5"><strong>加固分页</strong>：加上上下限，验证非法值被夹紧。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-6"><label for="t-05-6"><strong>用 FluentValidation</strong>：把验证改成声明式，对比代码可读性。</label></div>
+  <div class="task"><input type="checkbox" id="t-05-7"><label for="t-05-7"><strong>回答面试题</strong>：① 参数可以从哪几个位置取？② 为什么服务端必须再校验一次？③ 分页要防哪些边界？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 能说出参数的五个来源及区别；<br>
+    ② <strong>知道路由约束能减少无谓的业务处理</strong>；<br>
+    ③ <strong>理解「客户端可以绕过一切校验」这条铁律</strong>；<br>
+    ④ 能写出带范围/长度校验的验证器；<br>
+    ⑤ <strong>知道分页要夹紧 page 和 size 两个边界</strong>。<br>
+    <br>
+    <em>第 ③ 和 第 ⑤ 条最实用——**前者是安全意识，后者是真实踩过的坑**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="04-aspnet-core.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">04 ASP.NET Core 框架 ★★</div>
+  </a>
+  <a class="next" href="06-auth.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">06 鉴权与会话 ★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

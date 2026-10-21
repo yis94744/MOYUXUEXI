@@ -4,7 +4,9 @@
 
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
-  [object Object]
+  上一页（17）讲了怎么把热更推上线。这一页讲<em>出问题之后怎么查</em>。<br>
+  <strong>关键衔接</strong>：页 07 的<em>error / xpcall</em>、页 15-17 的<em>状态残留</em>在这里变成一张排查清单。<br>
+  <strong>下一页</strong>（19）性能实战。<em>功能 bug 和性能问题，是两套排查手法。</em>
 </div>
 
 <h2 id="characteristics">一、Lua 错误的三个特点</h2>
@@ -15,14 +17,14 @@
   <tbody>
     <tr><td><strong>错误位置可能不准</strong></td><td>报错行 ≠ 真正的错误行</td><td><em>往上看几行</em></td></tr>
     <tr><td><strong>静默失败多</strong></td><td>访问 nil 字段只是返回 nil</td><td><strong>主动加断言</strong></td></tr>
-    <tr><td><strong>错误信息不完整</strong></td><td>只有一行，没有调用栈</td><td>用 <code>xpcall + traceback</code></td></tr>
+    <tr><td><strong>被 pcall 吞掉后没有调用栈</strong></td><td><code>pcall</code> 只返回一行的错误信息，不带堆栈</td><td>用 <code>xpcall + debug.traceback</code></td></tr>
   </tbody>
 </table>
 </div>
 
 <div class="callout callout--danger">
   <span class="callout__title">Lua 最常见的错误：attempt to index a nil value</span>
-  <strong>这个错误占 Lua 报错的 80%</strong>。<br>
+  <strong>这是 Lua 项目里最高频的一类报错</strong>（没有一个可靠的公开统计说"占 80%"，这是经验说法，<em>别当成数据引用</em>）。<br>
   含义：<em>你访问了一个 nil 值的字段</em>。<br>
   <code>local obj = nil</code><br>
   <code>obj.field = 1  -- attempt to index a nil value (local obj)</code><br><br>
@@ -66,8 +68,12 @@
 
 <div class="callout callout--tip">
   <span class="callout__title">xpcall + traceback 获取调用栈</span>
-  <strong>Lua 的默认错误信息没有调用栈</strong>——只有一行"哪里出错了"。<br>
-  <strong>获取完整堆栈</strong>：<br>
+  <strong>分两种情况，别混为一谈</strong>：<br><br>
+  <strong>① 未捕获的错误</strong>：<code>lua.exe</code> 这类独立解释器<em>会</em>打印完整堆栈（<code>stack traceback:</code> 后面那几行）。<br>
+  <em>但游戏里的 Lua 通常是嵌在宿主里的</em>——宿主只把 <code>error</code> 的第一行记日志，堆栈就丢了。<br><br>
+  <strong>② 被 <code>pcall</code> 捕获的错误</strong>：<strong>确实没有堆栈</strong>，只有一行。实测：<br>
+  <code>local ok, err = pcall(outer)  -- err = "xxx.lua:2: boom"，不含 stack traceback</code><br><br>
+  <strong>所以要用 xpcall 的消息处理器</strong>：<br>
   <code>local ok, err = xpcall(func, debug.traceback)</code><br>
   <em>err 里会包含从调用点开始的完整调用链。</em><br><br>
   <strong>实战用法</strong>：<em>框架的顶层（UI 按钮回调、网络回调、定时器回调）都应该用 xpcall 包一层</em>。<br>

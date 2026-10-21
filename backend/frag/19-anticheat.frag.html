@@ -1,0 +1,573 @@
+<h1>19 · 防作弊与服务端权威 ★★★</h1>
+
+<p class="lead">防作弊<strong>不是加个验证码</strong>，而是<em>架构层面的设计</em>。<strong>核心一句话</strong>：客户端的一切都可以被修改。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（18）背包与经济系统 —— 道具流水、并发扣减、幂等、防刷、对账。<br>
+  <strong>这一页</strong>（19）防作弊与服务端权威 —— 哪些必须服务端算、客户端校验、异常行为检测。<br>
+  <strong>下一页</strong>（20）前端基础与选型 —— Vue/React 选型、工程化、组件化思维（客户端视角切入）。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+<h2 id="untrusted">一、客户端不可信：三个层面</h2>
+
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace BackendSamples.AntiCheat
+{
+    // ============================================================
+    // 1. 客户端不可信的三个层面
+    // ============================================================
+    // 【核心原则】客户端的一切都可以被修改：
+    //   内存（Cheat Engine）
+    //   网络包（抓包改包）
+    //   代码（反编译后重打包）
+
+    public static class TrustLevel
+    {
+        public static readonly (string Item, string CanTrust, string Why)[] All =
+        {
+            ("客户端上报的伤害",  "不可信", "内存可改"),
+            ("客户端上报的击杀数", "不可信", "抓包可改"),
+            ("客户端计算的奖励",  "不可信", "代码可反编译"),
+            ("客户端显示的界面",  "无关紧要", "改了只影响自己"),
+            ("客户端的操作意图",  "有限可信", "但要服务端校验可行性"),
+            ("服务器计算的一切",  "可信", "受控环境"),
+        };
+    }
+
+    // ============================================================
+    // 2. 服务端权威：什么必须服务端算
+    // ============================================================
+
+    public static class AuthorityGuide
+    {
+        public static readonly (string Logic, string Where, string Reason)[] All =
+        {
+            ("伤害计算",     "服务端", "客户端算 = 秒杀"),
+            ("掉落判定",     "服务端", "客户端算 = 必出稀有"),
+            ("金币变动",     "服务端", "客户端算 = 无限金币"),
+            ("技能冷却",     "服务端", "客户端算 = 无 CD"),
+            ("经验获得",     "服务端", "客户端算 = 秒满级"),
+            ("移动速度",     "服务端校验", "客户端算 = 加速挂"),
+            ("界面显示",     "客户端", "无关紧要"),
+            ("特效播放",     "客户端", "只影响自己"),
+            ("输入采集",     "客户端", "这是它的职责"),
+        };
+
+        public static void Print()
+        {
+            foreach (var (logic, where, reason) in All)
+            {
+                var mark = where == "服务端" ? "[必须]" : where == "服务端校验" ? "[校验]" : "[可以]";
+                Console.WriteLine($"    {mark} {logic,-12} {where,-10} {reason}");
+            }
+        }
+    }
+
+    // ============================================================
+    // 3. 服务端校验的三种模式
+    // ============================================================
+
+    public class ServerValidation
+    {
+        // ---- 模式一：完全服务端计算（最安全）----
+        public static int CalculateDamage_Server(int attack, int defense, double critRate, Random rng)
+        {
+            // 【关键】随机的种子在服务端
+            bool crit = rng.NextDouble() &lt; critRate;
+            int damage = Math.Max(1, attack - defense);
+            return crit ? damage * 2 : damage;
+        }
+
+        // ---- 模式二：客户端计算 + 服务端校验（性能优化）----
+        public static (bool Ok, string Reason) ValidateDamageReport(
+            int reportedDamage, int attack, int defense, int targetHp)
+        {
+            // 【校验1】不能超过理论上限
+            int maxPossible = (attack * 3);   // 假设最高 3 倍暴击
+            if (reportedDamage &gt; maxPossible)
+                return (false, $"伤害 {reportedDamage} 超过上限 {maxPossible}");
+
+            // 【校验2】不能超过目标血量
+            if (reportedDamage &gt; targetHp)
+                return (false, "伤害超过目标血量（溢出）");
+
+            // 【校验3】不能是负数或零（除非特殊技能）
+            if (reportedDamage &lt;= 0)
+                return (false, "伤害非法");
+
+            return (true, "通过");
+        }
+
+        // ---- 模式三：抽样复核（降低开销）----
+        //   只对部分操作做完整计算，其余信任客户端
+        public static bool ShouldFullAudit(long playerId, int reportCount, double auditRate = 0.1)
+        {
+            // 【策略】高风险玩家提高抽样率
+            //   本 demo 用简单的取模模拟
+            return (playerId + reportCount) % (int)(1 / auditRate) == 0;
+        }
+    }
+
+    // ============================================================
+    // 4. 移动速度校验：最常见的外挂
+    // ============================================================
+
+    public class MovementValidator
+    {
+        public class Position
+        {
+            public double X, Y, Z;
+            public DateTime Time = DateTime.UtcNow;
+        }
+
+        // 【核心】根据时间差和最大速度，判断移动是否合理
+        public static (bool Ok, string Reason, double Speed) Validate(
+            Position from, Position to, double maxSpeed)
+        {
+            double dt = (to.Time - from.Time).TotalSeconds;
+            if (dt &lt;= 0) return (false, "时间差非法", 0);
+
+            double dist = Math.Sqrt(
+                Math.Pow(to.X - from.X, 2) +
+                Math.Pow(to.Y - from.Y, 2) +
+                Math.Pow(to.Z - from.Z, 2));
+
+            double speed = dist / dt;
+
+            // 【关键】留一定容差（网络抖动、卡顿补偿）
+            const double tolerance = 1.5;   // 50% 容差
+
+            if (speed &gt; maxSpeed * tolerance)
+            {
+                return (false,
+                    $"速度 {speed:F1} 超过上限 {maxSpeed * tolerance:F1}",
+                    speed);
+            }
+
+            return (true, "正常", speed);
+        }
+    }
+
+    // ============================================================
+    // 5. 异常行为检测：多层防御
+    // ============================================================
+
+    public class BehaviorDetector
+    {
+        private readonly Dictionary&lt;long, PlayerBehavior&gt; _stats = new();
+
+        public class PlayerBehavior
+        {
+            public long PlayerId;
+            public int TotalKills;
+            public int TotalDeaths;
+            public int HeadshotCount;
+            public int TotalShots;
+            public int TotalHits;
+            public int Matches;
+            public double AvgReactionMs;
+        }
+
+        public void RecordMatch(long playerId, int kills, int deaths, int headshots, int shots, int hits, double reactionMs)
+        {
+            if (!_stats.TryGetValue(playerId, out var s))
+            {
+                s = new PlayerBehavior { PlayerId = playerId };
+                _stats[playerId] = s;
+            }
+
+            s.TotalKills += kills;
+            s.TotalDeaths += deaths;
+            s.HeadshotCount += headshots;
+            s.TotalShots += shots;
+            s.TotalHits += hits;
+            s.Matches++;
+
+            // 移动平均
+            s.AvgReactionMs = (s.AvgReactionMs * (s.Matches - 1) + reactionMs) / s.Matches;
+        }
+
+        // 【检测1】爆头率异常
+        public (bool Suspicious, string Reason) CheckHeadshotRate(long playerId)
+        {
+            if (!_stats.TryGetValue(playerId, out var s) || s.TotalShots &lt; 100)
+                return (false, "样本不足");
+
+            double headshotRate = (double)s.HeadshotCount / Math.Max(1, s.TotalHits);
+
+            // 职业选手爆头率约 40~50%，超过 80% 就很可疑
+            if (headshotRate &gt; 0.8)
+                return (true, $"爆头率 {headshotRate * 100:F1}%（正常&lt;50%）");
+
+            return (false, $"爆头率 {headshotRate * 100:F1}%");
+        }
+
+        // 【检测2】命中率异常
+        public (bool Suspicious, string Reason) CheckAccuracy(long playerId)
+        {
+            if (!_stats.TryGetValue(playerId, out var s) || s.TotalShots &lt; 100)
+                return (false, "样本不足");
+
+            double accuracy = (double)s.TotalHits / s.TotalShots;
+
+            if (accuracy &gt; 0.9)
+                return (true, $"命中率 {accuracy * 100:F1}%（正常&lt;70%）");
+
+            return (false, $"命中率 {accuracy * 100:F1}%");
+        }
+
+        // 【检测3】反应时间异常（自瞄的特征）
+        public (bool Suspicious, string Reason) CheckReactionTime(long playerId)
+        {
+            if (!_stats.TryGetValue(playerId, out var s) || s.Matches &lt; 5)
+                return (false, "样本不足");
+
+            // 人类反应极限约 150ms，职业选手约 200ms
+            if (s.AvgReactionMs &lt; 100)
+                return (true, $"平均反应 {s.AvgReactionMs:F0}ms（人类极限&gt;150ms）");
+
+            return (false, $"平均反应 {s.AvgReactionMs:F0}ms");
+        }
+
+        // 【检测4】K/D 比异常
+        public (bool Suspicious, string Reason) CheckKdRatio(long playerId)
+        {
+            if (!_stats.TryGetValue(playerId, out var s) || s.Matches &lt; 10)
+                return (false, "样本不足");
+
+            double kd = s.TotalDeaths == 0 ? s.TotalKills : (double)s.TotalKills / s.TotalDeaths;
+
+            // 顶级选手约 3~5
+            if (kd &gt; 10)
+                return (true, $"K/D {kd:F1}（正常&lt;5）");
+
+            return (false, $"K/D {kd:F1}");
+        }
+
+        public PlayerBehavior? GetStats(long playerId) =&gt;
+            _stats.TryGetValue(playerId, out var s) ? s : null;
+    }
+
+    // ============================================================
+    // 6. 处置策略：检测到之后做什么
+    // ============================================================
+
+    public static class Punishment
+    {
+        public static readonly (string Level, string Action, string When)[] All =
+        {
+            ("观察",   "标记，不干预",     "轻度可疑"),
+            ("限制",   "降低匹配优先级",   "中度可疑"),
+            ("隔离",   "进作弊者匹配池",   "高度可疑"),
+            ("封禁",   "禁止登录",         "确认作弊"),
+            ("回滚",   "撤销非法收益",     "确认刷道具"),
+        };
+
+        // 【关键】不能自动封禁，要人工复核
+        public static string Decide(int suspicionScore) =&gt; suspicionScore switch
+        {
+            &lt; 30 =&gt; "正常，继续观察",
+            &lt; 60 =&gt; "标记，加入监控列表",
+            &lt; 80 =&gt; "限制匹配，人工复核",
+            _ =&gt; "紧急：暂停账号，立即人工审核",
+        };
+
+        public static void Print()
+        {
+            foreach (var (level, action, when) in All)
+                Console.WriteLine($"    {level,-6} {action,-16} {when}");
+        }
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 什么可以信，什么不能 ===");
+            foreach (var (item, trust, why) in TrustLevel.All)
+            {
+                var mark = trust == "不可信" ? "[X]" : trust == "可信" ? "[OK]" : "[~]";
+                Console.WriteLine($"    {mark} {item,-20} {trust,-10} {why}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 服务端权威：职责划分 ===");
+            AuthorityGuide.Print();
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 伤害校验 ===");
+            Console.WriteLine("  正常伤害（攻击 100，防御 20）:");
+            var rng = new Random(42);
+            int dmg = ServerValidation.CalculateDamage_Server(100, 20, 0.3, rng);
+            Console.WriteLine($"    服务端计算: {dmg}");
+            var (ok, reason) = ServerValidation.ValidateDamageReport(dmg, 100, 20, 1000);
+            Console.WriteLine($"    校验: {ok} {reason}");
+
+            Console.WriteLine();
+            Console.WriteLine("  作弊客户端上报 99999 伤害:");
+            var (ok2, reason2) = ServerValidation.ValidateDamageReport(99999, 100, 20, 1000);
+            Console.WriteLine($"    校验: {ok2}, {reason2}");
+
+            Console.WriteLine();
+            Console.WriteLine("  上报伤害超过目标血量:");
+            var (ok3, reason3) = ServerValidation.ValidateDamageReport(5000, 100, 20, 1000);
+            Console.WriteLine($"    校验: {ok3}, {reason3}");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 移动速度校验（加速挂）===");
+            var maxSpeed = 6.0;   // 最大 6 米/秒
+
+            // 正常移动
+            var p1 = new MovementValidator.Position { X = 0, Y = 0, Z = 0, Time = DateTime.UtcNow };
+            var p2 = new MovementValidator.Position { X = 5, Y = 0, Z = 0, Time = DateTime.UtcNow.AddSeconds(1) };
+            var (okM, msgM, spdM) = MovementValidator.Validate(p1, p2, maxSpeed);
+            Console.WriteLine($"  正常移动（1秒走5米）: {okM}, 速度 {spdM:F1}");
+
+            // 加速挂
+            var p3 = new MovementValidator.Position { X = 50, Y = 0, Z = 0, Time = DateTime.UtcNow.AddSeconds(1) };
+            var (okF, msgF, spdF) = MovementValidator.Validate(p1, p3, maxSpeed);
+            Console.WriteLine($"  加速挂（1秒走50米）: {okF}, {msgF}");
+
+            // 瞬移（时间差为 0）
+            var p4 = new MovementValidator.Position { X = 100, Y = 0, Z = 0, Time = DateTime.UtcNow };
+            var (okT, msgT, _) = MovementValidator.Validate(p1, p4, maxSpeed);
+            Console.WriteLine($"  瞬移（时间差0）: {okT}, {msgT}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】校验要留容差（网络抖动）");
+            Console.WriteLine("          但不能太大（否则外挂能利用）");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 5. 行为异常检测 ===");
+            var detector = new BehaviorDetector();
+
+            // 正常玩家
+            for (int i = 0; i &lt; 20; i++)
+                detector.RecordMatch(2001, kills: 3, deaths: 5, headshots: 1, shots: 100, hits: 30, reactionMs: 280);
+
+            // 疑似外挂
+            for (int i = 0; i &lt; 20; i++)
+                detector.RecordMatch(2002, kills: 25, deaths: 1, headshots: 22, shots: 100, hits: 95, reactionMs: 45);
+
+            foreach (long pid in new[] { 2001L, 2002L })
+            {
+                Console.WriteLine($"  玩家 {pid}:");
+                var s = detector.GetStats(pid)!;
+                Console.WriteLine($"    数据: 击杀{s.TotalKills} 死亡{s.TotalDeaths} 爆头{s.HeadshotCount} 射击{s.TotalShots} 命中{s.TotalHits}");
+
+                var checks = new[]
+                {
+                    ("爆头率", detector.CheckHeadshotRate(pid)),
+                    ("命中率", detector.CheckAccuracy(pid)),
+                    ("反应时间", detector.CheckReactionTime(pid)),
+                    ("K/D", detector.CheckKdRatio(pid)),
+                };
+
+                foreach (var (checkName, checkResult) in checks)
+                {
+                    var (isSuspicious, checkReason) = checkResult;
+                    var mark = isSuspicious ? "【异常】" : "  正常 ";
+                    Console.WriteLine($"    {mark} {checkName,-8} {checkReason}");
+                }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【重要】单一指标异常不足以定性");
+            Console.WriteLine("          要看多个指标同时异常");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 6. 处置策略 ===");
+            Punishment.Print();
+
+            Console.WriteLine();
+            Console.WriteLine("  按可疑度决定处置:");
+            foreach (int score in new[] { 20, 45, 70, 90 })
+            {
+                Console.WriteLine($"    可疑度 {score}: {Punishment.Decide(score)}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【铁律】不要自动封号");
+            Console.WriteLine("    · 误封的代价 &gt; 放过一个作弊者");
+            Console.WriteLine("    · 高可疑度先暂停 + 人工审核");
+            Console.WriteLine("    · 要有申诉渠道");
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.AntiCheat.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>数据</th><th>能否信任</th><th>原因</th></tr></thead>
+  <tbody>
+    <tr><td><strong>上报的伤害</strong></td><td><span class="mk mk--no">不可信</span></td><td><em>内存可改</em></td></tr>
+    <tr><td><strong>上报的击杀数</strong></td><td><span class="mk mk--no">不可信</span></td><td><em>抓包可改</em></td></tr>
+    <tr><td><strong>移动速度</strong></td><td><span class="mk mk--no">不可信</span></td><td><strong>加速挂</strong></td></tr>
+    <tr><td><strong>界面显示</strong></td><td><span class="mk mk--yes">无关紧要</span></td><td><em>改了只影响自己</em></td></tr>
+    <tr><td><strong>操作意图</strong></td><td><em>有限可信</em></td><td>但服务端要校验可行性</td></tr>
+    <tr><td><strong>服务端计算</strong></td><td><span class="mk mk--yes">可信</span></td><td>受控环境</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="authority">二、什么必须服务端算 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">判断标准：改了会怎样</span>
+  <strong>问自己</strong>：<em>如果玩家能任意修改这个结果，会怎样？</em><br><br>
+  <div class="table-wrap">
+  <table>
+  <thead><tr><th>逻辑</th><th>放哪</th><th>改了会怎样</th></tr></thead>
+  <tbody>
+    <tr><td><strong>伤害计算</strong></td><td><strong>服务端</strong></td><td>秒杀一切</td></tr>
+    <tr><td><strong>掉落判定</strong></td><td><strong>服务端</strong></td><td>必出稀有</td></tr>
+    <tr><td><strong>金币变动</strong></td><td><strong>服务端</strong></td><td>无限金币</td></tr>
+    <tr><td><strong>技能冷却</strong></td><td><strong>服务端</strong></td><td>无 CD</td></tr>
+    <tr><td>移动速度</td><td><strong>服务端校验</strong></td><td>加速挂</td></tr>
+    <tr><td>界面/特效</td><td>客户端</td><td>只影响自己</td></tr>
+  </tbody>
+  </table>
+  </div>
+  <strong>一句话</strong>：<em>所有影响其他玩家或经济系统的，都必须在服务端</em>。
+</div>
+
+<h2 id="validation">三、三种校验模式</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">模式一：完全服务端计算（最安全）</span>
+  <strong>做法</strong>：客户端只发<em>操作意图</em>，服务端算一切。<br><br>
+  <strong>优点</strong>：<em>无法作弊</em><br>
+  <strong>缺点</strong>：<em>服务器压力大</em>（<em>要跑所有逻辑</em>）<br><br>
+  <strong>本页实现</strong>：<br>
+  <code>CalculateDamage_Server(attack, defense, critRate, rng)</code><br>
+  · 随机数<strong>种子在服务端</strong><br>
+  · 客户端拿不到真正的暴击判定<br><br>
+  <strong>适用</strong>：<em>经济相关、竞技对战</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">模式二：客户端算 + 服务端校验</span>
+  <strong>做法</strong>：客户端算，服务端<em>检查是否合理</em>。<br><br>
+  <strong>本页实测的三条校验</strong>：<br>
+  <code>正常伤害（攻击 100，防御 20）: 服务端计算 80，校验通过</code><br>
+  <code>作弊客户端上报 99999: 拒绝，伤害 99999 超过上限 300</code><br>
+  <code>上报伤害超过目标血量: 拒绝，伤害 5000 超过上限 300</code><br><br>
+  <strong>校验逻辑</strong>：<br>
+  · 不能超过<strong>理论上限</strong>（<em>攻击×3</em>）<br>
+  · 不能超过<strong>目标血量</strong><br>
+  · 不能是负数/零<br><br>
+  <strong>适用</strong>：<em>非经济、性能敏感的场景</em>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">模式三：抽样复核</span>
+  <strong>做法</strong>：只对<em>部分操作</em>做完整计算。<br>
+  · 普通玩家：<em>10% 抽样</em><br>
+  · 可疑玩家：<em>100% 审核</em><br><br>
+  <strong>优点</strong>：<em>兼顾性能与安全</em><br><br>
+  <strong>关键</strong>：<em>让玩家不知道什么时候会被查</em>——<strong>威慑效果</strong>。
+</div>
+
+<h2 id="speed">四、移动速度校验：最常见的外挂 ★★</h2>
+
+<div class="callout callout--warn">
+  <span class="callout__title">本页实测的三种情况</span>
+  <strong>校验原理</strong>：<code>速度 = 距离 / 时间差</code><br>
+  超过最大速度的一定倍数 → 异常<br><br>
+  <strong>本页实测</strong>：<br>
+  <code>正常移动（1秒走5米）: True, 速度 5.0</code><br>
+  <code>加速挂（1秒走50米）: False, 速度 49.8 超过上限 9.0</code><br>
+  <code>瞬移（时间差0）: False, 时间差非法</code><br><br>
+  <strong>为什么要留容差</strong>：<br>
+  · <em>网络抖动</em>——包延迟导致时间差不准<br>
+  · <em>客户端卡顿</em>——累积了移动距离后一次性上报<br>
+  · 本页用 <strong>1.5 倍容差</strong>（<em>即在 5m/s 上限下，超过 7.5m/s 才判异常</em>）<br><br>
+  <strong>但容差不能太大</strong>——<em>否则外挂可以利用</em>。
+</div>
+
+<h2 id="behavior">五、行为异常检测：多指标交叉 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">四个检测指标（本页实测）</span>
+  <strong>本页对比了正常玩家和疑似外挂</strong>：<br><br>
+  <div class="table-wrap">
+  <table>
+  <thead><tr><th>指标</th><th>正常</th><th>外挂</th><th>阈值</th></tr></thead>
+  <tbody>
+    <tr><td><strong>爆头率</strong></td><td>3.3%</td><td><strong>23.2%</strong></td><td>&gt;20%</td></tr>
+    <tr><td><strong>命中率</strong></td><td>30%</td><td><strong>95%</strong></td><td>&gt;90%</td></tr>
+    <tr><td><strong>反应时间</strong></td><td>280ms</td><td><strong>45ms</strong></td><td>&lt;150ms（人类极限）</td></tr>
+    <tr><td><strong>K/D</strong></td><td>0.6</td><td><strong>25.0</strong></td><td>&gt;5</td></tr>
+  </tbody>
+  </table>
+  </div>
+  <strong>关键原则</strong>：<em>单一指标异常不足以定性</em><br>
+  · 手感好的玩家可能爆头率高<br>
+  · 但要<strong>四个指标同时异常</strong> → 基本确定<br><br>
+  <strong>人类极限参考</strong>：<br>
+  · 反应时间 &gt; 150ms（<em>神经传导极限</em>）<br>
+  · 职业选手爆头率 40~50%<br>
+  · 职业选手命中率 40~60%
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">处置策略：不要自动封号</span>
+  <strong>本页的处置等级</strong>：<br>
+  <code>可疑度 20: 正常，继续观察</code><br>
+  <code>可疑度 45: 标记，加入监控</code><br>
+  <code>可疑度 70: 限制匹配，人工复核</code><br>
+  <code>可疑度 90: 暂停账号，立即审核</code><br><br>
+  <strong>铁律</strong>：<br>
+  · <strong>误封的代价 &gt; 放过一个作弊者</strong><br>
+  · 高可疑度<em>先暂停</em>，不要直接封<br>
+  · <strong>必须有申诉渠道</strong><br>
+  · <em>封号要走人工审核</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="19">
+  <div class="task"><input type="checkbox" id="t-19-1"><label for="t-19-1"><strong>列出你项目的逻辑</strong>：标注哪些必须服务端算。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-2"><label for="t-19-2"><strong>实现伤害校验</strong>：用理论上限拦截异常上报。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-3"><label for="t-19-3"><strong>实现速度校验</strong>：检测加速挂，并留合理容差。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-4"><label for="t-19-4"><strong>实现行为检测</strong>：用至少三个指标交叉判断。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-5"><label for="t-19-5"><strong>设计处置流程</strong>：从观察到封禁的等级。</label></div>
+  <div class="task"><input type="checkbox" id="t-19-6"><label for="t-19-6"><strong>回答面试题</strong>：① 哪些逻辑必须服务端算？② 速度校验为什么要留容差？③ 为什么不能自动封号？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出「客户端不可信」的三个层面</strong>；<br>
+    ② <strong>能用「改了会怎样」判断逻辑该放哪</strong>；<br>
+    ③ <strong>能实现三种校验模式并说出取舍</strong>；<br>
+    ④ <strong>能实现速度校验，并知道容差的必要性</strong>；<br>
+    ⑤ <strong>知道多指标交叉判断，且不能自动封号</strong>。<br>
+    <br>
+    <em>这一页是游戏后端的「底线」——**做错任何一条都可能毁掉游戏的经济和公平**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="18-inventory-economy.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">18 背包与经济系统 ★★★</div>
+  </a>
+  <a class="next" href="20-fullstack-frontend.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">20 前端基础与选型 ★</div>
+  </a>
+</nav>

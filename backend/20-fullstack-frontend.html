@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>20 前端基础与选型 — Unity 游戏后端 + 全栈开发路线｜从客户端主程延伸为能独立扛服务的全栈工程师</title>
+<meta name="description" content="Vue/React 选型、工程化、组件化思维（客户端视角切入）">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">Unity 游戏后端 + 全栈开发路线
+        <span>从客户端主程延伸为能独立扛服务的全栈工程师</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>20 · 前端基础与选型 ★</h1>
+
+<p class="lead">这一页是<strong>写给后端看的前端</strong>。你不需要成为前端专家，但<em>要能自己做出一个运营后台</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（19）防作弊与服务端权威 —— 哪些必须服务端算、客户端校验、异常行为检测。<br>
+  <strong>这一页</strong>（20）前端基础与选型 —— Vue/React 选型、工程化、组件化思维（客户端视角切入）。<br>
+  <strong>下一页</strong>（21）运营后台实战 —— 从零做一个 GM 后台：列表、筛选、权限、导出。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="03-http-basics.html#response" data-brief="统一响应 code/msg/data、状态码语义、错误码分段"><span class="prereq__title">HTTP 与 REST</span><span class="prereq__page">03-http-basics</span></a>
+          <a class="prereq__item" href="20-fullstack-frontend.html#paging-api" data-brief="一次返回 items+total+page+size"><span class="prereq__title">分页接口设计</span><span class="prereq__page">20-fullstack-frontend</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="choice">一、框架选型：别为了先进而先进</h2>
+
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace BackendSamples.Frontend
+{
+    // ============================================================
+    // 1. 前端框架选型（写给后端看）
+    // ============================================================
+    // 【从后端视角看前端】
+    //   前端本质是「把后端数据渲染成界面 + 收集用户输入」
+
+    public static class FrameworkChoice
+    {
+        public static readonly (string Framework, string Pros, string Cons, string Use)[] All =
+        {
+            ("Vue 3",   "上手快、中文文档好", "生态比 React 小", "【运营后台首选】"),
+            ("React",   "生态最大、灵活",     "概念多、需要更多决策", "复杂交互、国际化"),
+            ("Svelte",  "编译期优化、代码少", "生态小", "小型项目"),
+            ("纯 HTML+JS", "零依赖",          "复杂页面难维护", "极简工具页"),
+            ("ASP.NET Razor", "后端一把梭",  "交互能力弱", "【最省事】表单型后台"),
+        };
+
+        // 【对后端最重要的判断】要不要引入构建工具
+        public static string Recommendation(int pageCount, bool needRichInteraction)
+        {
+            if (pageCount &lt;= 3 &amp;&amp; !needRichInteraction)
+                return "用 Razor / 服务端渲染，不要引入前端框架";
+            if (pageCount &lt;= 10 &amp;&amp; !needRichInteraction)
+                return "Vue 3 + CDN（不构建）";
+            return "Vue 3 / React + Vite";
+        }
+    }
+
+    // ============================================================
+    // 2. 组件化思维（后端也能理解）
+    // ============================================================
+    // 【类比】前端组件 ≈ 后端的「可复用模块」
+    //   输入（props）-&gt; 处理 -&gt; 输出（渲染）
+
+    public class Component
+    {
+        public string Name = "";
+        public Dictionary&lt;string, object&gt; Props = new();
+        public List&lt;Component&gt; Children = new();
+
+        public Component(string name) =&gt; Name = name;
+
+        public Component WithProp(string key, object value)
+        {
+            Props[key] = value;
+            return this;
+        }
+
+        public Component Add(Component child)
+        {
+            Children.Add(child);
+            return this;
+        }
+
+        // 模拟渲染
+        public string Render(int depth = 0)
+        {
+            var indent = new string(' ', depth * 2);
+            var props = Props.Count &gt; 0
+                ? " " + string.Join(" ", Props.Select(kv =&gt; $"{kv.Key}=\"{kv.Value}\""))
+                : "";
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"{indent}&amp;lt;{Name}{props}&amp;gt;");
+            foreach (var c in Children) sb.Append(c.Render(depth + 1));
+            sb.AppendLine($"{indent}&amp;lt;/{Name}&amp;gt;");
+            return sb.ToString();
+        }
+    }
+
+    // ============================================================
+    // 3. 前后端数据交互的三种模式
+    // ============================================================
+
+    public static class DataFlow
+    {
+        public static readonly (string Mode, string How, string Pros, string Cons)[] All =
+        {
+            ("服务端渲染(SSR)", "后端拼 HTML 返回", "首屏快、SEO好", "交互弱、每次刷新"),
+            ("SPA + REST",     "前端拉 JSON，自己渲染", "交互流畅", "首屏慢、要处理状态"),
+            ("SPA + GraphQL",  "前端按需查询", "减少请求数", "后端复杂度高"),
+            ("BFF",            "为前端定制的聚合层", "前端简单", "多一层维护"),
+        };
+    }
+
+    // ============================================================
+    // 4. 一个典型的分页列表：前后端怎么配合
+    // ============================================================
+    // 【后端该给什么】前端要什么就给什么，不要让它拼多次请求
+
+    public class PageResult&lt;T&gt;
+    {
+        public List&lt;T&gt; Items = new();
+        public int Total;
+        public int Page;
+        public int Size;
+
+        public int TotalPages =&gt; (Total + Size - 1) / Size;
+        public bool HasPrev =&gt; Page &gt; 1;
+        public bool HasNext =&gt; Page &lt; TotalPages;
+    }
+
+    public class PlayerAdminItem
+    {
+        public long Id;
+        public string Name = "";
+        public int Level;
+        public int Gold;
+        public string LastLogin = "";
+        public bool Banned;
+    }
+
+    // 【反例】只返回列表，前端还要再请求总数
+    public class BadApi
+    {
+        public List&lt;PlayerAdminItem&gt; GetPlayers_Bad(int page, int size)
+        {
+            // 前端拿到列表后，还要再调一次 /count 才知道总页数
+            return new List&lt;PlayerAdminItem&gt;();
+        }
+    }
+
+    // 【正例】一次返回列表 + 总数 + 分页信息
+    public class GoodApi
+    {
+        private readonly List&lt;PlayerAdminItem&gt; _all = new();
+
+        public GoodApi()
+        {
+            for (int i = 1; i &lt;= 55; i++)
+            {
+                _all.Add(new PlayerAdminItem
+                {
+                    Id = i,
+                    Name = $"玩家{i}",
+                    Level = (i % 50) + 1,
+                    Gold = i * 100,
+                    LastLogin = DateTime.UtcNow.AddHours(-i).ToString("MM-dd HH:mm"),
+                    Banned = i % 17 == 0,
+                });
+            }
+        }
+
+        public PageResult&lt;PlayerAdminItem&gt; GetPlayers(int page, int size)
+        {
+            var r = new PageResult&lt;PlayerAdminItem&gt;
+            {
+                Total = _all.Count,
+                Page = page,
+                Size = size,
+            };
+            r.Items = _all.Skip((page - 1) * size).Take(size).ToList();
+            return r;
+        }
+
+        // 【关键】筛选条件也要一次给全
+        public PageResult&lt;PlayerAdminItem&gt; Search(string? keyword, bool? banned, int page, int size)
+        {
+            var q = _all.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(keyword))
+                q = q.Where(p =&gt; p.Name.Contains(keyword));
+
+            if (banned.HasValue)
+                q = q.Where(p =&gt; p.Banned == banned.Value);
+
+            var list = q.ToList();
+            var r = new PageResult&lt;PlayerAdminItem&gt;
+            {
+                Total = list.Count,
+                Page = page,
+                Size = size,
+            };
+            r.Items = list.Skip((page - 1) * size).Take(size).ToList();
+            return r;
+        }
+    }
+
+    // ============================================================
+    // 5. 前端状态管理（后端需要理解的）
+    // ============================================================
+    // 【核心问题】前端有「状态」：登录用户、列表数据、加载中、错误
+    //   状态管理错了 -&gt; 界面错乱（显示旧数据、重复请求）
+
+    public class ListState
+    {
+        public bool Loading;
+        public string? Error;
+        public List&lt;PlayerAdminItem&gt; Items = new();
+        public int Total;
+        public int Page = 1;
+
+        public bool IsEmpty =&gt; !Loading &amp;&amp; Error == null &amp;&amp; Items.Count == 0;
+
+        public string Describe()
+        {
+            if (Loading) return "加载中...";
+            if (Error != null) return "错误: " + Error;
+            if (IsEmpty) return "暂无数据";
+            return $"共 {Total} 条，第 {Page} 页，当前显示 {Items.Count} 条";
+        }
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 框架选型建议 ===");
+            foreach (var (fw, pros, cons, use) in FrameworkChoice.All)
+            {
+                Console.WriteLine($"    {fw,-14} 优点: {pros,-22} {use}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  按场景推荐:");
+            foreach (var (pages, rich) in new[] { (2, false), (8, false), (30, true) })
+            {
+                var rec = FrameworkChoice.Recommendation(pages, rich);
+                Console.WriteLine($"    {pages,3} 页 / {(rich ? "复杂交互" : "简单表单")} -&gt; {rec}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【给后端的建议】");
+            Console.WriteLine("    如果只是做个 GM 后台，Razor 就够了");
+            Console.WriteLine("    不要为了「技术先进」引入整套前端工程");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 组件化（和后端模块化是一个思路）===");
+            var page = new Component("div").WithProp("class", "container");
+            var table = new Component("table");
+            var header = new Component("thead");
+            var row = new Component("tr");
+            row.Add(new Component("th").WithProp("width", "80"));
+            row.Add(new Component("th").WithProp("width", "120"));
+            header.Add(row);
+            table.Add(header);
+            page.Add(table);
+
+            Console.WriteLine("  渲染结果:");
+            foreach (var line in page.Render().Split('\n'))
+            {
+                if (!string.IsNullOrWhiteSpace(line)) Console.WriteLine("    " + line);
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【类比】前端组件 = 后端模块");
+            Console.WriteLine("    输入(props) -&gt; 处理 -&gt; 输出(渲染)");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 分页接口：一次性给全 ===");
+            var api = new GoodApi();
+
+            Console.WriteLine("  【错误做法】只返回列表:");
+            Console.WriteLine("    前端还要再调 /count 拿总数 -&gt; 2 次请求");
+            Console.WriteLine("    如果这期间数据变了 -&gt; 页码对不上");
+
+            Console.WriteLine();
+            Console.WriteLine("  【正确做法】一次返回 items + total + page + size:");
+            var r = api.GetPlayers(1, 10);
+            Console.WriteLine($"    {r.Items.Count} 条，共 {r.Total} 条，{r.TotalPages} 页");
+            Console.WriteLine($"    有上一页: {r.HasPrev}，有下一页: {r.HasNext}");
+
+            Console.WriteLine();
+            Console.WriteLine("  第 6 页（最后一页）:");
+            var r6 = api.GetPlayers(6, 10);
+            Console.WriteLine($"    {r6.Items.Count} 条，有下一页: {r6.HasNext}");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 筛选 + 分页 ===");
+            Console.WriteLine("  搜「玩家1」:");
+            var s1 = api.Search("玩家1", null, 1, 5);
+            Console.WriteLine($"    结果 {s1.Total} 条，本页 {s1.Items.Count} 条");
+
+            Console.WriteLine("  只看已封禁:");
+            var s2 = api.Search(null, true, 1, 5);
+            Console.WriteLine($"    结果 {s2.Total} 条");
+            foreach (var p in s2.Items)
+            {
+                Console.WriteLine($"      {p.Name} 已封禁");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】筛选条件要一次给全");
+            Console.WriteLine("          不要「先按名字筛，再按状态筛」两次请求");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 5. 前端状态的四种情况 ===");
+            var states = new[]
+            {
+                new ListState { Loading = true },
+                new ListState { Error = "网络超时" },
+                new ListState(),
+                new ListState { Items = api.GetPlayers(1, 3).Items, Total = 55, Page = 1 },
+            };
+
+            foreach (var st in states)
+            {
+                Console.WriteLine($"    {st.Describe()}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【后端要注意】每种状态前端都要处理");
+            Console.WriteLine("    · 加载中要显示骨架屏");
+            Console.WriteLine("    · 错误要能重试");
+            Console.WriteLine("    · 空数据要显示提示（不是白屏）");
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Frontend.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>框架</th><th>优点</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Vue 3</strong></td><td>上手快、中文文档好</td><td><strong>运营后台首选</strong></td></tr>
+    <tr><td><strong>React</strong></td><td>生态最大</td><td><em>复杂交互</em></td></tr>
+    <tr><td><strong>Svelte</strong></td><td>代码少</td><td><em>小型项目</em></td></tr>
+    <tr><td><strong>纯 HTML+JS</strong></td><td>零依赖</td><td><em>极简工具页</em></td></tr>
+    <tr><td><strong>Razor</strong></td><td>后端一把梭</td><td><strong>最省事</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="recommendation">二、选型的实用判断 ★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">本页给出的三条建议</span>
+  <strong>按页面数和交互复杂度判断</strong>：<br><br>
+  <div class="table-wrap">
+  <table>
+  <thead><tr><th>场景</th><th>推荐</th></tr></thead>
+  <tbody>
+    <tr><td>≤3 页 + 简单表单</td><td><strong>Razor（服务端渲染）</strong></td></tr>
+    <tr><td>≤10 页 + 简单交互</td><td>Vue 3 + CDN（<em>不构建</em>）</td></tr>
+    <tr><td>复杂后台</td><td>Vue 3 / React + Vite</td></tr>
+  </tbody>
+  </table>
+  </div>
+  <strong>给后端的建议</strong>：<em>如果只是做个 GM 后台，Razor 就够了</em>。<br>
+  <strong>不要为了「技术先进」引入整套前端工程</strong>——<br>
+  · 要维护 <code>node_modules</code><br>
+  · 要配构建流程<br>
+  · <em>团队成员还得会前端</em><br><br>
+  <strong>判断标准</strong>：<em>这个后台会有多少人用？用多久？</em>
+</div>
+
+<h2 id="paging-api">三、分页接口：一次给全 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">反例：只返回列表</span>
+  <strong>错误设计</strong>：<br>
+  <code>GET /api/players?page=1</code> → <code>[{...}, {...}]</code><br>
+  <em>前端不知道总共有多少页！</em><br>
+  只能再调 <code>GET /api/players/count</code> → <strong>2 次请求</strong><br><br>
+  <strong>问题</strong>：<br>
+  · 两次请求之间数据可能变了 → <em>页码对不上</em><br>
+  · 前端要多写一次请求逻辑<br>
+  · <em>首屏慢一倍</em><br><br>
+  <strong>本页实测的正确做法</strong>：<br>
+  <code>{ items: [...], total: 55, page: 1, size: 10 }</code><br>
+  <code>10 条，共 55 条，6 页</code><br>
+  <code>有上一页: False，有下一页: True</code><br>
+  <code>第 6 页（最后一页）: 5 条，有下一页: False</code><br><br>
+  <strong>原则</strong>：<em>前端渲染一屏所需的所有数据，一次给全</em>。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">筛选也一样</span>
+  <strong>错误</strong>：<em>先按名字筛，再按状态筛</em>（两次请求）<br>
+  <strong>正确</strong>：所有筛选条件一次传<br>
+  <code>GET /api/players?keyword=玩家1&amp;banned=true&amp;page=1</code><br><br>
+  <strong>本页实测</strong>：<br>
+  <code>搜「玩家1」: 结果 11 条，本页 5 条</code><br>
+  <code>只看已封禁: 结果 3 条（玩家17 / 玩家34 / 玩家51）</code><br><br>
+  <strong>后端要注意</strong>：<br>
+  · <code>total</code> 要反映<strong>筛选后</strong>的总数（<em>不是全表</em>）<br>
+  · 空条件要正确处理<br>
+  · <em>索引要覆盖筛选字段</em>（<em>页 07</em>）
+</div>
+
+<h2 id="state">四、前端状态：四种情况都要处理</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">本页实现的 ListState</span>
+  <strong>前端列表有四种状态</strong>：<br>
+  <code>加载中...</code><br>
+  <code>错误: 网络超时</code><br>
+  <code>暂无数据</code><br>
+  <code>共 55 条，第 1 页，当前显示 3 条</code><br><br>
+  <strong>后端要注意什么</strong>：<br>
+  · 加载中 → 前端显示骨架屏（<em>后端要快</em>）<br>
+  · 错误 → <em>返回明确的错误码和消息</em>（<em>页 03</em>）<br>
+  · 空数据 → <em>返回空数组，不是 404</em><br>
+  · 正常 → <em>带全分页信息</em><br><br>
+  <strong>常见错误</strong>：<em>查不到数据时返回 404</em> → 前端当成错误处理 → <strong>显示报错而不是「暂无数据」</strong>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="20">
+  <div class="task"><input type="checkbox" id="t-20-1"><label for="t-20-1"><strong>选一个框架</strong>：按本页的三条建议，给你的后台选型。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-2"><label for="t-20-2"><strong>设计分页接口</strong>：一次返回 items + total + page + size。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-3"><label for="t-20-3"><strong>加筛选</strong>：支持关键词和状态组合筛选。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-4"><label for="t-20-4"><strong>处理四种状态</strong>：加载、错误、空、正常。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-5"><label for="t-20-5"><strong>做一个最小页面</strong>：用 Razor 或 Vue 渲染一个列表。</label></div>
+  <div class="task"><input type="checkbox" id="t-20-6"><label for="t-20-6"><strong>回答面试题</strong>：① 分页接口该返回什么？② 查不到数据该返回 404 还是空数组？③ 为什么小后台不建议引入前端框架？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能按场景选出合适的前端方案</strong>；<br>
+    ② <strong>知道小后台用 Razor 最省事</strong>；<br>
+    ③ <strong>能设计出「一次给全」的分页接口</strong>；<br>
+    ④ 知道筛选条件要一次传，且 total 要反映筛选结果；<br>
+    ⑤ <strong>知道查不到数据要返回空数组而不是 404</strong>。<br>
+    <br>
+    <em>第 ③ 和 第 ⑤ 条最实用——**它们能避免前后端来回扯皮**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="19-anticheat.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">19 防作弊与服务端权威 ★★★</div>
+  </a>
+  <a class="next" href="21-admin-panel.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">21 运营后台实战 ★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

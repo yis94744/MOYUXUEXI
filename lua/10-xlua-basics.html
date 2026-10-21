@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">Lua 热更新路线
+      <a href="index.html">Lua 热更新路线
         <span>从零基础到独立搭建可上线的热更框架</span>
       </a>
     </div>
@@ -52,7 +52,6 @@
       <div class="prereq">
         <div class="prereq__label">读这一页之前，建议先掌握</div>
         <div class="prereq__list">
-          <a class="prereq__item" href="09-hotupdate-basics.html#require" data-brief="package.loaded 缓存，热更要清缓存"><span class="prereq__title">require 与模块</span><span class="prereq__page">09-hotupdate-basics</span></a>
           <a class="prereq__item" href="09-hotupdate-basics.html#require" data-brief="清 package.loaded + 重新 require，旧引用问题"><span class="prereq__title">热更新原理</span><span class="prereq__page">09-hotupdate-basics</span></a>
         </div>
         <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
@@ -80,9 +79,13 @@
   <code>xlua.hotfix(CS.GameLogic, "CalculateDamage", function(self, atk, def)</code><br>
   <code>&nbsp;&nbsp;return atk * 1.5 - def</code><br>
   <code>end)</code><br><br>
+  <strong>前提</strong>：热补丁要先打开 <code>HOTFIX_ENABLE</code> 宏，再执行
+  <code>XLua/Generate Code</code> + <code>XLua/Hotfix Inject In Editor</code> 做<strong>代码注入</strong>。
+  <em>只打标签不注入，运行时会报 <code>xlua.access, no field __Hitfix0_XXX</code>。</em><br><br>
   <strong>代价</strong>：<br>
   · 被 hotfix 的方法<em>调用开销变大</em>（要过一次 Lua）<br>
-  · 需要<strong>预先生成绑定代码</strong>（不能运行时反射）<br>
+  · 需要<strong>预先生成代码并注入</strong>（注入是构建期做的，不是运行时反射）<br>
+  · <strong>只支持 Assets 下的业务代码</strong>，引擎与 C# 系统库不能打补丁<br>
   <em>所以：只 hotfix 真正需要频繁调整的方法，不要全量 hotfix。</em>
 </div>
 
@@ -108,13 +111,13 @@
   <strong>① Vector3 之类的 struct 传递</strong><br>
   Lua 里 <code>transform.position = Vector3(x, y, z)</code><br>
   <em>每次都创建一个新的 C# struct 对象</em>——<strong>这是 GC 的重灾区</strong>。<br>
-  <strong>优化</strong>：用 xLua 提供的 <code>xlua.struct</code> 或缓存 Vector3 对象复用。<br><br>
+  <strong>优化</strong>：用 <code>xlua.structclone</code> 克隆结构体，而不是反复传同样的值；更根本的办法是<em>把 struct 从热路径上拿掉</em>（见下）。<br><br>
   <strong>② 频繁的 string 转换</strong><br>
   C# string 传给 Lua 要<em>拷贝一份</em>。每个字符串都有开销。<br>
   <strong>优化</strong>：<em>避免在热路径上频繁传字符串</em>（比如每帧拼接日志）。<br><br>
   <strong>③ Lua table 转 C# 对象</strong><br>
   <code>CS.SomeClass(table)</code> 会<em>创建一个完整的 C# 对象并逐字段拷贝</em>。<br>
-  <strong>优化</strong>：<em>复用对象，不要每次 new</em>。
+  <strong>优化</strong>：<em>复用对象，不要每次 new</em>。给目标类型加 <code>[GCOptimize]</code> 能让这层转换少产生 GC（见页 11）。
 </div>
 
 <h2 id="codegen">三、生成代码：性能的关键</h2>

@@ -4,7 +4,9 @@
 
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
-  [object Object]
+  上一页（10）讲了 xLua 的基本用法。这一页深入<strong>决定性能的部分</strong>：<em>跨语言调用的真实成本、GC 的来源、批量与缓存策略</em>。<br>
+  <strong>关键衔接</strong>：页 08 的<em>性能方法</em>在这里换了测量对象——从"Lua 内部"变成"Lua 与 C# 的边界"。<br>
+  <strong>下一页</strong>（12）横向对比其它热更方案。<em>先知道边界的成本，才有资格谈要不要换方案。</em>
 </div>
 
 <h2 id="cost">一、跨语言调用的真实成本</h2>
@@ -50,7 +52,22 @@
   · <strong>缓存 Vector3</strong>：<code>local tmpVec = CS.UnityEngine.Vector3.zero</code>，用 <code>Set</code> 修改而不是 new<br>
   · <strong>避免传字符串</strong>：用数字 ID 或缓存字符串引用<br>
   · <strong>避免传函数</strong>：用事件 ID + 注册表代替直接传 delegate<br>
-  · <strong>用 <code>xlua.struct</code></strong>：让 struct 在 Lua 侧以值语义传递
+  · <strong>给值类型加 <code>[GCOptimize]</code></strong>：让 struct 在 Lua 与 C# 之间传递<em>不产生 GC Alloc</em>（见下）
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">关于 Vector3 的一个常见误解</span>
+  <strong>「xLua 提供了一个 <code>xlua.struct</code> 让 struct 按值语义传」——没有这个 API。</strong><br>
+  xLua 的 Lua 侧接口（官方 XLua_API 文档所列）只有 <code>xlua.hotfix</code> / <code>xlua.private_accessible</code> /
+  <code>xlua.structclone</code> / <code>xlua.get_generic_method</code> / <code>cast</code> / <code>typeof</code> / <code>uint64.*</code>，
+  <em>官方文档里不存在 <code>xlua.struct</code></em>。<br><br>
+  <strong>真正管 struct 的是 C# 侧的 <code>[GCOptimize]</code> 标签</strong>：<br>
+  · 加在<em>「字段全是值类型」的 struct</em>（或枚举）上，xLua 会为它生成无 GC 的打包/解包代码<br>
+  · 加了这个标签之后，<code>Vector3</code> 这类值类型在<strong>通过 delegate、无 GC 接口或数组</strong>传递时才不产生 GC Alloc<br>
+  · <em>Unity 内置的 Vector2/Vector3/Color/Quaternion 等，xLua 已经预置了 GCOptimize 配置</em><br><br>
+  <strong>所以「每次 <code>Vector3(x,y,z)</code> 都是 GC 重灾区」这个说法要打个折</strong>：
+  真正贵的是<em>调用次数</em>（每次跨语言调用都有栈切换），而不只是对象本身。<br>
+  <em>结论不变：把 N 次调用合成 1 次，收益远大于纠结「这个 struct 会不会分配」。</em>
 </div>
 
 <div class="callout callout--tip">
@@ -83,13 +100,18 @@
 
 <div class="callout callout--note">
   <span class="callout__title">缓存引用的正确姿势</span>
-  <strong>差的写法</strong>：<br>
-  <code>local go = CS.UnityEngine.GameObject()  -- 每次都查 CS 表</code><br><br>
+  <strong>差的写法</strong>（每帧都在查 <code>CS</code> 表）：<br>
+  <code>for i = 1, 100 do</code><br>
+  <code>&nbsp;&nbsp;CS.UnityEngine.GameObject.Find("Enemy")</code><br>
+  <code>end</code><br><br>
   <strong>好的写法</strong>：<br>
   <code>local GameObject = CS.UnityEngine.GameObject  -- 模块顶部缓存</code><br>
-  <code>local go = GameObject()  -- 直接用缓存</code><br><br>
+  <code>for i = 1, 100 do GameObject.Find("Enemy") end</code><br><br>
   <strong>但要小心</strong>：<em>缓存的是"类引用"，不是"实例引用"</em>。<br>
-  实例引用如果指向已销毁的对象，会变成"假 null"（见 C# 站页 11）——<em>用之前要检查 <code>~= nil</code></em>。
+  C# 的 <code>UnityEngine.Object</code> 被 Destroy 后，Lua 侧拿到的对象<strong>不是 nil</strong>（"假 null"），
+  <code>obj ~= nil</code> 判不出来——要写成 <code>if obj and not obj:Equals(nil) then</code>，或者先用
+  <code>xlua.private_accessible</code> 之外的方式拿到 <code>UnityEngine.Object.op_Equality</code> 再比较。<br>
+  <em>这是 xLua 项目里非常高频的一类空引用崩溃（详见 C# 站页 11 的"假 null"）。</em>
 </div>
 
 <h2 id="tasks">本章动手任务</h2>

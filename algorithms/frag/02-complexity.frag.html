@@ -4,7 +4,10 @@
 
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
-  [object Object]
+  <strong>上一页</strong>（01）说了要学什么。这一页给出<em>判断标准</em>——看到一个操作，能立刻说出它值不值得优化。<br>
+  <strong>关键衔接</strong>：这里定下的"每帧 16.7ms、单系统 1~2ms"是后面所有性能结论的基准；页 12、26、30 的取舍都建立在这个预算上。<br>
+  <strong>下一页</strong>（03）开始讲具体结构。<em>先有预算感，再看结构，才不会把注意力放错地方。</em><br>
+  <strong>验证方式</strong>：本页的"队列 vs 环形缓冲""拼接 vs concat"都有实测数字，后面的页面会逐个复现。
 </div>
 
 <h2 id="budget">一、游戏程序的"复杂度预算"</h2>
@@ -67,13 +70,13 @@
   <em>1000 个单位 = 50 万次距离计算 = 必卡</em><br>
   <strong>解法</strong>：空间划分（<em>页 12</em>）<br><br>
   <strong>② 队列用 <code>table.remove(t, 1)</code></strong><br>
-  <em>每次出队都要移动后面所有元素</em>——实测比环形缓冲<strong>慢 500 倍</strong><br>
+  <em>每次出队都要移动后面所有元素</em>——实测比环形缓冲<strong>慢 500 倍以上</strong><br>
   <strong>解法</strong>：环形缓冲（<em>页 03</em>）<br><br>
   <strong>③ 循环内字符串拼接</strong><br>
   <code>local s = ""</code><br>
   <code>for i = 1, n do s = s .. i end</code><br>
   <em>每次 <code>..</code> 都创建新字符串</em><br>
-  <strong>解法</strong>：<code>table.concat</code>（<em>实测快 17~30 倍</em>）
+  <strong>解法</strong>：<code>table.concat</code>（<em>实测快 16~22 倍</em>）
 </div>
 
 <h2 id="intuition">三、怎么培养复杂度直觉</h2>

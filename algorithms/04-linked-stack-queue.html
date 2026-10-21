@@ -133,7 +133,8 @@
   · 用<strong>环形缓冲</strong>（本页演示的方式）——<em>出队 O(1)</em>
   · 或用<strong>头尾索引</strong>代替删除（不移动元素，只移动索引）
   · 或用<strong>反向数组</strong>（从尾部进出）
-  <strong>实测对比</strong>：10000 个元素的队列，用 <code>table.remove(t,1)</code> 出队需要 <em>约 0.5 秒</em>；用环形缓冲只要 <em>0.001 秒</em>——<strong>差 500 倍</strong>。
+  <strong>实测对比</strong>：10000 个元素的队列，用 <code>table.remove(t,1)</code> 逐个出队需要 <em>约 0.40~0.50 秒</em>；改用<em>头索引</em>（只移动 head，不搬元素）几乎测不出耗时（低于 <code>os.clock</code> 的分辨率）——<strong>差距在 500 倍以上</strong>。<br>
+  <em>注意</em>：环形缓冲和"头索引"是同一个思想的两种写法——<em>出队时只改索引，不搬数据</em>。
 </div>
 
 <h2 id="tasks">本章动手任务</h2>

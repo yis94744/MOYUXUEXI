@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">Lua 热更新路线
+      <a href="index.html">Lua 热更新路线
         <span>从零基础到独立搭建可上线的热更框架</span>
       </a>
     </div>
@@ -80,13 +80,16 @@ print()
 print("  一个成熟的热更框架通常分为五层：")
 print()
 print("    ┌─────────────────────────────────────────┐")
-print("    │  业务层   玩法逻辑、UI 界面、活动         │  &lt;- 策划/程序都改这里")
+print("    │  ① 业务层   玩法逻辑、UI 界面、活动      │  &lt;- 策划/程序都改这里")
 print("    ├─────────────────────────────────────────┤")
-print("    │  框架层   模块管理、事件、资源、网络      │  &lt;- 框架开发者维护")
+print("    │  ② 框架层   模块管理、事件、资源、网络   │  &lt;- 框架开发者维护")
 print("    ├─────────────────────────────────────────┤")
-print("    │  适配层   xLua 封装、Unity API 桥接      │  &lt;- 隔离引擎差异")
+print("    │  ③ 适配层   xLua 封装、Unity API 桥接   │  &lt;- 隔离引擎差异")
 print("    ├─────────────────────────────────────────┤")
-print("    │  引擎层   Unity / C#                     │")
+print("    │  ④ 引擎层   Unity / C#                  │  &lt;- 引擎团队")
+print("    ├─────────────────────────────────────────┤")
+print("    │  ⑤ 平台层   iOS/Android/PC 打包、热更、  │  &lt;- 发行 + 运维")
+print("    │              渠道 SDK                    │")
 print("    └─────────────────────────────────────────┘")
 print()
 print("  【关键原则】依赖只能【从上往下】—— 业务层可以调框架层，")
@@ -417,6 +420,7 @@ print("  理解了这个结构，再看真实框架的源码就不会迷路。")
     <tr><td><strong>框架层</strong></td><td>模块管理、事件、资源、网络</td><td><strong>框架开发者</strong></td></tr>
     <tr><td><strong>适配层</strong></td><td>xLua 封装、Unity API 桥接</td><td>隔离引擎差异</td></tr>
     <tr><td><strong>引擎层</strong></td><td>Unity / C#</td><td>引擎团队</td></tr>
+    <tr><td><strong>平台层</strong></td><td>iOS / Android / PC 的打包、热更下载、渠道 SDK</td><td>发行 + 运维</td></tr>
   </tbody>
 </table>
 </div>
@@ -463,7 +467,12 @@ print("  理解了这个结构，再看真实框架的源码就不会迷路。")
   如果直接遍历原列表，会导致<em>索引错位、跳过元素或崩溃</em>。<br><br>
   <strong>解决方案</strong>：派发前<strong>复制一份快照</strong>再遍历。<br>
   <em>代价是每次派发多一次表复制</em>——但这个代价是值得的，因为<strong>回调里修改订阅是最常见的用法</strong>。<br><br>
-  <strong>优化</strong>：如果事件频繁且订阅者少，可以用<em>复用缓冲区</em>避免每次分配。
+  <strong>优化</strong>：如果事件频繁且订阅者少，可以用<em>复用缓冲区</em>避免每次分配。<br><br>
+  <strong>本页实测（Lua 5.4.7，见本页代码样本）</strong>：三个订阅者 A/B/C，A 在回调里取消 B——<br>
+  · <strong>快照遍历</strong>：调用顺序 <code>A → B → C</code>，共 3 次，不报错<br>
+  · <strong>直接遍历原表</strong>：调用顺序 <code>A → C</code>，共 2 次——<em>B 被静默跳过</em>（下标前移）<br>
+  · <strong>对照</strong>：只有一个订阅者、且它取消的是自己时，<em>即使不用快照也不会出问题</em>
+  ——所以"取消自己"这个 demo 根本测不出问题，<strong>必须用"取消别人"才能复现</strong>。
 </div>
 
 <div class="callout callout--danger">
@@ -473,9 +482,12 @@ print("  理解了这个结构，再看真实框架的源码就不会迷路。")
   <code>emit(X)</code> → 入队 → 循环取出派发<br>
   如果派发中又有 <code>emit</code>，<em>只是入队，由外层循环处理</em>。<br><br>
   <strong>好处</strong>：<br>
-  · 不会无限递归<br>
+  · <em>不会因为"同步重入"而爆栈</em>（回调里的 emit 只是入队，由外层循环处理）<br>
   · 派发顺序可预测（FIFO）<br>
-  · 可以在回调里安全地订阅/取消订阅
+  · 可以在回调里安全地订阅/取消订阅<br><br>
+  <strong>但它并不是万能的</strong>：如果回调里<em>每次都无条件再 emit 同一个事件</em>，队列只会越来越长——
+  栈不爆，<strong>但会死循环（卡在 while 里）</strong>。真正的防护还得靠<em>业务上的终止条件</em>
+  或者给队列加一个<strong>单次派发的最大重入次数</strong>。
 </div>
 
 <h2 id="scope">四、框架骨架 vs 完整框架</h2>

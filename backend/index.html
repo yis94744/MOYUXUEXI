@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>路线总览 — Unity 游戏后端 + 全栈开发路线｜从客户端主程延伸为能独立扛服务的全栈工程师</title>
+<meta name="description" content="整条路线的结构、两段式设计与学习节奏">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">Unity 游戏后端 + 全栈开发路线
+        <span>从客户端主程延伸为能独立扛服务的全栈工程师</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>Unity 游戏后端 + 全栈开发路线</h1>
+
+<p class="lead">你已经是客户端主程了——<strong>懂引擎、懂性能、懂玩法</strong>。这条路线的目标是：<em>把能力延伸到服务端，成为能独立扛起一个项目前后端的全栈工程师</em>。</p>
+
+<h2 id="advantage">为什么客户端转后端有优势</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>你的现有能力</th><th>在后端的价值</th></tr></thead>
+  <tbody>
+    <tr><td><strong>C# / .NET 熟悉</strong></td><td>ASP.NET Core 就是 C#，<em>语法零成本</em></td></tr>
+    <tr><td><strong>性能调优经验</strong></td><td><strong>后端同样吃性能</strong>：GC、连接池、SQL</td></tr>
+    <tr><td><strong>理解网络同步</strong></td><td><em>状态同步/帧同步是你做过的</em></td></tr>
+    <tr><td><strong>懂游戏业务</strong></td><td><strong>最稀缺</strong>——纯后端不懂玩法</td></tr>
+    <tr><td><strong>懂客户端约束</strong></td><td><em>能设计出客户端好用的协议</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">你的最大优势：懂两边</span>
+  <strong>纯后端工程师写的协议，客户端往往用起来很别扭</strong>——<br>· 字段设计不符合客户端的数据结构<br>· 一个界面要发 5 个请求才能凑齐数据<br>· 没有考虑网络抖动时的体验<br><br><strong>而你两边都懂</strong>，能设计出「客户端一个请求拿到一屏数据」的接口。<br><em>这是纯后端给不了的价值，也是你转岗的谈判筹码。</em>
+</div>
+
+<h2 id="phases">四段式设计</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>阶段</th><th>页数</th><th>目标</th></tr></thead>
+  <tbody>
+    <tr><td><strong>第一段：后端基础</strong></td><td>03-10 页</td><td>ASP.NET Core + 数据库 + 缓存 + 消息队列</td></tr>
+    <tr><td><strong>第二段：游戏后端</strong></td><td>11-19 页</td><td>长连接、同步、匹配、排行榜、防作弊</td></tr>
+    <tr><td><strong>第三段：全栈能力</strong></td><td>20-24 页</td><td>前端、运营后台、部署、扩展性、安全</td></tr>
+    <tr><td><strong>第四段：工程实践</strong></td><td>25-32 页</td><td>性能、测试、架构、实战、面试</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">最大的坑：直接啃游戏后端</span>
+  <strong>很多人一上来就想学「帧同步」「状态同步」</strong>——<em>但没有 Web 基础会处处卡壳</em>：<br>· 不知道中间件是什么，看不懂框架代码<br>· 不会写 SQL，数据存不下来<br>· 不知道什么叫幂等，结算逻辑写崩<br><br><strong>建议顺序</strong>：<em>先花 2~3 周打通 03-10 页，再进游戏后端</em>。<br>那些基础是<strong>所有后端的地基</strong>，绕不过去。
+</div>
+
+<h2 id="roadmap">完整路线图</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>编号</th><th>标题</th><th>核心内容</th></tr></thead>
+  <tbody>
+    <tr><td><strong>01</strong></td><td>岗位与行业现实</td><td><em>游戏后端 / Web 后端 / 全栈的分工</em></td></tr>
+    <tr><td><strong>02</strong></td><td>环境搭建与第一个 API</td><td>装 SDK、跑通第一个接口</td></tr>
+    <tr><td><strong>03</strong></td><td>HTTP、REST 与 API 设计</td><td><strong>状态码、幂等、错误码规范</strong></td></tr>
+    <tr><td><strong>04</strong></td><td>ASP.NET Core 框架</td><td><strong>中间件、DI、配置</strong></td></tr>
+    <tr><td><strong>05</strong></td><td>路由、模型绑定与验证</td><td><em>参数来源、统一响应</em></td></tr>
+    <tr><td><strong>06</strong></td><td>鉴权与会话</td><td><strong>JWT、Token 刷新、越权</strong></td></tr>
+    <tr><td><strong>07</strong></td><td>数据库与 EF Core</td><td><strong>N+1、事务、迁移</strong></td></tr>
+    <tr><td><strong>08</strong></td><td>缓存与 Redis</td><td><em>穿透雪崩、分布式锁</em></td></tr>
+    <tr><td><strong>09</strong></td><td>消息队列与异步</td><td><em>削峰、最终一致、幂等消费</em></td></tr>
+    <tr><td><strong>10</strong></td><td>日志、监控与可观测性</td><td>结构化日志、链路追踪</td></tr>
+    <tr><td><strong>11</strong></td><td>游戏后端全景</td><td><strong>登录服/网关/战斗服分工</strong></td></tr>
+    <tr><td><strong>12</strong></td><td>长连接与短连接</td><td><strong>心跳、重连、粘包拆包</strong></td></tr>
+    <tr><td><strong>13</strong></td><td>协议设计与序列化</td><td>Protobuf、版本兼容</td></tr>
+    <tr><td><strong>14</strong></td><td>状态同步与帧同步</td><td><strong>确定性、回滚</strong></td></tr>
+    <tr><td><strong>15</strong></td><td>战斗服与结算</td><td><em>房间、校验、幂等结算</em></td></tr>
+    <tr><td><strong>16</strong></td><td>匹配系统</td><td>Elo/MMR、匹配池</td></tr>
+    <tr><td><strong>17</strong></td><td>排行榜</td><td><strong>Redis ZSet</strong></td></tr>
+    <tr><td><strong>18</strong></td><td>背包与经济系统</td><td><strong>并发扣减、防刷、对账</strong></td></tr>
+    <tr><td><strong>19</strong></td><td>防作弊与服务端权威</td><td><em>哪些必须服务端算</em></td></tr>
+    <tr><td><strong>20</strong></td><td>前端基础与选型</td><td>Vue/React</td></tr>
+    <tr><td><strong>21</strong></td><td>运营后台实战</td><td><strong>GM 后台</strong></td></tr>
+    <tr><td><strong>22</strong></td><td>部署与运维</td><td>Linux、Nginx、Docker</td></tr>
+    <tr><td><strong>23</strong></td><td>扩展性与高可用</td><td><em>负载均衡、分库分表</em></td></tr>
+    <tr><td><strong>24</strong></td><td>安全与合规</td><td>注入、XSS、越权</td></tr>
+    <tr><td><strong>25</strong></td><td>后端性能优化</td><td><em>压测、连接池、GC</em></td></tr>
+    <tr><td><strong>26</strong></td><td>测试与质量</td><td>单元/集成/压测</td></tr>
+    <tr><td><strong>27</strong></td><td>架构与设计模式</td><td><em>微服务与单体取舍</em></td></tr>
+    <tr><td><strong>28</strong></td><td>AI 辅助后端开发</td><td><em>AI 的边界</em></td></tr>
+    <tr><td><strong>29</strong></td><td>实战项目集</td><td><strong>五个项目</strong></td></tr>
+    <tr><td><strong>30</strong></td><td>面试题库</td><td><em>高频题</em></td></tr>
+    <tr><td><strong>31</strong></td><td>客户端转后端的思维转换</td><td><strong>你的优势与盲区</strong></td></tr>
+    <tr><td><strong>32</strong></td><td>速查手册</td><td>命令、状态码、SQL</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">怎么用这条路线</span>
+  <strong>每个知识点页都有四部分</strong>：<br>① <strong>这一页在路线中的位置</strong>——前后衔接<br>② <strong>正文</strong>——原理 + 对比表 + 代码<br>③ <strong>动手任务</strong>——必须实际做<br>④ <strong>过关标准</strong>——自检清单<br><br><strong>和其他四个站一样</strong>：<em>代码能跑、结论有依据、陷阱有实测</em>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="index">
+  <div class="task"><input type="checkbox" id="t-index-1"><label for="t-index-1"><strong>评估现状</strong>：你写的后端代码有多少行？用过哪些框架？<em>决定从哪页开始。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-index-2"><label for="t-index-2"><strong>定目标</strong>：是想转岗做后端，还是想做全栈自己扛项目？<em>目标不同，重点不同。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-index-3"><label for="t-index-3"><strong>跑通第一个 API</strong>：按 02 页装好环境，看到一个 JSON 返回。</label></div>
+  <div class="task"><input type="checkbox" id="t-index-4"><label for="t-index-4"><strong>列一份技能清单</strong>：把路线里的 32 页做成打勾清单，<em>每周标一次进度</em>。</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① 理解这条路线的四段式结构；<br>
+    ② <strong>知道客户端转后端的三个优势</strong>；<br>
+    ③ 知道要<em>先打基础再啃游戏后端</em>，不能跳；<br>
+    ④ 跑通第一个 Web API；<br>
+    ⑤ 明确自己的目标（转岗 or 全栈）。<br>
+    <br>
+    <em>这一页只是入场——**关键是第 03-10 页的基础**，那才是分水岭。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a class="next" href="01-role.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">01 岗位与行业现实</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

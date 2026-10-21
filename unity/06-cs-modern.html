@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">C# + Unity 路线
+      <a href="index.html">C# + Unity 路线
         <span>从零基础到独立完成商业级项目</span>
       </a>
     </div>
@@ -311,6 +311,13 @@ public class ReflectionDemo : MonoBehaviour
 using System;
 using System.Reflection;
 
+// 为单文件编译补上被引用的类型（原示例中它定义在 reflection.cs）
+public class ReflectTarget
+{
+    public int PublicField = 1;
+    public void PublicMethod(int x) { }
+}
+
 // ============================================================
 //  反射的性能代价与三种优化方案
 // ============================================================
@@ -571,7 +578,7 @@ public class GlobalExceptionCatcher : MonoBehaviour
 
       <div class="callout callout--danger">
         <span class="callout__title">三个必须记住的版本限制</span>
-        <strong>① C# 8 的默认接口实现（DIM）在 Unity 中不可用。</strong>Mono 运行时没实现它，<em>语法能编译但运行时出错</em>。<br>
+        <strong>① C# 8 的默认接口实现（DIM）：老版本编译期就报错，2021.3 起能编译、能运行，但仍不建议依赖。</strong>Unity 2020.2 及更早的官方文档写明该特性会直接编译报错；<em>2021.3.21f1c1 实测能编译并正常调用</em>，但 IL2CPP 后端与不同版本的支持并不一致（页 04 有完整说明）。<br>
         <strong>② C# 10/11 的新特性 Unity 完全不支持。</strong>包括文件作用域命名空间、<code>record struct</code>、原始字符串 <code>"""..."""</code>、<code>required</code> 成员。<br>
         <strong>③ 不要在 Unity 项目里用 <code>-langversion:latest</code>。</strong>把语言版本调到 11 并不会让新语法可用，反而可能编译失败。<br>
         <em>写代码前先确认「这个语法我的 Unity 版本支持吗」，能省下大量试错时间。</em>
@@ -677,6 +684,7 @@ public class ModernFeatures : MonoBehaviour
     }
 
     // C# 9：init 访问器（只能在初始化时赋值）
+    // 注意：必须配合下面的 IsExternalInit shim，否则编译报 CS0518
     public class WeaponData
     {
         public string Id { get; init; } = "";
@@ -699,8 +707,20 @@ public class ModernFeatures : MonoBehaviour
 }
 
 // ============================================================
-//  C# 9：record（Unity 2021.2+）
+//  C# 9：record 与 init —— 必须先补 IsExternalInit
 // ============================================================
+// Unity 的 .NET Standard 2.1 参考程序集里【没有】IsExternalInit，
+// 而 C# 9 的 init / record 都依赖它。
+// 不补这个 shim 会报错：
+//   error CS0518: 预定义类型 System.Runtime.CompilerServices.IsExternalInit 未定义或导入
+//
+// 解决办法：在项目里自己定义一次（放在任意 .cs 文件、任意命名空间外即可，
+// 全项目只需要一份，重复定义会报 CS0101 类型重复）。
+namespace System.Runtime.CompilerServices
+{
+    internal static class IsExternalInit { }
+}
+
 public record PlayerProfile(string Name, int Level);
 
 public class RecordDemo : MonoBehaviour
@@ -727,7 +747,10 @@ public class RecordDemo : MonoBehaviour
         <span class="callout__title">关于 <code>record</code> 在 Unity 中的一个限制</span>
         <code>record</code> <strong>不能被 Unity 序列化</strong>——它不是 <code>[System.Serializable]</code>，编译器生成的字段是只读 init 属性。<br>
         所以 <code>record</code> 适合做<em>纯逻辑层的不可变数据</em>、编辑器工具、DTO，但<strong>不要用在需要 Inspector 显示的地方</strong>。<br>
-        好消息是：<code>record</code> 在 IL2CPP 下完全可用（Unity 2021.2+）。
+        <strong>还有一个必踩的坑</strong>：Unity 的 .NET Standard 2.1 参考程序集里<strong>没有</strong> <code>System.Runtime.CompilerServices.IsExternalInit</code>，而 <code>record</code> 和 <code>init</code> 都依赖它。不补就会在 Unity 编译管线里直接报
+        <code>error CS0518: Predefined type 'System.Runtime.CompilerServices.IsExternalInit' is not defined or imported</code>（我在 2021.3.21f1c1 下复现过）。<br>
+        解决办法：在项目里自己声明一次即可 —— <code>namespace System.Runtime.CompilerServices { internal static class IsExternalInit { } }</code>。全项目只需要一份。本节示例代码里已经带上了这个 shim。<br>
+        好消息是：补上 shim 之后，<code>record</code> 在 Mono 和 IL2CPP 下都能正常用（Unity 2021.2+）。
       </div>
 
       <h2 id="tasks">六、本章动手任务</h2>

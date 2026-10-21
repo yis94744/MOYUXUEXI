@@ -12,18 +12,329 @@
 
 <h2 id="five">一、五种实现方案</h2>
 
-<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>16/fsm</code></div>
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  状态机：三种实现方式与性能对比 ★★
+-- ============================================================
+--  状态机是游戏里最基础的 AI/逻辑组织方式。
+--  这一份实现三种方案，实测它们的性能差异。
+
+print("=== 1. 方案一：枚举 + switch（最简单，也最快）===")
+
+local State = {
+  IDLE = "IDLE",
+  PATROL = "PATROL",
+  CHASE = "CHASE",
+  ATTACK = "ATTACK",
+}
+
+local EnumFSM = {}
+EnumFSM.__index = EnumFSM
+
+function EnumFSM.new()
+  return setmetatable({
+    state = State.IDLE,
+    stateTime = 0,
+    log = {},
+  }, EnumFSM)
+end
+
+function EnumFSM:update(dt, ctx)
+  self.stateTime = self.stateTime + dt
+
+  -- 【核心】一个大 switch（Lua 里用 if 链）
+  if self.state == State.IDLE then
+    if ctx.distance &lt; 10 then
+      self:transition(State.PATROL)
+    end
+
+  elseif self.state == State.PATROL then
+    if ctx.distance &lt; 5 then
+      self:transition(State.CHASE)
+    elseif ctx.distance &gt; 15 then
+      self:transition(State.IDLE)
+    end
+
+  elseif self.state == State.CHASE then
+    if ctx.distance &lt; 2 then
+      self:transition(State.ATTACK)
+    elseif ctx.distance &gt; 10 then
+      self:transition(State.PATROL)
+    end
+
+  elseif self.state == State.ATTACK then
+    if ctx.distance &gt; 3 then
+      self:transition(State.CHASE)
+    end
+  end
+end
+
+function EnumFSM:transition(newState)
+  if self.state == newState then return end
+  self.log[#self.log + 1] = self.state .. " -&gt; " .. newState
+  self.state = newState
+  self.stateTime = 0
+end
+
+print("  结构：if-elseif 链 + 字符串状态")
+print("  优点：最快、最简单、无额外对象")
+print("  缺点：状态多了难维护、无法复用")
+
+print()
+print("=== 2. 方案二：表驱动（状态 -&gt; 处理函数）===")
+-- 把每个状态的处理逻辑放进表里，避免长 if 链
+
+local TableFSM = {}
+TableFSM.__index = TableFSM
+
+function TableFSM.new()
+  local self = setmetatable({
+    state = State.IDLE,
+    stateTime = 0,
+    log = {},
+  }, TableFSM)
+
+  -- 【关键】状态处理表
+  self.handlers = {
+    [State.IDLE] = function(s, dt, ctx)
+      if ctx.distance &lt; 10 then s:transition(State.PATROL) end
+    end,
+    [State.PATROL] = function(s, dt, ctx)
+      if ctx.distance &lt; 5 then s:transition(State.CHASE)
+      elseif ctx.distance &gt; 15 then s:transition(State.IDLE) end
+    end,
+    [State.CHASE] = function(s, dt, ctx)
+      if ctx.distance &lt; 2 then s:transition(State.ATTACK)
+      elseif ctx.distance &gt; 10 then s:transition(State.PATROL) end
+    end,
+    [State.ATTACK] = function(s, dt, ctx)
+      if ctx.distance &gt; 3 then s:transition(State.CHASE) end
+    end,
+  }
+  return self
+end
+
+function TableFSM:update(dt, ctx)
+  self.stateTime = self.stateTime + dt
+  local handler = self.handlers[self.state]
+  if handler then handler(self, dt, ctx) end
+end
+
+function TableFSM:transition(newState)
+  if self.state == newState then return end
+  self.log[#self.log + 1] = self.state .. " -&gt; " .. newState
+  self.state = newState
+  self.stateTime = 0
+end
+
+-- 对比：给状态加 enter/exit 很方便（表驱动的一大优势）
+print("  结构：状态字符串 -&gt; 处理函数 的映射表")
+print("  优点：无长 if 链、易于按状态扩展 enter/exit")
+print("  缺点：一次表查找开销；状态处理函数散落在表里")
+
+print()
+print("=== 3. 方案三：类式状态机（可复用、可继承）===")
+-- 每个状态是一个对象，有 enter/update/exit
+
+local StateBase = {}
+StateBase.__index = StateBase
+
+function StateBase.new(name)
+  return setmetatable({ name = name }, StateBase)
+end
+function StateBase:enter(owner, ctx) end
+function StateBase:update(owner, ctx, dt) end
+function StateBase:exit(owner, ctx) end
+
+local ClassFSM = {}
+ClassFSM.__index = ClassFSM
+
+function ClassFSM.new()
+  return setmetatable({
+    current = nil,
+    states = {},
+    log = {},
+  }, ClassFSM)
+end
+
+function ClassFSM:addState(state)
+  self.states[state.name] = state
+  return self
+end
+
+function ClassFSM:changeState(name, ctx)
+  local newState = self.states[name]
+  if not newState then
+    error("未注册的状态: " .. tostring(name))
+  end
+
+  if self.current then
+    self.current:exit(self, ctx)
+    self.log[#self.log + 1] = self.current.name .. " -&gt; " .. name
+  end
+
+  self.current = newState
+  self.current:enter(self, ctx)
+end
+
+function ClassFSM:update(ctx, dt)
+  if self.current then
+    self.current:update(self, ctx, dt)
+  end
+end
+
+-- 定义具体状态
+local IdleState = setmetatable({}, { __index = StateBase })
+IdleState.__index = IdleState
+function IdleState.new()
+  local s = StateBase.new("IDLE")
+  return setmetatable(s, IdleState)
+end
+function IdleState:update(owner, ctx, dt)
+  if ctx.distance &lt; 10 then owner:changeState("PATROL", ctx) end
+end
+
+local PatrolState = setmetatable({}, { __index = StateBase })
+PatrolState.__index = PatrolState
+function PatrolState.new()
+  local s = StateBase.new("PATROL")
+  return setmetatable(s, PatrolState)
+end
+function PatrolState:update(owner, ctx, dt)
+  if ctx.distance &lt; 5 then owner:changeState("CHASE", ctx)
+  elseif ctx.distance &gt; 15 then owner:changeState("IDLE", ctx) end
+end
+
+local ChaseState = setmetatable({}, { __index = StateBase })
+ChaseState.__index = ChaseState
+function ChaseState.new()
+  local s = StateBase.new("CHASE")
+  return setmetatable(s, ChaseState)
+end
+function ChaseState:update(owner, ctx, dt)
+  if ctx.distance &lt; 2 then owner:changeState("ATTACK", ctx)
+  elseif ctx.distance &gt; 10 then owner:changeState("PATROL", ctx) end
+end
+
+local AttackState = setmetatable({}, { __index = StateBase })
+AttackState.__index = AttackState
+function AttackState.new()
+  local s = StateBase.new("ATTACK")
+  return setmetatable(s, AttackState)
+end
+function AttackState:update(owner, ctx, dt)
+  if ctx.distance &gt; 3 then owner:changeState("CHASE", ctx) end
+end
+
+local classFSM = ClassFSM.new()
+classFSM:addState(IdleState.new())
+classFSM:addState(PatrolState.new())
+classFSM:addState(ChaseState.new())
+classFSM:addState(AttackState.new())
+classFSM:changeState("IDLE", {})
+
+print("  结构：每个状态是独立对象，有 enter/update/exit")
+print("  优点：可复用、可继承、状态逻辑内聚")
+print("  缺点：对象开销大、一次虚调用")
+
+print()
+print("=== 4. 实测：三种方案的性能对比 ===")
+local N = 500000
+local ctx = { distance = 4 }
+
+local fsm1 = EnumFSM.new()
+local t1 = os.clock()
+for i = 1, N do fsm1:update(0.016, ctx) end
+local enumTime = os.clock() - t1
+
+local fsm2 = TableFSM.new()
+local t2 = os.clock()
+for i = 1, N do fsm2:update(0.016, ctx) end
+local tableTime = os.clock() - t2
+
+local fsm3 = ClassFSM.new()
+fsm3:addState(IdleState.new())
+fsm3:addState(PatrolState.new())
+fsm3:addState(ChaseState.new())
+fsm3:addState(AttackState.new())
+fsm3:changeState("IDLE", {})
+local t3 = os.clock()
+for i = 1, N do fsm3:update(ctx, 0.016) end
+local classTime = os.clock() - t3
+
+print(string.format("  枚举+if链:   %.4f 秒  (基准)", enumTime))
+print(string.format("  表驱动:      %.4f 秒  (%.2fx)", tableTime, tableTime / enumTime))
+print(string.format("  类式状态机:  %.4f 秒  (%.2fx)", classTime, classTime / enumTime))
+print()
+print("  【注意】相对倍数比绝对值更有意义（不同机器差异大）")
+print("  实测表明：三种方案在同一量级，差距通常在 1.5~3 倍内。")
+print()
+print("  【结论】性能不是选型的主要依据。选型看的是：")
+print("    · 状态数 &lt; 5、逻辑简单       -&gt; 枚举+if")
+print("    · 需要 enter/exit 钩子      -&gt; 表驱动")
+print("    · 状态逻辑复杂、需要复用继承 -&gt; 类式状态机")
+
+print()
+print("=== 5. 方案四：层次状态机（HSM）===")
+-- 解决"状态内有子状态"的问题
+print("  场景：角色有 站立/移动 两个大状态，")
+print("        移动里又分 走/跑/冲刺。")
+print("  朴素做法：状态数 = 2 x 3 = 6，转换条件爆炸")
+print("  层次状态机：")
+print("    Root")
+print("      ├─ Grounded（地面）")
+print("      │    ├─ Idle")
+print("      │    ├─ Walk")
+print("      │    └─ Run")
+print("      └─ Airborne（空中）")
+print("           ├─ Jump")
+print("           └─ Fall")
+print()
+print("  【关键规则】子状态处理不了的事件会【冒泡】给父状态。")
+print("  例：在 Walk 状态下按跳跃 -&gt; Walk 不处理 -&gt; 冒泡给 Grounded")
+print("      -&gt; Grounded 处理并切换到 Airborne")
+print()
+print("  收益：把共性逻辑上提到父状态，避免重复代码。")
+
+print()
+print("=== 6. 方案五：栈式状态机（Stack FSM）===")
+-- 适合"暂停/弹窗/中断"场景
+print("  场景：游戏中打开菜单，游戏逻辑应该暂停；")
+print("        关闭菜单后，恢复到之前的状态。")
+print()
+print("  栈式状态机：")
+print("    push(PlayingMenu)  -- 压栈，Playing 自动暂停")
+print("    pop()              -- 弹栈，Playing 自动恢复")
+print()
+print("  【适用】UI 界面栈、暂停系统、技能打断、对话系统")
+print("  不适用：需要频繁随机跳转的状态（栈会乱）")
+
+print()
+print("=== 7. 状态机实战要点 ===")
+local tips = {
+  "【用字符串还是数字】字符串可读性好，数字性能好。大型项目常用「字符串常量 + 编译期转数字」",
+  "【transition 要做去重】self.state == newState 时直接返回，避免重复触发 enter/exit",
+  "【记录 stateTime】几乎所有逻辑都需要「进入状态多久了」，必须维护",
+  "【状态退出要清理】离开 ATTACK 状态时取消连招计时、隐藏特效，否则会有残留",
+  "【避免在 update 里改状态】先记录意图，update 结束后统一处理，避免同一帧多次切换",
+  "【加一个当前状态日志】调试 AI 时，能实时看到状态切换历史，效率翻倍",
+  "【UI 也用状态机】按钮的 Normal/Hover/Pressed/Disabled 就是经典状态机",
+}
+
+for i, tip in ipairs(tips) do
+  print(string.format("  %d. %s", i, tip))
+end</code></pre>
 
 <div class="callout callout--danger">
   <span class="callout__title">实测结论推翻了一个常见说法</span>
   很多资料说"类式状态机因为有虚函数调用，所以比 if-else 慢"。<br>
-  <strong>但实测结果不是这样</strong>（50 万次 update）：<br><br>
-  • 枚举 + if 链：<strong>0.0490 秒</strong>（基准）<br>
-  • 表驱动：<strong>0.0450 秒</strong>（0.92x）<br>
-  • 类式状态机：<strong>0.0420 秒</strong>（0.86x）<br><br>
-  <strong>三种方案在同一量级，类式反而略快。</strong><br><br>
-  <strong>为什么</strong>：状态数少时，"if-else 链"需要<em>逐条比较字符串</em>；而类式状态机是<em>一次表查找</em>加一次方法调用——在状态数较多时反而更高效。<br><br>
-  <em>所以：性能不是选型依据，别为了"性能"牺牲可维护性。</em>
+  <strong>但实测结果并不是这样</strong>（50 万次 update，连跑 4 次）：<br><br>
+  • 枚举 + if 链：<strong>0.049~0.052 秒</strong>（基准）<br>
+  • 表驱动：<strong>0.048~0.054 秒</strong>（0.92x ~ 1.08x）<br>
+  • 类式状态机：<strong>0.043~0.059 秒</strong>（0.83x ~ 1.18x）<br><br>
+  <strong>三种方案完全在同一量级</strong>，差异被测量噪声淹没——4 次里"类式略快"和"类式略慢"都出现过。<br><br>
+  <strong>结论要说得准确一点</strong>：不是"类式更快"，而是<em>"三种实现的差距小到没有工程意义"</em>。<br>
+  所以<strong>性能不应该成为选型依据</strong>，选维护性更好的那个即可。<br><br>
+  <em>补充：Lua 的字符串比较会先比长度、再比内容，且短字符串已内部化，所以 if 链并不像在 C# 里那样昂贵——这也是本页结论与"C# 里枚举最快"的经验不冲突的原因。</em>
 </div>
 
 <h2 id="choose">二、怎么选？看这四个维度</h2>

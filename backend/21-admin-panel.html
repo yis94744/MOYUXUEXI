@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>21 运营后台实战 — Unity 游戏后端 + 全栈开发路线｜从客户端主程延伸为能独立扛服务的全栈工程师</title>
+<meta name="description" content="从零做一个 GM 后台：列表、筛选、权限、导出">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">Unity 游戏后端 + 全栈开发路线
+        <span>从客户端主程延伸为能独立扛服务的全栈工程师</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>21 · 运营后台实战 ★★</h1>
+
+<p class="lead">运营后台是<strong>全栈能力最典型的练习</strong>：前端界面 + 后端接口 + 权限 + 审计。<em>做完一个，全栈就通了</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（20）前端基础与选型 —— Vue/React 选型、工程化、组件化思维（客户端视角切入）。<br>
+  <strong>这一页</strong>（21）运营后台实战 —— 从零做一个 GM 后台：列表、筛选、权限、导出。<br>
+  <strong>下一页</strong>（22）部署与运维 —— Linux、Nginx、进程守护、Docker、CI/CD。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="03-http-basics.html#idempotency" data-brief="重复调用只生效一次；「已处理」要返回成功"><span class="prereq__title">幂等设计</span><span class="prereq__page">03-http-basics</span></a>
+          <a class="prereq__item" href="06-auth.html#password" data-brief="慢哈希 + 盐；不能用可逆加密"><span class="prereq__title">密码存储</span><span class="prereq__page">06-auth</span></a>
+          <a class="prereq__item" href="21-admin-panel.html#roles" data-brief="Viewer/Operator/Admin/SuperAdmin 四级"><span class="prereq__title">GM 权限模型</span><span class="prereq__page">21-admin-panel</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="difference">一、和玩家接口的区别 ★★</h2>
+
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace BackendSamples.Admin
+{
+    // ============================================================
+    // 1. 运营后台的本质：CRUD + 权限 + 审计
+    // ============================================================
+    // 【和玩家接口的区别】
+    //   玩家接口：高频、要性能、要防作弊
+    //   GM 后台：低频、要安全、要留痕
+
+    public enum GmRole
+    {
+        Viewer,      // 只能看
+        Operator,    // 能操作（发奖、封号）
+        Admin,       // 能改配置、加人
+        SuperAdmin,  // 什么都能做
+    }
+
+    public static class RolePermission
+    {
+        public static readonly (GmRole Role, string CanDo, string Cannot)[] All =
+        {
+            (GmRole.Viewer,     "查询玩家、查日志",           "任何修改操作"),
+            (GmRole.Operator,   "发奖、封号、改体力",         "改配置、加GM"),
+            (GmRole.Admin,      "改活动配置、加Operator",     "加Admin、改权限"),
+            (GmRole.SuperAdmin, "一切",                      "—"),
+        };
+
+        public static bool Can(GmRole role, string action) =&gt; action switch
+        {
+            "view"            =&gt; true,
+            "grant_item"      =&gt; role &gt;= GmRole.Operator,
+            "ban_player"      =&gt; role &gt;= GmRole.Operator,
+            "edit_config"     =&gt; role &gt;= GmRole.Admin,
+            "add_gm"          =&gt; role &gt;= GmRole.Admin,
+            "change_role"     =&gt; role &gt;= GmRole.SuperAdmin,
+            _ =&gt; false,
+        };
+    }
+
+    // ============================================================
+    // 2. 审计日志：谁在什么时候做了什么
+    // ============================================================
+    // 【为什么必须】
+    //   · 内部人员误操作 -&gt; 能追溯
+    //   · 内鬼刷道具 -&gt; 能查出来
+    //   · 合规审计 -&gt; 必须留痕
+
+    public class AuditLog
+    {
+        public long Id;
+        public string Operator = "";
+        public GmRole Role;
+        public string Action = "";
+        public string Target = "";
+        public string Detail = "";
+        public DateTime Time = DateTime.UtcNow;
+        public string Ip = "";
+
+        public override string ToString() =&gt;
+            $"[{Time:HH:mm:ss}] {Operator}({Role}) {Action} {Target} | {Detail}";
+    }
+
+    public class AuditService
+    {
+        private readonly List&lt;AuditLog&gt; _logs = new();
+        private long _id;
+
+        public void Record(string op, GmRole role, string action, string target, string detail, string ip = "127.0.0.1")
+        {
+            _logs.Add(new AuditLog
+            {
+                Id = ++_id,
+                Operator = op,
+                Role = role,
+                Action = action,
+                Target = target,
+                Detail = detail,
+                Ip = ip,
+            });
+        }
+
+        public IEnumerable&lt;AuditLog&gt; All =&gt; _logs;
+        public IEnumerable&lt;AuditLog&gt; ByOperator(string op) =&gt; _logs.Where(l =&gt; l.Operator == op);
+        public int Count =&gt; _logs.Count;
+    }
+
+    // ============================================================
+    // 3. GM 接口：权限检查 + 审计 + 幂等
+    // ============================================================
+
+    public class GmService
+    {
+        private readonly AuditService _audit;
+        private readonly Dictionary&lt;long, int&gt; _playerGold = new();
+        private readonly HashSet&lt;long&gt; _banned = new();
+        private readonly HashSet&lt;string&gt; _processedOps = new();
+
+        public GmService(AuditService audit)
+        {
+            _audit = audit;
+            for (long i = 1; i &lt;= 10; i++) _playerGold[i] = 1000;
+        }
+
+        public int GetGold(long playerId) =&gt; _playerGold.TryGetValue(playerId, out int g) ? g : 0;
+        public bool IsBanned(long playerId) =&gt; _banned.Contains(playerId);
+
+        // 【GM 发奖】三个关键点
+        public (bool Ok, string Msg) GrantGold(
+            string op, GmRole role, long playerId, int amount, string reason, string opId)
+        {
+            // ① 权限检查
+            if (!RolePermission.Can(role, "grant_item"))
+                return (false, $"权限不足（{role} 不能发奖）");
+
+            // ② 参数校验（防止手滑多打一个 0）
+            if (amount &lt;= 0)
+                return (false, "数量必须大于 0");
+            if (amount &gt; 100000)
+                return (false, "单次发放不能超过 10 万（请分批）");
+
+            // ③ 幂等（防止重复点击提交）
+            if (_processedOps.Contains(opId))
+                return (true, "已处理过（幂等）");
+            _processedOps.Add(opId);
+
+            // 执行
+            if (!_playerGold.ContainsKey(playerId))
+                return (false, "玩家不存在");
+
+            _playerGold[playerId] += amount;
+
+            // ④ 审计
+            _audit.Record(op, role, "grant_gold", $"玩家{playerId}", $"+{amount} ({reason})");
+
+            return (true, $"成功，玩家余额 {_playerGold[playerId]}");
+        }
+
+        // 【GM 封号】
+        public (bool Ok, string Msg) BanPlayer(
+            string op, GmRole role, long playerId, string reason, int days)
+        {
+            if (!RolePermission.Can(role, "ban_player"))
+                return (false, "权限不足");
+
+            if (string.IsNullOrWhiteSpace(reason))
+                return (false, "封号必须填写原因");
+
+            // 【关键】封号前要二次确认（本 demo 用一个规则模拟）
+            if (days &gt; 365)
+                return (false, "超过 365 天需要 SuperAdmin 审批");
+
+            _banned.Add(playerId);
+            _audit.Record(op, role, "ban_player", $"玩家{playerId}", $"{days}天: {reason}");
+            return (true, $"玩家 {playerId} 已封禁 {days} 天");
+        }
+
+        // 【危险操作】删档
+        public (bool Ok, string Msg) DeletePlayer(
+            string op, GmRole role, long playerId, string confirmCode)
+        {
+            // 【关键】危险操作需要二次确认码
+            if (role != GmRole.SuperAdmin)
+                return (false, "只有 SuperAdmin 能删档");
+
+            if (confirmCode != "DELETE-" + playerId)
+                return (false, "确认码错误（应为 DELETE-玩家ID）");
+
+            _playerGold.Remove(playerId);
+            _audit.Record(op, role, "delete_player", $"玩家{playerId}", "永久删除");
+            return (true, "已删除");
+        }
+    }
+
+    // ============================================================
+    // 4. 批量操作：最容易出事的地方
+    // ============================================================
+    // 【场景】给 1000 个玩家发补偿
+    // 【风险】操作失误 -&gt; 发错人 / 发错量
+
+    public class BatchOperation
+    {
+        public class BatchResult
+        {
+            public int Total;
+            public int Success;
+            public int Failed;
+            public List&lt;string&gt; Errors = new();
+        }
+
+        // 【安全做法】先预览，再执行
+        public static BatchResult Preview(List&lt;long&gt; playerIds, int amount)
+        {
+            var r = new BatchResult { Total = playerIds.Count };
+
+            Console.WriteLine($"  预览批量发奖:");
+            Console.WriteLine($"    目标人数: {playerIds.Count}");
+            Console.WriteLine($"    每人金额: {amount}");
+            Console.WriteLine($"    总额: {(long)playerIds.Count * amount}");
+            Console.WriteLine($"    前 5 个目标: {string.Join(", ", playerIds.Take(5))}");
+
+            return r;
+        }
+
+        // 分批执行 + 失败记录
+        public static BatchResult Execute(
+            List&lt;long&gt; playerIds, int amount, int batchSize,
+            Func&lt;long, int, (bool Ok, string Msg)&gt; action)
+        {
+            var r = new BatchResult { Total = playerIds.Count };
+
+            for (int i = 0; i &lt; playerIds.Count; i += batchSize)
+            {
+                var batch = playerIds.Skip(i).Take(batchSize).ToList();
+                Console.WriteLine($"    处理第 {i / batchSize + 1} 批（{batch.Count} 人）");
+
+                foreach (var pid in batch)
+                {
+                    var (ok, msg) = action(pid, amount);
+                    if (ok) r.Success++;
+                    else
+                    {
+                        r.Failed++;
+                        r.Errors.Add($"玩家{pid}: {msg}");
+                    }
+                }
+            }
+
+            return r;
+        }
+    }
+
+    // ============================================================
+    // 5. 后台的四个必备功能
+    // ============================================================
+
+    public static class MustHave
+    {
+        public static readonly (string Feature, string Why, string Risk)[] All =
+        {
+            ("玩家查询",   "客服要用",           "不能直接看敏感信息"),
+            ("发奖/扣款",  "补偿、活动",         "【必须审计】"),
+            ("封号/解封",  "违规处理",           "【必须填原因】"),
+            ("日志查询",   "排查问题",           "注意脱敏"),
+            ("配置修改",   "活动调整",           "要审批流"),
+            ("权限管理",   "团队协作",           "最小权限原则"),
+        };
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 角色与权限 ===");
+            foreach (var (role, can, cannot) in RolePermission.All)
+            {
+                Console.WriteLine($"    {role,-12} 能做: {can,-24} 不能: {cannot}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  权限检查测试:");
+            foreach (var (role, action) in new[]
+            {
+                (GmRole.Viewer, "view"),
+                (GmRole.Viewer, "grant_item"),
+                (GmRole.Operator, "grant_item"),
+                (GmRole.Operator, "edit_config"),
+                (GmRole.Admin, "edit_config"),
+                (GmRole.Admin, "change_role"),
+            })
+            {
+                var ok = RolePermission.Can(role, action);
+                Console.WriteLine($"    {role,-12} 执行 {action,-14} -&gt; {(ok ? "允许" : "拒绝")}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. GM 发奖（权限+校验+幂等+审计）===");
+            var audit = new AuditService();
+            var gm = new GmService(audit);
+
+            Console.WriteLine("  Viewer 尝试发奖:");
+            var (ok1, msg1) = gm.GrantGold("小明", GmRole.Viewer, 1, 1000, "测试", "op-001");
+            Console.WriteLine($"    {msg1}");
+
+            Console.WriteLine();
+            Console.WriteLine("  Operator 正常发奖:");
+            var (ok2, msg2) = gm.GrantGold("小红", GmRole.Operator, 1, 500, "补偿", "op-002");
+            Console.WriteLine($"    {msg2}");
+
+            Console.WriteLine();
+            Console.WriteLine("  重复提交（同一个 opId）:");
+            var (ok3, msg3) = gm.GrantGold("小红", GmRole.Operator, 1, 500, "补偿", "op-002");
+            Console.WriteLine($"    {msg3}（余额没变，防重复）");
+
+            Console.WriteLine();
+            Console.WriteLine("  数量超出上限（手滑打多了 0）:");
+            var (ok4, msg4) = gm.GrantGold("小红", GmRole.Operator, 1, 2000000, "补偿", "op-003");
+            Console.WriteLine($"    {msg4}");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 封号 ===");
+            Console.WriteLine("  不填原因:");
+            var (b1, bm1) = gm.BanPlayer("小红", GmRole.Operator, 2, "", 7);
+            Console.WriteLine($"    {bm1}");
+
+            Console.WriteLine("  正常封号:");
+            var (b2, bm2) = gm.BanPlayer("小红", GmRole.Operator, 2, "使用外挂", 7);
+            Console.WriteLine($"    {bm2}");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 危险操作（删档）===");
+            Console.WriteLine("  Operator 尝试删档:");
+            var (d1, dm1) = gm.DeletePlayer("小红", GmRole.Operator, 3, "DELETE-3");
+            Console.WriteLine($"    {dm1}");
+
+            Console.WriteLine("  SuperAdmin 但确认码错误:");
+            var (d2, dm2) = gm.DeletePlayer("老板", GmRole.SuperAdmin, 3, "delete-3");
+            Console.WriteLine($"    {dm2}");
+
+            Console.WriteLine("  SuperAdmin 确认码正确:");
+            var (d3, dm3) = gm.DeletePlayer("老板", GmRole.SuperAdmin, 3, "DELETE-3");
+            Console.WriteLine($"    {dm3}");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 5. 审计日志 ===");
+            Console.WriteLine($"  共 {audit.Count} 条记录:");
+            foreach (var l in audit.All)
+            {
+                Console.WriteLine($"    {l}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】所有修改操作都要留痕");
+            Console.WriteLine("          出事时能查清楚是谁做的");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 6. 批量操作：先预览再执行 ===");
+            var targets = Enumerable.Range(1, 10).Select(i =&gt; (long)i).ToList();
+            BatchOperation.Preview(targets, 1000);
+
+            Console.WriteLine();
+            Console.WriteLine("  执行（每批 3 人）:");
+            var result = BatchOperation.Execute(targets, 1000, 3,
+                (pid, amount) =&gt; gm.GrantGold("运营", GmRole.Operator, pid, amount, "全服补偿", $"batch-{pid}"));
+
+            Console.WriteLine($"    成功 {result.Success}，失败 {result.Failed}");
+            foreach (var e in result.Errors)
+            {
+                Console.WriteLine($"      {e}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【危险】玩家 10 不存在，失败被记录");
+            Console.WriteLine("          批量操作必须能容忍部分失败");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 7. 后台必备功能 ===");
+            foreach (var (f, why, risk) in MustHave.All)
+            {
+                Console.WriteLine($"    {f,-12} 用途: {why,-16} 风险: {risk}");
+            }
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Admin.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>维度</th><th>玩家接口</th><th>GM 后台</th></tr></thead>
+  <tbody>
+    <tr><td><strong>频率</strong></td><td><em>极高</em></td><td><em>低</em></td></tr>
+    <tr><td><strong>关注点</strong></td><td>性能、防作弊</td><td><strong>安全、可追溯</strong></td></tr>
+    <tr><td><strong>权限</strong></td><td>玩家自己</td><td><strong>分级角色</strong></td></tr>
+    <tr><td><strong>审计</strong></td><td>可选</td><td><strong>必须</strong></td></tr>
+    <tr><td><strong>危险操作</strong></td><td>一般没有</td><td><strong>发奖/封号/删档</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="roles">二、四级权限模型 ★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">本页实现的角色与权限</span>
+  <div class="table-wrap">
+  <table>
+  <thead><tr><th>角色</th><th>能做</th><th>不能做</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Viewer</strong></td><td>查询</td><td>任何修改</td></tr>
+    <tr><td><strong>Operator</strong></td><td>发奖、封号</td><td>改配置</td></tr>
+    <tr><td><strong>Admin</strong></td><td>改配置、加人</td><td>改权限</td></tr>
+    <tr><td><strong>SuperAdmin</strong></td><td>一切</td><td>—</td></tr>
+  </tbody>
+  </table>
+  </div>
+  <strong>本页实测的权限拦截</strong>：<br>
+  <code>Viewer&nbsp;&nbsp;&nbsp;执行 view&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&gt; 允许</code><br>
+  <code>Viewer&nbsp;&nbsp;&nbsp;执行 grant_item -&gt; 拒绝</code><br>
+  <code>Operator 执行 grant_item -&gt; 允许</code><br>
+  <code>Operator 执行 edit_config -&gt; 拒绝</code><br>
+  <code>Admin&nbsp;&nbsp;&nbsp;执行 edit_config -&gt; 允许</code><br>
+  <code>Admin&nbsp;&nbsp;&nbsp;执行 change_role -&gt; 拒绝（只有 SuperAdmin 能）</code><br><br>
+  <strong>原则</strong>：<em>最小权限</em>——<em>能不给就不给</em>。
+</div>
+
+<h2 id="grant">三、GM 发奖的四个关键点 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">本页实测的四道防线</span>
+  <strong>① 权限检查</strong><br>
+  <code>Viewer 尝试发奖 -&gt; 权限不足</code><br><br>
+  <strong>② 参数校验</strong>（<em>防手滑</em>）<br>
+  <code>数量 2000000 -&gt; 拒绝，单次不能超过 10 万</code><br>
+  <em>这是真实需求——多打一个 0 就会造成事故</em><br><br>
+  <strong>③ 幂等</strong>（<em>防重复点击</em>）<br>
+  <code>同一 opId 重复提交 -&gt; 已处理过，余额没变</code><br>
+  <em>运营手抖点两次提交是常事</em><br><br>
+  <strong>④ 审计</strong><br>
+  <code>[03:20:15] 小红(Operator) grant_gold 玩家1 | +500 (补偿)</code><br>
+  <em>（时间戳取运行时时刻，格式是 </em><code>HH:mm:ss</code><em>）</em><br>
+  <em>出事时能查清楚是谁做的</em><br><br>
+  <strong>四个缺一不可。</strong>
+</div>
+
+<h2 id="dangerous">四、危险操作要二次确认 ★★</h2>
+
+<div class="callout callout--warn">
+  <span class="callout__title">本页的删档保护</span>
+  <strong>三道保护</strong>：<br>
+  ① 只有 <code>SuperAdmin</code> 能做<br>
+  ② 必须提供<strong>确认码</strong>（<code>DELETE-玩家ID</code>）<br>
+  ③ 记录完整审计<br><br>
+  <strong>本页实测</strong>：<br>
+  <code>Operator 尝试删档 -&gt; 只有 SuperAdmin 能删档</code><br>
+  <code>SuperAdmin 确认码错误 -&gt; 确认码错误</code><br>
+  <code>SuperAdmin 确认码正确 -&gt; 已删除</code><br><br>
+  <strong>为什么需要确认码</strong>：<em>防止误点</em>。<br>
+  · 界面上「删除」按钮和「发奖」按钮挨着<br>
+  · 手一抖就点了删除<br>
+  · <em>要求输入玩家ID才能删</em> → <strong>必须动脑子，不会误触</strong>
+</div>
+
+<h2 id="batch">五、批量操作：最危险的地方 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">本页的「先预览再执行」</span>
+  <strong>风险</strong>：<em>给 1000 个玩家发补偿，条件写错了 → 全服多发</em><br><br>
+  <strong>本页实现的安全流程</strong>：<br>
+  <code>预览: 目标人数 10，每人 1000，总额 10000</code><br>
+  <code>前 5 个目标: 1, 2, 3, 4, 5</code><br>
+  <em>→ 确认无误后再执行</em><br><br>
+  <strong>执行要分批 + 容错</strong>：<br>
+  <code>处理第 1 批（3 人）</code><br>
+  <code>处理第 2 批（3 人）</code><br>
+  <code>成功 9，失败 1</code><br>
+  <code>玩家3: 玩家不存在</code><br><br>
+  <strong>关键</strong>：<em>部分失败不能中断整个批量</em>——<br>
+  要记录失败清单，事后单独处理。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="21">
+  <div class="task"><input type="checkbox" id="t-21-1"><label for="t-21-1"><strong>实现四级权限</strong>：验证每个角色能做什么、不能做什么。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-2"><label for="t-21-2"><strong>做 GM 发奖</strong>：加权限、校验、幂等、审计四道防线。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-3"><label for="t-21-3"><strong>做封号</strong>：强制要求填原因。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-4"><label for="t-21-4"><strong>做删档保护</strong>：SuperAdmin + 确认码。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-5"><label for="t-21-5"><strong>做批量操作</strong>：先预览，再分批执行，记录失败。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-6"><label for="t-21-6"><strong>查审计日志</strong>：按操作人查，验证可追溯。</label></div>
+  <div class="task"><input type="checkbox" id="t-21-7"><label for="t-21-7"><strong>回答面试题</strong>：① GM 发奖要做哪几道防护？② 为什么危险操作要二次确认？③ 批量操作要注意什么？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能设计四级权限模型</strong>；<br>
+    ② <strong>能实现 GM 发奖的四道防线（权限/校验/幂等/审计）</strong>；<br>
+    ③ <strong>知道危险操作要二次确认</strong>；<br>
+    ④ <strong>能实现「先预览再执行」的批量操作</strong>；<br>
+    ⑤ <strong>知道批量操作要能容忍部分失败</strong>。<br>
+    <br>
+    <em>这一页是**全栈能力的集大成**——前后端 + 权限 + 审计都涉及到了。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="20-fullstack-frontend.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">20 前端基础与选型 ★</div>
+  </a>
+  <a class="next" href="22-deploy.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">22 部署与运维 ★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

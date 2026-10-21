@@ -43,7 +43,10 @@
 
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
-  [object Object]
+  <strong>上一页</strong>（22）是任务进度的追踪。这一页是<em>战斗数值的追踪</em>——Buff 的叠加、优先级、到期，比任务复杂得多。<br>
+  <strong>关键衔接</strong>：Buff 到期用<em>堆（07）</em>管理，与<em>定时器（25）</em>是同一套机制；原子效果拆分则与<em>技能配置的数据驱动</em>直接相关。<br>
+  <strong>下一页</strong>（24）背包与掉落。<em>数值系统的另一半：产出。</em><br>
+  <strong>验证方式</strong>：本页的四种叠加规则都能用最小用例验证——尤其是"控制类必须设上限"这一条。
 </div>
 
 
@@ -51,7 +54,7 @@
         <div class="prereq__label">读这一页之前，建议先掌握</div>
         <div class="prereq__list">
           <a class="prereq__item" href="07-heap-priority.html#topk" data-brief="Top-K 用最小堆，建堆是 O(n)"><span class="prereq__title">堆与优先队列</span><span class="prereq__page">07-heap-priority</span></a>
-          <a class="prereq__item" href="../lua/13-framework-design.html#event" data-brief="快照遍历 + 队列化派发，防止回调中修改列表"><span class="prereq__title">事件系统</span><span class="prereq__page">13-framework-design</span></a>
+          <a class="prereq__item" href="../gamedev-lua-hotupdate/13-framework-design.html#event" data-brief="快照遍历 + 队列化派发，防止回调中修改列表"><span class="prereq__title">事件系统</span><span class="prereq__page">13-framework-design</span></a>
         </div>
         <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
       </div>

@@ -1,0 +1,119 @@
+<h1>28 · AI 辅助后端开发</h1>
+
+<p class="lead">AI 在后端<strong>确实能提效</strong>，但<em>用错地方会带来隐患</em>。这一页讲<strong>哪些能用、哪些别碰</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（27）架构与设计模式 —— 分层、领域模型、微服务与单体取舍、事件驱动。<br>
+  <strong>这一页</strong>（28）AI 辅助后端开发 —— 用 AI 写 CRUD、生成测试、审查 SQL 的边界。<br>
+  <strong>下一页</strong>（29）实战项目集 —— 五个由浅入深的后端项目，能写进简历。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+<h2 id="boundary">一、AI 在后端的能力边界 ★★</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>任务</th><th>效果</th><th>原因</th></tr></thead>
+  <tbody>
+    <tr><td><strong>CRUD 样板代码</strong></td><td><span class="mk mk--yes">很好</span></td><td>模式固定</td></tr>
+    <tr><td><strong>DTO / 实体定义</strong></td><td><span class="mk mk--yes">很好</span></td><td><em>纯结构</em></td></tr>
+    <tr><td><strong>单元测试</strong></td><td><span class="mk mk--yes">好</span></td><td>输入输出明确</td></tr>
+    <tr><td><strong>SQL 查询</strong></td><td><span class="mk mk--warn">中等</span></td><td><em>可能忽略索引</em></td></tr>
+    <tr><td><strong>架构设计</strong></td><td><span class="mk mk--no">差</span></td><td><strong>不了解业务上下文</strong></td></tr>
+    <tr><td><strong>性能优化</strong></td><td><span class="mk mk--no">差</span></td><td><strong>必须实测</strong></td></tr>
+    <tr><td><strong>并发正确性</strong></td><td><span class="mk mk--no">差</span></td><td><em>容易漏边界</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--danger">
+  <span class="callout__title">AI 写后端代码的三个高频错误</span>
+  <strong>① 忽略并发</strong><br>
+  <code>var gold = repo.Get(id); gold -= 100; repo.Save(gold);</code><br>
+  <em>这就是「先读后写」，会丢失更新</em>（<em>页 18</em>）<br><br>
+  <strong>② 忘记幂等</strong><br>
+  写发奖接口时<em>不加唯一键</em> → 重复调用会重复发<br><br>
+  <strong>③ 缺少边界校验</strong><br>
+  <em>不检查负数、超大值、空值</em><br><br>
+  <strong>这三个的共同点</strong>：<em>都是「能跑但会出事」的代码</em>。<br>
+  <strong>必须人工审查。</strong>
+</div>
+
+<h2 id="useful">二、AI 最有价值的四个用法 ★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">用对地方才有收益</span>
+  <strong>① 写样板代码</strong><br>
+  <em>DTO、实体、Mapper、基础 CRUD</em> —— <strong>省大量时间</strong><br><br>
+  <strong>② 写单元测试</strong><br>
+  <em>给它一个类，让它生成测试用例</em> —— <strong>覆盖边界很全面</strong><br><br>
+  <strong>③ 解释陌生的代码</strong><br>
+  <em>接手老项目时，让它解释一段逻辑</em><br><br>
+  <strong>④ 生成 SQL / 分析执行计划</strong><br>
+  <em>但复杂查询要自己验证索引</em><br><br>
+  <strong>共同点</strong>：<em>有明确输入输出、可验证的任务</em>。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">AI 不该碰的三个地方</span>
+  <strong>① 并发与事务</strong><br>
+  <em>AI 容易写出「看起来对但有竞态」的代码</em><br><br>
+  <strong>② 幂等与去重</strong><br>
+  <em>AI 常忘记加唯一键</em><br><br>
+  <strong>③ 权限校验</strong><br>
+  <em>AI 只校验登录，不校验归属</em>（<em>页 06 的越权</em>）<br><br>
+  <strong>原因</strong>：<em>这三个都需要「知道业务的边界在哪」，AI 不知道</em>。
+</div>
+
+<h2 id="checklist">三、验证 AI 代码的清单</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">五步检查</span>
+  <strong>拿到 AI 写的后端代码，按这个清单检查</strong>：<br><br>
+  <strong>① 编译/运行</strong><br>
+  <em>能跑是底线</em> —— <strong>本页所有代码都编译验证过</strong><br><br>
+  <strong>② 并发安全</strong><br>
+  <em>有没有「先读后写」</em> → 改成条件 UPDATE<br><br>
+  <strong>③ 幂等</strong><br>
+  <em>重复调用会怎样</em> → 加唯一键<br><br>
+  <strong>④ 权限</strong><br>
+  <em>有没有校验资源归属</em> → 加 owner 检查<br><br>
+  <strong>⑤ 边界值</strong><br>
+  <em>负数、0、null、超大值</em> → 加校验<br><br>
+  <strong>这个清单花 5 分钟，能避免大部分线上事故。</strong>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="28">
+  <div class="task"><input type="checkbox" id="t-28-1"><label for="t-28-1"><strong>让 AI 写一个发奖接口</strong>：重点检查幂等和权限。</label></div>
+  <div class="task"><input type="checkbox" id="t-28-2"><label for="t-28-2"><strong>让 AI 写并发扣减</strong>：观察它是否会写出「先读后写」。</label></div>
+  <div class="task"><input type="checkbox" id="t-28-3"><label for="t-28-3"><strong>用 AI 生成测试</strong>：给它一个类，看测试覆盖是否全面。</label></div>
+  <div class="task"><input type="checkbox" id="t-28-4"><label for="t-28-4"><strong>按五步清单审查</strong>：把 AI 的代码过一遍清单。</label></div>
+  <div class="task"><input type="checkbox" id="t-28-5"><label for="t-28-5"><strong>回答面试题</strong>：① AI 写后端最容易犯什么错？② 什么任务适合交给 AI？③ 怎么验证 AI 的代码？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道 AI 在七类任务上的能力差异</strong>；<br>
+    ② <strong>能说出 AI 的三个高频错误（并发、幂等、边界）</strong>；<br>
+    ③ 知道 AI 最有价值的四个用法；<br>
+    ④ <strong>知道并发、幂等、权限不该交给 AI</strong>；<br>
+    ⑤ <strong>能按五步清单审查 AI 代码</strong>。<br>
+    <br>
+    <em>这一页的核心是**「AI 是加速器，不是决策者」**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="27-architecture.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">27 架构与设计模式 ★★</div>
+  </a>
+  <a class="next" href="29-projects.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">29 实战项目集</div>
+  </a>
+</nav>

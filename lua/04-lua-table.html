@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">Lua 热更新路线
+      <a href="index.html">Lua 热更新路线
         <span>从零基础到独立搭建可上线的热更框架</span>
       </a>
     </div>
@@ -244,7 +244,7 @@ print("=== 2. __index：访问不存在的键时触发 ===")
 -- 形式一：__index 是表 —— 去那个表里找
 local base = { greeting = "hello" }
 local derived = setmetatable({}, { __index = base })
-print("derived.greeting =", derived.greeting)     -- "hello"（从 base 查到的）
+print("derived.greeting =", derived.greeting)     -- hello（从 base 查到的）
 print("rawget 绕过 __index:", rawget(derived, "greeting"))  -- nil
 
 -- 形式二：__index 是函数 —— 自定义查找逻辑
@@ -313,7 +313,9 @@ Vector.__unm = function(a) return Vector.new(-a.x, -a.y) end   -- 一元负号
 -- 比较运算符
 Vector.__eq = function(a, b) return a.x == b.x and a.y == b.y end
 Vector.__lt = function(a, b) return (a.x * a.x + a.y * a.y) &lt; (b.x * b.x + b.y * b.y) end
-Vector.__le = function(a, b) return not (b &lt; a) end
+-- 【重要】Lua 5.4 起，__le【不会】再从 __lt 自动推导——必须显式定义 __le，
+-- 否则 a &lt;= b 会报 "attempt to compare two table values"（5.3 及更早会自动推导）。
+Vector.__le = function(a, b) return (a.x * a.x + a.y * a.y) &lt;= (b.x * b.x + b.y * b.y) end
 
 -- 长度与字符串
 Vector.__len = function(a) return 2 end
@@ -331,7 +333,15 @@ print("点积 v1*v2 =", v1 * v2)
 print("取负 -v1   =", tostring(-v1))
 print("相等 v1==v1:", v1 == Vector.new(1, 2))
 print("小于 v1&lt;v2 :", v1 &lt; v2)
+print("小于等于 v1&lt;=v2:", v1 &lt;= v2)          -- 显式 __le，5.4 不会从 __lt 推导
 print("#v1        =", #v1)
+
+-- 演示：只定义 __lt、不定义 __le 时，a &lt;= b 在 5.4 会报错
+local onlyLt = setmetatable({ v = 1 }, { __lt = function(a, b) return a.v &lt; b.v end })
+local okLe, errLe = pcall(function()
+  return onlyLt &lt;= setmetatable({ v = 2 }, getmetatable(onlyLt))
+end)
+print("只定义 __lt 时 a&lt;=b:", okLe, errLe)
 
 print()
 print("=== 5. __call：让表可以像函数一样调用 ===")
@@ -442,7 +452,7 @@ print(string.format("触发元方法比直接命中慢约 %.1f 倍", missTime / 
     <tr><td colspan="2"><em>（位运算：<code>__band</code> <code>__bor</code> <code>__bxor</code> <code>__bnot</code> <code>__shl</code> <code>__shr</code>）</em></td></tr>
     <tr><td rowspan="3"><strong>比较</strong></td><td><code>__eq</code></td><td><code>a == b</code>（<em>两边都是 table 时才触发</em>）</td></tr>
     <tr><td><code>__lt</code></td><td><code>a &lt; b</code></td></tr>
-    <tr><td><code>__le</code></td><td><code>a &lt;= b</code>（Lua 会自动用 <code>not (b &lt; a)</code> 推导）</td></tr>
+    <tr><td><code>__le</code></td><td><code>a &lt;= b</code>（<strong>5.4 起必须显式定义</strong>；5.1~5.3 才会用 <code>not (b &lt; a)</code> 自动推导）</td></tr>
     <tr><td rowspan="3"><strong>其它运算</strong></td><td><code>__concat</code></td><td><code>a .. b</code></td></tr>
     <tr><td><code>__len</code></td><td><code>#a</code></td></tr>
     <tr><td><code>__call</code></td><td><code>a(...)</code> 像函数一样调用</td></tr>

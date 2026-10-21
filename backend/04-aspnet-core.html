@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>04 ASP.NET Core 框架 — Unity 游戏后端 + 全栈开发路线｜从客户端主程延伸为能独立扛服务的全栈工程师</title>
+<meta name="description" content="中间件、依赖注入、配置系统、生命周期">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">Unity 游戏后端 + 全栈开发路线
+        <span>从客户端主程延伸为能独立扛服务的全栈工程师</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>04 · ASP.NET Core 框架 ★★</h1>
+
+<p class="lead">ASP.NET Core 的核心只有<strong>三样东西</strong>：<em>依赖注入、中间件、配置系统</em>。理解这三样，框架就不再神秘。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（03）HTTP、REST 与 API 设计 —— 请求方法、状态码、幂等、版本化、错误码规范。<br>
+  <strong>这一页</strong>（04）ASP.NET Core 框架 —— 中间件、依赖注入、配置系统、生命周期。<br>
+  <strong>下一页</strong>（05）路由、模型绑定与验证 —— 特性路由、参数绑定来源、FluentValidation、统一响应。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="04-aspnet-core.html#di" data-brief="依赖接口不依赖实现，便于替换与测试"><span class="prereq__title">依赖注入</span><span class="prereq__page">04-aspnet-core</span></a>
+          <a class="prereq__item" href="04-aspnet-core.html#lifetime" data-brief="Singleton/Scoped/Transient；DbContext 必须 Scoped"><span class="prereq__title">三种生命周期</span><span class="prereq__page">04-aspnet-core</span></a>
+          <a class="prereq__item" href="04-aspnet-core.html#middleware" data-brief="请求管道的每一环，可短路；顺序决定行为"><span class="prereq__title">中间件</span><span class="prereq__page">04-aspnet-core</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="di">一、依赖注入：后端架构的地基 ★★★</h2>
+
+<p><strong>依赖注入（DI）的核心</strong>：类不自己创建依赖，而是<em>从外部接收</em>。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace BackendSamples.AspNetCore
+{
+    // ============================================================
+    // 1. 依赖注入（DI）：后端架构的地基
+    // ============================================================
+    // 【为什么需要】如果每个类都自己 new 依赖，会出现：
+    //   · 无法替换实现（测试时改不了数据库）
+    //   · 无法管理生命周期（每次 new 一个连接池）
+    //   · 依赖关系散落各处，改一处崩一片
+
+    public interface IInventoryRepository
+    {
+        int GetCount(long userId, int itemId);
+        void Add(long userId, int itemId, int count);
+    }
+
+    // 内存实现（生产环境换成数据库实现，业务代码不用改）
+    public class InMemoryInventoryRepository : IInventoryRepository
+    {
+        private readonly Dictionary&lt;(long, int), int&gt; _data = new();
+
+        public int GetCount(long userId, int itemId) =&gt;
+            _data.TryGetValue((userId, itemId), out int c) ? c : 0;
+
+        public void Add(long userId, int itemId, int count)
+        {
+            _data.TryGetValue((userId, itemId), out int cur);
+            _data[(userId, itemId)] = cur + count;
+        }
+    }
+
+    // 业务服务：只依赖【接口】，不依赖具体实现
+    public class InventoryService
+    {
+        private readonly IInventoryRepository _repo;
+
+        // 【关键】通过构造函数注入，而不是自己 new
+        public InventoryService(IInventoryRepository repo)
+        {
+            _repo = repo ?? throw new ArgumentNullException(nameof(repo));
+        }
+
+        public bool TryPickup(long userId, int itemId, int count)
+        {
+            if (count &lt;= 0) return false;
+            _repo.Add(userId, itemId, count);
+            return true;
+        }
+
+        public int Query(long userId, int itemId) =&gt; _repo.GetCount(userId, itemId);
+    }
+
+    // ============================================================
+    // 2. 三种生命周期
+    // ============================================================
+    // 【最容易踩的坑】选错生命周期会导致：
+    //   · 内存泄漏（Singleton 持有请求数据）
+    //   · 并发问题（Singleton 里存可变状态）
+    //   · 性能问题（Scoped 被当成 Transient 频繁创建）
+
+    public class SingletonService
+    {
+        public int Counter;
+        public SingletonService() =&gt; Console.WriteLine("    [创建] SingletonService");
+    }
+
+    public class ScopedService
+    {
+        public int Counter;
+        public ScopedService() =&gt; Console.WriteLine("    [创建] ScopedService");
+    }
+
+    public class TransientService
+    {
+        public int Counter;
+        public TransientService() =&gt; Console.WriteLine("    [创建] TransientService");
+    }
+
+    // 简化的 DI 容器（演示用，生产用内置的 ServiceProvider）
+    public class SimpleContainer
+    {
+        private readonly Dictionary&lt;Type, object&gt; _singletons = new();
+        private readonly Dictionary&lt;Type, Func&lt;object&gt;&gt; _factories = new();
+
+        public void AddSingleton&lt;T&gt;(T instance) =&gt; _singletons[typeof(T)] = instance;
+
+        public void AddScoped&lt;T&gt;(Func&lt;T&gt; factory) where T : class =&gt;
+            _factories[typeof(T)] = () =&gt; factory();
+
+        public T Get&lt;T&gt;() where T : class
+        {
+            var type = typeof(T);
+            if (_singletons.TryGetValue(type, out var s)) return (T)s;
+            if (_factories.TryGetValue(type, out var f)) return (T)f();
+            throw new InvalidOperationException("未注册: " + type.Name);
+        }
+    }
+
+    // ============================================================
+    // 3. 中间件：请求管道的每一环
+    // ============================================================
+    // 【本质】一个中间件 = 一个 Func&lt;Request, Func&lt;Task&gt;, Task&gt;
+    //   它可以：① 在下一个中间件前后做事情  ② 短路（不调用 next）
+
+    public class HttpContext
+    {
+        public string Path { get; set; } = "";
+        public Dictionary&lt;string, string&gt; Headers { get; } = new();
+        public int StatusCode { get; set; } = 200;
+        public string Body { get; set; } = "";
+        public DateTime StartTime { get; set; }
+        public long UserId { get; set; }
+    }
+
+    public delegate Task RequestDelegate(HttpContext ctx);
+
+    // 中间件 1：记录耗时
+    public class TimingMiddleware
+    {
+        private readonly RequestDelegate _next;
+        public TimingMiddleware(RequestDelegate next) =&gt; _next = next;
+
+        public async Task InvokeAsync(HttpContext ctx)
+        {
+            ctx.StartTime = DateTime.Now;
+            await _next(ctx);   // 调用下一个中间件
+            var ms = (DateTime.Now - ctx.StartTime).TotalMilliseconds;
+            Console.WriteLine($"    [耗时] {ctx.Path} -&gt; {ctx.StatusCode} ({ms:F1}ms)");
+        }
+    }
+
+    // 中间件 2：认证（可以短路）
+    public class AuthMiddleware
+    {
+        private readonly RequestDelegate _next;
+        public AuthMiddleware(RequestDelegate next) =&gt; _next = next;
+
+        public async Task InvokeAsync(HttpContext ctx)
+        {
+            // 白名单
+            if (ctx.Path == "/login" || ctx.Path == "/health")
+            {
+                await _next(ctx);
+                return;
+            }
+
+            // 【关键】没有 token 直接短路，不往下走
+            if (!ctx.Headers.ContainsKey("token"))
+            {
+                ctx.StatusCode = 401;
+                ctx.Body = "未登录";
+                Console.WriteLine($"    [认证失败] {ctx.Path}");
+                return;
+            }
+
+            ctx.UserId = 1001;   // 从 token 解析出来
+            await _next(ctx);
+        }
+    }
+
+    // 中间件 3：业务处理（终点）
+    public class EndpointMiddleware
+    {
+        private readonly RequestDelegate? _next;
+        public EndpointMiddleware(RequestDelegate? next = null) =&gt; _next = next;
+
+        public Task InvokeAsync(HttpContext ctx)
+        {
+            ctx.StatusCode = 200;
+            ctx.Body = ctx.Path switch
+            {
+                "/health" =&gt; "OK",
+                "/login" =&gt; "{\"token\":\"abc123\"}",
+                "/inventory" =&gt; "{\"items\":[{\"id\":1001,\"count\":5}]}",
+                _ =&gt; "{\"msg\":\"hello\"}"
+            };
+            return Task.CompletedTask;
+        }
+    }
+
+    // 管道构建器
+    public class PipelineBuilder
+    {
+        private readonly List&lt;Func&lt;RequestDelegate, RequestDelegate&gt;&gt; _middlewares = new();
+
+        public PipelineBuilder Use(Func&lt;RequestDelegate, RequestDelegate&gt; mw)
+        {
+            _middlewares.Add(mw);
+            return this;
+        }
+
+        public RequestDelegate Build(RequestDelegate terminal)
+        {
+            // 【关键】从后往前包装，最后注册的最先执行
+            RequestDelegate pipeline = terminal;
+            for (int i = _middlewares.Count - 1; i &gt;= 0; i--)
+            {
+                pipeline = _middlewares[i](pipeline);
+            }
+            return pipeline;
+        }
+    }
+
+    // ============================================================
+    // 4. 配置系统：分层与覆盖
+    // ============================================================
+    // 【规则】后加载的覆盖先加载的
+    //   appsettings.json -&gt; appsettings.{Env}.json -&gt; 环境变量 -&gt; 命令行
+
+    public class AppConfig
+    {
+        private readonly Dictionary&lt;string, string&gt; _values = new();
+
+        public void Load(Dictionary&lt;string, string&gt; source)
+        {
+            foreach (var kv in source) _values[kv.Key] = kv.Value;
+        }
+
+        public string Get(string key, string def = "") =&gt;
+            _values.TryGetValue(key, out var v) ? v : def;
+
+        public int GetInt(string key, int def = 0) =&gt;
+            int.TryParse(Get(key), out int v) ? v : def;
+
+        public bool GetBool(string key, bool def = false) =&gt;
+            bool.TryParse(Get(key), out bool v) ? v : def;
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static async Task Run()
+        {
+            Console.WriteLine("=== 1. 依赖注入 ===");
+            var container = new SimpleContainer();
+            container.AddSingleton&lt;IInventoryRepository&gt;(new InMemoryInventoryRepository());
+            container.AddScoped(() =&gt; new InventoryService(container.Get&lt;IInventoryRepository&gt;()));
+
+            var inv = container.Get&lt;InventoryService&gt;();
+            inv.TryPickup(1001, 5001, 10);
+            inv.TryPickup(1001, 5001, 5);
+            Console.WriteLine($"  玩家 1001 的 5001 数量: {inv.Query(1001, 5001)}");
+            Console.WriteLine("  【关键】业务代码只依赖 IInventoryRepository 接口");
+            Console.WriteLine("          换数据库实现不用改 InventoryService");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 三种生命周期 ===");
+            Console.WriteLine("  Singleton: 全局唯一，第一次获取时创建");
+            var s1 = new SingletonService();
+            var s2 = s1;   // 单例：同一实例
+            s1.Counter++;
+            Console.WriteLine($"    s1.Counter={s1.Counter}, s2.Counter={s2.Counter}（同一实例）");
+
+            Console.WriteLine("  Scoped: 每个请求一个，请求内共享");
+            var sc1 = new ScopedService();
+            sc1.Counter++;
+            Console.WriteLine($"    同请求内两个服务共享: {sc1.Counter}");
+
+            Console.WriteLine("  Transient: 每次获取都新建");
+            var t1 = new TransientService();
+            var t2 = new TransientService();
+            t1.Counter++;
+            Console.WriteLine($"    t1.Counter={t1.Counter}, t2.Counter={t2.Counter}（不同实例）");
+
+            Console.WriteLine();
+            Console.WriteLine("  【选择依据】");
+            Console.WriteLine("    Singleton -&gt; 无状态的服务（配置、缓存客户端、日志）");
+            Console.WriteLine("    Scoped    -&gt; 有请求级状态的（数据库上下文 DbContext）");
+            Console.WriteLine("    Transient -&gt; 轻量无状态（工具类）");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 中间件管道 ===");
+            var builder = new PipelineBuilder();
+            builder.Use(next =&gt; ctx =&gt; new TimingMiddleware(next).InvokeAsync(ctx));
+            builder.Use(next =&gt; ctx =&gt; new AuthMiddleware(next).InvokeAsync(ctx));
+            var pipeline = builder.Build(ctx =&gt; new EndpointMiddleware().InvokeAsync(ctx));
+
+            Console.WriteLine("  请求 1: /health（白名单，不需要 token）");
+            await pipeline(new HttpContext { Path = "/health" });
+
+            Console.WriteLine();
+            Console.WriteLine("  请求 2: /inventory（无 token，被拦截）");
+            await pipeline(new HttpContext { Path = "/inventory" });
+
+            Console.WriteLine();
+            Console.WriteLine("  请求 3: /inventory（带 token，正常）");
+            var ctx3 = new HttpContext { Path = "/inventory" };
+            ctx3.Headers["token"] = "abc123";
+            await pipeline(ctx3);
+            Console.WriteLine($"    返回: {ctx3.Body}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】中间件的顺序决定行为");
+            Console.WriteLine("    Timing 在最外层 -&gt; 能统计到认证失败的耗时");
+            Console.WriteLine("    Auth 在 Endpoint 前面 -&gt; 能拦住未认证请求");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 配置系统 ===");
+            var cfg = new AppConfig();
+            cfg.Load(new Dictionary&lt;string, string&gt;
+            {
+                ["Database:Host"] = "localhost",
+                ["Database:Port"] = "5432",
+                ["Cache:Enabled"] = "true",
+            });
+            // 环境变量覆盖
+            cfg.Load(new Dictionary&lt;string, string&gt; { ["Database:Host"] = "prod-db" });
+
+            Console.WriteLine($"  Database:Host = {cfg.Get("Database:Host")}（被环境变量覆盖）");
+            Console.WriteLine($"  Database:Port = {cfg.GetInt("Database:Port")}");
+            Console.WriteLine($"  Cache:Enabled = {cfg.GetBool("Cache:Enabled")}");
+            Console.WriteLine("  【规则】后加载的覆盖先加载的");
+            Console.WriteLine("          json -&gt; json.{Env} -&gt; 环境变量 -&gt; 命令行");
+        }
+    }
+}
+
+public class Program
+{
+    public static async Task Main() =&gt; await BackendSamples.AspNetCore.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>问题</th><th>不用 DI</th><th>用 DI</th></tr></thead>
+  <tbody>
+    <tr><td><strong>替换实现</strong></td><td><em>要改代码</em></td><td><strong>换个注册即可</strong></td></tr>
+    <tr><td><strong>测试</strong></td><td>难（依赖真实数据库）</td><td><strong>注入 Mock</strong></td></tr>
+    <tr><td><strong>生命周期</strong></td><td>自己管，容易泄漏</td><td>框架管</td></tr>
+    <tr><td><strong>依赖关系</strong></td><td>散落各处</td><td><strong>集中在构造函数</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="lifetime">二、三种生命周期：选错就是灾难 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三者的区别（最常考）</span>
+  <div class="table-wrap">
+  <table>
+  <thead><tr><th>生命周期</th><th>何时创建</th><th>典型用途</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Singleton</strong></td><td>第一次请求时创建，<strong>全局唯一</strong></td><td>配置、缓存客户端、日志</td></tr>
+    <tr><td><strong>Scoped</strong></td><td><strong>每个请求一个</strong></td><td><code>DbContext</code>、请求级上下文</td></tr>
+    <tr><td><strong>Transient</strong></td><td><strong>每次获取都新建</strong></td><td>轻量无状态工具类</td></tr>
+  </tbody>
+  </table>
+  </div>
+  <strong>经典错误</strong>：把 <code>DbContext</code> 注册成 <strong>Singleton</strong>——<br>
+  · <em>DbContext 不是线程安全的</em><br>
+  · 多个请求并发使用同一个实例 → <strong>数据错乱</strong><br>
+  · 长期不释放 → <em>内存泄漏 + 连接池耗尽</em><br><br>
+  <strong>正确做法</strong>：<code>AddDbContext</code> 默认就是 <strong>Scoped</strong>。
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">一个隐蔽的坑：Singleton 捕获了 Scoped</span>
+  <strong>场景</strong>：<br>
+  <code>class MySingleton</code><br>
+  <code>{</code><br>
+  <code>&nbsp;&nbsp;public MySingleton(MyDbContext db) { ... }</code><br>
+  <code>}</code><br>
+  <em>Singleton 依赖 Scoped → 这个 Scoped 会活到应用结束</em><br><br>
+  <strong>后果</strong>：<br>
+  · DbContext 被长期持有 → <em>追踪的对象越来越多，内存暴涨</em><br>
+  · 数据可能读到旧值（<em>因为缓存了旧实体</em>）<br><br>
+  <strong>框架默认行为</strong>：<em>开发环境会直接抛异常</em>（<code>Cannot consume scoped service from singleton</code>）。<br>
+  <strong>如果确实需要</strong>：用 <code>IServiceScopeFactory</code> 手动创建作用域。
+</div>
+
+<h2 id="middleware">三、中间件：请求管道的每一环 ★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">中间件的本质</span>
+  <strong>一个中间件就是一个函数</strong>：<br>
+  <code>Task Invoke(HttpContext ctx)</code><br><br>
+  <strong>它能做三件事</strong>：<br>
+  ① <strong>在下一个中间件之前</strong>做事（<em>如计时开始、记录请求</em>）<br>
+  ② <strong>在之后</strong>做事（<em>如计时结束、改响应</em>）<br>
+  ③ <strong>短路</strong>——不调用 <code>next</code>，直接返回<br><br>
+  <strong>本页实测验证</strong>：<br>
+  · <code>/health</code> 走白名单 → 通过<br>
+  · <code>/inventory</code> 无 token → <strong>被 Auth 短路</strong>，返回 401<br>
+  · <code>/inventory</code> 带 token → 走到 Endpoint<br><br>
+  <strong>顺序很重要</strong>：<em>Timing 放最外层，才能统计到认证失败的耗时</em>。
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">常见中间件的顺序</span>
+  <strong>官方推荐顺序</strong>（从上到下）：<br>
+  1. <strong>异常处理</strong>（<em>要能捕获所有后续异常</em>）<br>
+  2. HTTPS 重定向<br>
+  3. <strong>静态文件</strong>（<em>命中就直接返回，不往下走</em>）<br>
+  4. 路由<br>
+  5. <strong>认证</strong>（<em>你是谁</em>）<br>
+  6. <strong>授权</strong>（<em>你能不能做</em>）<br>
+  7. 端点<br><br>
+  <strong>放错顺序的典型后果</strong>：<br>
+  · 异常处理放最后 → <em>前面中间件的异常捕获不到</em><br>
+  · 授权放在认证之前 → <em>拿不到用户身份</em>
+</div>
+
+<h2 id="config">四、配置系统</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">分层覆盖规则</span>
+  <strong>加载顺序</strong>（<em>后面的覆盖前面的</em>）：<br>
+  ① <code>appsettings.json</code><br>
+  ② <code>appsettings.{Environment}.json</code><br>
+  ③ <strong>环境变量</strong><br>
+  ④ 命令行参数<br><br>
+  <strong>本页实测</strong>：<br>
+  <code>Database:Host</code> 在 json 里是 <code>localhost</code><br>
+  环境变量覆盖后变成 <code>prod-db</code><br><br>
+  <strong>实战价值</strong>：<em>同一份代码，不同环境用不同配置</em>。<br>
+  · 开发：连本地数据库<br>
+  · 生产：环境变量注入真实地址（<em>不写进代码库</em>）
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="04">
+  <div class="task"><input type="checkbox" id="t-04-1"><label for="t-04-1"><strong>实现一个服务</strong>：写一个接口 + 实现，用 DI 注册并在控制器里注入。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-2"><label for="t-04-2"><strong>验证生命周期</strong>：分别注册 Singleton/Scoped/Transient，打印实例哈希值，观察创建次数。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-3"><label for="t-04-3"><strong>写一个中间件</strong>：记录每个请求的耗时和状态码。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-4"><label for="t-04-4"><strong>做认证中间件</strong>：没有 token 就返回 401（短路），验证后续中间件不执行。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-5"><label for="t-04-5"><strong>复现 Singleton 依赖 Scoped 的错误</strong>：看框架报什么错。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-6"><label for="t-04-6"><strong>做配置覆盖</strong>：用环境变量覆盖 json 里的值，验证生效。</label></div>
+  <div class="task"><input type="checkbox" id="t-04-7"><label for="t-04-7"><strong>回答面试题</strong>：① 三种生命周期的区别？② 为什么 DbContext 不能是 Singleton？③ 中间件顺序为什么重要？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>理解 DI 解决什么问题</strong>；<br>
+    ② <strong>能说清三种生命周期及各自适用场景</strong>；<br>
+    ③ <strong>知道 DbContext 必须 Scoped，以及原因</strong>；<br>
+    ④ <strong>能写中间件并解释短路</strong>；<br>
+    ⑤ 知道中间件的推荐顺序。<br>
+    <br>
+    <em>第 ② 和 第 ③ 条是面试必问——**生命周期选错是真实项目最常见的事故来源**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="03-http-basics.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">03 HTTP、REST 与 API 设计 ★</div>
+  </a>
+  <a class="next" href="05-routing-modelbind.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">05 路由、模型绑定与验证</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

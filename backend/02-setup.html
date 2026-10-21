@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>02 环境搭建与第一个 API — Unity 游戏后端 + 全栈开发路线｜从客户端主程延伸为能独立扛服务的全栈工程师</title>
+<meta name="description" content="装 .NET SDK、跑起第一个 Web API、理解请求响应">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">Unity 游戏后端 + 全栈开发路线
+        <span>从客户端主程延伸为能独立扛服务的全栈工程师</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>02 · 环境搭建与第一个 API</h1>
+
+<p class="lead">这一页的目标：<strong>半小时内跑起第一个 Web API，用浏览器看到 JSON 返回</strong>。<em>后端的第一步比 Unity 简单——没有引擎要装。</em></p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（01）岗位与行业现实 —— 游戏后端 vs Web 后端 vs 全栈：分工、薪资、技能要求。<br>
+  <strong>这一页</strong>（02）环境搭建与第一个 API —— 装 .NET SDK、跑起第一个 Web API、理解请求响应。<br>
+  <strong>下一页</strong>（03）HTTP、REST 与 API 设计 —— 请求方法、状态码、幂等、版本化、错误码规范。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+<h2 id="install">一、装 .NET SDK</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>方式</th><th>命令</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><strong>官方安装包</strong></td><td>下载 .NET 8 SDK</td><td><em>推荐新手</em></td></tr>
+    <tr><td><strong>脚本安装</strong></td><td><code>dotnet-install.ps1</code></td><td><strong>无需管理员</strong>，可装到指定目录</td></tr>
+    <tr><td><strong>已有 Visual Studio</strong></td><td>勾选「.NET 桌面开发」</td><td><em>顺带就装了</em></td></tr>
+    <tr><td><strong>验证</strong></td><td><code>dotnet --version</code></td><td>应输出 <code>8.x.x</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">为什么用 .NET 8</span>
+  <strong>选择依据</strong>：<br>· <strong>LTS</strong>（长期支持）——<em>2026 年 11 月前有官方支持</em><br>· <em>性能比 .NET 6 提升明显</em><br>· 生态成熟，<em>第三方库都支持</em><br><br><strong>.NET 9 / 10 也可以用</strong>——<em>但新版本第三方库跟进慢，生产环境建议 LTS</em>。<br><br><strong>和 Unity 的关系</strong>：<em>Unity 用的是 .NET Standard 2.1 子集</em>——<strong>后端可以用完整 .NET</strong>，不受 Unity 限制。<br><em>不必担心「和 Unity 版本冲突」——它们是两套运行时。</em>
+</div>
+
+<h2 id="first-project">二、第一个项目</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">三条命令跑起来</span>
+  <strong>① 创建项目</strong><br><code>dotnet new web -n MyFirstApi</code><br><br><strong>② 进入目录并运行</strong><br><code>cd MyFirstApi</code><br><code>dotnet run</code><br><br><strong>③ 浏览器访问</strong><br><code>http://localhost:5000</code>（端口看控制台输出）<br><br><em>会看到 <code>Hello World!</code></em><br><br><strong>发生了什么</strong>：<br>· <code>dotnet new web</code>——生成最小 Web API 项目<br>· <code>dotnet run</code>——编译 + 启动 Kestrel 服务器<br>· <em>Kestrel 是 .NET 内置的 Web 服务器，不需要额外装 Nginx</em>（<em>生产环境通常会加</em>）
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">项目结构只有三个文件</span>
+  <strong>最小 Web API 的结构</strong>：<br><code>MyFirstApi/</code><br><code>├── Program.cs</code>——<em>入口 + 路由</em><br><code>├── MyFirstApi.csproj</code>——<em>项目配置</em><br><code>└── Properties/launchSettings.json</code>——<em>启动配置</em><br><br><strong>对比 Unity</strong>：<br>· Unity 项目有<em>上千个文件</em><br>· 后端项目<strong>三个文件就能跑</strong><br><br><em>这就是为什么后端入门比游戏开发快——没有引擎那层复杂度。</em>
+</div>
+
+<h2 id="modify">三、最快的验证：改一行代码</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">真正的「跑通」标准</span>
+  <strong>不是看到 Hello World，而是能改代码并看到变化。</strong><br><br>
+  <strong>任务</strong>：把返回内容改成一段 JSON。<br>
+  <code>app.MapGet("/hero", () =&gt; new {</code><br>
+  <code>&nbsp;&nbsp;Id = 1001,</code><br>
+  <code>&nbsp;&nbsp;Name = "勇者",</code><br>
+  <code>&nbsp;&nbsp;Level = 10</code><br>
+  <code>});</code><br><br>
+  <strong>访问 <code>/hero</code></strong> → 应看到：<br>
+  <code>{"id":1001,"name":"勇者","level":10}</code><br><br>
+  <em>这一刻你才真正跑通了：<strong>改代码 → 重新编译 → 看到新结果</strong>。</em>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">两个常见卡点</span>
+  <strong>① 端口冲突</strong><br><em>提示 <code>Address already in use</code></em><br>
+  → 换端口：<code>dotnet run --urls "http://localhost:5100"</code><br><br>
+  <strong>② 找不到 dotnet 命令</strong><br><em>装完需要重开终端</em>（<em>PATH 才生效</em>）<br>
+  → 或用绝对路径：<code>C:\Program Files\dotnet\dotnet.exe --version</code><br><br>
+  <strong>③ HTTPS 证书警告</strong><br><em>首次运行可能提示证书不受信任</em><br>
+  → 执行一次 <code>dotnet dev-certs https --trust</code>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="02">
+  <div class="task"><input type="checkbox" id="t-02-1"><label for="t-02-1"><strong>装好 SDK</strong>：<code>dotnet --version</code> 能看到 8.x。</label></div>
+  <div class="task"><input type="checkbox" id="t-02-2"><label for="t-02-2"><strong>创建并运行</strong>：<code>dotnet new web</code> + <code>dotnet run</code>。</label></div>
+  <div class="task"><input type="checkbox" id="t-02-3"><label for="t-02-3"><strong>改一行代码</strong>：把返回改成 JSON 对象，浏览器看到结果。</label></div>
+  <div class="task"><input type="checkbox" id="t-02-4"><label for="t-02-4"><strong>加一个路由</strong>：新增 <code>/time</code> 返回当前时间。<em>验证你能加接口。</em></label></div>
+  <div class="task"><input type="checkbox" id="t-02-5"><label for="t-02-5"><strong>试试热重载</strong>：<code>dotnet watch run</code>，改代码后自动重编译。</label></div>
+  <div class="task"><input type="checkbox" id="t-02-6"><label for="t-02-6"><strong>回答面试题</strong>：① .NET 和 .NET Framework 的区别？② 为什么生产环境要在 Kestrel 前面加 Nginx？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>装好 .NET 8 SDK 并能运行</strong>；<br>
+    ② <strong>成功创建并启动一个 Web API 项目</strong>；<br>
+    ③ 能修改代码并看到变化；<br>
+    ④ 知道项目结构只有三个核心文件；<br>
+    ⑤ 知道 <code>dotnet watch</code> 可以热重载。<br>
+    <br>
+    <em>这一页的标准很硬——**跑不通就不要往下走**。后端的坑大多在环境上。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="01-role.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">01 岗位与行业现实</div>
+  </a>
+  <a class="next" href="03-http-basics.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">03 HTTP、REST 与 API 设计 ★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

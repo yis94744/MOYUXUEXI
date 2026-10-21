@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>14 状态同步与帧同步 — Unity 游戏后端 + 全栈开发路线｜从客户端主程延伸为能独立扛服务的全栈工程师</title>
+<meta name="description" content="两种同步的本质差异、确定性、回滚、反外挂取舍">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="scrim" id="scrim"></div>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <a href="index.html">Unity 游戏后端 + 全栈开发路线
+        <span>从客户端主程延伸为能独立扛服务的全栈工程师</span>
+      </a>
+    </div>
+    <ul class="sidebar__nav" id="sidebar-nav"></ul>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sidebar-toggle" id="sidebar-toggle">目录</button>
+      <div class="search-box" id="search-wrap">
+        <input type="search" id="site-search" placeholder="搜索章节…（按 / 聚焦）" autocomplete="off" aria-label="搜索章节">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="progress-pill">
+        <span>本页进度</span>
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-text">0/0</span>
+      </div>
+      <button class="btn" id="theme-toggle">深色</button>
+    </header>
+
+    <main class="content">
+<h1>14 · 状态同步与帧同步 ★★★</h1>
+
+<p class="lead">这是<strong>游戏后端最核心的选择</strong>。选错了架构，后期推倒重来。<em>两种方案没有优劣，只有适用场景</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（13）协议设计与序列化 —— Protobuf、协议版本兼容、字段演进、包体压缩。<br>
+  <strong>这一页</strong>（14）状态同步与帧同步 —— 两种同步的本质差异、确定性、回滚、反外挂取舍。<br>
+  <strong>下一页</strong>（15）战斗服与结算 —— 房间模型、战斗校验、结算幂等、断线重连补帧。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+
+      <div class="prereq">
+        <div class="prereq__label">读这一页之前，建议先掌握</div>
+        <div class="prereq__list">
+          <a class="prereq__item" href="13-protocol-design.html#field-number" data-brief="用编号代替字段名，省 57% 带宽"><span class="prereq__title">字段编号</span><span class="prereq__page">13-protocol-design</span></a>
+          <a class="prereq__item" href="14-state-sync.html#comparison" data-brief="状态同步传结果，帧同步传操作"><span class="prereq__title">两种同步对比</span><span class="prereq__page">14-state-sync</span></a>
+        </div>
+        <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
+      </div>
+
+<h2 id="comparison">一、两种同步的本质区别</h2>
+
+<p><strong>一句话区分</strong>：<em>状态同步传「结果」，帧同步传「操作」</em>。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace BackendSamples.Sync
+{
+    // ============================================================
+    // 1. 两种同步方式的本质区别
+    // ============================================================
+
+    public static class SyncComparison
+    {
+        public static readonly (string Aspect, string StateSync, string Lockstep)[] All =
+        {
+            ("传输内容", "状态（位置、血量）", "操作指令（按键、点击）"),
+            ("带宽", "大", "极小（几字节）"),
+            ("服务器压力", "高（要跑逻辑）", "低（只转发）"),
+            ("确定性要求", "不需要", "【必须完全确定】"),
+            ("反外挂", "好（服务器权威）", "差（客户端有完整逻辑）"),
+            ("断线重连", "容易（拉最新状态）", "困难（要重放所有指令）"),
+            ("适用", "MMO、FPS、大部分手游", "RTS、MOBA、格斗、卡牌"),
+        };
+    }
+
+    // ============================================================
+    // 2. 确定性：帧同步的命门 ★★★
+    // ============================================================
+    // 【核心问题】同样的输入，不同机器算出不同结果 -&gt; 不同步
+
+    public class DeterminismDemo
+    {
+        // 【错误】用浮点 -&gt; 不同 CPU/编译器结果可能不同
+        public static float BadAdd(float a, float b) =&gt; a + b;
+
+        // 【正确】用定点数（放大倍数后取整）
+        //   1.0 表示为 10000
+        public const int SCALE = 10000;
+
+        public static int FixedAdd(int a, int b) =&gt; a + b;
+        public static int FixedMul(int a, int b) =&gt; (int)((long)a * b / SCALE);
+
+        // 【错误】用系统随机数
+        public static int BadRandom() =&gt; new Random().Next();
+
+        // 【正确】确定性随机（线性同余）
+        public class DeterministicRandom
+        {
+            private uint _state;
+            public DeterministicRandom(uint seed) =&gt; _state = seed;
+
+            public uint Next()
+            {
+                // 【关键】同样的 seed 在任何机器上都产生同样的序列
+                _state = _state * 1664525 + 1013904223;
+                return _state;
+            }
+
+            public int Next(int min, int max) =&gt; min + (int)(Next() % (uint)(max - min));
+        }
+
+        public static void Run()
+        {
+            Console.WriteLine("  浮点 vs 定点:");
+            // 【实测发现】0.1f + 0.2f == 0.3f 在 C# 里居然是 True
+            //   因为 .NET 的 float 比较做了特殊处理
+            //   要暴露浮点问题，必须用「累积运算」而不是单次相加
+            float fa = 0.1f, fb = 0.2f;
+            Console.WriteLine($"    浮点 0.1 + 0.2 = {BadAdd(fa, fb):F10}");
+            Console.WriteLine($"    等于 0.3 吗: {BadAdd(fa, fb) == 0.3f}（.NET 做了特殊处理）");
+
+            // 【真正会出问题的地方】累积运算
+            float acc = 0f;
+            for (int i = 0; i &lt; 10; i++) acc += 0.1f;
+            Console.WriteLine($"    0.1 累加 10 次 = {acc:F10}");
+            Console.WriteLine($"    等于 1.0 吗: {acc == 1.0f}  &lt;-- 这里会 False");
+
+            int ia = (int)(0.1 * SCALE), ib = (int)(0.2 * SCALE);
+            Console.WriteLine($"    定点 1000 + 2000 = {FixedAdd(ia, ib)} (= {FixedAdd(ia, ib) / (float)SCALE:F1})");
+            Console.WriteLine("    【结论】单次相加可能没事，但累加必然出问题");
+
+            Console.WriteLine();
+            Console.WriteLine("  确定性随机:");
+            var rng1 = new DeterministicRandom(12345);
+            var rng2 = new DeterministicRandom(12345);
+            var seq1 = Enumerable.Range(0, 5).Select(_ =&gt; rng1.Next(1, 100)).ToList();
+            var seq2 = Enumerable.Range(0, 5).Select(_ =&gt; rng2.Next(1, 100)).ToList();
+            Console.WriteLine($"    seed=12345 第一次: [{string.Join(", ", seq1)}]");
+            Console.WriteLine($"    seed=12345 第二次: [{string.Join(", ", seq2)}]");
+            Console.WriteLine($"    序列相同: {seq1.SequenceEqual(seq2)}");
+            Console.WriteLine("    【关键】帧同步里所有客户端必须用同一 seed");
+        }
+    }
+
+    // ============================================================
+    // 3. 帧同步：指令收集与广播
+    // ============================================================
+
+    public class LockstepServer
+    {
+        public class Frame
+        {
+            public int Id;
+            public Dictionary&lt;long, string&gt; Commands = new();   // playerId -&gt; command
+        }
+
+        private readonly Dictionary&lt;int, Frame&gt; _frames = new();
+        private readonly Dictionary&lt;int, HashSet&lt;long&gt;&gt; _ready = new();
+        private readonly int _playerCount;
+        private int _currentFrame;
+
+        public LockstepServer(int playerCount) =&gt; _playerCount = playerCount;
+
+        // 客户端提交指令
+        public bool Submit(long playerId, string command)
+        {
+            int frameId = _currentFrame + 1;
+
+            if (!_frames.TryGetValue(frameId, out var f))
+            {
+                f = new Frame { Id = frameId };
+                _frames[frameId] = f;
+            }
+
+            f.Commands[playerId] = command;
+
+            if (!_ready.TryGetValue(frameId, out var set))
+            {
+                set = new HashSet&lt;long&gt;();
+                _ready[frameId] = set;
+            }
+            set.Add(playerId);
+
+            return true;
+        }
+
+        // 【关键】必须所有玩家都提交了才能推进（锁步）
+        public Frame? TryAdvance()
+        {
+            int frameId = _currentFrame + 1;
+
+            if (!_ready.TryGetValue(frameId, out var set)) return null;
+            if (set.Count &lt; _playerCount) return null;   // 还没齐
+
+            // 补齐：没提交的玩家用空指令
+            if (!_frames.TryGetValue(frameId, out var frame))
+            {
+                frame = new Frame { Id = frameId };
+                _frames[frameId] = frame;
+            }
+
+            for (long pid = 1; pid &lt;= _playerCount; pid++)
+            {
+                if (!frame.Commands.ContainsKey(pid))
+                    frame.Commands[pid] = "idle";   // 没操作 = 空指令
+            }
+
+            _currentFrame = frameId;
+            return frame;
+        }
+
+        public int CurrentFrame =&gt; _currentFrame;
+        public int PendingFrame =&gt; _currentFrame + 1;
+    }
+
+    // ============================================================
+    // 4. 状态同步：服务器权威 + 增量同步
+    // ============================================================
+
+    public class StateSyncServer
+    {
+        public class Unit
+        {
+            public long Id;
+            public float X, Y;
+            public int Hp;
+            public int HpMax;
+        }
+
+        private readonly Dictionary&lt;long, Unit&gt; _units = new();
+        private int _frameId;
+
+        public void Spawn(long id, float x, float y, int hp)
+        {
+            _units[id] = new Unit { Id = id, X = x, Y = y, Hp = hp, HpMax = hp };
+        }
+
+        // 【关键】状态同步的三个优化
+        public StateUpdate GenerateUpdate(long viewerId)
+        {
+            _frameId++;
+            var update = new StateUpdate { FrameId = _frameId };
+
+            foreach (var u in _units.Values)
+            {
+                if (u.Id == viewerId) continue;
+
+                // 【优化1】视野裁剪：只同步附近的
+                var viewer = _units.GetValueOrDefault(viewerId);
+                if (viewer != null)
+                {
+                    double dist = Math.Sqrt(Math.Pow(u.X - viewer.X, 2) + Math.Pow(u.Y - viewer.Y, 2));
+                    if (dist &gt; 50) continue;   // 视野外不同步
+                }
+
+                update.Units.Add(new UnitSnapshot
+                {
+                    Id = u.Id,
+                    X = u.X,
+                    Y = u.Y,
+                    Hp = u.Hp,
+                });
+            }
+
+            return update;
+        }
+
+        // 【优化2】增量同步：只发变化的字段
+        public Dictionary&lt;long, List&lt;string&gt;&gt; GenerateDelta(long playerId, Dictionary&lt;long, Unit&gt; lastSent)
+        {
+            var delta = new Dictionary&lt;long, List&lt;string&gt;&gt;();
+
+            foreach (var u in _units.Values)
+            {
+                var changed = new List&lt;string&gt;();
+
+                if (!lastSent.TryGetValue(u.Id, out var old))
+                {
+                    changed.Add("all");
+                }
+                else
+                {
+                    if (Math.Abs(old.X - u.X) &gt; 0.01f || Math.Abs(old.Y - u.Y) &gt; 0.01f)
+                        changed.Add("pos");
+                    if (old.Hp != u.Hp) changed.Add("hp");
+                }
+
+                if (changed.Count &gt; 0) delta[u.Id] = changed;
+            }
+
+            return delta;
+        }
+
+        // 【优化3】量化压缩：位置保留 2 位小数
+        public static int QuantizePos(float v) =&gt; (int)(v * 100);
+
+        public IEnumerable&lt;Unit&gt; AllUnits =&gt; _units.Values;
+    }
+
+    public class StateUpdate
+    {
+        public int FrameId;
+        public List&lt;UnitSnapshot&gt; Units = new();
+    }
+
+    public class UnitSnapshot
+    {
+        public long Id;
+        public float X, Y;
+        public int Hp;
+
+        public override string ToString() =&gt; $"#{Id}({X:F1},{Y:F1}) HP={Hp}";
+    }
+
+    // ============================================================
+    // 5. 客户端预测与服务端校正
+    // ============================================================
+    // 【问题】玩家按前进，等服务器确认要 100ms -&gt; 手感极差
+    // 【方案】客户端预测 + 服务器校正
+
+    // 【关键】PlayerState 提到命名空间级别，Demo 里才能用
+    public class PlayerState
+    {
+        public float X;
+        public int LastAckInput;
+    }
+
+    public class PredictionDemo
+    {
+
+        private readonly List&lt;string&gt; _pendingInputs = new();
+        private int _inputSeq;
+
+        // 客户端：立即执行 + 记录输入
+        public float ClientMove(PlayerState state, float delta)
+        {
+            state.X += delta;
+            _pendingInputs.Add($"input-{++_inputSeq}:move{delta}");
+            return state.X;
+        }
+
+        // 服务端：返回权威位置
+        public (float authoritativeX, int ackSeq) ServerSimulate(float serverX, float delta)
+        {
+            return (serverX + delta, _inputSeq);
+        }
+
+        // 客户端：收到校正
+        public (float newX, int rollbackCount) ClientReconcile(PlayerState state, float serverX, int ackSeq)
+        {
+            // 丢弃已确认的输入
+            _pendingInputs.RemoveAll(p =&gt; int.Parse(p.Split(':')[0].Split('-')[1]) &lt;= ackSeq);
+
+            // 如果服务端位置和预测差太多 -&gt; 回滚重放
+            if (Math.Abs(serverX - state.X) &gt; 0.1f)
+            {
+                int rollback = _pendingInputs.Count;
+                state.X = serverX;
+                // 重放未确认的输入
+                foreach (var p in _pendingInputs)
+                {
+                    float d = float.Parse(p.Split(':')[1].Replace("move", ""));
+                    state.X += d;
+                }
+                return (state.X, rollback);
+            }
+
+            return (state.X, 0);
+        }
+
+        public int PendingCount =&gt; _pendingInputs.Count;
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 两种同步方式 ===");
+            Console.WriteLine($"    {"方面",-14} {"状态同步",-24} 帧同步");
+            foreach (var (aspect, state, lockstep) in SyncComparison.All)
+            {
+                Console.WriteLine($"    {aspect,-14} {state,-24} {lockstep}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 确定性 ===");
+            DeterminismDemo.Run();
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 帧同步的锁步机制 ===");
+            var ls = new LockstepServer(3);
+
+            Console.WriteLine("  3 个玩家，当前帧 0");
+
+            Console.WriteLine("  玩家 1、2 提交了指令，玩家 3 还没:");
+            ls.Submit(1, "move-right");
+            ls.Submit(2, "attack");
+            var f = ls.TryAdvance();
+            Console.WriteLine($"    能否推进: {f != null}（必须等玩家 3）");
+
+            Console.WriteLine("  玩家 3 也提交了:");
+            ls.Submit(3, "idle");
+            f = ls.TryAdvance();
+            Console.WriteLine($"    能否推进: {f != null}");
+            if (f != null)
+            {
+                Console.WriteLine($"    帧 {f.Id} 指令: {string.Join(", ", f.Commands.Select(kv =&gt; $"P{kv.Key}={kv.Value}"))}");
+            }
+            Console.WriteLine($"    当前帧: {ls.CurrentFrame}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】必须所有玩家都到齐才能推进");
+            Console.WriteLine("          一个玩家卡住，所有人一起等");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 状态同步：视野裁剪 ===");
+            var stateSync = new StateSyncServer();
+            stateSync.Spawn(1, 0, 0, 100);      // 自己
+            stateSync.Spawn(2, 10, 0, 100);     // 附近
+            stateSync.Spawn(3, 30, 0, 100);     // 稍远
+            stateSync.Spawn(4, 100, 0, 100);    // 视野外
+
+            var update = stateSync.GenerateUpdate(1);
+            Console.WriteLine("  玩家 1 收到的状态（视野 50 以内）:");
+            foreach (var u in update.Units)
+            {
+                Console.WriteLine($"    {u}");
+            }
+            Console.WriteLine($"  共 {update.Units.Count} 个单位（4 号在视野外，不同步）");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 5. 客户端预测 ===");
+            var pred = new PredictionDemo();
+            var clientState = new PlayerState();
+
+            Console.WriteLine("  客户端连续 3 次前进（立即执行，不等服务器）:");
+            for (int i = 0; i &lt; 3; i++)
+            {
+                float x = pred.ClientMove(clientState, 1.0f);
+                Console.WriteLine($"    第 {i + 1} 次: 本地位置 = {x:F1}");
+            }
+            Console.WriteLine($"    待确认输入: {pred.PendingCount} 条");
+
+            Console.WriteLine();
+            Console.WriteLine("  服务器返回权威位置（假设一致）:");
+            var (authX, ackSeq) = pred.ServerSimulate(3.0f, 0);
+            var (newX, rollback) = pred.ClientReconcile(clientState, 3.0f, ackSeq);
+            Console.WriteLine($"    校正后位置: {newX:F1}，回滚 {rollback} 条输入");
+
+            Console.WriteLine();
+            Console.WriteLine("  服务器说位置应该是 1.0（发生了碰撞）:");
+            var (newX2, rollback2) = pred.ClientReconcile(clientState, 1.0f, ackSeq);
+            Console.WriteLine($"    校正后位置: {newX2:F1}，回滚 {rollback2} 条输入");
+            Console.WriteLine("  【体验】客户端会「回拉」到正确位置");
+            Console.WriteLine("          这就是为什么网络差时角色会瞬移");
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Sync.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>维度</th><th>状态同步</th><th>帧同步</th></tr></thead>
+  <tbody>
+    <tr><td><strong>传输内容</strong></td><td><em>位置、血量</em></td><td><strong>按键、点击</strong></td></tr>
+    <tr><td><strong>带宽</strong></td><td><span class="mk mk--no">大</span></td><td><span class="mk mk--yes">极小</span></td></tr>
+    <tr><td><strong>服务器压力</strong></td><td><span class="mk mk--no">高（跑逻辑）</span></td><td><span class="mk mk--yes">低（只转发）</span></td></tr>
+    <tr><td><strong>确定性</strong></td><td>不需要</td><td><strong>必须完全确定</strong></td></tr>
+    <tr><td><strong>反外挂</strong></td><td><span class="mk mk--yes">好</span></td><td><span class="mk mk--no">差</span></td></tr>
+    <tr><td><strong>断线重连</strong></td><td><span class="mk mk--yes">容易</span></td><td><span class="mk mk--no">困难</span></td></tr>
+    <tr><td><strong>适用</strong></td><td><strong>MMO、FPS、多数手游</strong></td><td><em>RTS、MOBA、格斗、卡牌</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="determinism">二、确定性：帧同步的命门 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三个必须解决的确定性问题</span>
+  <strong>① 浮点运算不确定</strong><br>
+  不同 CPU、不同编译器优化，浮点结果可能<em>有微小差异</em>。<br>
+  <strong>本页实测（重要更正）</strong>：<code>0.1f + 0.2f == 0.3f</code> 在 .NET 里返回 <strong>True</strong>——<br>
+  因为 <code>0.1f</code> 与 <code>0.2f</code> 转成 float 后的和，恰好落在与 <code>0.3f</code> <em>相同的位模式</em>上。<br>
+  <em>只测单次相加会得出「浮点没问题」的错觉。</em><br>
+  <strong>真正会炸的是累积运算</strong>：<code>0.1f</code> 连加 10 次 = <code>1.0000001192</code>，<code>== 1.0f</code> → <strong>False</strong>。<br>
+  <strong>方案</strong>：<em>用定点数</em>（<em>放大 1000 倍取整</em>），或全程用 <code>decimal</code>/整数运算<br><br>
+  <strong>② 随机数不确定</strong><br>
+  <code>new Random().Next()</code> 每个客户端结果不同。<br>
+  <strong>方案</strong>：<em>用确定性随机（同 seed 同序列）</em><br>
+  本页实测：seed=12345 两次产生<strong>完全相同的序列</strong>。<br><br>
+  <strong>③ 遍历顺序不确定</strong><br>
+  <code>Dictionary</code> / <code>HashSet</code> 的遍历顺序<em>在不同运行中可能不同</em>。<br>
+  <strong>方案</strong>：<em>用 List 或排序后的数组</em>。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">帧同步的锁步机制</span>
+  <strong>核心</strong>：<em>所有玩家都提交了指令，才能推进一帧</em>。<br><br>
+  <strong>本页实测</strong>：<br>
+  <code>玩家1、2 提交了，玩家3 没提交</code><br>
+  <code>能否推进: False（必须等玩家3）</code><br>
+  <code>玩家3 也提交后 → 能否推进: True</code><br><br>
+  <strong>没提交的玩家怎么处理</strong>：<em>用空指令（idle）补齐</em>。<br>
+  <strong>但问题来了</strong>：如果玩家故意不提交（<em>掉线/恶意</em>）→ <strong>所有人卡住</strong>。<br><br>
+  <strong>解决方案</strong>：<br>
+  · <strong>超时自动补空指令</strong>（<em>最常用</em>）<br>
+  · 掉线托管（<em>AI 接管</em>）<br>
+  · 踢出并让其他人继续
+</div>
+
+<h2 id="optimization">三、状态同步的三个优化 ★★</h2>
+
+<div class="callout callout--warn">
+  <span class="callout__title">状态同步的带宽问题</span>
+  <strong>问题</strong>：100 个玩家，每人每秒 10 次同步<br>
+  · 每次同步 100 个单位的位置<br>
+  · <strong>每秒 10 万条状态</strong> → 带宽爆炸<br><br>
+  <strong>三个优化</strong>：<br>
+  <strong>① 视野裁剪</strong>（<em>本页实测</em>）<br>
+  · 只同步「附近 50 米」内的单位<br>
+  · 4 个单位中只同步 3 个<br><br>
+  <strong>② 增量同步</strong><br>
+  · 只发<em>变化的字段</em>（位置变了发位置，血量变了发血量）<br>
+  · 本页实现了 <code>GenerateDelta</code><br><br>
+  <strong>③ 量化压缩</strong><br>
+  · 位置保留 2 位小数 → <em>float 4 字节变 2 字节</em><br>
+  · 角度用 1 字节（<em>0~255 映射 0~360</em>）
+</div>
+
+<h2 id="prediction">四、客户端预测：手感的来源 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">为什么需要预测</span>
+  <strong>问题</strong>：玩家按前进<br>
+  · 请求到服务器：50ms<br>
+  · 服务器处理：10ms<br>
+  · 回来：50ms<br>
+  → <strong>总共 110ms 才看到动</strong> → <em>手感极差</em><br><br>
+  <strong>预测的做法</strong>：<br>
+  ① <strong>客户端立即执行</strong>（<em>玩家马上看到动</em>）<br>
+  ② 同时把输入发给服务器<br>
+  ③ 服务器返回权威位置<br>
+  ④ <strong>不一致时回滚重放</strong><br><br>
+  <strong>本页实测</strong>：<br>
+  <code>第 1 次: 本地位置 = 1.0 / 第 2 次: 2.0 / 第 3 次: 3.0</code><br>
+  <code>待确认输入: 3 条</code><br>
+  <code>服务器返回权威位置（假设一致）: 校正后位置: 3.0，回滚 0 条输入</code><br>
+  <code>服务器说位置应该是 1.0（发生了碰撞）: 校正后位置: 1.0，回滚 0 条输入</code><br><br>
+  <strong>这里有个容易看漏的点</strong>：<em>两次校正的回滚条数都是 0</em>——因为
+  <code>ServerSimulate</code> 返回的 <code>ackSeq</code> 已经等于 3（全部输入都确认了），
+  待重放的队列是空的，所以<strong>只发生了位置校正、没有重放</strong>。<br>
+  <em>回滚条数 = 未被服务器确认的输入数</em>。真实网络里 ack 落后于本地输入，才会有重放；
+  重放时如果再撞墙，就表现为玩家看到的「回拉」卡顿。<br><br>
+  <strong>副作用</strong>：<em>玩家会看到角色「回拉」</em>——<strong>这就是网络差时瞬移的原因</strong>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="14">
+  <div class="task"><input type="checkbox" id="t-14-1"><label for="t-14-1"><strong>验证浮点问题</strong>：测 <code>0.1f + 0.2f == 0.3f</code>，观察结果。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-2"><label for="t-14-2"><strong>实现定点数</strong>：用放大取整做运算，验证精确性。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-3"><label for="t-14-3"><strong>确定性随机</strong>：同 seed 生成两次序列，验证完全一致。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-4"><label for="t-14-4"><strong>实现锁步</strong>：三个玩家，必须都提交才推进。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-5"><label for="t-14-5"><strong>做视野裁剪</strong>：只同步附近的单位。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-6"><label for="t-14-6"><strong>做客户端预测</strong>：模拟服务器校正，观察回滚。</label></div>
+  <div class="task"><input type="checkbox" id="t-14-7"><label for="t-14-7"><strong>回答面试题</strong>：① 两种同步的区别？② 帧同步为什么要定点数？③ 客户端预测的副作用？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能说出两种同步的七个差异</strong>；<br>
+    ② <strong>知道帧同步必须解决浮点、随机、遍历顺序三个不确定</strong>；<br>
+    ③ <strong>能实现锁步推进并知道掉线时怎么处理</strong>；<br>
+    ④ <strong>能说出状态同步的三个优化</strong>；<br>
+    ⑤ <strong>理解客户端预测与回滚，知道「回拉」的原因</strong>。<br>
+    <br>
+    <em>第 ② 和 第 ⑤ 条最重要——**前者是帧同步的门槛，后者是网络手感的来源**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="13-protocol-design.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">13 协议设计与序列化 ★★</div>
+  </a>
+  <a class="next" href="15-battle-server.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">15 战斗服与结算 ★★★</div>
+  </a>
+</nav>
+    </main>
+  </div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>

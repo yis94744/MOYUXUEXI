@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">Lua 热更新路线
+      <a href="index.html">Lua 热更新路线
         <span>从零基础到独立搭建可上线的热更框架</span>
       </a>
     </div>
@@ -43,7 +43,9 @@
 
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
-  [object Object]
+  前四页（13-16）讲的是框架<em>长什么样</em>。这一页讲<em>怎么把它推到线上还不翻车</em>。<br>
+  <strong>关键衔接</strong>：页 09 的<em>热更流程六步</em>在这里落到代码：清单、差异、原子切换、回滚。<br>
+  <strong>下一页</strong>（18）调试与排错。<em>这一页讲的问题，几乎都会在线上以"疑难 bug"的形式再出现一次。</em>
 </div>
 
 
@@ -52,7 +54,6 @@
         <div class="prereq__list">
           <a class="prereq__item" href="09-hotupdate-basics.html#require" data-brief="清 package.loaded + 重新 require，旧引用问题"><span class="prereq__title">热更新原理</span><span class="prereq__page">09-hotupdate-basics</span></a>
           <a class="prereq__item" href="13-framework-design.html#module" data-brief="注册/初始化/逆序销毁"><span class="prereq__title">模块管理器</span><span class="prereq__page">13-framework-design</span></a>
-          <a class="prereq__item" href="09-hotupdate-basics.html#require" data-brief="package.loaded 缓存，热更要清缓存"><span class="prereq__title">require 与模块</span><span class="prereq__page">09-hotupdate-basics</span></a>
         </div>
         <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
       </div>
@@ -64,7 +65,7 @@
 <pre class="mono code-block" data-lang="lua"><code>-- ============================================================
 --  热更与版本管理：从原理到工程实现
 -- ============================================================
---  这一页的重点不是"怎么热更「，而是」怎么保证热更不出事故「。
+--  这一页的重点不是「怎么热更」，而是「怎么保证热更不出事故」。
 
 print("=== 1. 清单文件的设计 ===")
 print()
@@ -218,6 +219,7 @@ function HotUpdateManager.new()
     completedFiles = {},         -- 已完成的文件
     totalFiles = 0,
     versionHistory = {},    -- 历史版本列表（用于回滚）
+    expectedFiles = {},     -- 本次下载应得的文件清单（按 path 校验）
     log = {},
   }, HotUpdateManager)
 end
@@ -228,10 +230,12 @@ function HotUpdateManager:_log(msg)
 end
 
 -- 开始下载
-function HotUpdateManager:beginDownload(version, fileCount)
+-- files：本次要下载的清单（path 列表）。真实项目里是 [{path, md5, size}, ...]
+function HotUpdateManager:beginDownload(version, files)
   self.stagingVersion = version
   self.stagingDir = "scripts_" .. version .. "_staging"
-  self.totalFiles = fileCount
+  self.expectedFiles = files or {}
+  self.totalFiles = #self.expectedFiles
   self.completedFiles = {}
 
   FileSystem.mkdir(self.stagingDir)   -- 创建临时目录
@@ -239,20 +243,38 @@ function HotUpdateManager:beginDownload(version, fileCount)
 end
 
 -- 下载单个文件
+-- expected：本次要下载的清单（path 列表）。真实项目里还带 md5/size。
 function HotUpdateManager:downloadFile(path, content)
   FileSystem.write(self.stagingDir, path, content)
   self.completedFiles[#self.completedFiles + 1] = path
   self:_log(string.format("  下载 %s (%d/%d)", path, #self.completedFiles, self.totalFiles))
 end
 
--- 校验（模拟 MD5 校验）
+-- 【关键】校验「清单里的每个文件都在」，而不是「下载次数够了」
+-- 如果只比较次数，同一个文件被重复下载（断点续传重试、网络重发）
+-- 就会把计数凑满 —— 明明缺文件也会切换成功。
 function HotUpdateManager:verify()
+  local seen = {}
+  for _, p in ipairs(self.completedFiles) do seen[p] = true end
+
+  local missing = {}
+  for _, p in ipairs(self.expectedFiles or {}) do
+    if not seen[p] then missing[#missing + 1] = p end
+  end
+
+  if #missing &gt; 0 then
+    self:_log(string.format("  校验失败：缺 %d 个文件（%s）",
+      #missing, table.concat(missing, ", ")))
+    return false
+  end
+
   if #self.completedFiles &lt; self.totalFiles then
     self:_log(string.format("  校验失败：只完成 %d/%d 个文件",
       #self.completedFiles, self.totalFiles))
     return false
   end
-  self:_log("校验通过：所有文件完整")
+
+  self:_log("校验通过：清单里所有文件都已就位")
   return true
 end
 
@@ -318,7 +340,7 @@ local hm = HotUpdateManager.new()
 FileSystem.write("scripts_v1", "logic/battle.lua", "战斗逻辑 v1")
 FileSystem.write("scripts_v1", "ui/bag.lua", "背包界面 v1")
 
-hm:beginDownload("v2", 3)
+hm:beginDownload("v2", { "logic/battle.lua", "logic/skill.lua", "ui/bag.lua" })
 hm:downloadFile("logic/battle.lua", "战斗逻辑 v2")
 hm:downloadFile("logic/skill.lua", "技能逻辑 v1")
 hm:downloadFile("ui/bag.lua", "背包界面 v2")
@@ -341,7 +363,7 @@ FileSystem.write("scripts_v1", "logic/battle.lua", "旧版本")
 hm2.activeDir = "scripts_v1"
 hm2.currentVersion = "v1"
 
-hm2:beginDownload("v3", 5)
+hm2:beginDownload("v3", { "a.lua", "b.lua", "c.lua", "d.lua", "e.lua" })
 hm2:downloadFile("a.lua", "a")
 hm2:downloadFile("b.lua", "b")
 -- 玩家在这里退出了（只下载了 2/5）
@@ -355,6 +377,30 @@ print()
 print("  【关键】因为校验不通过，拒绝切换")
 print("          玩家仍然使用旧版本 —— 游戏能正常启动")
 print("          下次启动会重新下载（断点续传）")
+
+print()
+print("=== 4b. 【边界】重复下载同一个文件，会不会把校验蒙混过去 ===")
+print()
+print("  场景：清单要 3 个文件，弱网重试把 a.lua 下了两遍，c.lua 没下到。")
+print("  如果校验只看「下载次数」，就会误判为「够了」。")
+print()
+
+local hm3 = HotUpdateManager.new()
+FileSystem.write("scripts_v1", "keep.lua", "旧文件")
+hm3.activeDir = "scripts_v1"
+hm3.currentVersion = "v1"
+
+hm3:beginDownload("v4", { "a.lua", "b.lua", "c.lua" })
+hm3:downloadFile("a.lua", "a")
+hm3:downloadFile("a.lua", "a")     -- 重试，同一个文件
+hm3:downloadFile("b.lua", "b")     -- c.lua 始终没下到
+print()
+
+local committed = hm3:commit()
+print("  commit() 返回值 =", tostring(committed))
+print("  当前版本 =", hm3.currentVersion, "（应仍为 v1）")
+print("  【结论】按文件名校验 -&gt; 缺 c.lua 被识破，拒绝切换")
+print("          若按下载次数校验（旧写法），这里会误判通过")
 
 print()
 print("=== 5. 版本强制校验（联机必需）★★★ ===")
@@ -459,9 +505,20 @@ print("    解决：模块提供 reset() + 状态迁移 + 状态与逻辑分离"
   <strong>典型场景</strong>：玩家弱网下载到 80% 退出，下次启动读到不完整的文件。<br><br>
   <strong>解决方案</strong>：<br>
   ① <strong>下载到临时目录，全部完成后再切换</strong>（原子操作）<br>
-  ② <strong>每个文件都要 MD5 校验</strong><br>
+  ② <strong>每个文件都要 MD5 校验</strong>——注意是<em>按「清单里的文件名」校验</em>，
+     不是「下载了几个文件」这种计数校验<br>
   ③ <strong>保留完整的旧版本</strong>，新版本有问题就切回去<br><br>
-  <em>这三个措施缺一个都可能出事故。</em>
+  <strong>为什么强调"按文件名"</strong>：如果校验只比「已下载数量 ≥ 总数」，
+  <em>同一个文件被重复下载（断点续传重试、网络重发）就会把计数凑满</em>，
+  而实际<strong>缺了文件也能切换成功</strong>——本页代码样本用的是<strong>简化版计数校验</strong>，
+  真实项目必须改成「清单里的每个 path 都存在且 hash 匹配」。<br><br>
+  <em>这三个措施缺一个都可能出事故。</em><br><br>
+  <strong>本页实测（Lua 5.4.7，见本页代码样本）</strong>：清单要 5 个文件，玩家下到 2/5 就退出——<br>
+  · <code>commit()</code> 返回 <strong>false</strong>，打印 <code>校验失败：缺 3 个文件（c.lua, d.lua, e.lua）</code><br>
+  · 当前版本仍是 <code>v1</code>、目录仍是 <code>scripts_v1</code>、<strong>旧目录 2 个文件内容一字未变</strong><br>
+  · 临时目录 <code>scripts_v3_staging</code> 被完整保留，下次启动可以续传<br>
+  · 另测了一个边界：<strong>同一个文件重复下载</strong>（a.lua 下两遍、c.lua 没下到）——
+    按文件名校验同样返回 <strong>false</strong>；<em>如果按"下载次数"校验，这里会误判通过</em>
 </div>
 
 <div class="callout callout--danger">

@@ -375,13 +375,14 @@ end</code></pre>
 <div class="callout callout--danger">
   <span class="callout__title">实测结论推翻了一个常见说法</span>
   很多资料说"类式状态机因为有虚函数调用，所以比 if-else 慢"。<br>
-  <strong>但实测结果不是这样</strong>（50 万次 update）：<br><br>
-  • 枚举 + if 链：<strong>0.0490 秒</strong>（基准）<br>
-  • 表驱动：<strong>0.0450 秒</strong>（0.92x）<br>
-  • 类式状态机：<strong>0.0420 秒</strong>（0.86x）<br><br>
-  <strong>三种方案在同一量级，类式反而略快。</strong><br><br>
-  <strong>为什么</strong>：状态数少时，"if-else 链"需要<em>逐条比较字符串</em>；而类式状态机是<em>一次表查找</em>加一次方法调用——在状态数较多时反而更高效。<br><br>
-  <em>所以：性能不是选型依据，别为了"性能"牺牲可维护性。</em>
+  <strong>但实测结果并不是这样</strong>（50 万次 update，连跑 4 次）：<br><br>
+  • 枚举 + if 链：<strong>0.049~0.052 秒</strong>（基准）<br>
+  • 表驱动：<strong>0.048~0.054 秒</strong>（0.92x ~ 1.08x）<br>
+  • 类式状态机：<strong>0.043~0.059 秒</strong>（0.83x ~ 1.18x）<br><br>
+  <strong>三种方案完全在同一量级</strong>，差异被测量噪声淹没——4 次里"类式略快"和"类式略慢"都出现过。<br><br>
+  <strong>结论要说得准确一点</strong>：不是"类式更快"，而是<em>"三种实现的差距小到没有工程意义"</em>。<br>
+  所以<strong>性能不应该成为选型依据</strong>，选维护性更好的那个即可。<br><br>
+  <em>补充：Lua 的字符串比较会先比长度、再比内容，且短字符串已内部化，所以 if 链并不像在 C# 里那样昂贵——这也是本页结论与"C# 里枚举最快"的经验不冲突的原因。</em>
 </div>
 
 <h2 id="choose">二、怎么选？看这四个维度</h2>

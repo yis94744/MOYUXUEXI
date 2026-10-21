@@ -66,7 +66,183 @@
 
 <p>创建 <code>hello.lua</code>，写入下面的内容，然后运行 <code>lua hello.lua</code>。</p>
 
-<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>02/hello</code></div>
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  第一段 Lua 脚本
+-- ============================================================
+-- 运行方式：lua hello.lua
+--
+-- 注意几个与 C# 不同的地方：
+--   1. 没有类、没有命名空间、没有 main 函数
+--   2. 没有分号（可以有，但不必要）
+--   3. 没有花括号，用 then/do/end 划分块
+--   4. 注释是 --（单行）和 --[[ ]]（多行）
+
+print("Hello, Lua!")
+print("版本:", _VERSION)
+
+-- ============================================================
+--  变量：默认是全局的（这是最需要注意的点）
+-- ============================================================
+name = "张三"          -- 全局变量（不推荐）
+local age = 25         -- 局部变量（推荐）
+
+print("姓名:", name, "年龄:", age)
+
+-- 不存在的变量是 nil（不是错误）
+print("不存在的变量:", undefinedVar)     -- 输出 nil
+
+-- ============================================================
+--  八种类型
+-- ============================================================
+print()
+print("=== 八种类型 ===")
+local samples = {
+  ["nil"] = nil,
+  ["boolean"] = true,
+  ["number"] = 42,
+  ["string"] = "text",
+  ["table"] = { 1, 2, 3 },
+  ["function"] = print,
+  ["thread"] = coroutine.create(function() end),
+}
+for name, value in pairs(samples) do
+  print(string.format("  %-10s -&gt; %s", name, type(value)))
+end
+-- userdata 需要 C 库，这里不演示
+
+-- ============================================================
+--  表（Lua 唯一的数据结构）
+-- ============================================================
+print()
+print("=== 表 ===")
+
+-- 数组（索引从 1 开始！）
+local arr = { "a", "b", "c" }
+print("  数组长度:", #arr)
+print("  arr[1]:", arr[1])
+print("  arr[0]:", arr[0])        -- nil（不是错误）
+
+-- 字典
+local dict = { name = "李四", level = 30 }
+print("  字典:", dict.name, dict.level)
+print("  用方括号访问:", dict["name"])
+
+-- ============================================================
+--  控制流
+-- ============================================================
+print()
+print("=== 控制流 ===")
+
+local score = 85
+
+if score &gt;= 90 then
+  print("  优秀")
+elseif score &gt;= 60 then
+  print("  及格")
+else
+  print("  不及格")
+end
+
+-- 数值 for
+for i = 1, 5 do
+  io.write(i, " ")
+end
+print()
+
+-- 泛型 for
+for i, v in ipairs(arr) do
+  io.write(i, "=", v, " ")
+end
+print()
+
+-- while
+local count = 0
+while count &lt; 3 do
+  count = count + 1
+end
+print("  while 循环次数:", count)
+
+-- ============================================================
+--  函数
+-- ============================================================
+print()
+print("=== 函数 ===")
+
+local function add(a, b)
+  return a + b
+end
+
+print("  add(3, 4) =", add(3, 4))
+
+-- 多返回值（Lua 特色）
+local function multiReturn()
+  return 1, 2, 3
+end
+
+local x, y, z = multiReturn()
+print("  多返回值:", x, y, z)
+
+-- 函数是值
+local fn = add
+print("  函数可以赋给变量:", fn(10, 20))
+
+-- ============================================================
+--  常用标准库
+-- ============================================================
+print()
+print("=== 常用标准库 ===")
+
+-- string
+print("  string.upper:", string.upper("hello"))
+print("  string.format:", string.format("%s 有 %d 个", "玩家", 5))
+print("  string.rep:", string.rep("ab", 3))
+print("  字符串方法语法:", ("hello"):upper())     -- 用冒号调用
+
+-- table
+local t = { 3, 1, 2 }
+table.sort(t)
+print("  table.sort 后:", table.concat(t, ", "))
+table.insert(t, 4)
+print("  table.insert 后:", table.concat(t, ", "))
+print("  table.remove 返回:", table.remove(t))
+
+-- math
+print("  math.floor(3.7):", math.floor(3.7))
+print("  math.max(1,5,3):", math.max(1, 5, 3))
+print("  math.random:", math.random(1, 100))
+
+-- os
+print("  os.time():", os.time())
+print("  os.clock():", math.floor(os.clock() * 1000) / 1000)
+
+-- ============================================================
+--  错误处理
+-- ============================================================
+print()
+print("=== 错误处理 ===")
+
+-- pcall：捕获错误
+local ok, err = pcall(function()
+  error("这是一个错误")
+end)
+print("  pcall 结果:", ok, err)
+
+-- 正常执行时
+local ok2, result = pcall(function()
+  return "成功"
+end)
+print("  正常执行:", ok2, result)
+
+-- ============================================================
+--  下一步
+-- ============================================================
+print()
+print("=== 下一步 ===")
+print("  你已经跑通了第一段 Lua 代码。")
+print("  接下来去 03 页学基础语法 —— 重点注意三件事：")
+print("    1. 索引从 1 开始（不是 0）")
+print("    2. 只有 nil 和 false 是假值（0 是真值！）")
+print("    3. 不加 local 就是全局变量")</code></pre>
 
 <h2 id="tasks">本章动手任务</h2>
 
@@ -96,8 +272,8 @@
     <div class="dir">← 上一页</div>
     <div class="title">01 为什么用 Lua 热更</div>
   </a>
-  <a class="next" href="kp-index.html">
+  <a class="next" href="03-lua-basic.html">
     <div class="dir">下一页 →</div>
-    <div class="title">知识点索引</div>
+    <div class="title">03 基础语法</div>
   </a>
 </nav>

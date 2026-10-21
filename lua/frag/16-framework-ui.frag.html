@@ -4,13 +4,553 @@
 
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
-  [object Object]
+  上一页（15）讲了 class 系统。<em>UI 框架是 class 系统最大的用户。</em><br>
+  <strong>关键衔接</strong>：页 13 的<em>事件系统</em>在这一页会被"按所有者批量取消订阅"这个需求倒逼着扩展——<em>这正是框架设计要提前想清楚依赖关系的原因</em>。<br>
+  <strong>下一页</strong>（17）热更与版本管理。
 </div>
 
 <h2 id="elements">一、UI 框架的六大要素</h2>
 
 
-<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>16/ui-framework</code></div>
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  UI 框架：界面栈 + 生命周期 + 数据绑定
+-- ============================================================
+--  这是 Lua 层代码量最大的部分，也是最能体现框架设计功力的地方。
+
+print("=== 1. 三种界面类型 ===")
+print()
+print("  【全屏界面】打开时隐藏下层，返回时恢复")
+print("    例：主界面、背包、设置")
+print()
+print("  【弹窗】下层仍可见，可同时存在多个")
+print("    例：确认框、道具详情、活动弹窗")
+print()
+print("  【飘字/Toast】不入栈，自动消失")
+print("    例：获得道具、提示信息")
+print()
+
+local ViewType = {
+  FULL = "full",       -- 全屏
+  POPUP = "popup",     -- 弹窗
+  TOAST = "toast",     -- 飘字
+}
+
+print("=== 2. 界面基类（生命周期）===")
+print()
+
+local function class(name, base)
+  local c = {}
+  c.__name = name
+  c.__base = base
+  c.__index = c
+  if base then
+    setmetatable(c, { __index = base })
+    c.super = base
+  end
+  function c.new(...)
+    local obj = setmetatable({}, c)
+    if obj.ctor then obj:ctor(...) end
+    return obj
+  end
+  return c
+end
+
+local ViewBase = class("ViewBase")
+
+function ViewBase:ctor(name, viewType)
+  self.name = name
+  self.viewType = viewType or ViewType.FULL
+  self.isOpen = false
+  self.isCreated = false
+  self.createdTime = nil
+  self.openCount = 0        -- 统计打开次数
+  self.subscriptions = {}   -- 记录本界面订阅的事件
+  self.dirty = false        -- 脏标记（数据变了但没刷新）
+end
+
+-- ============================================================
+--  生命周期：五个阶段
+-- ============================================================
+-- OnCreate  —— 只执行一次：创建界面、绑定按钮
+-- OnOpen    —— 每次打开：订阅事件、请求数据
+-- OnRefresh —— 数据变化时：刷新显示
+-- OnClose   —— 每次关闭：取消订阅、清理
+-- OnDestroy —— 只执行一次：彻底销毁、释放资源
+
+function ViewBase:onCreate()
+  -- 子类重写
+end
+
+function ViewBase:onOpen()
+  -- 子类重写
+end
+
+function ViewBase:onRefresh()
+  self.dirty = false
+end
+
+function ViewBase:onClose()
+  -- 【关键】取消所有订阅，防止"界面关闭后还在刷新"
+  for _, sub in ipairs(self.subscriptions) do
+    sub.eventManager:off(sub.eventName, sub.handler)
+  end
+  self.subscriptions = {}
+end
+
+function ViewBase:onDestroy()
+  -- 子类重写
+end
+
+-- 便捷方法：订阅事件（自动记录，便于关闭时取消）
+function ViewBase:subscribe(eventManager, eventName, handler)
+  eventManager:on(eventName, handler, self)
+  self.subscriptions[#self.subscriptions + 1] = {
+    eventManager = eventManager,
+    eventName = eventName,
+    handler = handler,
+  }
+end
+
+-- 标记数据变化（惰性刷新）
+function ViewBase:markDirty()
+  if not self.isOpen then return end   -- 没打开就不需要刷新
+  self.dirty = true
+end
+
+-- ============================================================
+--  3. 事件系统（简化版，来自页 13）
+-- ============================================================
+local EventManager = {}
+EventManager.__index = EventManager
+
+function EventManager.new()
+  return setmetatable({ handlers = {} }, EventManager)
+end
+
+function EventManager:on(eventName, handler, target)
+  self.handlers[eventName] = self.handlers[eventName] or {}
+  local list = self.handlers[eventName]
+  list[#list + 1] = { fn = handler, target = target }
+  return handler
+end
+
+function EventManager:off(eventName, handler)
+  local list = self.handlers[eventName]
+  if not list then return end
+  for i = #list, 1, -1 do
+    if list[i].fn == handler then table.remove(list, i) end
+  end
+end
+
+function EventManager:emit(eventName, ...)
+  local list = self.handlers[eventName]
+  if not list then return 0 end
+
+  -- 快照遍历
+  local snapshot = {}
+  for i = 1, #list do snapshot[i] = list[i] end
+
+  local count = 0
+  for _, item in ipairs(snapshot) do
+    if item.target then
+      item.fn(item.target, ...)
+    else
+      item.fn(...)
+    end
+    count = count + 1
+  end
+  return count
+end
+
+function EventManager:listenerCount(eventName)
+  return self.handlers[eventName] and #self.handlers[eventName] or 0
+end
+
+-- ============================================================
+--  4. UI 管理器（界面栈）
+-- ============================================================
+local UIManager = {}
+UIManager.__index = UIManager
+
+function UIManager.new(eventManager)
+  return setmetatable({
+    eventManager = eventManager,
+    stack = {},              -- 界面栈
+    views = {},              -- 所有已创建的界面（name -&gt; view）
+    popups = {},             -- 单独的弹窗列表（不属于栈）
+    log = {},                -- 操作日志（便于观察）
+    refreshCount = 0,
+  }, UIManager)
+end
+
+function UIManager:_log(msg)
+  self.log[#self.log + 1] = msg
+  print("    " .. msg)
+end
+
+-- 注册界面（只创建一次实例）
+function UIManager:register(view)
+  self.views[view.name] = view
+  return view
+end
+
+-- 打开界面
+function UIManager:open(name, ...)
+  local view = self.views[name]
+  if not view then
+    error("界面未注册: " .. tostring(name))
+  end
+
+  -- 首次打开：执行 onCreate
+  if not view.isCreated then
+    view.isCreated = true
+    view.createdTime = os.clock()
+    view:onCreate()
+    self:_log("[OnCreate] " .. name)
+  end
+
+  -- 已经是打开的，不重复打开
+  if view.isOpen then
+    self:_log("界面已打开，忽略: " .. name)
+    return view
+  end
+
+  -- 【关键】全屏界面：隐藏栈顶的界面
+  if view.viewType == ViewType.FULL then
+    -- 【重要】如果这个界面已经躺在栈里（只是被上层盖住了），
+    -- 说明玩家是在"回退"到它，而不是"新开"它 —— 必须先把上面几层关掉，
+    -- 否则同一个界面会被重复压栈，返回键的层级就全乱了。
+    for i = #self.stack, 1, -1 do
+      if self.stack[i] == view then
+        while #self.stack &gt; i do
+          local above = table.remove(self.stack)
+          if above.isOpen then
+            above.isOpen = false
+            above:onClose()
+            self:_log("[退回] 关闭上层 " .. above.name)
+          end
+        end
+        break
+      end
+    end
+
+    local top = self.stack[#self.stack]
+    if top and top ~= view and top.isOpen then
+      top.isOpen = false
+      top:onClose()
+      self:_log("[隐藏] " .. top.name .. "（被 " .. name .. " 覆盖）")
+    end
+    -- 已经在栈里就不再 push
+    if self.stack[#self.stack] ~= view then
+      self.stack[#self.stack + 1] = view
+    end
+  elseif view.viewType == ViewType.POPUP then
+    -- 弹窗不入栈，单独管理
+    self.popups[#self.popups + 1] = view
+  end
+
+  view.isOpen = true
+  view.openCount = view.openCount + 1
+  view:onOpen()
+  self:_log("[OnOpen] " .. name)
+
+  if view.dirty then
+    view:onRefresh()
+    self.refreshCount = self.refreshCount + 1
+    self:_log("[OnRefresh] " .. name)
+  end
+
+  return view
+end
+
+-- 关闭（返回上一级）
+function UIManager:close(name)
+  local view = self.views[name]
+  if not view or not view.isOpen then return false end
+
+  view.isOpen = false
+  view:onClose()
+  self:_log("[OnClose] " .. name)
+
+  -- 从栈里移除
+  if view.viewType == ViewType.FULL then
+    for i = #self.stack, 1, -1 do
+      if self.stack[i] == view then
+        table.remove(self.stack, i)
+        break
+      end
+    end
+  else
+    for i = #self.popups, 1, -1 do
+      if self.popups[i] == view then
+        table.remove(self.popups, i)
+        break
+      end
+    end
+  end
+
+  -- 【关键】恢复被覆盖的全屏界面
+  local top = self.stack[#self.stack]
+  if top and not top.isOpen then
+    top.isOpen = true
+    top:onOpen()
+    self:_log("[恢复] " .. top.name)
+  end
+
+  return true
+end
+
+-- 返回键处理
+function UIManager:onBackPressed()
+  -- 优先关闭弹窗（弹窗在最上层）
+  if #self.popups &gt; 0 then
+    local topPopup = self.popups[#self.popups]
+    self:_log("返回键 -&gt; 关闭弹窗 " .. topPopup.name)
+    self:close(topPopup.name)
+    return true
+  end
+
+  -- 再关全屏界面
+  if #self.stack &gt; 1 then    -- 保留最底层的界面
+    local top = self.stack[#self.stack]
+    self:_log("返回键 -&gt; 关闭界面 " .. top.name)
+    self:close(top.name)
+    return true
+  end
+
+  self:_log("返回键 -&gt; 已在最底层，忽略（或弹退出确认）")
+  return false
+end
+
+-- 每帧刷新（惰性刷新）
+function UIManager:update()
+  for _, view in pairs(self.views) do
+    if view.isOpen and view.dirty then
+      view:onRefresh()
+      self.refreshCount = self.refreshCount + 1
+      self:_log("[OnRefresh] " .. view.name .. "（数据变化）")
+    end
+  end
+end
+
+function UIManager:destroyAll()
+  for name, view in pairs(self.views) do
+    view:onDestroy()
+    self:_log("[OnDestroy] " .. name)
+  end
+  self.views = {}
+  self.stack = {}
+  self.popups = {}
+end
+
+-- ============================================================
+--  5. 具体界面实现
+-- ============================================================
+print()
+print("=== 5. 实现三个界面并测试 ===")
+print()
+
+local em = EventManager.new()
+
+-- 主界面
+local MainView = class("MainView", ViewBase)
+local superMain = MainView.super
+
+function MainView:ctor()
+  superMain.ctor(self, "主界面", ViewType.FULL)
+  self.playerLevel = 1
+end
+
+function MainView:onCreate()
+  print("      创建主界面：加载预制体、绑定按钮")
+end
+
+function MainView:onOpen()
+  self:subscribe(em, "LevelUp", function(this, newLevel)
+    this.playerLevel = newLevel
+    this:markDirty()
+  end)
+end
+
+function MainView:onRefresh()
+  print(string.format("      刷新主界面显示：等级 = %d", self.playerLevel))
+  self.dirty = false
+end
+
+-- 背包界面
+local BagView = class("BagView", ViewBase)
+local superBag = BagView.super
+
+function BagView:ctor()
+  superBag.ctor(self, "背包界面", ViewType.FULL)
+  self.itemCount = 0
+end
+
+function BagView:onCreate()
+  print("      创建背包界面")
+end
+
+function BagView:onOpen()
+  self:subscribe(em, "ItemChanged", function(this, count)
+    this.itemCount = count
+    this:markDirty()
+  end)
+end
+
+function BagView:onRefresh()
+  print(string.format("      刷新背包显示：道具数 = %d", self.itemCount))
+  self.dirty = false
+end
+
+-- 确认弹窗
+local ConfirmView = class("ConfirmView", ViewBase)
+local superConfirm = ConfirmView.super
+
+function ConfirmView:ctor()
+  superConfirm.ctor(self, "使用确认弹窗", ViewType.POPUP)
+  self.message = ""
+end
+
+function ConfirmView:onCreate()
+  print("      创建确认弹窗")
+end
+
+function ConfirmView:onOpen()
+  print("      弹窗打开（下层界面仍然可见）")
+end
+
+-- 注册
+local ui = UIManager.new(em)
+ui:register(MainView.new())
+ui:register(BagView.new())
+ui:register(ConfirmView.new())
+
+print("--- 场景 1：打开主界面 ---")
+ui:open("主界面")
+
+print()
+print("--- 场景 2：打开背包（主界面被隐藏）---")
+ui:open("背包界面")
+
+print()
+print("--- 场景 3：数据变化（背包道具数变了）---")
+em:emit("ItemChanged", 5)
+ui:update()
+
+print()
+print("--- 场景 4：打开确认弹窗（背包仍然可见）---")
+ui:open("使用确认弹窗")
+
+print()
+print("--- 场景 5：按返回键（关闭弹窗）---")
+ui:onBackPressed()
+
+print()
+print("--- 场景 6：按返回键（关闭背包，主界面恢复）---")
+ui:onBackPressed()
+
+print()
+print("--- 场景 7：主界面收到升级事件（此时它是打开的）---")
+em:emit("LevelUp", 5)
+ui:update()
+
+print()
+print("=== 6. 【关键】验证「关闭后不再刷新」 ===")
+print()
+print("  现在关闭主界面，然后触发事件，看是否还会刷新：")
+ui:close("主界面")
+print()
+print("  触发 LevelUp 事件：")
+local triggered = em:emit("LevelUp", 10)
+print("    事件处理函数被调用了 " .. triggered .. " 次")
+print("    【关键】应该是 0 次 —— 因为界面关闭时取消订阅了")
+
+print()
+print("=== 7. 对比：如果没有取消订阅会怎样 ===")
+print()
+print("  假设 onClose 里没有取消订阅：")
+print("    · 事件回调仍然会执行")
+print("    · 回调里访问已销毁的 UI 对象 -&gt; 报错")
+print("    · 这就是「界面关闭后还在刷新」的 bug")
+print()
+print("  本框架的防护：")
+print("    · ViewBase:subscribe 自动记录订阅")
+print("    · ViewBase:onClose 自动批量取消")
+print("    · 业务代码不需要手动管理")
+
+print()
+print("=== 8. 【边界】重复打开一个已经压在栈里的界面 ===")
+print()
+print("  场景：主界面 -&gt; 背包，然后从背包里点「回主城」（又 open 了一次主界面）")
+print("  错误实现会让主界面被重复压栈，栈深度虚增、返回键层级错乱。")
+print()
+
+local ui2 = UIManager.new(EventManager.new())
+local M2 = class("M2", ViewBase)
+local superM2 = M2.super
+function M2:ctor() superM2.ctor(self, "主城", ViewType.FULL) end
+function M2:onCreate() end
+function M2:onOpen() end
+function M2:onRefresh() end
+
+local B2 = class("B2", ViewBase)
+local superB2 = B2.super
+function B2:ctor() superB2.ctor(self, "行囊", ViewType.FULL) end
+function B2:onCreate() end
+function B2:onOpen() end
+function B2:onRefresh() end
+
+ui2:register(M2.new())
+ui2:register(B2.new())
+
+ui2:open("主城")
+ui2:open("行囊")
+print("    打开主城+行囊后，栈深度 =", #ui2.stack)
+
+ui2:open("主城")    -- 回主城
+local names = {}
+for i, v in ipairs(ui2.stack) do names[i] = v.name end
+print("    再点一次主城后，栈深度 =", #ui2.stack, "，栈 =", table.concat(names, " -&gt; "))
+print("    【正确】栈里只剩一层（行囊被退回时关掉了），主城没有重复项")
+
+local dup = 0
+for _, v in ipairs(ui2.stack) do if v.name == "主城" then dup = dup + 1 end end
+print("    主城在栈里出现次数 =", dup, "（应为 1）")
+
+print()
+print("=== 9. 统计信息 ===")
+local created, opened = 0, 0
+for _, v in pairs(ui.views) do
+  created = created + 1
+  opened = opened + v.openCount
+end
+print("    注册界面数:", created)
+print("    总打开次数:", opened)
+print("    刷新次数:", ui.refreshCount)
+print("    当前栈深度:", #ui.stack)
+print("    当前弹窗数:", #ui.popups)
+
+print()
+ui:destroyAll()
+
+print()
+print("=== 10. UI 框架的六个设计要点 ===")
+print()
+print(string.format("  %-22s %-24s %s", "要点", "做法", "解决的问题"))
+print("  " .. string.rep("-", 78))
+
+local points = {
+  { "界面栈",       "push/pop/replace",     "返回上一级" },
+  { "三种类型",     "全屏/弹窗/飘字",       "层级关系清晰" },
+  { "生命周期",     "5 个回调",             "责任划分明确" },
+  { "订阅自动取消", "subscribe 记录",       "防止关闭后刷新" },
+  { "惰性刷新",     "脏标记 + update",      "避免频繁刷新" },
+  { "事件解耦",     "数据变化发事件",       "UI 与逻辑分离" },
+}
+
+for _, p in ipairs(points) do
+  print(string.format("  %-22s %-24s %s", p[1], p[2], p[3]))
+end</code></pre>
 
 <div class="table-wrap">
 <table>
@@ -41,6 +581,19 @@
   · <code>Push</code>——打开新界面（旧界面可能隐藏但保留）<br>
   · <code>Pop</code>——返回上一级<br>
   · <code>Replace</code>——替换当前界面（不增加层级）
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">栈最容易写错的一处：重复压栈</span>
+  <strong>场景</strong>：主界面 → 背包，然后从背包里点「回主城」——<em>又 open 了一次主界面</em>。<br><br>
+  <strong>天真的实现</strong>（只看 <code>view.isOpen</code>）：主界面此刻是<em>关闭</em>状态（被背包盖住时已经 OnClose 过），
+  于是它被<strong>再压一次栈</strong>，栈变成 <code>[主城, 行囊, 主城]</code>。<br>
+  <strong>后果</strong>：栈深度虚增、返回键的层级全乱、同一个界面的 OnCreate 只会跑一次但 OnOpen 会被跑两轮
+  （订阅如果没清干净就会<em>重复注册</em>）。<br><br>
+  <strong>正确做法</strong>：open 之前先<strong>在栈里找一遍</strong>——<br>
+  · 找到了 → 把它在栈里的<em>上层全部弹出并关闭</em>，然后恢复它，<strong>不要再 push</strong><br>
+  · 没找到 → 才走正常的压栈流程<br><br>
+  <em>本页代码样本的第 8 段就是这段逻辑的实测演示（修复后栈里不会出现重复项）。</em>
 </div>
 
 <div class="callout callout--danger">

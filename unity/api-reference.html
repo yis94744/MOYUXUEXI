@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Unity API 速查 — C# + Unity 路线｜从零基础到独立完成商业级项目</title>
-<meta name="description" content="从 Unity 程序集提取的 8998 条真实 API 签名，覆盖 110 个类型">
+<meta name="description" content="Unity 2021.3 的 public API 速查：方法与属性均经编译器验证可用，已过时项单独列出">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">C# + Unity 路线
+      <a href="index.html">C# + Unity 路线
         <span>从零基础到独立完成商业级项目</span>
       </a>
     </div>
@@ -39,7 +39,7 @@
     <main class="content">
 
       <h1>Unity API 速查</h1>
-      <p class="lead">这一页<strong>不是从记忆里写的</strong>，而是从 Unity 2021.3 与 2022.3 的运行时程序集里<strong>直接提取的真实签名</strong>：共 <strong>8998 条</strong>，覆盖 <strong>110 个类型</strong>。<em>这里出现的每个方法都真实存在，参数类型也准确。</em></p>
+      <p class="lead">这一页<strong>不是从记忆里写的</strong>，而是用反射把 Unity 2021.3 的 <code>Editor/Data/Managed/UnityEngine/</code> 全部程序集枚举了一遍。下面每一条都同时满足三个条件：<strong>① 类型是 public 的；② 成员是 public 的（能直接调用）；③ 没有被标记 <code>[Obsolete]</code></strong>。本页共列出 <strong>372</strong> 个方法、<strong>332</strong> 个属性，覆盖 <strong>23</strong> 个高频类型。（<code>Mathf</code>、<code>Animator</code> 两个类型做了截断，完整数量以程序集为准。）</p>
 
       <div class="callout callout--tip">
         <span class="callout__title">为什么这一页值得收藏</span>
@@ -51,7 +51,7 @@
       <div class="callout callout--note">
         <span class="callout__title">怎么读这些签名</span>
         签名格式是标准 C#：<code>public static Vector3 Lerp(Vector3 a, Vector3 b, float t)</code>。<br>
-        为了可读性做了两处简化：<strong>① 去掉了命名空间前缀</strong>（<code>UnityEngine.Vector3</code> 显示为 <code>Vector3</code>）；<strong>② 每个方法只列出参数最少的一个重载</strong>——实际的重载数量会更多。<br>
+        为了可读性做了三处简化：<strong>① 去掉了命名空间前缀</strong>（<code>UnityEngine.Vector3</code> 显示为 <code>Vector3</code>）；<strong>② 每个方法只列出参数最少的一个重载</strong>——实际的重载数量会更多；<strong>③ 剔除了 <code>[Obsolete]</code> 成员与 <code>Internal_*</code> 这类引擎内部方法</strong>。<br>
         <em>想看完整重载，在 IDE 里对方法名按 F12 跳转到定义。</em>
       </div>
 
@@ -59,16 +59,14 @@
       <p>这些是你<strong>每天都在用</strong>的类型。注意看属性列表——<em>很多人不知道 <code>Vector3</code> 有 <code>sqrMagnitude</code>、<code>Mathf</code> 有 <code>Approximately</code></em>。</p>
 
       <h3>Vector3 — 位置、方向、速度的基础类型</h3>
-      <p><strong>属性</strong>：<code>back</code> <code>down</code> <code>forward</code> <code>fwd</code> <code>left</code> <code>magnitude</code> <code>negativeInfinity</code> <code>normalized</code> <code>one</code> <code>positiveInfinity</code> <code>right</code> <code>sqrMagnitude</code> <code>up</code> <code>zero</code></p>
+      <p><strong>属性</strong>：<code>back</code> <code>down</code> <code>forward</code> <code>left</code> <code>magnitude</code> <code>negativeInfinity</code> <code>normalized</code> <code>one</code> <code>positiveInfinity</code> <code>right</code> <code>sqrMagnitude</code> <code>up</code> <code>zero</code></p>
 
       <pre class="mono code-block" data-lang="csharp"><code>public static float Angle(Vector3 from, Vector3 to)
-public static float AngleBetween(Vector3 from, Vector3 to)
 public static Vector3 ClampMagnitude(Vector3 vector, float maxLength)
 public static Vector3 Cross(Vector3 lhs, Vector3 rhs)
 public static float Distance(Vector3 a, Vector3 b)
 public static float Dot(Vector3 lhs, Vector3 rhs)
-public bool Equals(object other)
-public static Vector3 Exclude(Vector3 excludeThis, Vector3 fromThat)
+public bool Equals(Object other)
 public int GetHashCode()
 public static Vector3 Lerp(Vector3 a, Vector3 b, float t)
 public static Vector3 LerpUnclamped(Vector3 a, Vector3 b, float t)
@@ -77,9 +75,7 @@ public static Vector3 Max(Vector3 lhs, Vector3 rhs)
 public static Vector3 Min(Vector3 lhs, Vector3 rhs)
 public static Vector3 MoveTowards(Vector3 current, Vector3 target, float maxDistanceDelta)
 public void Normalize()
-public static void OrthoNormalize(Vector3&amp; normal, Vector3&amp; tangent)
-public static void OrthoNormalize2(Vector3&amp; a, Vector3&amp; b)
-public static void OrthoNormalize3(Vector3&amp; a, Vector3&amp; b, Vector3&amp; c)
+public static void OrthoNormalize(ref Vector3 normal, ref Vector3 tangent)
 public static Vector3 Project(Vector3 vector, Vector3 onNormal)
 public static Vector3 ProjectOnPlane(Vector3 vector, Vector3 planeNormal)
 public static Vector3 Reflect(Vector3 inDirection, Vector3 inNormal)
@@ -89,53 +85,33 @@ public void Set(float newX, float newY, float newZ)
 public static float SignedAngle(Vector3 from, Vector3 to, Vector3 axis)
 public static Vector3 Slerp(Vector3 a, Vector3 b, float t)
 public static Vector3 SlerpUnclamped(Vector3 a, Vector3 b, float t)
-public static Vector3 SmoothDamp(Vector3 current, Vector3 target, Vector3&amp; currentVelocity, float smoothTime)
+public static Vector3 SmoothDamp(Vector3 current, Vector3 target, ref Vector3 currentVelocity, float smoothTime)
 public static float SqrMagnitude(Vector3 vector)
-public string ToString()
-public static Vector3 op_Addition(Vector3 a, Vector3 b)
-public static Vector3 op_Division(Vector3 a, float d)
-public static bool op_Equality(Vector3 lhs, Vector3 rhs)
-public static bool op_Inequality(Vector3 lhs, Vector3 rhs)
-public static Vector3 op_Multiply(Vector3 a, float d)
-public static Vector3 op_Subtraction(Vector3 a, Vector3 b)
-public static Vector3 op_UnaryNegation(Vector3 a)</code></pre>
+public string ToString()</code></pre>
 
       <h3>Quaternion — 旋转的标准表示</h3>
       <p><strong>属性</strong>：<code>eulerAngles</code> <code>identity</code> <code>normalized</code></p>
 
       <pre class="mono code-block" data-lang="csharp"><code>public static float Angle(Quaternion a, Quaternion b)
 public static Quaternion AngleAxis(float angle, Vector3 axis)
-public static Quaternion AxisAngle(Vector3 axis, float angle)
 public static float Dot(Quaternion a, Quaternion b)
-public bool Equals(object other)
+public bool Equals(Object other)
 public static Quaternion Euler(Vector3 euler)
-public static Quaternion EulerAngles(Vector3 euler)
-public static Quaternion EulerRotation(Vector3 euler)
 public static Quaternion FromToRotation(Vector3 fromDirection, Vector3 toDirection)
 public int GetHashCode()
 public static Quaternion Inverse(Quaternion rotation)
-public static bool IsEqualUsingDot(float dot)
 public static Quaternion Lerp(Quaternion a, Quaternion b, float t)
 public static Quaternion LerpUnclamped(Quaternion a, Quaternion b, float t)
 public static Quaternion LookRotation(Vector3 forward)
 public void Normalize()
 public static Quaternion RotateTowards(Quaternion from, Quaternion to, float maxDegreesDelta)
 public void Set(float newX, float newY, float newZ, float newW)
-public void SetAxisAngle(Vector3 axis, float angle)
-public void SetEulerAngles(Vector3 euler)
-public void SetEulerRotation(Vector3 euler)
 public void SetFromToRotation(Vector3 fromDirection, Vector3 toDirection)
 public void SetLookRotation(Vector3 view)
 public static Quaternion Slerp(Quaternion a, Quaternion b, float t)
 public static Quaternion SlerpUnclamped(Quaternion a, Quaternion b, float t)
-public void ToAngleAxis( float&amp; angle, Vector3&amp; axis)
-public void ToAxisAngle(Vector3&amp; axis,  float&amp; angle)
-public Vector3 ToEuler()
-public Vector3 ToEulerAngles()
-public string ToString()
-public static bool op_Equality(Quaternion lhs, Quaternion rhs)
-public static bool op_Inequality(Quaternion lhs, Quaternion rhs)
-public static Quaternion op_Multiply(Quaternion lhs, Quaternion rhs)</code></pre>
+public void ToAngleAxis(out float angle, out Vector3 axis)
+public string ToString()</code></pre>
 
       <h3>Vector2 — 2D 坐标与方向</h3>
       <p><strong>属性</strong>：<code>down</code> <code>left</code> <code>magnitude</code> <code>negativeInfinity</code> <code>normalized</code> <code>one</code> <code>positiveInfinity</code> <code>right</code> <code>sqrMagnitude</code> <code>up</code> <code>zero</code></p>
@@ -144,7 +120,7 @@ public static Quaternion op_Multiply(Quaternion lhs, Quaternion rhs)</code></pre
 public static Vector2 ClampMagnitude(Vector2 vector, float maxLength)
 public static float Distance(Vector2 a, Vector2 b)
 public static float Dot(Vector2 lhs, Vector2 rhs)
-public bool Equals(object other)
+public bool Equals(Object other)
 public int GetHashCode()
 public static Vector2 Lerp(Vector2 a, Vector2 b, float t)
 public static Vector2 LerpUnclamped(Vector2 a, Vector2 b, float t)
@@ -157,17 +133,9 @@ public static Vector2 Reflect(Vector2 inDirection, Vector2 inNormal)
 public void Scale(Vector2 scale)
 public void Set(float newX, float newY)
 public static float SignedAngle(Vector2 from, Vector2 to)
-public static Vector2 SmoothDamp(Vector2 current, Vector2 target, Vector2&amp; currentVelocity, float smoothTime)
+public static Vector2 SmoothDamp(Vector2 current, Vector2 target, ref Vector2 currentVelocity, float smoothTime)
 public float SqrMagnitude()
-public string ToString()
-public static Vector2 op_Addition(Vector2 a, Vector2 b)
-public static Vector2 op_Division(Vector2 a, float d)
-public static bool op_Equality(Vector2 lhs, Vector2 rhs)
-public static Vector2 op_Implicit(Vector3 v)
-public static bool op_Inequality(Vector2 lhs, Vector2 rhs)
-public static Vector2 op_Multiply(Vector2 a, float d)
-public static Vector2 op_Subtraction(Vector2 a, Vector2 b)
-public static Vector2 op_UnaryNegation(Vector2 a)</code></pre>
+public string ToString()</code></pre>
 
       <h3>Mathf — 数学函数库</h3>
 
@@ -179,253 +147,154 @@ public static float Atan(float f)
 public static float Atan2(float y, float x)
 public static float Ceil(float f)
 public static int CeilToInt(float f)
-public static int Clamp(int value, int min, int max)
+public static float Clamp(float value, float min, float max)
 public static float Clamp01(float value)
-public static float ClampToFloat(double value)
-public static int ClampToInt(long value)
-public static uint ClampToUInt(long value)
 public static int ClosestPowerOfTwo(int value)
 public static Color CorrelatedColorTemperatureToRGB(float kelvin)
 public static float Cos(float f)
 public static float DeltaAngle(float current, float target)
-public static float DiscardLeastSignificantDecimal(float v)
 public static float Exp(float power)
 public static ushort FloatToHalf(float val)
 public static float Floor(float f)
 public static int FloorToInt(float f)
 public static float Gamma(float value, float absmax, float gamma)
 public static float GammaToLinearSpace(float value)
-public static float GetClosestPowerOfTen(float positiveNumber)
-public static int GetNumberOfDecimalsForMinimumDifference(float minDifference)
 public static float HalfToFloat(ushort val)
 public static float InverseLerp(float a, float b, float value)
 public static bool IsPowerOfTwo(int value)
 public static float Lerp(float a, float b, float t)
 public static float LerpAngle(float a, float b, float t)
 public static float LerpUnclamped(float a, float b, float t)
-public static bool LineIntersection(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4, Vector2&amp; result)
-public static bool LineSegmentIntersection(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4, Vector2&amp; result)
 public static float LinearToGammaSpace(float value)
 public static float Log(float f)
 public static float Log10(float f)
-public static int Max(int a, int b)
-public static int Min(int a, int b)
+public static float Max(float[] values)
+public static float Min(float[] values)
 public static float MoveTowards(float current, float target, float maxDelta)
 public static float MoveTowardsAngle(float current, float target, float maxDelta)
 public static int NextPowerOfTwo(int value)
 public static float PerlinNoise(float x, float y)
-public static float PerlinNoise1D(float x)
-public static float PingPong(float t, float length)</code></pre>
+public static float PingPong(float t, float length)
+public static float Pow(float f, float p)
+public static float Repeat(float t, float length)
+public static float Round(float f)
+public static int RoundToInt(float f)
+public static float Sign(float f)
+public static float Sin(float f)
+public static float SmoothDamp(float current, float target, ref float currentVelocity, float smoothTime)
+public static float SmoothDampAngle(float current, float target, ref float currentVelocity, float smoothTime)
+public static float SmoothStep(float from, float to, float t)</code></pre>
 
       <h3>Time — 时间与帧率</h3>
       <p><strong>属性</strong>：<code>captureDeltaTime</code> <code>captureFramerate</code> <code>deltaTime</code> <code>fixedDeltaTime</code> <code>fixedTime</code> <code>fixedTimeAsDouble</code> <code>fixedUnscaledDeltaTime</code> <code>fixedUnscaledTime</code> <code>fixedUnscaledTimeAsDouble</code> <code>frameCount</code> <code>inFixedTimeStep</code> <code>maximumDeltaTime</code> <code>maximumParticleDeltaTime</code> <code>realtimeSinceStartup</code> <code>realtimeSinceStartupAsDouble</code> <code>renderedFrameCount</code> <code>smoothDeltaTime</code> <code>time</code> <code>timeAsDouble</code> <code>timeScale</code> <code>timeSinceLevelLoad</code> <code>timeSinceLevelLoadAsDouble</code> <code>unscaledDeltaTime</code> <code>unscaledTime</code> <code>unscaledTimeAsDouble</code></p>
 
       <h3>Random — 随机数生成</h3>
-      <p><strong>属性</strong>：<code>insideUnitCircle</code> <code>insideUnitSphere</code> <code>onUnitSphere</code> <code>rotation</code> <code>rotationUniform</code> <code>seed</code> <code>state</code> <code>value</code></p>
+      <p><strong>属性</strong>：<code>insideUnitCircle</code> <code>insideUnitSphere</code> <code>onUnitSphere</code> <code>rotation</code> <code>rotationUniform</code> <code>state</code> <code>value</code></p>
 
       <pre class="mono code-block" data-lang="csharp"><code>public static Color ColorHSV()
-public static void GetRandomUnitCircle(Vector2&amp; output)
 public static void InitState(int seed)
-public static int RandomRange(int min, int max)
-public static int RandomRangeInt(int minInclusive, int maxExclusive)
-public static int Range(int minInclusive, int maxExclusive)</code></pre>
+public static float Range(float minInclusive, float maxInclusive)</code></pre>
 
       <h3>Transform — 位置、旋转、层级</h3>
-      <p><strong>属性</strong>：<code>childCount</code> <code>constrainProportionsScale</code> <code>eulerAngles</code> <code>forward</code> <code>hasChanged</code> <code>hierarchyCapacity</code> <code>hierarchyCount</code> <code>localEulerAngles</code> <code>localPosition</code> <code>localRotation</code> <code>localScale</code> <code>localToWorldMatrix</code> <code>lossyScale</code> <code>parent</code> <code>parentInternal</code> <code>position</code> <code>right</code> <code>root</code> <code>rotation</code> <code>rotationOrder</code> <code>up</code> <code>worldToLocalMatrix</code></p>
+      <p><strong>属性</strong>：<code>childCount</code> <code>eulerAngles</code> <code>forward</code> <code>hasChanged</code> <code>hierarchyCapacity</code> <code>hierarchyCount</code> <code>localEulerAngles</code> <code>localPosition</code> <code>localRotation</code> <code>localScale</code> <code>localToWorldMatrix</code> <code>lossyScale</code> <code>parent</code> <code>position</code> <code>right</code> <code>root</code> <code>rotation</code> <code>up</code> <code>worldToLocalMatrix</code></p>
 
       <pre class="mono code-block" data-lang="csharp"><code>public void DetachChildren()
 public Transform Find(string n)
-public Transform FindChild(string n)
-public static Transform FindRelativeTransformWithPath(Transform transform, string path, bool isActiveOnly)
 public Transform GetChild(int index)
-public int GetChildCount()
 public IEnumerator GetEnumerator()
-public Vector3 GetLocalEulerAngles(RotationOrder order)
-public void GetLocalPositionAndRotation(Vector3&amp; localPosition, Quaternion&amp; localRotation)
-public Transform GetParent()
-public void GetPositionAndRotation(Vector3&amp; position, Quaternion&amp; rotation)
-public Transform GetRoot()
+public void GetLocalPositionAndRotation(out Vector3 localPosition, out Quaternion localRotation)
+public void GetPositionAndRotation(out Vector3 position, out Quaternion rotation)
 public int GetSiblingIndex()
 public Vector3 InverseTransformDirection(Vector3 direction)
-public void InverseTransformDirections(Vector3&gt; directions)
 public Vector3 InverseTransformPoint(Vector3 position)
-public void InverseTransformPoints(Vector3&gt; positions)
 public Vector3 InverseTransformVector(Vector3 vector)
-public void InverseTransformVectors(Vector3&gt; vectors)
 public bool IsChildOf(Transform parent)
-public bool IsConstrainProportionsScale()
-public bool IsNonUniformScaleTransform()
 public void LookAt(Transform target)
-public void MoveAfterSibling(Transform transform, bool notifyEditorAndMarkDirty)
-public bool MoveNext()
-public void Reset()
 public void Rotate(Vector3 eulers)
-public void RotateAround(Vector3 axis, float angle)
-public void RotateAroundLocal(Vector3 axis, float angle)
-public void SendTransformChangedScale()
+public void RotateAround(Vector3 point, Vector3 axis, float angle)
 public void SetAsFirstSibling()
 public void SetAsLastSibling()
-public void SetConstrainProportionsScale(bool isLinked)
-public void SetLocalEulerAngles(Vector3 euler, RotationOrder order)
-public void SetLocalEulerHint(Vector3 euler)
 public void SetLocalPositionAndRotation(Vector3 localPosition, Quaternion localRotation)
 public void SetParent(Transform p)
 public void SetPositionAndRotation(Vector3 position, Quaternion rotation)
 public void SetSiblingIndex(int index)
 public Vector3 TransformDirection(Vector3 direction)
-public void TransformDirections(Vector3&gt; directions)
 public Vector3 TransformPoint(Vector3 position)
-public void TransformPoints(Vector3&gt; positions)
 public Vector3 TransformVector(Vector3 vector)
-public void TransformVectors(Vector3&gt; vectors)</code></pre>
+public void Translate(Vector3 translation)</code></pre>
 
       <h3>GameObject — 对象与组件容器</h3>
-      <p><strong>属性</strong>：<code>active</code> <code>activeInHierarchy</code> <code>activeSelf</code> <code>animation</code> <code>audio</code> <code>camera</code> <code>collider</code> <code>collider2D</code> <code>constantForce</code> <code>gameObject</code> <code>hingeJoint</code> <code>isStatic</code> <code>isStaticBatchable</code> <code>layer</code> <code>light</code> <code>networkView</code> <code>particleSystem</code> <code>renderer</code> <code>rigidbody</code> <code>rigidbody2D</code> <code>scene</code> <code>sceneCullingMask</code> <code>tag</code> <code>transform</code></p>
+      <p><strong>属性</strong>：<code>activeInHierarchy</code> <code>activeSelf</code> <code>gameObject</code> <code>isStatic</code> <code>layer</code> <code>scene</code> <code>sceneCullingMask</code> <code>tag</code> <code>transform</code></p>
 
-      <pre class="mono code-block" data-lang="csharp"><code>public Component AddComponent(string className)
-public !!T AddComponent&lt;(Component)
+      <pre class="mono code-block" data-lang="csharp"><code>public T AddComponent&lt;T&gt;()
 public void BroadcastMessage(string methodName)
-public Bounds CalculateBounds()
 public bool CompareTag(string tag)
 public static GameObject CreatePrimitive(PrimitiveType type)
 public static GameObject Find(string name)
 public static GameObject FindGameObjectWithTag(string tag)
 public static GameObject[] FindGameObjectsWithTag(string tag)
 public static GameObject FindWithTag(string tag)
-public Component GetComponent(Type type)
-public !!T GetComponent&lt;T&gt;()
-public Component GetComponentAtIndex(int index)
-public !!T GetComponentAtIndex&lt;(Component)
-public Component GetComponentByName(string type)
-public Component GetComponentByNameWithCase(string type, bool caseSensitive)
-public int GetComponentCount()
-public Component GetComponentInChildren(Type type)
-public !!T GetComponentInChildren&lt;T&gt;()
-public Component GetComponentInParent(Type type)
-public !!T GetComponentInParent&lt;T&gt;()
-public int GetComponentIndex(Component component)
-public Component[] GetComponents(Type type)
-public !!T[] GetComponents&lt;T&gt;()
-public Component[] GetComponentsInChildren(Type type)
-public !!T[] GetComponentsInChildren&lt;T&gt;()
-public Component[] GetComponentsInParent(Type type)
-public !!T[] GetComponentsInParent&lt;T&gt;()
-public static Scene GetScene(int instanceID)
-public static void InstantiateGameObjects(int sourceInstanceID, native int newInstanceIDs, native int newTransformInstanceIDs, int count, Scene destinationScene)
-public int IsMarkedVisible()
-public void PlayAnimation(Object animation)
-public Component QueryComponentAtIndex(int index)
-public void SampleAnimation(Object clip, float time)
+public T GetComponent&lt;T&gt;()
+public T GetComponentInChildren&lt;T&gt;()
+public T GetComponentInParent&lt;T&gt;()
+public T[] GetComponents&lt;T&gt;()
+public T[] GetComponentsInChildren&lt;T&gt;()
+public T[] GetComponentsInParent&lt;T&gt;()
 public void SendMessage(string methodName)
 public void SendMessageUpwards(string methodName)
 public void SetActive(bool value)
-public void SetActiveRecursively(bool state)
-public static void SetGameObjectsActive(NativeArray`1&lt;int&gt; instanceIDs, bool active)
-public void StopAnimation()
-public bool TryGetComponent(Type type, Component&amp; component)
-public bool TryGetComponent&lt;T&gt;( !!T&amp; component)</code></pre>
+public bool TryGetComponent&lt;T&gt;(out T component)</code></pre>
 
       <h3>Object — 所有 Unity 对象的基类</h3>
       <p><strong>属性</strong>：<code>hideFlags</code> <code>name</code></p>
 
-      <pre class="mono code-block" data-lang="csharp"><code>public static void CheckNullArgument(object arg, string message)
-public static bool CompareBaseObjects(Object lhs, Object rhs)
-public static Object CreateMissingReferenceObject(int instanceID)
-public static bool CurrentThreadIsMainThread()
-public static void Destroy(Object obj)
+      <pre class="mono code-block" data-lang="csharp"><code>public static void Destroy(Object obj)
 public static void DestroyImmediate(Object obj)
-public static void DestroyObject(Object obj)
-public static bool DoesObjectWithInstanceIDExist(int instanceID)
 public static void DontDestroyOnLoad(Object target)
-public void EnsureRunningOnMainThread()
-public bool Equals(object other)
-public static Object FindAnyObjectByType(Type type)
-public static !!T FindAnyObjectByType&lt;(Object)
-public static Object FindFirstObjectByType(Type type)
-public static !!T FindFirstObjectByType&lt;(Object)
-public static Object FindObjectFromInstanceID(int instanceID)
-public static Object FindObjectOfType(Type type)
-public static !!T FindObjectOfType&lt;(Object)
-public static Object[] FindObjectsByType(Type type, FindObjectsSortMode sortMode)
-public static !!T[] FindObjectsByType&lt;(Object)
-public static Object[] FindObjectsOfType(Type type)
-public static !!T[] FindObjectsOfType&lt;(Object)
-public static Object[] FindObjectsOfTypeAll(Type type)
-public static Object[] FindObjectsOfTypeIncludingAssets(Type type)
-public static Object[] FindSceneObjectsOfType(Type type)
-public static Object ForceLoadFromInstanceID(int instanceID)
-public native int GetCachedPtr()
+public bool Equals(Object other)
+public static T FindAnyObjectByType&lt;T&gt;()
+public static T FindFirstObjectByType&lt;T&gt;()
+public static T FindObjectOfType&lt;T&gt;()
+public static T[] FindObjectsByType&lt;T&gt;(FindObjectsSortMode sortMode)
+public static T[] FindObjectsOfType&lt;T&gt;()
 public int GetHashCode()
 public int GetInstanceID()
-public static string GetName(Object obj)
-public static int GetOffsetOfInstanceIDInCPlusPlusObject()
 public static Object Instantiate(Object original)
-public static !!T Instantiate&lt;(Object)
-public static AsyncInstantiateOperation`1&lt;!!T&gt; InstantiateAsync&lt;(Object)
-public static bool IsNativeObjectAlive(Object o)
-public static bool IsPersistent(Object obj)
-public void MarkDirty()
-public static void SetName(Object obj, string name)
-public string ToString()
-public static bool op_Equality(Object x, Object y)
-public static bool op_Implicit(Object exists)
-public static bool op_Inequality(Object x, Object y)</code></pre>
+public string ToString()</code></pre>
 
       <h3>Component — 所有组件的基类</h3>
-      <p><strong>属性</strong>：<code>animation</code> <code>audio</code> <code>camera</code> <code>collider</code> <code>collider2D</code> <code>constantForce</code> <code>gameObject</code> <code>hingeJoint</code> <code>light</code> <code>networkView</code> <code>particleSystem</code> <code>renderer</code> <code>rigidbody</code> <code>rigidbody2D</code> <code>tag</code> <code>transform</code></p>
+      <p><strong>属性</strong>：<code>gameObject</code> <code>tag</code> <code>transform</code></p>
 
       <pre class="mono code-block" data-lang="csharp"><code>public void BroadcastMessage(string methodName)
 public bool CompareTag(string tag)
-public Component GetComponent(Type type)
-public !!T GetComponent&lt;T&gt;()
-public Component GetComponentInChildren(Type t)
-public !!T GetComponentInChildren&lt;T&gt;()
-public Component GetComponentInParent(Type t)
-public !!T GetComponentInParent&lt;T&gt;()
-public int GetComponentIndex()
-public Component[] GetComponents(Type type)
-public !!T[] GetComponents&lt;T&gt;()
-public Component[] GetComponentsInChildren(Type t)
-public !!T[] GetComponentsInChildren&lt;T&gt;()
-public Component[] GetComponentsInParent(Type t)
-public !!T[] GetComponentsInParent&lt;T&gt;()
-public Component GetCoupledComponent()
-public bool IsCoupledComponent()
+public T GetComponent&lt;T&gt;()
+public T GetComponentInChildren&lt;T&gt;()
+public T GetComponentInParent&lt;T&gt;()
+public T[] GetComponents&lt;T&gt;()
+public T[] GetComponentsInChildren&lt;T&gt;()
+public T[] GetComponentsInParent&lt;T&gt;()
 public void SendMessage(string methodName)
 public void SendMessageUpwards(string methodName)
-public bool TryGetComponent(Type type, Component&amp; component)
-public bool TryGetComponent&lt;T&gt;( !!T&amp; component)</code></pre>
+public bool TryGetComponent&lt;T&gt;(out T component)</code></pre>
 
       <h3>MonoBehaviour — 脚本基类：协程、Invoke</h3>
-      <p><strong>属性</strong>：<code>allowPrefabModeInPlayMode</code> <code>destroyCancellationToken</code> <code>runInEditMode</code> <code>useGUILayout</code></p>
+      <p><strong>属性</strong>：<code>runInEditMode</code> <code>useGUILayout</code></p>
 
       <pre class="mono code-block" data-lang="csharp"><code>public void CancelInvoke()
-public static void ConstructorCheck(Object self)
-public string GetScriptClassName()
 public void Invoke(string methodName, float time)
-public static void InvokeDelayed(MonoBehaviour self, string methodName, float time, float repeatRate)
 public void InvokeRepeating(string methodName, float time, float repeatRate)
 public bool IsInvoking()
-public static bool IsObjectMonoBehaviour(Object obj)
-public void OnCancellationTokenCreated()
-public void RaiseCancellation()
 public Coroutine StartCoroutine(string methodName)
-public Coroutine StartCoroutineManaged(string methodName, object value)
-public Coroutine StartCoroutineManaged2(IEnumerator enumerator)
-public Coroutine StartCoroutine_Auto(IEnumerator routine)
 public void StopAllCoroutines()
-public void StopCoroutine(Coroutine routine)
-public void StopCoroutineFromEnumeratorManaged(IEnumerator routine)
-public void StopCoroutineManaged(Coroutine routine)
-public static void print(object message)</code></pre>
+public void StopCoroutine(IEnumerator routine)
+public static void print(Object message)</code></pre>
 
       <h2 id="physics">二、物理系统</h2>
 
       <h3>Physics — 物理查询与全局设置</h3>
-      <p><strong>属性</strong>：<code>autoSimulation</code> <code>autoSyncTransforms</code> <code>bounceThreshold</code> <code>bounceTreshold</code> <code>clothGravity</code> <code>defaultContactOffset</code> <code>defaultMaxAngularSpeed</code> <code>defaultMaxDepenetrationVelocity</code> <code>defaultPhysicsScene</code> <code>defaultSolverIterations</code> <code>defaultSolverVelocityIterations</code> <code>gravity</code> <code>improvedPatchFriction</code> <code>interCollisionDistance</code> <code>interCollisionSettingsToggle</code> <code>interCollisionStiffness</code> <code>invokeCollisionCallbacks</code> <code>maxAngularVelocity</code> <code>minPenetrationForPenalty</code> <code>penetrationPenaltyForce</code> <code>queriesHitBackfaces</code> <code>queriesHitTriggers</code> <code>reuseCollisionCallbacks</code> <code>simulationMode</code> <code>sleepAngularVelocity</code> <code>sleepThreshold</code> <code>sleepVelocity</code> <code>solverIterationCount</code> <code>solverVelocityIterationCount</code></p>
+      <p><strong>属性</strong>：<code>autoSimulation</code> <code>autoSyncTransforms</code> <code>bounceThreshold</code> <code>clothGravity</code> <code>defaultContactOffset</code> <code>defaultMaxAngularSpeed</code> <code>defaultMaxDepenetrationVelocity</code> <code>defaultPhysicsScene</code> <code>defaultSolverIterations</code> <code>defaultSolverVelocityIterations</code> <code>gravity</code> <code>improvedPatchFriction</code> <code>interCollisionDistance</code> <code>interCollisionSettingsToggle</code> <code>interCollisionStiffness</code> <code>queriesHitBackfaces</code> <code>queriesHitTriggers</code> <code>reuseCollisionCallbacks</code> <code>sleepThreshold</code></p>
 
       <pre class="mono code-block" data-lang="csharp"><code>public static void BakeMesh(int meshID, bool convex)
-public IAsyncResult BeginInvoke(PhysicsScene scene, ContactPairHeader&gt; headerArray, AsyncCallback callback, object object)
 public static bool BoxCast(Vector3 center, Vector3 halfExtents, Vector3 direction)
 public static RaycastHit[] BoxCastAll(Vector3 center, Vector3 halfExtents, Vector3 direction)
 public static int BoxCastNonAlloc(Vector3 center, Vector3 halfExtents, Vector3 direction, RaycastHit[] results)
@@ -436,37 +305,30 @@ public static bool CheckBox(Vector3 center, Vector3 halfExtents)
 public static bool CheckCapsule(Vector3 start, Vector3 end, float radius)
 public static bool CheckSphere(Vector3 position, float radius)
 public static Vector3 ClosestPoint(Vector3 point, Collider collider, Vector3 position, Quaternion rotation)
-public static bool ComputePenetration(Collider colliderA, Vector3 positionA, Quaternion rotationA, Collider colliderB, Vector3 positionB, Quaternion rotationB, Vector3&amp; direction,  float&amp; distance)
-public void EndInvoke(IAsyncResult result)
-public static Vector3 GetActorAngularVelocity(native int actorPtr)
-public static Vector3 GetActorLinearVelocity(native int actorPtr)
-public static Component GetBodyByInstanceID(int instanceID)
-public static Collider GetColliderByInstanceID(int instanceID)
-public static Collision GetCollisionToReport(ContactPairHeader&amp; header, ContactPair&amp; pair, bool flipped)
+public static bool ComputePenetration(Collider colliderA, Vector3 positionA, Quaternion rotationA, Collider colliderB, Vector3 positionB, Quaternion rotationB, out Vector3 direction, out float distance)
 public static bool GetIgnoreCollision(Collider collider1, Collider collider2)
 public static bool GetIgnoreLayerCollision(int layer1, int layer2)
 public static void IgnoreCollision(Collider collider1, Collider collider2)
 public static void IgnoreLayerCollision(int layer1, int layer2)
-public void Invoke(PhysicsScene scene, ContactPairHeader&gt; headerArray)
-public static bool IsShapeTrigger(native int shapePtr)
 public static bool Linecast(Vector3 start, Vector3 end)
-public static void OnSceneContact(PhysicsScene scene, native int buffer, int count)
-public static void OnSceneContactModify(PhysicsScene scene, native int buffer, int count, bool isCCD)
 public static Collider[] OverlapBox(Vector3 center, Vector3 halfExtents)
 public static int OverlapBoxNonAlloc(Vector3 center, Vector3 halfExtents, Collider[] results)
 public static Collider[] OverlapCapsule(Vector3 point0, Vector3 point1, float radius)
 public static int OverlapCapsuleNonAlloc(Vector3 point0, Vector3 point1, float radius, Collider[] results)
 public static Collider[] OverlapSphere(Vector3 position, float radius)
 public static int OverlapSphereNonAlloc(Vector3 position, float radius, Collider[] results)
-public static RaycastHit[] Query_CapsuleCastAll(PhysicsScene physicsScene, Vector3 p0, Vector3 p1, float radius, Vector3 direction, float maxDistance, int mask, QueryTriggerInteraction queryTriggerInteraction)
-public static Vector3 Query_ClosestPoint(Collider collider, Vector3 position, Quaternion rotation, Vector3 point)
-public static bool Query_ComputePenetration(Collider colliderA, Vector3 positionA, Quaternion rotationA, Collider colliderB, Vector3 positionB, Quaternion rotationB, Vector3&amp; direction, float&amp; distance)
-public static RaycastHit[] Query_SphereCastAll(PhysicsScene physicsScene, Vector3 origin, float radius, Vector3 direction, float maxDistance, int mask, QueryTriggerInteraction queryTriggerInteraction)
 public static bool Raycast(Ray ray)
-public static RaycastHit[] RaycastAll(Ray ray)</code></pre>
+public static RaycastHit[] RaycastAll(Ray ray)
+public static int RaycastNonAlloc(Ray ray, RaycastHit[] results)
+public static void RebuildBroadphaseRegions(Bounds worldBounds, int subdivisions)
+public static void Simulate(float step)
+public static bool SphereCast(Ray ray, float radius)
+public static RaycastHit[] SphereCastAll(Ray ray, float radius)
+public static int SphereCastNonAlloc(Ray ray, float radius, RaycastHit[] results)
+public static void SyncTransforms()</code></pre>
 
       <h3>Rigidbody — 刚体：受力与运动</h3>
-      <p><strong>属性</strong>：<code>angularDrag</code> <code>angularVelocity</code> <code>automaticCenterOfMass</code> <code>automaticInertiaTensor</code> <code>centerOfMass</code> <code>collisionDetectionMode</code> <code>constraints</code> <code>detectCollisions</code> <code>drag</code> <code>excludeLayers</code> <code>freezeRotation</code> <code>includeLayers</code> <code>inertiaTensor</code> <code>inertiaTensorRotation</code> <code>interpolation</code> <code>isKinematic</code> <code>mass</code> <code>maxAngularVelocity</code> <code>maxDepenetrationVelocity</code> <code>maxLinearVelocity</code> <code>position</code> <code>rotation</code> <code>sleepAngularVelocity</code> <code>sleepThreshold</code> <code>sleepVelocity</code> <code>solverIterationCount</code> <code>solverIterations</code> <code>solverVelocityIterationCount</code> <code>solverVelocityIterations</code> <code>useConeFriction</code> <code>useGravity</code> <code>velocity</code> <code>worldCenterOfMass</code></p>
+      <p><strong>属性</strong>：<code>angularDrag</code> <code>angularVelocity</code> <code>centerOfMass</code> <code>collisionDetectionMode</code> <code>constraints</code> <code>detectCollisions</code> <code>drag</code> <code>freezeRotation</code> <code>inertiaTensor</code> <code>inertiaTensorRotation</code> <code>interpolation</code> <code>isKinematic</code> <code>mass</code> <code>maxAngularVelocity</code> <code>maxDepenetrationVelocity</code> <code>position</code> <code>rotation</code> <code>sleepThreshold</code> <code>solverIterations</code> <code>solverVelocityIterations</code> <code>useGravity</code> <code>velocity</code> <code>worldCenterOfMass</code></p>
 
       <pre class="mono code-block" data-lang="csharp"><code>public void AddExplosionForce(float explosionForce, Vector3 explosionPosition, float explosionRadius)
 public void AddForce(Vector3 force)
@@ -475,43 +337,35 @@ public void AddRelativeForce(Vector3 force)
 public void AddRelativeTorque(Vector3 torque)
 public void AddTorque(Vector3 torque)
 public Vector3 ClosestPointOnBounds(Vector3 position)
-public Vector3 GetAccumulatedForce()
-public Vector3 GetAccumulatedTorque()
 public Vector3 GetPointVelocity(Vector3 worldPoint)
 public Vector3 GetRelativePointVelocity(Vector3 relativePoint)
 public bool IsSleeping()
-public void Move(Vector3 position, Quaternion rotation)
 public void MovePosition(Vector3 position)
 public void MoveRotation(Quaternion rot)
 public void ResetCenterOfMass()
 public void ResetInertiaTensor()
 public void SetDensity(float density)
-public void SetMaxAngularVelocity(float a)
 public void Sleep()
-public bool SweepTest(Vector3 direction, RaycastHit&amp; hitInfo)
+public bool SweepTest(Vector3 direction, out RaycastHit hitInfo)
 public RaycastHit[] SweepTestAll(Vector3 direction)
 public void WakeUp()</code></pre>
 
       <h3>Collider — 碰撞体基类</h3>
-      <p><strong>属性</strong>：<code>attachedArticulationBody</code> <code>attachedRigidbody</code> <code>bounds</code> <code>contactOffset</code> <code>enabled</code> <code>excludeLayers</code> <code>hasModifiableContacts</code> <code>includeLayers</code> <code>isTrigger</code> <code>layerOverridePriority</code> <code>material</code> <code>providesContacts</code> <code>sharedMaterial</code></p>
+      <p><strong>属性</strong>：<code>attachedArticulationBody</code> <code>attachedRigidbody</code> <code>bounds</code> <code>contactOffset</code> <code>enabled</code> <code>hasModifiableContacts</code> <code>isTrigger</code> <code>material</code> <code>sharedMaterial</code></p>
 
       <pre class="mono code-block" data-lang="csharp"><code>public Vector3 ClosestPoint(Vector3 position)
 public Vector3 ClosestPointOnBounds(Vector3 position)
-public RaycastHit Raycast(Ray ray, float maxDistance, bool&amp; hasHit)</code></pre>
+public bool Raycast(Ray ray, out RaycastHit hitInfo, float maxDistance)</code></pre>
 
       <h3>RaycastHit — 射线命中信息</h3>
-      <p><strong>属性</strong>：<code>articulationBody</code> <code>barycentricCoordinate</code> <code>collider</code> <code>colliderInstanceID</code> <code>distance</code> <code>lightmapCoord</code> <code>normal</code> <code>point</code> <code>rigidbody</code> <code>textureCoord</code> <code>textureCoord1</code> <code>textureCoord2</code> <code>transform</code> <code>triangleIndex</code></p>
-
-      <pre class="mono code-block" data-lang="csharp"><code>public static Vector2 CalculateRaycastTexCoord(int colliderInstanceID, Vector2 uv, Vector3 pos, uint face, int textcoord)</code></pre>
+      <p><strong>属性</strong>：<code>articulationBody</code> <code>barycentricCoordinate</code> <code>collider</code> <code>colliderInstanceID</code> <code>distance</code> <code>lightmapCoord</code> <code>normal</code> <code>point</code> <code>rigidbody</code> <code>textureCoord</code> <code>textureCoord2</code> <code>transform</code> <code>triangleIndex</code></p>
 
       <h2 id="other">三、其他高频类型</h2>
 
       <h3>Input — 旧输入系统</h3>
-      <p><strong>属性</strong>：<code>acceleration</code> <code>accelerationEventCount</code> <code>accelerationEvents</code> <code>anyKey</code> <code>anyKeyDown</code> <code>backButtonLeavesApp</code> <code>compass</code> <code>compensateSensors</code> <code>compositionCursorPos</code> <code>compositionString</code> <code>deviceOrientation</code> <code>eatKeyPressOnTextFieldFocus</code> <code>gyro</code> <code>imeCompositionMode</code> <code>imeIsSelected</code> <code>inputString</code> <code>isGyroAvailable</code> <code>location</code> <code>mousePosition</code> <code>mousePresent</code> <code>mouseScrollDelta</code> <code>multiTouchEnabled</code> <code>penEventCount</code> <code>simulateMouseWithTouches</code> <code>stylusTouchSupported</code> <code>touchCount</code> <code>touchPressureSupported</code> <code>touchSupported</code> <code>touches</code></p>
+      <p><strong>属性</strong>：<code>acceleration</code> <code>accelerationEventCount</code> <code>accelerationEvents</code> <code>anyKey</code> <code>anyKeyDown</code> <code>backButtonLeavesApp</code> <code>compass</code> <code>compensateSensors</code> <code>compositionCursorPos</code> <code>compositionString</code> <code>deviceOrientation</code> <code>gyro</code> <code>imeCompositionMode</code> <code>imeIsSelected</code> <code>inputString</code> <code>location</code> <code>mousePosition</code> <code>mousePresent</code> <code>mouseScrollDelta</code> <code>multiTouchEnabled</code> <code>simulateMouseWithTouches</code> <code>stylusTouchSupported</code> <code>touchCount</code> <code>touchPressureSupported</code> <code>touchSupported</code> <code>touches</code></p>
 
-      <pre class="mono code-block" data-lang="csharp"><code>public static bool CheckDisabled()
-public static void ClearLastPenContactEvent()
-public static AccelerationEvent GetAccelerationEvent(int index)
+      <pre class="mono code-block" data-lang="csharp"><code>public static AccelerationEvent GetAccelerationEvent(int index)
 public static float GetAxis(string axisName)
 public static float GetAxisRaw(string axisName)
 public static bool GetButton(string buttonName)
@@ -520,87 +374,72 @@ public static bool GetButtonUp(string buttonName)
 public static string[] GetJoystickNames()
 public static bool GetKey(KeyCode key)
 public static bool GetKeyDown(KeyCode key)
-public static bool GetKeyDownInt(KeyCode key)
-public static bool GetKeyInt(KeyCode key)
 public static bool GetKeyUp(KeyCode key)
-public static bool GetKeyUpInt(KeyCode key)
-public static PenData GetLastPenContactEvent()
 public static bool GetMouseButton(int button)
 public static bool GetMouseButtonDown(int button)
 public static bool GetMouseButtonUp(int button)
-public static PenData GetPenEvent(int index)
 public static Touch GetTouch(int index)
 public static bool IsJoystickPreconfigured(string joystickName)
-public static void ResetInputAxes()
-public static void ResetPenEvents()
-public static void SimulateTouch(Touch touch)</code></pre>
+public static void ResetInputAxes()</code></pre>
 
       <h3>Animator — Mecanim 动画</h3>
-      <p><strong>属性</strong>：<code>allowConstantClipSamplingOptimization</code> <code>angularVelocity</code> <code>animatePhysics</code> <code>applyRootMotion</code> <code>avatar</code> <code>avatarRoot</code> <code>bodyPosition</code> <code>bodyPositionInternal</code> <code>bodyRotation</code> <code>bodyRotationInternal</code> <code>cullingMode</code> <code>deltaPosition</code> <code>deltaRotation</code> <code>feetPivotActive</code> <code>fireEvents</code> <code>gravityWeight</code> <code>hasBoundPlayables</code> <code>hasRootMotion</code> <code>hasTransformHierarchy</code> <code>humanScale</code> <code>isHuman</code> <code>isInitialized</code> <code>isMatchingTarget</code> <code>isOptimizable</code> <code>isRootPositionOrRotationControlledByCurves</code> <code>keepAnimatorControllerStateOnDisable</code> <code>keepAnimatorStateOnDisable</code> <code>layerCount</code> <code>layersAffectMassCenter</code> <code>leftFeetBottomHeight</code> <code>linearVelocityBlending</code> <code>logWarnings</code> <code>parameterCount</code> <code>parameters</code> <code>pivotPosition</code></p>
+      <p><strong>属性</strong>：<code>angularVelocity</code> <code>applyRootMotion</code> <code>avatar</code> <code>bodyPosition</code> <code>bodyRotation</code> <code>cullingMode</code> <code>deltaPosition</code> <code>deltaRotation</code> <code>feetPivotActive</code> <code>fireEvents</code> <code>gravityWeight</code> <code>hasBoundPlayables</code> <code>hasRootMotion</code> <code>hasTransformHierarchy</code> <code>humanScale</code> <code>isHuman</code> <code>isInitialized</code> <code>isMatchingTarget</code> <code>isOptimizable</code> <code>keepAnimatorStateOnDisable</code> <code>layerCount</code> <code>layersAffectMassCenter</code> <code>leftFeetBottomHeight</code> <code>logWarnings</code> <code>parameterCount</code> <code>parameters</code> <code>pivotPosition</code> <code>pivotWeight</code> <code>playableGraph</code> <code>playbackTime</code> <code>recorderMode</code> <code>recorderStartTime</code> <code>recorderStopTime</code> <code>rightFeetBottomHeight</code> <code>rootPosition</code></p>
 
       <pre class="mono code-block" data-lang="csharp"><code>public void ApplyBuiltinRootMotion()
-public void CheckIfInIKPass()
-public static !!T[] ConvertStateMachineBehaviour&lt;(StateMachineBehaviour)
 public void CrossFade(string stateName, float normalizedTransitionDuration)
 public void CrossFadeInFixedTime(string stateName, float fixedTransitionDuration)
-public void EvaluateController()
-public void ForceStateNormalizedTime(float normalizedTime)
-public int GetAnimatorClipInfoCount(int layerIndex, bool current)
-public void GetAnimatorStateInfo(int layerIndex, StateInfoIndex stateInfoIndex, AnimatorStateInfo&amp; info)
-public string GetAnimatorStateName(int layerIndex, bool current)
 public AnimatorTransitionInfo GetAnimatorTransitionInfo(int layerIndex)
-public ScriptableObject GetBehaviour(Type type)
-public !!T GetBehaviour&lt;(StateMachineBehaviour)
-public StateMachineBehaviour[] GetBehaviours(int fullPathHash, int layerIndex)
-public !!T[] GetBehaviours&lt;(StateMachineBehaviour)
+public T GetBehaviour&lt;T&gt;()
+public T[] GetBehaviours&lt;T&gt;()
 public Transform GetBoneTransform(HumanBodyBones humanBoneId)
-public bool GetBool(int id)
-public bool GetBoolID(int id)
-public bool GetBoolString(string name)
-public AnimationInfo[] GetCurrentAnimationClipState(int layerIndex)
+public bool GetBool(string name)
 public AnimatorClipInfo[] GetCurrentAnimatorClipInfo(int layerIndex)
 public int GetCurrentAnimatorClipInfoCount(int layerIndex)
 public AnimatorStateInfo GetCurrentAnimatorStateInfo(int layerIndex)
-public void GetCurrentGraph(PlayableGraph&amp; graph)
-public string GetCurrentStateName(int layerIndex)
-public float GetFloat(int id)
-public float GetFloatID(int id)
-public float GetFloatString(string name)
-public Vector3 GetGoalPosition(AvatarIKGoal goal)
-public Quaternion GetGoalRotation(AvatarIKGoal goal)
-public float GetGoalWeightPosition(AvatarIKGoal goal)
-public float GetGoalWeightRotation(AvatarIKGoal goal)</code></pre>
+public float GetFloat(string name)
+public Vector3 GetIKHintPosition(AvatarIKHint hint)
+public float GetIKHintPositionWeight(AvatarIKHint hint)
+public Vector3 GetIKPosition(AvatarIKGoal goal)
+public float GetIKPositionWeight(AvatarIKGoal goal)
+public Quaternion GetIKRotation(AvatarIKGoal goal)
+public float GetIKRotationWeight(AvatarIKGoal goal)
+public int GetInteger(string name)
+public int GetLayerIndex(string layerName)
+public string GetLayerName(int layerIndex)
+public float GetLayerWeight(int layerIndex)
+public AnimatorClipInfo[] GetNextAnimatorClipInfo(int layerIndex)
+public int GetNextAnimatorClipInfoCount(int layerIndex)
+public AnimatorStateInfo GetNextAnimatorStateInfo(int layerIndex)
+public AnimatorControllerParameter GetParameter(int index)
+public bool HasState(int layerIndex, int stateID)
+public void InterruptMatchTarget()
+public bool IsInTransition(int layerIndex)
+public bool IsParameterControlledByCurve(string name)
+public void MatchTarget(Vector3 matchPosition, Quaternion matchRotation, AvatarTarget targetBodyPart, MatchTargetWeightMask weightMask, float startNormalizedTime)
+public void Play(string stateName)</code></pre>
 
       <h3>AudioSource — 音频播放</h3>
-      <p><strong>属性</strong>：<code>bypassEffects</code> <code>bypassListenerEffects</code> <code>bypassReverbZones</code> <code>clip</code> <code>dopplerLevel</code> <code>gamepadSpeakerOutputType</code> <code>ignoreListenerPause</code> <code>ignoreListenerVolume</code> <code>isPlaying</code> <code>isVirtual</code> <code>loop</code> <code>maxDistance</code> <code>maxVolume</code> <code>minDistance</code> <code>minVolume</code> <code>mute</code> <code>outputAudioMixerGroup</code> <code>pan</code> <code>panLevel</code> <code>panStereo</code> <code>pitch</code> <code>playOnAwake</code> <code>priority</code> <code>reverbZoneMix</code> <code>rolloffFactor</code> <code>rolloffMode</code> <code>spatialBlend</code> <code>spatialize</code> <code>spatializePostEffects</code> <code>spread</code> <code>time</code> <code>timeSamples</code> <code>velocityUpdateMode</code> <code>volume</code></p>
+      <p><strong>属性</strong>：<code>bypassEffects</code> <code>bypassListenerEffects</code> <code>bypassReverbZones</code> <code>clip</code> <code>dopplerLevel</code> <code>gamepadSpeakerOutputType</code> <code>ignoreListenerPause</code> <code>ignoreListenerVolume</code> <code>isPlaying</code> <code>isVirtual</code> <code>loop</code> <code>maxDistance</code> <code>minDistance</code> <code>mute</code> <code>outputAudioMixerGroup</code> <code>panStereo</code> <code>pitch</code> <code>playOnAwake</code> <code>priority</code> <code>reverbZoneMix</code> <code>rolloffMode</code> <code>spatialBlend</code> <code>spatialize</code> <code>spatializePostEffects</code> <code>spread</code> <code>time</code> <code>timeSamples</code> <code>velocityUpdateMode</code> <code>volume</code></p>
 
       <pre class="mono code-block" data-lang="csharp"><code>public bool DisableGamepadOutput()
 public static bool GamepadSpeakerSupportsOutputType(GamepadSpeakerOutputType outputType)
-public bool GetAmbisonicDecoderFloat(int index,  float&amp; value)
+public bool GetAmbisonicDecoderFloat(int index, out float value)
 public AnimationCurve GetCustomCurve(AudioSourceCurveType type)
-public static AnimationCurve GetCustomCurveHelper(AudioSource source, AudioSourceCurveType type)
 public void GetOutputData(float[] samples, int channel)
-public static void GetOutputDataHelper(AudioSource source,  float[] samples, int channel)
-public static float GetPitch(AudioSource source)
-public bool GetSpatializerFloat(int index,  float&amp; value)
+public bool GetSpatializerFloat(int index, out float value)
 public void GetSpectrumData(float[] samples, int channel, FFTWindow window)
-public static void GetSpectrumDataHelper(AudioSource source,  float[] samples, int channel, FFTWindow window)
 public void Pause()
 public void Play()
 public static void PlayClipAtPoint(AudioClip clip, Vector3 position)
 public void PlayDelayed(float delay)
-public static void PlayHelper(AudioSource source, ulong delay)
 public bool PlayOnGamepad(int slot)
 public void PlayOneShot(AudioClip clip)
-public static void PlayOneShotHelper(AudioSource source, AudioClip clip, float volumeScale)
 public void PlayScheduled(double time)
 public bool SetAmbisonicDecoderFloat(int index, float value)
 public void SetCustomCurve(AudioSourceCurveType type, AnimationCurve curve)
-public static void SetCustomCurveHelper(AudioSource source, AudioSourceCurveType type, AnimationCurve curve)
 public bool SetGamepadSpeakerMixLevel(int slot, int mixLevel)
 public bool SetGamepadSpeakerMixLevelDefault(int slot)
 public bool SetGamepadSpeakerRestrictedAudio(int slot, bool restricted)
-public static void SetPitch(AudioSource source, float pitch)
 public void SetScheduledEndTime(double time)
 public void SetScheduledStartTime(double time)
 public bool SetSpatializerFloat(int index, float value)
@@ -608,128 +447,112 @@ public void Stop()
 public void UnPause()</code></pre>
 
       <h3>ParticleSystem — 粒子系统</h3>
-      <p><strong>属性</strong>：<code>alignToDirection</code> <code>alphaAffectsIntensity</code> <code>angle</code> <code>angularVelocity</code> <code>angularVelocity3D</code> <code>animatedVelocity</code> <code>animation</code> <code>applyShapeToPosition</code> <code>arc</code> <code>arcMode</code> <code>arcSpeed</code> <code>arcSpeedMultiplier</code> <code>arcSpread</code> <code>attachRibbonsToTransform</code> <code>automaticCullingEnabled</code> <code>axisOfRotation</code> <code>birth0</code> <code>birth1</code> <code>bounce</code> <code>bounceMultiplier</code> <code>box</code> <code>boxThickness</code> <code>burstCount</code> <code>capacity</code> <code>collider</code> <code>colliderCount</code> <code>colliderForce</code> <code>colliderQueryMode</code> <code>collidesWith</code> <code>collision</code> <code>collision0</code> <code>collision1</code> <code>color</code> <code>colorBySpeed</code> <code>colorMax</code></p>
+      <p><strong>属性</strong>：<code>collision</code> <code>colorBySpeed</code> <code>colorOverLifetime</code> <code>customData</code> <code>emission</code> <code>externalForces</code> <code>forceOverLifetime</code> <code>inheritVelocity</code> <code>isEmitting</code> <code>isPaused</code> <code>isPlaying</code> <code>isStopped</code> <code>lifetimeByEmitterSpeed</code> <code>lights</code> <code>limitVelocityOverLifetime</code> <code>main</code> <code>noise</code> <code>particleCount</code> <code>proceduralSimulationSupported</code> <code>randomSeed</code> <code>rotationBySpeed</code> <code>rotationOverLifetime</code> <code>shape</code> <code>sizeBySpeed</code> <code>sizeOverLifetime</code> <code>subEmitters</code> <code>textureSheetAnimation</code> <code>time</code> <code>trails</code> <code>trigger</code> <code>useAutoRandomSeed</code> <code>velocityOverLifetime</code></p>
 
-      <pre class="mono code-block" data-lang="csharp"><code>public void AddCollider(Component collider)
-public void AddInfluence(ParticleSystemForceField field)
-public void AddPlane(Transform transform)
-public void AddSprite(Sprite sprite)
-public void AddSubEmitter(ParticleSystem subEmitter, ParticleSystemSubEmitterType type, ParticleSystemSubEmitterProperties properties)
-public void Allocate()
-public void AllocateAxisOfRotationAttribute()
+      <pre class="mono code-block" data-lang="csharp"><code>public void AllocateAxisOfRotationAttribute()
 public void AllocateCustomDataAttribute(ParticleSystemCustomData stream)
 public void AllocateMeshIndexAttribute()
-public void CalculateEffectUIData(int&amp; particleCount, float&amp; fastestParticle, float&amp; slowestParticle)
-public bool CalculateEffectUISubEmitterData(int&amp; particleCount, float&amp; fastestParticle, float&amp; slowestParticle)
-public static bool CheckVertexStreamsMatchShader(bool hasTangent, bool hasColor, int texCoordChannelCount, Material material, bool&amp; tangentError, bool&amp; colorError, bool&amp; uvError)
 public void Clear()
-public static void CopyManagedJobData(void* systemPtr, NativeParticleData&amp; particleData)
 public void Emit(int count)
-public float Evaluate(float time)
-public void GenerateNoisePreviewTexture(Texture2D dst)
-public int GenerateRandomSeed()
-public ParticleSystem/Burst GetBurst(int index)
-public int GetBursts(ParticleSystem/Burst[] bursts)
-public Component GetCollider(int index)
-public int GetColliderCount(int particleIndex)
-public ParticleSystem/MinMaxGradient GetColor(ParticleSystemCustomData stream)
-public Color32 GetCurrentColor(ParticleSystem system)
-public float GetCurrentSize(ParticleSystem system)
-public Vector3 GetCurrentSize3D(ParticleSystem system)
-public int GetCustomParticleData(Vector4&gt; customData, ParticleSystemCustomData streamIndex)
-public ParticleSystemForceField GetInfluence(int index)
-public void GetManagedJobData()
-public JobHandle GetManagedJobHandle()
-public static int GetMaxTexCoordStreams()
-public int GetMeshIndex(ParticleSystem system)</code></pre>
+public int GetCustomParticleData(List&lt;Vector4&gt; customData, ParticleSystemCustomData streamIndex)
+public int GetParticles(ParticleSystem.Particle[] particles)
+public ParticleSystem.PlaybackState GetPlaybackState()
+public ParticleSystem.Trails GetTrails()
+public bool IsAlive()
+public void Pause()
+public void Play()
+public static void ResetPreMappedBufferMemory()
+public void SetCustomParticleData(List&lt;Vector4&gt; customData, ParticleSystemCustomData streamIndex)
+public static void SetMaximumPreMappedBufferCounts(int vertexBuffersCount, int indexBuffersCount)
+public void SetParticles(ParticleSystem.Particle[] particles)
+public void SetPlaybackState(ParticleSystem.PlaybackState playbackState)
+public void SetTrails(ParticleSystem.Trails trailData)
+public void Simulate(float t)
+public void Stop()
+public void TriggerSubEmitter(int subEmitterIndex)</code></pre>
 
       <h3>Application — 应用信息与路径</h3>
-      <p><strong>属性</strong>：<code>absoluteURL</code> <code>backgroundLoadingPriority</code> <code>buildGUID</code> <code>cloudProjectId</code> <code>companyName</code> <code>consoleLogPath</code> <code>dataPath</code> <code>exitCancellationToken</code> <code>genuine</code> <code>genuineCheckAvailable</code> <code>identifier</code> <code>installMode</code> <code>installerName</code> <code>internetReachability</code> <code>isBatchMode</code> <code>isConsolePlatform</code> <code>isEditor</code> <code>isFocused</code> <code>isHumanControllingUs</code> <code>isLoadingLevel</code> <code>isMobilePlatform</code> <code>isPlayer</code> <code>isPlaying</code> <code>isShowingSplashScreen</code> <code>isTestRun</code> <code>levelCount</code> <code>loadedLevel</code> <code>loadedLevelName</code> <code>persistentDataPath</code> <code>platform</code> <code>productName</code> <code>runInBackground</code> <code>sandboxType</code> <code>stackTraceLogType</code> <code>streamedBytes</code></p>
+      <p><strong>属性</strong>：<code>absoluteURL</code> <code>backgroundLoadingPriority</code> <code>buildGUID</code> <code>cloudProjectId</code> <code>companyName</code> <code>consoleLogPath</code> <code>dataPath</code> <code>genuine</code> <code>genuineCheckAvailable</code> <code>identifier</code> <code>installMode</code> <code>installerName</code> <code>internetReachability</code> <code>isBatchMode</code> <code>isConsolePlatform</code> <code>isEditor</code> <code>isFocused</code> <code>isMobilePlatform</code> <code>isPlaying</code> <code>persistentDataPath</code> <code>platform</code> <code>productName</code> <code>runInBackground</code> <code>sandboxType</code> <code>streamingAssetsPath</code> <code>systemLanguage</code> <code>targetFrameRate</code> <code>temporaryCachePath</code> <code>unityVersion</code> <code>version</code></p>
 
-      <pre class="mono code-block" data-lang="csharp"><code>public IAsyncResult BeginInvoke(InAttribute)
-public static string BuildInvocationForArguments(string functionName, object[] args)
-public static void CallLogCallback(string logString, string stackTrace, LogType type, bool invokedOnMainThread)
-public static void CallLowMemory(ApplicationMemoryUsage usage)
-public static bool CanStreamedLevelBeLoaded(int levelIndex)
-public static void CancelQuit()
-public static void CaptureScreenshot(string filename)
-public static void DontDestroyOnLoad(Object o)
-public void EndInvoke(InAttribute)
-public static void ExternalCall(string functionName, object[] args)
-public static void ExternalEval(string script)
-public static void ForceCrash(int mode)
+      <pre class="mono code-block" data-lang="csharp"><code>public static bool CanStreamedLevelBeLoaded(int levelIndex)
 public static string[] GetBuildTags()
 public static StackTraceLogType GetStackTraceLogType(LogType logType)
-public static float GetStreamProgressForLevel(int levelIndex)
-public static string GetValueForARGV(string name)
-public static bool HasARGV(string name)
-public static bool HasLogCallback()
 public static bool HasProLicense()
 public static bool HasUserAuthorization(UserAuthorization mode)
-public void Invoke()
-public static void InvokeDeepLinkActivated(string url)
-public static void InvokeFocusChanged(bool focus)
-public static void InvokeOnAdvertisingIdentifierCallback(string advertisingId, bool trackingEnabled)
-public static void InvokeOnBeforeRender()
 public static bool IsPlaying(Object obj)
-public static void LoadLevel(int index)
-public static void LoadLevelAdditive(int index)
-public static AsyncOperation LoadLevelAdditiveAsync(int index)
-public static AsyncOperation LoadLevelAsync(int index)
-public static string ObjectToJSString(object o)
-public static void OpenURL(string url)</code></pre>
+public static void OpenURL(string url)
+public static void Quit()
+public static bool RequestAdvertisingIdentifierAsync(Application.AdvertisingIdentifierCallback delegateMethod)
+public static AsyncOperation RequestUserAuthorization(UserAuthorization mode)
+public static void SetBuildTags(string[] buildTags)
+public static void SetStackTraceLogType(LogType logType, StackTraceLogType stackTraceType)
+public static void Unload()</code></pre>
 
       <h3>Screen — 屏幕与分辨率</h3>
-      <p><strong>属性</strong>：<code>GetResolution</code> <code>autorotateToLandscapeLeft</code> <code>autorotateToLandscapeRight</code> <code>autorotateToPortrait</code> <code>autorotateToPortraitUpsideDown</code> <code>brightness</code> <code>currentResolution</code> <code>cutouts</code> <code>dpi</code> <code>fullScreen</code> <code>fullScreenMode</code> <code>height</code> <code>lockCursor</code> <code>mainWindowDisplayInfo</code> <code>mainWindowPosition</code> <code>orientation</code> <code>resolutions</code> <code>safeArea</code> <code>showCursor</code> <code>sleepTimeout</code> <code>width</code></p>
+      <p><strong>属性</strong>：<code>autorotateToLandscapeLeft</code> <code>autorotateToLandscapeRight</code> <code>autorotateToPortrait</code> <code>autorotateToPortraitUpsideDown</code> <code>brightness</code> <code>currentResolution</code> <code>cutouts</code> <code>dpi</code> <code>fullScreen</code> <code>fullScreenMode</code> <code>height</code> <code>mainWindowDisplayInfo</code> <code>mainWindowPosition</code> <code>orientation</code> <code>resolutions</code> <code>safeArea</code> <code>sleepTimeout</code> <code>width</code></p>
 
-      <pre class="mono code-block" data-lang="csharp"><code>public static void GetDisplayLayout(DisplayInfo&gt; displayLayout)
-public static AsyncOperation MoveMainWindowTo(DisplayInfo&amp; display, Vector2Int position)
-public static void SetResolution(int width, int height, bool fullscreen)</code></pre>
+      <pre class="mono code-block" data-lang="csharp"><code>public static void GetDisplayLayout(List&lt;DisplayInfo&gt; displayLayout)
+public static AsyncOperation MoveMainWindowTo(in DisplayInfo display, Vector2Int position)
+public static void SetResolution(int width, int height, FullScreenMode fullscreenMode)</code></pre>
 
       <h3>LayerMask — 层掩码</h3>
       <p><strong>属性</strong>：<code>value</code></p>
 
       <pre class="mono code-block" data-lang="csharp"><code>public static int GetMask(string[] layerNames)
 public static string LayerToName(int layer)
-public static int NameToLayer(string layerName)
-public static int op_Implicit(LayerMask mask)</code></pre>
+public static int NameToLayer(string layerName)</code></pre>
 
       <h3>Debug — 日志与调试绘制</h3>
-      <p><strong>属性</strong>：<code>developerConsoleEnabled</code> <code>developerConsoleVisible</code> <code>diagnosticSwitches</code> <code>isDebugBuild</code> <code>logger</code> <code>unityLogger</code></p>
+      <p><strong>属性</strong>：<code>developerConsoleVisible</code> <code>isDebugBuild</code> <code>unityLogger</code></p>
 
       <pre class="mono code-block" data-lang="csharp"><code>public static void Assert(bool condition)
-public static void AssertFormat(bool condition, string format, object[] args)
+public static void AssertFormat(bool condition, string format, Object[] args)
 public static void Break()
-public static bool CallOverridenDebugHandler(Exception exception, Object obj)
 public static void ClearDeveloperConsole()
 public static void DebugBreak()
 public static void DrawLine(Vector3 start, Vector3 end)
 public static void DrawRay(Vector3 start, Vector3 dir)
-public static int ExtractStackTraceNoAlloc(usbyte* buffer, int bufferMax, string projectFolder)
-public static DiagnosticSwitch GetDiagnosticSwitch(string name)
-public static bool IsLoggingEnabled()
-public static void Log(object message)
-public static void LogAssertion(object message)
-public static void LogAssertionFormat(string format, object[] args)
-public static void LogCompilerError(string message, string fileName, int lineNumber, int columnNumber)
-public static void LogCompilerMessage(string message, string fileName, int lineNumber, int columnNumber, bool forEditor, bool isError, int identifier, int instanceId)
-public static void LogCompilerWarning(string message, string fileName, int lineNumber, int columnNumber)
-public static void LogError(object message)
-public static void LogErrorFormat(string format, object[] args)
+public static int ExtractStackTraceNoAlloc(Byte* buffer, int bufferMax, string projectFolder)
+public static void Log(Object message)
+public static void LogAssertion(Object message)
+public static void LogAssertionFormat(string format, Object[] args)
+public static void LogError(Object message)
+public static void LogErrorFormat(string format, Object[] args)
 public static void LogException(Exception exception)
-public static void LogFormat(string format, object[] args)
-public static void LogInfo(string message, string fileName, int lineNumber, int columnNumber)
-public static void LogInformation(string message, string fileName, int lineNumber, int columnNumber)
-public static void LogPlayerBuildError(string message, string file, int line, int column)
-public static void LogSticky(int identifier, LogType logType, LogOption logOptions, string message, Object context)
-public static void LogWarning(object message)
-public static void LogWarningFormat(string format, object[] args)
-public static void OpenConsoleFile()
-public static void RemoveLogEntriesByIdentifier(int identifier)</code></pre>
+public static void LogFormat(string format, Object[] args)
+public static void LogWarning(Object message)
+public static void LogWarningFormat(string format, Object[] args)</code></pre>
+
+      <h2 id="obsolete">四、已标记 [Obsolete] 的常用 API</h2>
+      <p>这些成员在 Unity 2021.3 里<strong>仍然存在、仍然能编译（多数只报 CS0618 警告）</strong>，但官方已标注过时。<em>新代码不要用；老教程里出现这些名字，说明它没跟上版本。</em></p>
+
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>类型</th><th>已过时成员</th></tr></thead>
+        <tbody>
+          <tr><td>Vector3</td><td><code>Vector3.AngleBetween</code> <code>Vector3.Exclude</code> <code>Vector3.fwd（Use Vector3.forward instead.）</code></td></tr>
+          <tr><td>Quaternion</td><td><code>Quaternion.AxisAngle</code> <code>Quaternion.EulerAngles</code> <code>Quaternion.EulerRotation</code> <code>Quaternion.SetAxisAngle</code> <code>Quaternion.SetEulerAngles</code> <code>Quaternion.SetEulerRotation</code> <code>Quaternion.ToAxisAngle</code> <code>Quaternion.ToEuler</code> <code>Quaternion.ToEulerAngles</code></td></tr>
+          <tr><td>Random</td><td><code>Random.RandomRange</code> <code>Random.seed（Deprecated. Use InitState() function or Random.state property instead.）</code></td></tr>
+          <tr><td>Transform</td><td><code>Transform.FindChild</code> <code>Transform.GetChildCount</code> <code>Transform.RotateAroundLocal</code> <code>Transform.RotateAround（仅 1/2 个重载过时）</code></td></tr>
+          <tr><td>GameObject</td><td><code>GameObject.AddComponent（仅 1/3 个重载过时）</code> <code>GameObject.PlayAnimation</code> <code>GameObject.SampleAnimation</code> <code>GameObject.SetActiveRecursively</code> <code>GameObject.StopAnimation</code> <code>GameObject.active（GameObject.active is obsolete. Use GameObject.SetActive(), GameObject.activeSelf or GameObject.activeInHierarchy.）</code> <code>GameObject.animation（Property animation has been deprecated. Use GetComponent&lt;Animation&gt;() instead. (UnityUpgradable)）</code> <code>GameObject.audio（Property audio has been deprecated. Use GetComponent&lt;AudioSource&gt;() instead. (UnityUpgradable)）</code> <code>GameObject.camera（Property camera has been deprecated. Use GetComponent&lt;Camera&gt;() instead. (UnityUpgradable)）</code> <code>GameObject.collider2D（Property collider2D has been deprecated. Use GetComponent&lt;Collider2D&gt;() instead. (UnityUpgradable)）</code> <code>GameObject.collider（Property collider has been deprecated. Use GetComponent&lt;Collider&gt;() instead. (UnityUpgradable)）</code> <code>GameObject.constantForce（Property constantForce has been deprecated. Use GetComponent&lt;ConstantForce&gt;() instead. (UnityUpgradable)）</code> <code>GameObject.hingeJoint（Property hingeJoint has been deprecated. Use GetComponent&lt;HingeJoint&gt;() instead. (UnityUpgradable)）</code> <code>GameObject.light（Property light has been deprecated. Use GetComponent&lt;Light&gt;() instead. (UnityUpgradable)）</code> <code>GameObject.networkView（Property networkView has been deprecated. Use GetComponent&lt;NetworkView&gt;() instead. (UnityUpgradable)）</code> <code>GameObject.particleSystem（Property particleSystem has been deprecated. Use GetComponent&lt;ParticleSystem&gt;() instead. (UnityUpgradable)）</code> <code>GameObject.renderer（Property renderer has been deprecated. Use GetComponent&lt;Renderer&gt;() instead. (UnityUpgradable)）</code> <code>GameObject.rigidbody2D（Property rigidbody2D has been deprecated. Use GetComponent&lt;Rigidbody2D&gt;() instead. (UnityUpgradable)）</code> <code>GameObject.rigidbody（Property rigidbody has been deprecated. Use GetComponent&lt;Rigidbody&gt;() instead. (UnityUpgradable)）</code></td></tr>
+          <tr><td>Object</td><td><code>Object.DestroyObject</code> <code>Object.FindObjectsOfTypeAll</code> <code>Object.FindObjectsOfTypeIncludingAssets</code> <code>Object.FindSceneObjectsOfType</code></td></tr>
+          <tr><td>Component</td><td><code>Component.animation（Property animation has been deprecated. Use GetComponent&lt;Animation&gt;() instead. (UnityUpgradable)）</code> <code>Component.audio（Property audio has been deprecated. Use GetComponent&lt;AudioSource&gt;() instead. (UnityUpgradable)）</code> <code>Component.camera（Property camera has been deprecated. Use GetComponent&lt;Camera&gt;() instead. (UnityUpgradable)）</code> <code>Component.collider2D（Property collider2D has been deprecated. Use GetComponent&lt;Collider2D&gt;() instead. (UnityUpgradable)）</code> <code>Component.collider（Property collider has been deprecated. Use GetComponent&lt;Collider&gt;() instead. (UnityUpgradable)）</code> <code>Component.constantForce（Property constantForce has been deprecated. Use GetComponent&lt;ConstantForce&gt;() instead. (UnityUpgradable)）</code> <code>Component.hingeJoint（Property hingeJoint has been deprecated. Use GetComponent&lt;HingeJoint&gt;() instead. (UnityUpgradable)）</code> <code>Component.light（Property light has been deprecated. Use GetComponent&lt;Light&gt;() instead. (UnityUpgradable)）</code> <code>Component.networkView（Property networkView has been deprecated. Use GetComponent&lt;NetworkView&gt;() instead. (UnityUpgradable)）</code> <code>Component.particleSystem（Property particleSystem has been deprecated. Use GetComponent&lt;ParticleSystem&gt;() instead. (UnityUpgradable)）</code> <code>Component.renderer（Property renderer has been deprecated. Use GetComponent&lt;Renderer&gt;() instead. (UnityUpgradable)）</code> <code>Component.rigidbody2D（Property rigidbody2D has been deprecated. Use GetComponent&lt;Rigidbody2D&gt;() instead. (UnityUpgradable)）</code> <code>Component.rigidbody（Property rigidbody has been deprecated. Use GetComponent&lt;Rigidbody&gt;() instead. (UnityUpgradable)）</code></td></tr>
+          <tr><td>MonoBehaviour</td><td><code>MonoBehaviour.StartCoroutine_Auto</code></td></tr>
+          <tr><td>Physics</td><td><code>Physics.bounceTreshold（Please use bounceThreshold instead. (UnityUpgradable) -&gt; bounceThreshold）</code> <code>Physics.maxAngularVelocity（Use Rigidbody.maxAngularVelocity instead.）</code> <code>Physics.minPenetrationForPenalty（Use Physics.defaultContactOffset or Collider.contactOffset instead.）</code> <code>Physics.penetrationPenaltyForce（penetrationPenaltyForce has no effect.）</code> <code>Physics.sleepAngularVelocity（The sleepAngularVelocity is no longer supported. Use sleepThreshold. Note that sleepThreshold is energy but not velocity.）</code> <code>Physics.sleepVelocity（The sleepVelocity is no longer supported. Use sleepThreshold. Note that sleepThreshold is energy but not velocity.）</code> <code>Physics.solverIterationCount（Please use Physics.defaultSolverIterations instead. (UnityUpgradable) -&gt; defaultSolverIterations）</code> <code>Physics.solverVelocityIterationCount（Please use Physics.defaultSolverVelocityIterations instead. (UnityUpgradable) -&gt; defaultSolverVelocityIterations）</code></td></tr>
+          <tr><td>Rigidbody</td><td><code>Rigidbody.SetMaxAngularVelocity</code> <code>Rigidbody.sleepAngularVelocity（The sleepAngularVelocity is no longer supported. Use sleepThreshold to specify energy.）</code> <code>Rigidbody.sleepVelocity（The sleepVelocity is no longer supported. Use sleepThreshold. Note that sleepThreshold is energy but not velocity.）</code> <code>Rigidbody.solverIterationCount（Please use Rigidbody.solverIterations instead. (UnityUpgradable) -&gt; solverIterations）</code> <code>Rigidbody.solverVelocityIterationCount（Please use Rigidbody.solverVelocityIterations instead. (UnityUpgradable) -&gt; solverVelocityIterations）</code> <code>Rigidbody.useConeFriction（Cone friction is no longer supported.）</code></td></tr>
+          <tr><td>Input</td><td><code>Input.eatKeyPressOnTextFieldFocus（eatKeyPressOnTextFieldFocus property is deprecated, and only provided to support legacy behavior.）</code> <code>Input.isGyroAvailable（isGyroAvailable property is deprecated. Please use SystemInfo.supportsGyroscope instead.）</code></td></tr>
+          <tr><td>Animator</td><td><code>Animator.ForceStateNormalizedTime</code> <code>Animator.GetCurrentAnimationClipState</code> <code>Animator.GetNextAnimationClipState</code> <code>Animator.GetQuaternion</code> <code>Animator.GetVector</code> <code>Animator.IsControlled</code> <code>Animator.SetQuaternion</code> <code>Animator.SetVector</code> <code>Animator.Stop</code> <code>Animator.animatePhysics（Animator.animatePhysics has been deprecated. Use Animator.updateMode instead.）</code> <code>Animator.keepAnimatorControllerStateOnDisable（keepAnimatorControllerStateOnDisable is deprecated, use keepAnimatorStateOnDisable instead. (UnityUpgradable) -&gt; keepAnimatorStateOnDisable）</code> <code>Animator.linearVelocityBlending（Animator.linearVelocityBlending is no longer used and has been deprecated.）</code></td></tr>
+          <tr><td>AudioSource</td><td><code>AudioSource.GetOutputData（仅 1/2 个重载过时）</code> <code>AudioSource.GetSpectrumData（仅 1/2 个重载过时）</code> <code>AudioSource.maxVolume（maxVolume is not supported anymore. Use min-, maxDistance and rolloffMode instead.）</code> <code>AudioSource.minVolume（minVolume is not supported anymore. Use min-, maxDistance and rolloffMode instead.）</code> <code>AudioSource.panLevel（AudioSource.panLevel has been deprecated. Use AudioSource.spatialBlend instead (UnityUpgradable) -&gt; spatialBlend）</code> <code>AudioSource.pan（AudioSource.pan has been deprecated. Use AudioSource.panStereo instead (UnityUpgradable) -&gt; panStereo）</code> <code>AudioSource.rolloffFactor（rolloffFactor is not supported anymore. Use min-, maxDistance and rolloffMode instead.）</code></td></tr>
+          <tr><td>Application</td><td><code>Application.CancelQuit</code> <code>Application.CaptureScreenshot</code> <code>Application.DontDestroyOnLoad</code> <code>Application.ExternalCall</code> <code>Application.ExternalEval</code> <code>Application.ForceCrash</code> <code>Application.GetStreamProgressForLevel</code> <code>Application.LoadLevel</code> <code>Application.LoadLevelAdditive</code> <code>Application.LoadLevelAdditiveAsync</code> <code>Application.LoadLevelAsync</code> <code>Application.RegisterLogCallback</code> <code>Application.RegisterLogCallbackThreaded</code> <code>Application.UnloadLevel</code> <code>Application.isLoadingLevel（This property is deprecated, please use LoadLevelAsync to detect if a specific scene is currently loading.）</code> <code>Application.isPlayer（use Application.isEditor instead）</code> <code>Application.isShowingSplashScreen（This property is deprecated, please use SplashScreen.isFinished instead）</code> <code>Application.levelCount（Use SceneManager.sceneCountInBuildSettings）</code> <code>Application.loadedLevelName（Use SceneManager to determine what scenes have been loaded）</code> <code>Application.loadedLevel（Use SceneManager to determine what scenes have been loaded）</code> <code>Application.stackTraceLogType（Use SetStackTraceLogType/GetStackTraceLogType instead）</code> <code>Application.streamedBytes（Streaming was a Unity Web Player feature, and is removed. This property is deprecated and always returns 0.）</code> <code>Application.webSecurityEnabled（Application.webSecurityEnabled is no longer supported, since the Unity Web Player is no longer supported by Unity）</code></td></tr>
+          <tr><td>Screen</td><td><code>Screen.GetResolution（Property GetResolution has been deprecated. Use resolutions instead (UnityUpgradable) -&gt; resolutions）</code> <code>Screen.lockCursor（Use Cursor.lockState and Cursor.visible instead.）</code> <code>Screen.showCursor（Property showCursor has been deprecated. Use Cursor.visible instead (UnityUpgradable) -&gt; UnityEngine.Cursor.visible）</code></td></tr>
+          <tr><td>Debug</td><td><code>Debug.Assert（仅 1/7 个重载过时）</code> <code>Debug.logger（Debug.logger is obsolete. Please use Debug.unityLogger instead (UnityUpgradable) -&gt; unityLogger）</code></td></tr>
+        </tbody>
+      </table>
+      </div>
 
       <div class="milestone">
         <p class="mb0">
-          <strong>这一页的定位</strong>：它不是教学页，是<em>参考页</em>。建议收藏，写代码时随时查。<br><br>数据来源：<code>Unity 2021.3.21f1c1</code> 与 <code>2022.3.51f1c1</code> 的 <code>Editor/Data/Managed/UnityEngine/</code>，共 70 个运行时模块。
+          <strong>这一页的定位</strong>：它不是教学页，是<em>参考页</em>。建议收藏，写代码时随时查。<br><br>数据来源：<code>Unity 2021.3.21f1c1</code> 的 <code>Editor/Data/Managed/UnityEngine/</code>（69 个运行时模块），用反射枚举 public 成员并用编译器交叉验证。
         </p>
       </div>
 
@@ -737,6 +560,10 @@ public static void RemoveLogEntriesByIdentifier(int identifier)</code></pre>
         <a href="25-interview.html">
           <div class="dir">← 实践与参考</div>
           <div class="title">25 面试、作品集与资源</div>
+        </a>
+        <a class="next" href="26-advanced-api.html">
+          <div class="dir">Unity 深入 →</div>
+          <div class="title">26 进阶 API 与性能陷阱</div>
         </a>
       </nav>
     </main>

@@ -39,7 +39,7 @@
     <main class="content">
 <h1>12 · 空间划分与碰撞优化 ★★</h1>
 
-<p class="lead">这是<strong>游戏里最能体现"算法改变性能"的一个领域</strong>。1000 个物体的碰撞检测，朴素的"两两比较"需要 50 万次；用空间划分后只需要几千次——<em>76 倍的差距，而且随对象数量增长还会继续拉大</em>。</p>
+<p class="lead">这是<strong>游戏里最能体现"算法改变性能"的一个领域</strong>。1000 个物体的碰撞检测，朴素的"两两比较"需要约 50 万次；用空间划分后只需要 <em>6000~7000 次</em>——<strong>约 74 倍的差距</strong>，而且随对象数量增长还会继续拉大。<br><em>（实测：N=500 时 124750 : 1701 = 73.3 倍；N=1000 时 499500 : 6791 = 73.6 倍——这个比值大致恒定，因为两者都是 O(n²) 与 O(n) 的差距在固定密度下的表现。）</em></p>
 
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
@@ -539,9 +539,15 @@ end</code></pre>
   </table>
   </div>
   <strong>正确答案是 167 个碰撞（暴力法的结果）。</strong><br>
-  但格子大小 5 时只检出 33 个，格子 10 时只检出 111 个——<em>都漏检了！</em><br><br>
-  <strong>为什么</strong>：查询半径是 20，而格子只有 5。<br>
-  只查「3×3 邻格」最多只能覆盖 15 个单位的范围，<strong>距离在 15~20 之间的碰撞全被漏掉了</strong>。<br><br>
+  但格子大小 5 时只检出 33 个，格子 10 时只检出 111 个——<em>都漏检了！</em>（分别漏掉 134 对与 56 对）<br><br>
+  <strong>为什么</strong>：查询半径是 20，而格子只有 5。「3×3 邻格」覆盖的范围只有 <strong>3 × 5 = 15</strong> 个单位，<br>
+  而需要覆盖的是 <strong>2 × 半径 = 40</strong> 个单位——所以<strong>凡是跨度超过 15 的碰撞对都可能被漏掉</strong>。<br><br>
+  <strong>实测的漏检距离分布</strong>（格子 5，共漏 134 对）：<code>[5,10): 15 对 · [10,15): 57 对 · [15,20): 62 对</code><br>
+  <em>看清楚了：漏检并不只发生在"15~20"这一段，<strong>连 5~15 之间也漏了 72 对</strong>——因为物体是否落在同一个 3×3 邻域，取决于它们各自在格子里的位置，而不只是距离。</em><br>
+  <em>那么判据是什么？实测出最关键的界线：<strong>格子 &lt; 半径就一定可能漏检，格子 ≥ 半径就稳定不漏</strong>。</em><br>
+  <strong>本页做了临界实验</strong>（半径 20，每次 30 轮随机点集）：<code>cell=14 漏 30/30 · 15 漏 30/30 · 16 漏 30/30 · 17 漏 30/30 · 18 漏 25/30 · 19 漏 9/30 · 20 漏 0/30</code><br>
+  <em>看出来了吗：只要小于半径，漏检概率就非零；越接近半径越低，但只有到了 <strong>cell ≥ 半径</strong> 才真正归零。</em><br>
+  <em>而 <code>cell × 3 &lt; 2 × 半径</code> 只是个"必然漏"的充分条件（比如 cell=14 时 42 &gt; 40，依然漏 30/30）——<strong>满足它一定漏，不满足它也不代表安全</strong>。</em><br><br>
   <strong>最危险的地方</strong>：格子 5 的"检测对数只有 33"，看起来<em>比其他方案快得多</em>——如果你只看性能数字，会以为这是最优配置，实际上<strong>结果是错的</strong>。
 </div>
 
@@ -596,7 +602,9 @@ end</code></pre>
   • 格子的 key = <code>hash(cellX, cellY)</code><br>
   • 只创建<em>有物体的格子</em>，稀疏数据下内存占用极小<br>
   • 支持负坐标（无限地图）<br><br>
-  <strong>注意</strong>：哈希会有<em>冲突</em>——不同格子可能映射到同一个 key。<em>实践中这个概率极低，且冲突只影响性能（多查几个对象），不影响正确性。</em>
+  <strong>注意</strong>：哈希会有<em>冲突</em>——不同格子可能映射到同一个 key。<br>
+  <em>本页的实现里冲突只影响性能（多查几个对象），不影响正确性</em>——因为查询时会把相邻 9 格的桶全部取出，再做一次精确距离判断。<br>
+  <strong>但有一个前提</strong>：桶里存的是对象引用，重复命中同一对会被 <code>a.id &lt; b.id</code> 过滤掉。<em>如果你的实现是按"格子坐标"去重，就要小心冲突导致的漏查。</em>
 </div>
 
 <h2 id="compare">五、四种方案完整对比</h2>
@@ -607,7 +615,7 @@ end</code></pre>
   <tbody>
     <tr><td><strong>暴力两两</strong></td><td>无</td><td>O(n²)</td><td>无</td><td>无</td><td><strong>n &lt; 100</strong></td></tr>
     <tr><td><strong>均匀网格</strong></td><td>O(n)</td><td>O(1)</td><td>O(1)</td><td>固定</td><td>分布均匀、地图固定</td></tr>
-    <tr><td><strong>四叉树</strong></td><td>O(n log n)</td><td>O(log n)</td><td>O(log n)</td><td>动态</td><td>分布不均、<strong>静态为主</strong></td></tr>
+    <tr><td><strong>四叉树</strong></td><td>O(n log n)</td><td>O(log n)</td><td>O(log n) 删除+重插</td><td>动态</td><td>分布不均、<strong>静态为主</strong></td></tr>
     <tr><td><strong>空间哈希</strong></td><td>O(n)</td><td>O(1)</td><td>O(1)</td><td>稀疏</td><td><strong>无限地图、动态增删</strong></td></tr>
   </tbody>
 </table>

@@ -1,0 +1,467 @@
+<h1>07 · 数据库与 EF Core ★★★</h1>
+
+<p class="lead">这是<strong>后端最核心的一页</strong>。数据存不住、查得慢、事务用错——<em>三个问题各能毁掉一个项目</em>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  读完这一页，你应该能把它和前面讲过的知识连起来——<strong>数据库与 EF Core</strong> 是后面几页的基础。如果某段看不懂，<em>先回上一页把概念补齐再看</em>。
+</div>
+
+<h2 id="nplus1">一、N+1 查询：后端最经典的性能问题 ★★★</h2>
+
+<p><strong>症状</strong>：接口在测试环境很快，数据一多就超时。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+
+namespace BackendSamples.Database
+{
+    // ============================================================
+    // 1. 关系建模：一对多、多对多
+    // ============================================================
+
+    public class Player
+    {
+        public long Id { get; set; }
+        public string Name { get; set; } = "";
+        // 【导航属性】一个玩家有多个道具
+        public List&lt;PlayerItem&gt; Items { get; set; } = new();
+    }
+
+    public class PlayerItem
+    {
+        public long Id { get; set; }
+        public long PlayerId { get; set; }
+        public int ItemId { get; set; }
+        public int Count { get; set; }
+        // 反向导航
+        public Player? Player { get; set; }
+    }
+
+    // 简化版内存数据库（模拟 EF Core 的行为）
+    public class InMemoryDb
+    {
+        public List&lt;Player&gt; Players = new();
+        public List&lt;PlayerItem&gt; Items = new();
+
+        // 【关键】模拟 EF Core 的「查询计数」
+        //   真实的 EF Core 每次访问数据库都算一次往返
+        public int QueryCount;
+
+        public List&lt;Player&gt; QueryPlayers()
+        {
+            QueryCount++;
+            return Players;
+        }
+
+        public List&lt;PlayerItem&gt; QueryItemsByPlayer(long playerId)
+        {
+            QueryCount++;
+            return Items.Where(i =&gt; i.PlayerId == playerId).ToList();
+        }
+
+        // 【关键】全量查询关联表 —— 这也是一次数据库往返，必须计数
+        //   对应 EF Core 的 .Include(p =&gt; p.Items) 或一次性 IN 查询
+        public List&lt;PlayerItem&gt; QueryAllItems()
+        {
+            QueryCount++;
+            return Items.ToList();
+        }
+
+        public void Reset() =&gt; QueryCount = 0;
+    }
+
+    // ============================================================
+    // 2. N+1 查询问题 ★★★
+    // ============================================================
+    // 【后端最经典的性能问题】
+    //   1 次查主表 + N 次查关联表 = N+1 次数据库往返
+
+    public class NPlusOneDemo
+    {
+        // 【错误】N+1 查询
+        public static void BadQuery(InMemoryDb db)
+        {
+            var players = db.QueryPlayers();              // 1 次
+
+            foreach (var p in players)
+            {
+                // 【问题】每个玩家都单独查一次
+                var items = db.QueryItemsByPlayer(p.Id);  // N 次
+                p.Items = items;
+            }
+            // 总计: 1 + N 次
+        }
+
+        // 【正确】一次性把关联数据取出来
+        public static void GoodQuery(InMemoryDb db)
+        {
+            var players = db.QueryPlayers();              // 1 次
+            var allItems = db.QueryAllItems();            // 1 次（用 Include 或一次 IN 查询）
+
+            // 内存里做分组（O(n)）
+            var lookup = allItems.GroupBy(i =&gt; i.PlayerId)
+                                 .ToDictionary(g =&gt; g.Key, g =&gt; g.ToList());
+
+            foreach (var p in players)
+            {
+                p.Items = lookup.TryGetValue(p.Id, out var list) ? list : new List&lt;PlayerItem&gt;();
+            }
+            // 总计: 2 次（无论多少个玩家）
+        }
+    }
+
+    // ============================================================
+    // 3. 索引：查询优化最有效的手段
+    // ============================================================
+
+    public class IndexDemo
+    {
+        public static void Run()
+        {
+            const int N = 100000;
+
+            // 建表
+            var items = new List&lt;PlayerItem&gt;(N);
+            var rnd = new Random(42);
+            for (int i = 0; i &lt; N; i++)
+            {
+                items.Add(new PlayerItem
+                {
+                    Id = i,
+                    PlayerId = i % 1000,          // 1000 个玩家
+                    ItemId = rnd.Next(1, 500),
+                    Count = rnd.Next(1, 100),
+                });
+            }
+
+            long targetPlayer = 500;
+
+            Console.WriteLine($"  数据量: {N} 条，目标 PlayerId={targetPlayer}");
+
+            // 【无索引】全表扫描
+            var sw = Stopwatch.StartNew();
+            var r1 = items.Where(i =&gt; i.PlayerId == targetPlayer).ToList();
+            sw.Stop();
+            double ms1 = sw.Elapsed.TotalMilliseconds;
+            Console.WriteLine($"  无索引（全表扫描）: {ms1:F3} ms，找到 {r1.Count} 条");
+
+            // 【建索引】按 PlayerId 建哈希索引 = O(1) 定位
+            var index = new Dictionary&lt;long, List&lt;PlayerItem&gt;&gt;();
+            foreach (var it in items)
+            {
+                if (!index.TryGetValue(it.PlayerId, out var list))
+                {
+                    list = new List&lt;PlayerItem&gt;();
+                    index[it.PlayerId] = list;
+                }
+                list.Add(it);
+            }
+
+            sw.Restart();
+            var r2 = index.TryGetValue(targetPlayer, out var hit) ? hit : new List&lt;PlayerItem&gt;();
+            sw.Stop();
+            double ms2 = sw.Elapsed.TotalMilliseconds;
+            string ratio = ms2 &gt; 0.0001 ? (ms1 / ms2).ToString("F0") + " 倍" : "差异过大";
+            Console.WriteLine($"  有索引:             {ms2:F4} ms，找到 {r2.Count} 条");
+            Console.WriteLine($"  差距:               {ratio}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【结论】索引把 O(n) 变成 O(1)");
+            Console.WriteLine("         真实数据库里这个差距通常是 1000 倍以上");
+
+            // 索引的代价
+            Console.WriteLine();
+            Console.WriteLine("  【索引的代价】");
+            Console.WriteLine("    · 占用额外存储（通常 10~30%）");
+            Console.WriteLine("    · 写入变慢（每次 INSERT/UPDATE 都要维护索引）");
+            Console.WriteLine("    · 所以：不是索引越多越好，只给高频查询建");
+        }
+    }
+
+    // ============================================================
+    // 4. 事务：保证多个操作原子性
+    // ============================================================
+
+    public class TransactionDemo
+    {
+        public class Account
+        {
+            public long Id;
+            public string Name = "";
+            public decimal Balance;
+        }
+
+        private readonly List&lt;Account&gt; _accounts = new()
+        {
+            new() { Id = 1, Name = "玩家A", Balance = 1000m },
+            new() { Id = 2, Name = "玩家B", Balance = 500m },
+        };
+
+        // 【错误】没有事务：中间失败会数据不一致
+        public bool Transfer_Bad(long from, long to, decimal amount)
+        {
+            var a = _accounts.First(x =&gt; x.Id == from);
+            var b = _accounts.First(x =&gt; x.Id == to);
+
+            if (a.Balance &lt; amount) return false;
+
+            a.Balance -= amount;
+            // 【假设这里崩溃了 / 抛异常】
+            // b.Balance += amount 没执行 -&gt; 钱消失了
+            b.Balance += amount;
+            return true;
+        }
+
+        // 【正确】事务：要么全成功，要么全失败
+        public bool Transfer_Good(long from, long to, decimal amount)
+        {
+            var a = _accounts.First(x =&gt; x.Id == from);
+            var b = _accounts.First(x =&gt; x.Id == to);
+
+            if (a.Balance &lt; amount)
+            {
+                Console.WriteLine($"    余额不足: {a.Name} 有 {a.Balance}, 需要 {amount}");
+                return false;
+            }
+
+            // 模拟事务
+            decimal oldA = a.Balance;
+            decimal oldB = b.Balance;
+
+            try
+            {
+                a.Balance -= amount;
+
+                // 【模拟】中间发生异常
+                if (amount &gt; 800) throw new InvalidOperationException("模拟：转账过程中系统故障");
+
+                b.Balance += amount;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                // 【关键】回滚
+                a.Balance = oldA;
+                b.Balance = oldB;
+                Console.WriteLine($"    异常: {ex.Message}");
+                Console.WriteLine($"    已回滚，余额保持不变");
+                return false;
+            }
+        }
+
+        public void PrintBalances()
+        {
+            foreach (var a in _accounts)
+                Console.WriteLine($"    {a.Name}: {a.Balance}");
+        }
+    }
+
+    // ============================================================
+    // 5. 迁移（Migration）：数据库结构的版本控制
+    // ============================================================
+
+    public static class MigrationExplainer
+    {
+        public static readonly (string Command, string Meaning)[] Commands =
+        {
+            ("dotnet ef migrations add Init", "创建迁移脚本（记录结构变更）"),
+            ("dotnet ef database update", "把变更应用到数据库"),
+            ("dotnet ef migrations list", "查看所有迁移"),
+            ("dotnet ef migrations remove", "撤销最近一次迁移"),
+            ("dotnet ef dbcontext script", "生成 SQL 脚本（用于生产环境审核）"),
+        };
+
+        public static void Print()
+        {
+            foreach (var (c, m) in Commands)
+                Console.WriteLine($"    {c,-42} {m}");
+        }
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            // 准备数据
+            var db = new InMemoryDb();
+            for (int i = 1; i &lt;= 20; i++)
+            {
+                db.Players.Add(new Player { Id = i, Name = $"玩家{i}" });
+                for (int j = 0; j &lt; 3; j++)
+                    db.Items.Add(new PlayerItem { Id = i * 10 + j, PlayerId = i, ItemId = j + 1, Count = 1 });
+            }
+
+            Console.WriteLine("=== 1. N+1 查询问题 ===");
+            Console.WriteLine($"  数据: 20 个玩家，每人 3 个道具");
+            Console.WriteLine();
+
+            db.Reset();
+            NPlusOneDemo.BadQuery(db);
+            Console.WriteLine($"  【错误做法】查询次数: {db.QueryCount} 次（1 + 20）");
+
+            db.Reset();
+            NPlusOneDemo.GoodQuery(db);
+            Console.WriteLine($"  【正确做法】查询次数: {db.QueryCount} 次（固定 2 次，与玩家数无关）");
+
+            Console.WriteLine();
+            Console.WriteLine("  【为什么严重】");
+            Console.WriteLine("    数据库往返一次约 1~10ms");
+            Console.WriteLine("    100 个玩家 = 101 次往返 = 100ms~1s");
+            Console.WriteLine("    -&gt; 接口超时、数据库连接池耗尽");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 索引的效果 ===");
+            IndexDemo.Run();
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 事务 ===");
+            var tx = new TransactionDemo();
+
+            Console.WriteLine("  正常转账 100:");
+            tx.Transfer_Good(1, 2, 100m);
+            tx.PrintBalances();
+
+            Console.WriteLine();
+            Console.WriteLine("  转账 900（触发模拟故障）:");
+            tx.Transfer_Good(1, 2, 900m);
+            tx.PrintBalances();
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】没有事务时，故障会导致钱凭空消失");
+            Console.WriteLine("          事务保证：要么全成功，要么全回滚");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 迁移命令 ===");
+            MigrationExplainer.Print();
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Database.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>做法</th><th>查询次数</th><th>100 个玩家时</th></tr></thead>
+  <tbody>
+    <tr><td><strong>循环里查关联</strong></td><td><span class="mk mk--no">1 + N</span></td><td><strong>101 次</strong></td></tr>
+    <tr><td><strong>一次性取回</strong></td><td><span class="mk mk--yes">2</span></td><td><strong>2 次</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="index">二、索引：查询优化最有效的手段 ★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">实测：索引带来几个数量级的差距</span>
+  <strong>本页实测（10 万条数据）</strong>：<br>
+  · <strong>无索引</strong>（全表扫描）：<em>毫秒级</em><br>
+  · <strong>有索引</strong>：<em>微秒级</em><br><br>
+  <strong>真实数据库里的差距更大</strong>——<em>因为磁盘 IO 比内存慢几个数量级</em>。<br><br>
+  <strong>但要记住索引的代价</strong>：<br>
+  · <strong>占用存储</strong>（<em>通常 10~30%</em>）<br>
+  · <strong>写入变慢</strong>（<em>每次 INSERT/UPDATE 都要维护索引</em>）<br>
+  · <em>索引越多，写入越慢</em><br><br>
+  <strong>原则</strong>：<em>只给「高频查询 + 区分度高」的字段建索引</em>。<br>
+  · 高频：<em>用户查自己的道具</em><br>
+  · 区分度高：<em>userId 好，gender 差（只有两个值）</em>
+</div>
+
+<h2 id="transaction">三、事务：保证原子性 ★★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">什么是事务</span>
+  <strong>一组操作，要么全成功，要么全失败。</strong><br><br>
+  <strong>经典例子：转账</strong><br>
+  <code>A 扣 100 → B 加 100</code><br>
+  如果没有事务：<br>
+  · A 扣了 100<br>
+  · <em>系统崩溃</em><br>
+  · B 没收到 → <strong>100 凭空消失</strong><br><br>
+  <strong>本页实测</strong>：<br>
+  <code>转账 900（触发故障）</code><br>
+  <code>异常: 模拟：转账过程中系统故障</code><br>
+  <code>已回滚，余额保持不变</code><br><br>
+  <strong>游戏里的应用</strong>：<br>
+  · 扣金币 + 发道具（<em>不能只扣不发</em>）<br>
+  · 战斗结算（<em>扣体力 + 发奖励</em>）<br>
+  · 交易系统
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">事务的两个常见误区</span>
+  <strong>误区一：事务可以随便用</strong><br>
+  · 事务会<strong>持有锁</strong>，长事务会阻塞其他请求<br>
+  · <em>不要在事务里做网络请求、文件 IO</em><br>
+  · 原则：<em>事务尽可能短</em><br><br>
+  <strong>误区二：以为 EF Core 会自动包事务</strong><br>
+  · <code>SaveChanges()</code> 单次调用<em>是原子的</em><br>
+  · 但<strong>多次 SaveChanges 不在同一事务里</strong><br>
+  · 需要显式 <code>BeginTransaction</code><br><br>
+  <strong>还要注意隔离级别</strong>：<br>
+  · 默认 <code>ReadCommitted</code>——<em>能防脏读，但防不了幻读</em><br>
+  · 高并发扣减要用<em>行锁或乐观锁</em>（<em>见页 18</em>）
+</div>
+
+<h2 id="migration">四、迁移：数据库结构的版本控制</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">迁移解决什么问题</span>
+  <strong>问题</strong>：你改了实体类，怎么让数据库表也跟着改？<br><br>
+  <strong>手工改表的问题</strong>：<br>
+  · 开发环境改了，<em>生产忘了改</em><br>
+  · 团队其他人<em>不知道要改</em><br>
+  · <em>回滚时不知道怎么还原</em><br><br>
+  <strong>迁移的做法</strong>：<br>
+  ① 改代码 → <code>migrations add Xxx</code> 生成脚本<br>
+  ② 脚本<strong>进版本库</strong>（<em>和代码一起 review</em>）<br>
+  ③ 部署时 <code>database update</code> 应用<br><br>
+  <strong>生产环境最佳实践</strong>：<br>
+  · 用 <code>dbcontext script</code> 生成 SQL<br>
+  · <em>DBA 审核后再执行</em><br>
+  · <strong>不要在生产直接 update</strong>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="07">
+  <div class="task"><input type="checkbox" id="t-07-1"><label for="t-07-1"><strong>建三个表</strong>：玩家、道具、玩家道具（一对多）。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-2"><label for="t-07-2"><strong>复现 N+1</strong>：循环查关联，统计查询次数。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-3"><label for="t-07-3"><strong>优化 N+1</strong>：改成一次性取回，看次数降到 2。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-4"><label for="t-07-4"><strong>测索引效果</strong>：10 万条数据，对比有无索引的查询耗时。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-5"><label for="t-07-5"><strong>实测事务回滚</strong>：转账中途抛异常，验证余额没变。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-6"><label for="t-07-6"><strong>做一次迁移</strong>：加一个字段，生成并应用迁移。</label></div>
+  <div class="task"><input type="checkbox" id="t-07-7"><label for="t-07-7"><strong>回答面试题</strong>：① 什么是 N+1？怎么解决？② 索引的代价是什么？③ 事务隔离级别有哪些？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能识别并修复 N+1 查询</strong>；<br>
+    ② <strong>知道索引能把 O(n) 变成 O(1)，以及它的代价</strong>；<br>
+    ③ <strong>能写事务并理解回滚</strong>；<br>
+    ④ 知道事务要短、不能做网络 IO；<br>
+    ⑤ 会用迁移管理数据库结构变更。<br>
+    <br>
+    <em>第 ① 和 第 ③ 条最重要——**前者是性能，后者是数据正确性**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="06-auth.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">06 鉴权与会话 ★★</div>
+  </a>
+  <a class="next" href="08-redis-cache.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">08 缓存与 Redis ★★</div>
+  </a>
+</nav>

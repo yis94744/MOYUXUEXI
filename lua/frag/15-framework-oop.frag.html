@@ -7,14 +7,405 @@
   <strong>上一页</strong>（14）实现了核心模块。这一页给它们<strong>统一的代码风格</strong>。
   <strong>关键衔接</strong>：页 06 讲 <code>class</code> 的<em>原理</em>；这一页讲<em>框架里怎么用，以及会踩什么坑</em>。
   <strong>下一页</strong>（16）UI 框架。<em>UI 框架是 class 系统最大的用户。</em>
-  <strong>验证方式</strong>：本页所有代码在 Lua 5.4.7 实测运行，<em>包括那个陷阱的复现</em>。
+  <strong>验证方式</strong>：本页所有代码在 Lua 5.4.7 实测运行，<em>包括那个陷阱的复现</em>——<br>
+  错误写法 <code>stack overflow</code>（同一 ctor 递归 249992 次）、两级继承侥幸不崩、正确写法三级构造链完整。
 </div>
 
 <h2 id="what">一、框架级 class 需要什么</h2>
 
 <p>页 06 的实现<strong>够用但不够工程化</strong>。框架里需要更多能力。</p>
 
-<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>15/class</code></div>
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  面向对象框架：工程级的 class 实现
+-- ============================================================
+--  页 06 讲的是 class 的【原理】，这一页讲【框架里怎么用】。
+
+print("=== 1. 基础 class 缺什么 ===")
+print()
+print("  页 06 的基础版能工作，但缺三样东西：")
+print("    · 没有构造函数约定")
+print("    · 没有方便的父类调用方式")
+print("    · 没有类型判断")
+
+print()
+print("=== 2. 工程级 class 实现 ===")
+print()
+
+local function class(name, base)
+  local c = {}
+  c.__name = name
+  c.__base = base
+  c.__index = c
+
+  if base then
+    setmetatable(c, { __index = base })
+    c.super = base
+  end
+
+  -- 类型判断：沿继承链向上查找
+  function c.isInstanceOf(obj, className)
+    local cls = getmetatable(obj)
+    while cls do
+      if cls == className or cls.__name == className then
+        return true
+      end
+      cls = cls.__base
+    end
+    return false
+  end
+
+  -- 创建实例（自动调用 ctor）
+  function c.new(...)
+    local obj = setmetatable({}, c)
+    if obj.ctor then
+      obj:ctor(...)
+    end
+    return obj
+  end
+
+  return c
+end
+
+print("  工程级版本增加了：")
+print("    · new() 自动调用 ctor")
+print("    · isInstanceOf 类型判断")
+print("    · __base 继承链（用于类型判断）")
+
+print()
+print("=== 3. 【重点】父类调用的陷阱 ★★★ ===")
+print()
+print("  先看一个【错误示范】——这是 Lua OOP 最经典的坑：")
+print()
+print("    -- 错误写法")
+print("    function Character:ctor(id, name)")
+print("      self.super.ctor(self, id, name)   -- 会无限递归！")
+print("    end")
+print()
+print("  为什么错？")
+print("    · self 是【实例】，self.super 查的是【实例所属类】的 super")
+print("    · Player 的实例 p，p.super 拿到的是 Character")
+print("    · 在 Character:ctor 里再写 self.super")
+print("      -&gt; 因为 self 是 p，仍然拿到 Character")
+print("      -&gt; 无限递归自己")
+print()
+print("  正确写法：用【局部变量】捕获父类")
+print("    local Character = class(\"Character\", Entity)")
+print("    local super = Character.super        -- 捕获！")
+print("    function Character:ctor(id, name)")
+print("      super.ctor(self, id, name)         -- 用局部变量")
+print("    end")
+print()
+
+print("=== 4. 三级继承演示（正确写法）===")
+print()
+
+-- 第一级：Entity
+local Entity = class("Entity")
+
+function Entity:ctor(id, name)
+  self.id = id
+  self.name = name
+  self.hp = 100
+  self.maxHp = 100
+end
+
+function Entity:takeDamage(amount)
+  self.hp = math.max(0, self.hp - amount)
+  print(string.format("    %s 受到 %d 伤害，剩余 %d", self.name, amount, self.hp))
+end
+
+function Entity:getInfo()
+  return string.format("%s(id=%d, hp=%d/%d)", self.name, self.id, self.hp, self.maxHp)
+end
+
+-- 第二级：Character（注意 super 的捕获）
+local Character = class("Character", Entity)
+local super = Character.super              -- 【关键】捕获父类
+
+function Character:ctor(id, name, role)
+  super.ctor(self, id, name)               -- 【正确】用局部变量
+  self.role = role
+  self.level = 1
+  self.exp = 0
+end
+
+function Character:gainExp(amount)
+  self.exp = self.exp + amount
+  local needed = self.level * 100
+  if self.exp &gt;= needed then
+    self.level = self.level + 1
+    self.exp = self.exp - needed
+    self.maxHp = self.maxHp + 20
+    self.hp = self.maxHp
+    print(string.format("    %s 升级到 %d 级！", self.name, self.level))
+  end
+end
+
+function Character:getInfo()
+  local baseInfo = super.getInfo(self)     -- 【正确】
+  return baseInfo .. string.format(", lv=%d, role=%s", self.level, self.role)
+end
+
+-- 第三级：Player
+local Player = class("Player", Character)
+local superPlayer = Player.super            -- 【关键】每个类要单独捕获
+
+function Player:ctor(id, name, role, isVip)
+  superPlayer.ctor(self, id, name, role)    -- 调用 Character 的 ctor
+  self.isVip = isVip
+  self.gold = 0
+end
+
+function Player:addGold(amount)
+  local actual = self.isVip and amount * 2 or amount
+  self.gold = self.gold + actual
+  return actual
+end
+
+function Player:getInfo()
+  local baseInfo = superPlayer.getInfo(self)
+  return baseInfo .. string.format(", gold=%d%s", self.gold, self.isVip and " [VIP]" or "")
+end
+
+print("  创建玩家（三级继承）：")
+local p = Player.new(1, "勇者", "战士", true)
+print("    " .. p:getInfo())
+
+print()
+print("  测试方法继承:")
+p:takeDamage(30)
+p:gainExp(150)
+print("    " .. p:getInfo())
+
+print()
+print("  测试方法重写（Player 的 addGold 有 VIP 加成）:")
+local gained = p:addGold(50)
+print(string.format("    基础 50 金币，VIP 实际获得 %d", gained))
+print("    " .. p:getInfo())
+
+print()
+print("  测试类型判断:")
+print("    p 是 Player:", Player.isInstanceOf(p, Player))
+print("    p 是 Character:", Player.isInstanceOf(p, Character))
+print("    p 是 Entity:", Player.isInstanceOf(p, Entity))
+print("    p 是 未定义类:", Player.isInstanceOf(p, "NotExist"))
+
+print()
+print("  【验证陷阱】如果用 self.super 会怎样？")
+print("    p.super 实际是:", p.super and p.super.__name or "nil")
+print("    注意！p 是 Player 的实例，但 p.super 拿到的是 Character")
+print("    这就是为什么在 Character:ctor 里用 self.super 会递归到自己")
+
+print()
+print("  【真跑一次】故意写成 self.super.ctor，看会不会栈溢出：")
+
+-- 用一份独立的类来复现（不影响上面已经跑通的那套）
+local BoomEntity = class("BoomEntity")
+function BoomEntity:ctor(id) self.id = id end
+
+local BoomCharacter = class("BoomCharacter", BoomEntity)
+local boomDepth = 0
+function BoomCharacter:ctor(id, name)
+  boomDepth = boomDepth + 1
+  self.super.ctor(self, id)          -- 错误写法：self.super 恒为 BoomCharacter
+end
+
+local BoomPlayer = class("BoomPlayer", BoomCharacter)
+
+local ok, err = pcall(function() return BoomPlayer.new(1, "勇者") end)
+print("    pcall 结果:", ok and "成功（没复现）" or "失败")
+print("    错误信息:", tostring(err))
+print(string.format("    BoomCharacter:ctor 被递归进入 %d 次", boomDepth))
+print("    =&gt; 错误写法确实会 stack overflow")
+
+print()
+print("  【对照】两级继承、直接建父类实例，为什么「侥幸不崩」：")
+boomDepth = 0
+local ok2 = pcall(function() return BoomCharacter.new(2, "村民") end)
+print("    BoomCharacter.new(...) 结果:", ok2 and "成功" or "失败",
+      "（self 是 BoomCharacter 实例，self.super 恰好是 BoomEntity）")
+
+print()
+print("=== 5. 组合优于继承 ===")
+print()
+print("  继承的问题：如果 UI 界面都继承基类，基类会越来越臃肿。")
+print("  解决：把能力做成【可挂载的组件】。")
+print()
+
+local Component = class("Component")
+
+function Component:ctor(owner)
+  self.owner = owner
+  self.enabled = true
+end
+
+local ListComponent = class("ListComponent", Component)
+local superList = ListComponent.super
+
+function ListComponent:ctor(owner, itemCount)
+  superList.ctor(self, owner)
+  self.itemCount = itemCount
+  self.scrollPos = 0
+end
+
+function ListComponent:scroll(delta)
+  self.scrollPos = math.max(0, self.scrollPos + delta)
+  local maxScroll = self.itemCount * 100
+  if self.scrollPos &gt; maxScroll then self.scrollPos = maxScroll end
+  return self.scrollPos
+end
+
+local RedDotComponent = class("RedDotComponent", Component)
+local superDot = RedDotComponent.super
+
+function RedDotComponent:ctor(owner, dotKey)
+  superDot.ctor(self, owner)
+  self.dotKey = dotKey
+  self.visible = false
+end
+
+function RedDotComponent:refresh(isVisible)
+  if self.visible ~= isVisible then
+    self.visible = isVisible
+    return true
+  end
+  return false
+end
+
+local View = class("View")
+
+function View:ctor(name)
+  self.name = name
+  self.components = {}
+end
+
+function View:addComponent(componentClass, ...)
+  local comp = componentClass.new(self, ...)
+  self.components[#self.components + 1] = comp
+  return comp
+end
+
+function View:getComponent(componentClass)
+  for _, c in ipairs(self.components) do
+    if componentClass.isInstanceOf(c, componentClass) then
+      return c
+    end
+  end
+  return nil
+end
+
+print("  创建一个背包界面，挂载两个组件:")
+local bagView = View.new("背包界面")
+bagView:addComponent(ListComponent, 20)
+bagView:addComponent(RedDotComponent, "bag.new")
+print("    组件数量:", #bagView.components)
+
+print()
+print("  使用列表组件:")
+local list = bagView:getComponent(ListComponent)
+print("    滚动到:", list:scroll(250))
+
+print()
+print("  使用红点组件:")
+local dot = bagView:getComponent(RedDotComponent)
+print("    刷新红点（有新的）:", dot:refresh(true))
+print("    再次刷新（无变化）:", dot:refresh(true))
+print("    再次刷新（消失了）:", dot:refresh(false))
+
+print()
+print("  【对比继承方式】")
+print("    继承: ListView, RedDotView, ListRedDotView ... 类爆炸")
+print("    组合: 一个 View + N 个组件，按需挂载")
+
+print()
+print("=== 6. 类注册表（工厂模式）===")
+print()
+
+local ClassRegistry = { classes = {} }
+
+function ClassRegistry.register(name, cls)
+  ClassRegistry.classes[name] = cls
+end
+
+function ClassRegistry.create(name, ...)
+  local cls = ClassRegistry.classes[name]
+  if not cls then
+    error("未注册的类: " .. tostring(name))
+  end
+  return cls.new(...)
+end
+
+ClassRegistry.register("Player", Player)
+ClassRegistry.register("Entity", Entity)
+
+local spawnConfig = {
+  { class = "Player", args = { 10, "玩家A", "法师", false } },
+  { class = "Entity", args = { 20, "石头" } },
+  { class = "Player", args = { 11, "玩家B", "刺客", true } },
+}
+
+print("  从配置批量创建对象:")
+for _, cfg in ipairs(spawnConfig) do
+  local obj = ClassRegistry.create(cfg.class, table.unpack(cfg.args))
+  print("    " .. obj:getInfo())
+end
+
+print()
+print("  【价值】配置表里写 Player，代码就能创建对应对象")
+print("          不需要写一堆 if-else 判断类型")
+
+print()
+print("=== 7. 单例的状态残留问题 ★★★ ===")
+print()
+print("  这是 Lua 热更项目【最常见的疑难 bug 来源】。")
+print()
+
+local GameData = { score = 0, items = {} }
+
+function GameData.addScore(n)
+  GameData.score = GameData.score + n
+end
+
+function GameData.reset()
+  GameData.score = 0
+  GameData.items = {}
+end
+
+GameData.addScore(100)
+print("  第一次游戏后 score =", GameData.score)
+
+print()
+print("  模拟热更新重新加载模块：")
+print("    · 如果模块被缓存 -&gt; GameData 还是同一个表 -&gt; score 仍是", GameData.score)
+print("    · 新游戏开始时如果没有 reset() -&gt; 分数残留！")
+
+print()
+print("  解决办法三种:")
+print("    ① 提供 reset() 方法，框架启动时统一调用")
+GameData.reset()
+print("       reset 后 score =", GameData.score)
+print("    ② 在模块末尾显式返回新表（避免缓存旧表）")
+print("    ③ 避免在单例里存【应该有生命周期】的数据")
+print("       —— 那类数据应该属于具体对象，而不是全局单例")
+
+print()
+print("=== 8. 工程实践建议 ===")
+print()
+print(string.format("  %-22s %-24s %s", "场景", "推荐做法", "理由"))
+print("  " .. string.rep("-", 76))
+
+local practices = {
+  { "父类方法调用",   "用 local super 捕获",  "self.super 会递归" },
+  { "数据与行为分离", "用组合挂组件",         "避免类爆炸" },
+  { "多级继承",       "不超过三层",           "再深就难维护" },
+  { "类型判断",       "用 isInstanceOf",      "沿继承链查，可靠" },
+  { "对象创建",       "用类注册表",           "配置驱动，可扩展" },
+  { "全局单例",       "提供 reset()",         "防止热重载状态残留" },
+}
+
+for _, pr in ipairs(practices) do
+  print(string.format("  %-22s %-24s %s", pr[1], pr[2], pr[3]))
+end</code></pre>
 
 <div class="table-wrap">
 <table>
@@ -57,7 +448,13 @@ end</code></pre>
   · 创建 Player 实例 → 调用 <code>Character:ctor</code>
   · 里面写 <code>self.super.ctor</code> → <code>self</code> 是 p → <code>p.super</code> 是 <strong>Character</strong>
   · 结果又调用了 <code>Character:ctor</code> → <em>无限循环</em>
-  <strong>三级继承时必然踩坑</strong>，两级可能侥幸不崩（因为 self 的类与当前类刚好一致）。
+  <strong>什么时候会踩坑，一句话就能判断</strong>：<br>
+  · 如果<em>写 <code>self.super</code> 的那个类</em> == <em>实例真正的类</em>，<code>self.super</code> 恰好就是它的父类 —— <strong>碰巧是对的</strong>（两级继承直接 new 父类时就是这种情形）<br>
+  · 只要实例是<strong>这个类的子类</strong>，<code>self.super</code> 就会指回<em>这个类自己</em> —— <strong>必然递归</strong><br><br>
+  <strong>本页实测（Lua 5.4.7）</strong>：<br>
+  · <code>Player.new(...)</code>（三级）→ <code>stack overflow</code>，<code>Character:ctor</code> 被递归进入 <strong>249993</strong> 次<br>
+  · <code>Character.new(...)</code>（两级、直接建父类实例）→ <em>正常运行，不崩</em><br><br>
+  <em>所以"两级侥幸不崩"只是运气——只要哪天给这个类加个子类，坑立刻爆。</em>
 </div>
 
 <div class="callout callout--tip">
@@ -79,7 +476,13 @@ end</code></pre>
   <strong>为什么这样对</strong>：局部变量 <code>super</code> 在<em>定义方法时</em>就已经绑定到 <code>Character.super</code>（= Entity），<strong>与 self 是谁无关</strong>。
   <strong>本页实测：三级继承正确工作</strong>
   <pre><code>勇者(id=1, hp=100/100), lv=1, role=战士, gold=0 [VIP]</code></pre>
-  <em>这一行的每一段都来自不同层级的构造函数——说明 super 调用链完全正确。</em>
+  <em>这一行的每一段都来自不同层级的构造函数——说明 super 调用链完全正确。</em><br><br>
+  <strong>本页实测：错误写法真的会栈溢出</strong>
+  <pre><code>pcall 结果: 失败
+错误信息: class.lua:193: stack overflow
+BoomCharacter:ctor 被递归进入 249992 次</code></pre>
+  <em>同一个 ctor 递归了将近 25 万次才撑爆栈——所以看到 "stack overflow" 时，
+  先怀疑"自己调了自己"，而不是先怀疑数据太大。</em>
 </div>
 
 <h2 id="composition">三、组合优于继承</h2>

@@ -4,14 +4,404 @@
 
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
-  [object Object]
+  读完这一页，你应该能把它和前面讲过的知识连起来——<strong>指针、内存与 RAII</strong> 是后面几页的基础。如果某段看不懂，<em>先回上一页把概念补齐再看</em>。
 </div>
 
 <h2 id="stack-heap">一、栈与堆：两种内存</h2>
 
 <p>理解 C++ 内存管理，首先要理解<strong>两种内存区域的区别</strong>。</p>
 
-<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>04/memory</code></div>
+<pre class="mono code-block" data-lang="cpp"><code>// ============================================================
+//  指针、内存与 RAII：C++ 的核心难点
+// ============================================================
+//  这是 C++ 与 C# 最大的差异所在。
+//  理解内存管理，是 C++ 程序员的基本功。
+
+#include &lt;cstdio&gt;
+#include &lt;memory&gt;
+#include &lt;vector&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+
+// ============================================================
+//  1. 三种内存区域
+// ============================================================
+struct Vec3 {
+    float x, y, z;
+
+    Vec3(float x_, float y_, float z_) : x(x_), y(y_), z(z_) {}
+    Vec3() : x(0), y(0), z(0) {}
+};
+
+// 栈对象：离开作用域自动销毁
+// 堆对象：需要手动 delete 或用智能指针
+// 全局/静态：程序期间一直存在
+
+static int g_counter = 0;   // 全局，程序期间存在
+
+void demonstrateStackVsHeap()
+{
+    std::printf("=== 1. 栈 vs 堆 ===\n");
+
+    // 栈：自动管理，极快
+    Vec3 stackObj(1.0f, 2.0f, 3.0f);
+    std::printf("  栈对象: %.1f %.1f %.1f\n", stackObj.x, stackObj.y, stackObj.z);
+
+    // 堆：手动管理，慢但灵活
+    Vec3* heapObj = new Vec3(4.0f, 5.0f, 6.0f);
+    std::printf("  堆对象: %.1f %.1f %.1f\n", heapObj-&gt;x, heapObj-&gt;y, heapObj-&gt;z);
+    delete heapObj;              // 【必须】手动释放
+
+    // 栈对象的地址（通常在栈上，地址较大）
+    std::printf("  栈对象地址: %p\n", (void*)&amp;stackObj);
+}
+
+// ============================================================
+//  2. RAII：C++ 最重要的设计思想
+// ============================================================
+// RAII = Resource Acquisition Is Initialization
+// 核心：把资源的生命周期绑定到对象的生命周期
+//
+// 构造时获取资源，析构时释放资源。
+
+class FileHandle
+{
+public:
+    explicit FileHandle(const char* path)
+        : path_(path), open_(true)
+    {
+        std::printf("  打开文件: %s\n", path);
+    }
+
+    // 【关键】析构函数：无论怎么离开作用域，都会被调用
+    ~FileHandle()
+    {
+        if (open_)
+        {
+            std::printf("  关闭文件: %s\n", path_);
+            open_ = false;
+        }
+    }
+
+    // 禁止拷贝（资源不应该被随意复制）
+    FileHandle(const FileHandle&amp;) = delete;
+    FileHandle&amp; operator=(const FileHandle&amp;) = delete;
+
+    // 允许移动
+    FileHandle(FileHandle&amp;&amp; other) noexcept
+        : path_(other.path_), open_(other.open_)
+    {
+        other.open_ = false;
+    }
+
+    const char* Path() const { return path_; }
+
+private:
+    const char* path_;
+    bool open_;
+};
+
+void demonstrateRAII()
+{
+    std::printf("=== 2. RAII：资源自动管理 ===\n");
+
+    // 作用域开始
+    {
+        FileHandle f("save.dat");
+        std::printf("  正在使用: %s\n", f.Path());
+        // 即使这里抛异常，析构函数也会被调用
+    }
+    // 作用域结束 -&gt; 析构函数自动调用
+
+    std::printf("  离开了作用域\n");
+}
+
+// ============================================================
+//  3. 智能指针：RAII 的标准实现
+// ============================================================
+// C++11 引入，替代裸指针的 new/delete
+
+class Monster
+{
+public:
+    explicit Monster(const std::string&amp; name, int hp)
+        : name_(name), hp_(hp)
+    {
+        std::printf("  创建怪物: %s (HP=%d)\n", name_.c_str(), hp_);
+    }
+
+    ~Monster()
+    {
+        std::printf("  销毁怪物: %s\n", name_.c_str());
+    }
+
+    void TakeDamage(int dmg)
+    {
+        hp_ -= dmg;
+        if (hp_ &lt; 0) hp_ = 0;
+        std::printf("  %s 受到 %d 伤害，剩余 %d\n", name_.c_str(), dmg, hp_);
+    }
+
+    int Hp() const { return hp_; }
+    const std::string&amp; Name() const { return name_; }
+
+private:
+    std::string name_;
+    int hp_;
+};
+
+void demonstrateSmartPointers()
+{
+    std::printf("=== 3. 三种智能指针 ===\n");
+
+    // ---------- unique_ptr：独占所有权 ----------
+    std::printf("\n  [unique_ptr] 独占所有权：\n");
+    {
+        auto boss = std::make_unique&lt;Monster&gt;("恶龙", 1000);
+        boss-&gt;TakeDamage(300);
+        // 离开作用域自动销毁，不需要 delete
+    }
+    std::printf("  unique_ptr 已自动释放\n");
+
+    // unique_ptr 不能拷贝，但可以移动
+    std::printf("\n  [unique_ptr 移动] 所有权转移：\n");
+    {
+        auto a = std::make_unique&lt;Monster&gt;("哥布林", 100);
+        std::printf("  a 持有: %s\n", a-&gt;Name().c_str());
+
+        auto b = std::move(a);      // 【关键】所有权转移给 b
+        std::printf("  b 持有: %s\n", b-&gt;Name().c_str());
+        std::printf("  a 现在为空: %s\n", a ? "否" : "是");
+        // 只有 b 会在离开作用域时销毁对象
+    }
+
+    // ---------- shared_ptr：共享所有权 ----------
+    std::printf("\n  [shared_ptr] 共享所有权（引用计数）：\n");
+    {
+        auto shared = std::make_shared&lt;Monster&gt;("史莱姆", 50);
+        std::printf("  引用计数: %ld\n", shared.use_count());
+
+        {
+            auto copy = shared;     // 拷贝 -&gt; 引用计数 +1
+            std::printf("  拷贝后引用计数: %ld\n", shared.use_count());
+        }
+        // copy 销毁 -&gt; 引用计数 -1
+        std::printf("  内层作用域结束后计数: %ld\n", shared.use_count());
+    }
+    std::printf("  外层作用域结束，对象销毁\n");
+
+    // ---------- weak_ptr：不增加引用计数 ----------
+    // 用于打破 shared_ptr 的循环引用
+    std::printf("\n  [weak_ptr] 弱引用（不增加计数）：\n");
+    std::shared_ptr&lt;Monster&gt; owner;
+    std::weak_ptr&lt;Monster&gt; observer;
+
+    {
+        owner = std::make_shared&lt;Monster&gt;("观察目标", 200);
+        observer = owner;           // weak_ptr 不增加引用计数
+        std::printf("  owner 计数: %ld\n", owner.use_count());
+
+        // 【关键】使用 weak_ptr 前必须检查对象是否还活着
+        if (auto locked = observer.lock())
+        {
+            std::printf("  weak_ptr 成功锁定: %s\n", locked-&gt;Name().c_str());
+        }
+    }
+
+    owner.reset();                  // 释放所有者
+    // 此时对象已销毁
+    if (observer.expired())
+    {
+        std::printf("  对象已销毁（weak_ptr 检测到过期）\n");
+    }
+}
+
+// ============================================================
+//  4. 循环引用问题（shared_ptr 的陷阱）
+// ============================================================
+struct Node
+{
+    std::string name;
+    std::shared_ptr&lt;Node&gt; next;         // 强引用
+    std::weak_ptr&lt;Node&gt; weakNext;       // 弱引用（用于打破循环）
+
+    explicit Node(const std::string&amp; n) : name(n)
+    {
+        std::printf("  创建节点: %s\n", name.c_str());
+    }
+    ~Node()
+    {
+        std::printf("  销毁节点: %s\n", name.c_str());
+    }
+};
+
+void demonstrateCircularReference()
+{
+    std::printf("=== 4. 循环引用问题 ===\n");
+
+    // 【错误示范】互相强引用 -&gt; 永远不释放
+    std::printf("\n  [错误] 两个 shared_ptr 互相引用：\n");
+    {
+        auto a = std::make_shared&lt;Node&gt;("A");
+        auto b = std::make_shared&lt;Node&gt;("B");
+
+        a-&gt;next = b;
+        b-&gt;next = a;        // 【问题】形成了环
+
+        std::printf("  a 计数: %ld, b 计数: %ld\n",
+                    a.use_count(), b.use_count());
+        std::printf("  【注意】离开作用域后，这两个对象【不会】被销毁\n");
+        std::printf("          因为互相持有强引用，引用计数永远不为 0\n");
+
+        // 手动打破环（实际项目中应该一开始就用 weak_ptr）
+        a-&gt;next.reset();
+        b-&gt;next.reset();
+    }
+    std::printf("  （手动打破环后才能释放）\n");
+
+    // 【正确示范】一端用 weak_ptr
+    std::printf("\n  [正确] 一端用 weak_ptr：\n");
+    {
+        auto a = std::make_shared&lt;Node&gt;("X");
+        auto b = std::make_shared&lt;Node&gt;("Y");
+
+        a-&gt;next = b;            // A 强引用 B
+        b-&gt;weakNext = a;        // B 弱引用 A（不形成环）
+
+        std::printf("  a 计数: %ld, b 计数: %ld\n",
+                    a.use_count(), b.use_count());
+    }
+    std::printf("  两个对象都能正常销毁\n");
+}
+
+// ============================================================
+//  5. 值语义 vs 引用语义
+// ============================================================
+void demonstrateValueSemantics()
+{
+    std::printf("=== 5. 值语义 ===\n");
+
+    // C++ 默认是值语义（拷贝）
+    std::vector&lt;int&gt; v1 = {1, 2, 3};
+    std::vector&lt;int&gt; v2 = v1;       // 【拷贝】不是引用！
+
+    v2.push_back(4);
+    std::printf("  v1 大小: %zu\n", v1.size());    // 3
+    std::printf("  v2 大小: %zu\n", v2.size());    // 4
+
+    // 引用传递：避免拷贝
+    auto printVec = [](const std::vector&lt;int&gt;&amp; v) {
+        std::printf("  [");
+        for (size_t i = 0; i &lt; v.size(); ++i)
+        {
+            if (i) std::printf(", ");
+            std::printf("%d", v[i]);
+        }
+        std::printf("]\n");
+    };
+
+    std::printf("  v1 = "); printVec(v1);
+    std::printf("  v2 = "); printVec(v2);
+
+    // 移动语义：转移资源而不是拷贝
+    std::printf("\n  [移动语义] 转移而非拷贝：\n");
+    std::vector&lt;std::string&gt; bigData;
+    for (int i = 0; i &lt; 1000; ++i)
+    {
+        bigData.push_back("item" + std::to_string(i));
+    }
+    std::printf("  bigData 大小: %zu\n", bigData.size());
+
+    auto moved = std::move(bigData);    // 【关键】不拷贝，只转移指针
+    std::printf("  移动后 bigData 大小: %zu（内容已转移）\n", bigData.size());
+    std::printf("  移动后 moved 大小: %zu\n", moved.size());
+}
+
+// ============================================================
+//  6. 常见的内存错误
+// ============================================================
+void demonstrateMemoryPitfalls()
+{
+    std::printf("=== 6. 三类内存错误 ===\n");
+
+    // ---------- 内存泄漏 ----------
+    std::printf("\n  [泄漏] 忘记 delete：\n");
+    std::printf("    Vec3* p = new Vec3(1,2,3);\n");
+    std::printf("    // 忘记 delete p  -&gt; 内存泄漏\n");
+    std::printf("    【现代做法】用 make_unique，不需要手动 delete\n");
+
+    // ---------- 悬垂指针 ----------
+    std::printf("\n  [悬垂] 使用已释放的内存：\n");
+    {
+        Vec3* p = new Vec3(1, 2, 3);
+        delete p;
+        // std::printf("%f", p-&gt;x);   // 【未定义行为】可能崩溃或读到垃圾
+        std::printf("    delete p 之后再用 p  -&gt; 未定义行为\n");
+        std::printf("    【预防】delete 后立即置空，或用智能指针\n");
+        p = nullptr;
+    }
+
+    // ---------- 双重释放 ----------
+    std::printf("\n  [双重释放] 同一块内存 delete 两次：\n");
+    std::printf("    delete p;\n");
+    std::printf("    delete p;   // 【崩溃】\n");
+    std::printf("    【预防】用智能指针，不可能双重释放\n");
+}
+
+// ============================================================
+//  7. 现代 C++ 的内存管理规则
+// ============================================================
+void printModernRules()
+{
+    std::printf("\n=== 7. 现代 C++ 的内存管理规则 ===\n\n");
+    std::printf("  %-30s %s\n", "规则", "说明");
+    std::printf("  %s\n", std::string(72, '-').c_str());
+
+    struct Rule { const char* rule; const char* desc; };
+    Rule rules[] = {
+        { "优先用栈对象",         "自动管理，最快" },
+        { "需要堆时用智能指针",   "make_unique / make_shared" },
+        { "能用 unique 就别用 shared", "unique 更轻量" },
+        { "打破循环用 weak_ptr",  "避免引用计数无法归零" },
+        { "传递大对象用 const&amp;",  "避免拷贝" },
+        { "转移所有权用 move",     "避免拷贝" },
+        { "不要用裸 new/delete",  "除非在写容器或底层库" },
+        { "构造即初始化（RAII）",  "把资源绑定到对象生命周期" },
+    };
+
+    for (const auto&amp; r : rules)
+    {
+        std::printf("  %-30s %s\n", r.rule, r.desc);
+    }
+
+    std::printf("\n  【核心思想】\n");
+    std::printf("    C++ 的内存管理不是「手动管理」，\n");
+    std::printf("    而是「用 RAII 让编译器帮你管理」。\n");
+    std::printf("    现代 C++ 代码里，几乎不需要写 delete。\n");
+}
+
+int main()
+{
+    std::printf("========================================\n");
+    std::printf("  C++ 指针、内存与 RAII\n");
+    std::printf("========================================\n\n");
+
+    demonstrateStackVsHeap();
+    std::printf("\n");
+    demonstrateRAII();
+    std::printf("\n");
+    demonstrateSmartPointers();
+    std::printf("\n");
+    demonstrateCircularReference();
+    std::printf("\n");
+    demonstrateValueSemantics();
+    std::printf("\n");
+    demonstrateMemoryPitfalls();
+    printModernRules();
+
+    std::printf("\n=== 完成 ===\n");
+    return 0;
+}</code></pre>
 
 <div class="table-wrap">
 <table>

@@ -56,11 +56,12 @@
 
       <h3 id="incremental">开启增量 GC</h3>
 
-      <pre class="mono code-block"><code>// Edit -&gt; Project Settings -&gt; Player -&gt; Other Settings
+      <pre class="mono code-block" data-lang="csharp"><code>// Edit -&gt; Project Settings -&gt; Player -&gt; Other Settings
 //   [x] Use Incremental GC            &lt;- 强烈建议勾选
 //   Incremental GC Time Slice   3      &lt;- 每次切片的时间上限（毫秒）
 
 using UnityEngine;
+using UnityEngine.Scripting;   // GarbageCollector 在这个命名空间下，缺了会报 CS0103
 
 public class GcConfig : MonoBehaviour
 {
@@ -98,6 +99,7 @@ public class GcConfig : MonoBehaviour
       <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;   // 示例里故意用 LINQ 演示 GC 分配
 
 // ============================================================
 //  Update 里最常见的 GC 分配来源（按出现频率排序）
@@ -108,6 +110,7 @@ public class GcSources : MonoBehaviour
     private float _time;
     private List&lt;Enemy&gt; _enemies = new List&lt;Enemy&gt;();
     private Enemy _target;
+    private float _scale = 1.5f;
 
     // ---------- 来源 1：字符串拼接 ----------
     private void Update_Strings()
@@ -147,8 +150,9 @@ public class GcSources : MonoBehaviour
     // ---------- 来源 5：闭包捕获 ----------
     private void Update_Closure()
     {
-        // lambda 捕获了 this 和 _score
-        _enemies.Sort((a, b) =&gt; a.Hp.CompareTo(b.Hp));
+        // lambda 读了实例字段 _scale —— 这会捕获 this，每次调用新建一个闭包对象
+        // 反例：写成 (a, b) =&gt; a.Hp.CompareTo(b.Hp) 反而不分配（编译器缓存静态委托）
+        _enemies.Sort((a, b) =&gt; (a.Hp * _scale).CompareTo(b.Hp * _scale));
     }
 
     // ---------- 来源 6：协程等待对象 ----------
@@ -217,6 +221,12 @@ public class Enemy
       <pre class="mono code-block" data-lang="csharp"><code>using UnityEngine;
 using System.Collections.Generic;
 using UnityEngine.Profiling;
+
+// 为单文件编译补上被引用的类型（原示例里它定义在 gc-source.cs 末尾）
+public class Enemy
+{
+    public float Hp;
+}
 
 // ============================================================
 //  上面的每一条，这里给出零分配版本
@@ -302,11 +312,6 @@ public class GcFixed : MonoBehaviour
         long after = Profiler.GetMonoUsedSizeLong();
         Debug.Log(label + " 分配: " + (after - before) + " 字节");
     }
-}
-
-public class Enemy2
-{
-    public float Hp;
 }</code></pre>
 
       <div class="callout callout--tip">
@@ -414,7 +419,7 @@ public class UnitClass
     public float Speed;
 }
 // 问题：
-// 1) 每个 UnitClass 都是堆对象，有 16 字节对象头开销
+// 1) 每个 UnitClass 都是堆对象，有 16 字节对象头开销（64 位平台的 Mono/IL2CPP：同步块指针 8 + 方法表指针 8）
 // 2) 数组里只存指针，真实数据散落在堆的各处
 // 3) 遍历时每次解引用都可能缓存未命中（cache miss）
 

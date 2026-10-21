@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">Lua 热更新路线
+      <a href="index.html">Lua 热更新路线
         <span>从零基础到独立搭建可上线的热更框架</span>
       </a>
     </div>
@@ -43,7 +43,10 @@
 
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
-  [object Object]
+  <strong>上一页</strong>（23）是实战项目。这一页是<em>查手册</em>——不用背，收藏起来，写代码时随手查。<br>
+  <strong>覆盖范围</strong>：基础函数、string / table / math / os / io / 协程 / debug 六类库、Lua 5.4 新增特性、五个常用代码片段。<br>
+  <strong>全部可验证</strong>：本页的每个函数签名和返回值都基于 <em>Lua 5.4.7</em> 官方手册，示例输出均为实测结果。<br>
+  <strong>配套练习</strong>：页 03-08 讲语言机制，这一页讲"有什么函数可用"，两者对照看。
 </div>
 
 <h2 id="basic">一、基础函数</h2>
@@ -101,7 +104,7 @@
     <tr><td><code>string.byte/char</code></td><td>字符码</td><td><code>byte("A") == 65</code></td></tr>
     <tr><td><code>string.reverse</code></td><td>反转</td><td></td></tr>
     <tr><td><code>string.pack/unpack</code></td><td><strong>二进制打包</strong></td><td><em>5.3+ 新增</em></td></tr>
-    <tr><td><code>string.packsize</code></td><td>计算打包大小</td><td><em>5.4 新增</em></td></tr>
+    <tr><td><code>string.packsize</code></td><td>计算打包大小</td><td><em>5.3 随 pack 一起新增</em></td></tr>
   </tbody>
 </table>
 </div>
@@ -161,7 +164,7 @@
     <tr><td><code>math.type(x)</code></td><td><strong>区分 integer/float</strong></td><td><em>5.3+ 新增</em></td></tr>
     <tr><td><code>math.tointeger(x)</code></td><td>转整数（失败返回 nil）</td><td><em>5.3+ 新增</em></td></tr>
     <tr><td><code>math.random([m [, n]])</code></td><td>随机数</td><td><strong>随机种子见下</strong></td></tr>
-    <tr><td><code>math.randomseed(x)</code></td><td>设种子</td><td><em>5.4 起可以不调</em></td></tr>
+    <tr><td><code>math.randomseed(x)</code></td><td>设种子</td><td><em>5.4 起解释器启动时自动播种，可以不调</em></td></tr>
     <tr><td><code>math.fmod</code></td><td>取余</td><td><em>与 <code>%</code> 在负数时不同</em></td></tr>
   </tbody>
 </table>
@@ -198,7 +201,7 @@
     <tr><td><code>coroutine.resume(co, ...)</code></td><td>恢复</td><td>返回 <code>ok, ...</code></td></tr>
     <tr><td><code>coroutine.yield(...)</code></td><td>暂停</td><td><em>交出控制权</em></td></tr>
     <tr><td><code>coroutine.wrap(f)</code></td><td>包装</td><td><strong>出错会抛出</strong></td></tr>
-    <tr><td><code>coroutine.status(co)</code></td><td>状态</td><td><code>suspended</code>/<code>dead</code></td></tr>
+    <tr><td><code>coroutine.status(co)</code></td><td>状态</td><td><strong>4 种</strong>：<code>running</code>/<code>suspended</code>/<code>normal</code>/<code>dead</code></td></tr>
     <tr><td><code>coroutine.isyieldable()</code></td><td>能否 yield</td><td><em>5.3+ 新增</em></td></tr>
   </tbody>
 </table>
@@ -374,7 +377,7 @@ end</code></pre>
     <div class="dir">← 上一页</div>
     <div class="title">23 实战项目</div>
   </a>
-  <a class="next" href="../algorithms/index.html">
+  <a class="next" href="index.html">
     <div class="dir">下一页 →</div>
     <div class="title">返回路线总览</div>
   </a>

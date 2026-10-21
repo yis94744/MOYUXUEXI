@@ -14,7 +14,70 @@
 
 <p>Lua 只有八种类型，比其他语言少得多，这是它轻量的原因之一。<strong>注意：类型不是"变量的属性"，而是"值本身的属性"</strong>——同一个变量可以先存数字再存字符串。</p>
 
-<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>03/types</code></div>
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  Lua 的八种类型与 type() 判断
+-- ============================================================
+--  Lua 只有八种类型，比其他语言少得多，这是它轻量的原因之一。
+--  类型不是「变量的属性」，而是「值本身的属性」——
+--  同一个变量可以先存数字再存字符串，类型跟着值走。
+
+print("=== 八种类型的 type() 输出 ===")
+print("nil:      ", type(nil))
+print("boolean:  ", type(true), type(false))
+print("number:   ", type(1), type(1.5), type(0x10), type(1e10))
+print("string:   ", type("hello"), type('单引号也是字符串'))
+print("table:    ", type({}), type({1,2,3}))
+print("function: ", type(print), type(function() end))
+-- userdata 是 C 语言传入的数据（文件句柄、Unity 对象等）
+local tmpFile = io.open("_tmp_type_test.txt", "w")
+if tmpFile then
+  print("userdata: ", type(tmpFile))     -- file（userdata 的一种）
+  tmpFile:close()
+  os.remove("_tmp_type_test.txt")
+else
+  print("userdata:  (当前环境无法创建文件)")
+end
+print("thread:   ", type(coroutine.create(function() end)))
+
+print()
+print("=== 关键：只有 nil 和 false 是假值 ===")
+-- 【这是 Lua 与其他语言最大的差异之一】
+-- 0 和空字符串都是【真值】！
+if 0 then print("0 是真值") end
+if "" then print("空字符串是真值") end
+if {} then print("空表是真值") end
+
+-- 只有这两个是假
+local conditions = {
+  { name = "nil",   value = nil },
+  { name = "false", value = false },
+  { name = "0",     value = 0 },
+  { name = "''",    value = "" },
+}
+for _, item in ipairs(conditions) do
+  print(string.format("  %-8s -&gt; %s", item.name, tostring(item.value and "真" or "假")))
+end
+
+print()
+print("=== 数值类型：整数与浮点（Lua 5.3+ 的新特性）===")
+print("3   是整数:", math.type(3))
+print("3.0 是浮点:", math.type(3.0))
+print("3 == 3.0 ?", 3 == 3.0)          -- true：比较时按数学值
+print("整数除法 7//2 =", 7 // 2)        -- 3  向下取整
+print("浮点除法 7/2  =", 7 / 2)         -- 3.5
+print("取模 7 % 3    =", 7 % 3)
+print("幂 2^10       =", 2 ^ 10)
+print("整型溢出:", math.maxinteger + 1 == math.mininteger)  -- true，回绕
+
+print()
+print("=== 类型转换 ===")
+print("字符串转数字:", tonumber("42"), tonumber("3.14"), tonumber("0x1F"))
+print("转换失败返回 nil:", tonumber("abc"))
+print("数字转字符串:", tostring(42), tostring(3.14))
+print("隐式转换（算术自动转）:", "10" + 5)     -- 15
+-- 注意：.. 会把【数字】自动转成字符串（但不能转 boolean/table）
+print("数字会被 .. 自动转:", 10 .. "5")       -- "105"
+print("bool 拼接会报错:", pcall(function() return true .. "x" end))</code></pre>
 
 <div class="callout callout--danger">
   <span class="callout__title">反直觉之一：只有 nil 和 false 是假值</span>
@@ -39,7 +102,92 @@
 
 <p>这一节看起来是"语法基础"，但实际上是<strong>Lua 性能优化的第一课</strong>——因为访问局部变量和访问全局变量的性能差距，在热循环里非常明显。</p>
 
-<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>03/scope</code></div>
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  变量作用域与局部变量（Lua 性能的第一课）
+-- ============================================================
+--  【核心规则】Lua 默认创建的是【全局变量】。
+--  不加 local 的变量会进 _G 表，不仅慢，还会污染全局环境。
+
+print("=== 全局 vs 局部 ===")
+
+-- 不加 local：全局变量
+globalVar = "我是全局的"
+print("全局变量可通过 _G 访问:", _G.globalVar)
+
+-- 加 local：局部变量（推荐）
+local localVar = "我是局部的"
+print("局部变量不在 _G 里:", _G.localVar)      -- nil
+
+print()
+print("=== 作用域边界 ===")
+local outer = "outer"
+do
+  local inner = "inner"
+  print("块内可以访问:", outer, inner)
+end
+print("块外访问 inner:", inner)                -- nil（已超出作用域）
+
+print()
+print("=== 局部变量是性能关键：实测对比 ===")
+-- 【重要】访问局部变量是「寄存器访问」，访问全局变量是「表查找」，
+-- 两者性能差距在热循环里非常明显。
+local N = 2000000
+
+-- 场景 1：全局变量（慢）
+GLOBAL_COUNTER = 0
+local t1 = os.clock()
+for i = 1, N do
+  GLOBAL_COUNTER = GLOBAL_COUNTER + 1
+end
+local timeGlobal = os.clock() - t1
+
+-- 场景 2：局部变量（快）
+local localCounter = 0
+local t2 = os.clock()
+for i = 1, N do
+  localCounter = localCounter + 1
+end
+local timeLocal = os.clock() - t2
+
+print(string.format("全局变量 %d 次: %.4f 秒", N, timeGlobal))
+print(string.format("局部变量 %d 次: %.4f 秒", N, timeLocal))
+print(string.format("局部快 %.1f 倍", timeGlobal / timeLocal))
+
+print()
+print("=== 经典优化：把常用全局函数存成局部 ===")
+-- print 是全局函数，每次调用都要查 _G 表
+local t3 = os.clock()
+for i = 1, 500000 do
+  local _ = tostring(i)
+end
+local timeGlobalFn = os.clock() - t3
+
+local tostringLocal = tostring      -- 缓存成局部变量
+local t4 = os.clock()
+for i = 1, 500000 do
+  local _ = tostringLocal(i)
+end
+local timeLocalFn = os.clock() - t4
+
+print(string.format("全局函数调用: %.4f 秒", timeGlobalFn))
+print(string.format("局部化函数:   %.4f 秒", timeLocalFn))
+print(string.format("快 %.1f 倍", timeGlobalFn / timeLocalFn))
+
+print()
+print("=== 多变量赋值与交换 ===")
+local a, b, c = 1, 2, 3
+print("初始:", a, b, c)
+
+-- 交换两个变量（Lua 独有写法，不需要临时变量）
+a, b = b, a
+print("交换后 a,b:", a, b)
+
+-- 右边多余的值被丢弃，不足的补 nil
+local x, y, z = 1, 2
+print("值不足补 nil:", x, y, z)          -- 1  2  nil
+
+local p, q = 1, 2, 3
+print("值多余被丢弃:", p, q)             -- 1  2</code></pre>
 
 <div class="callout callout--danger">
   <span class="callout__title">反直觉之二：不加 local 就是全局变量</span>
@@ -85,7 +233,7 @@
 
 <div class="callout callout--warn">
   <span class="callout__title">and / or 返回操作数，不是布尔值</span>
-  这是 Lua 的一个<em>很有用但容易误用</strong>的特性：<br>
+  这是 Lua 的一个<em>很有用但容易误用</em>的特性：<br>
   <code>print(1 and 2)</code> 输出 <code>2</code>（不是 true）<br>
   <code>print(nil and 2)</code> 输出 <code>nil</code><br>
   <code>print(nil or 3)</code> 输出 <code>3</code><br>

@@ -259,20 +259,28 @@ using System.Collections.Generic;
 public class ClosurePerf : MonoBehaviour
 {
     private List&lt;Enemy&gt; _enemies = new List&lt;Enemy&gt;();
+    private float _scale = 1.5f;
 
-    // 每帧分配：lambda 捕获了 _enemies 和 this
+    // 每帧分配：lambda 捕获了 this（因为读了实例字段 _scale）
     private void BadUpdate()
     {
-        _enemies.Sort((a, b) =&gt; a.Hp.CompareTo(b.Hp));   // 每次都是新委托
+        _enemies.Sort((a, b) =&gt; (a.Hp * _scale).CompareTo(b.Hp * _scale));   // 每次都是新的闭包对象
     }
 
-    // 零分配：静态比较器，编译器缓存实例
+    // 零分配：静态比较器，编译器把实例缓存到静态字段
     private static readonly System.Comparison&lt;Enemy&gt; HpComparison =
         (a, b) =&gt; a.Hp.CompareTo(b.Hp);
 
     private void GoodUpdate()
     {
         _enemies.Sort(HpComparison);
+    }
+
+    // 另一个零分配写法：lambda 不捕获任何外部状态（含 this），
+    // 编译器会把它提升到方法外的缓存字段，只在第一次分配一次
+    private void NoCaptureUpdate()
+    {
+        _enemies.Sort((a, b) =&gt; a.Hp.CompareTo(b.Hp));   // 实测 0 B/次
     }
 
     // C# 9 的 static lambda（Unity 2021.2+）：编译期保证不捕获

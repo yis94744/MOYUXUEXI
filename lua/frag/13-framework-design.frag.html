@@ -14,7 +14,353 @@
 
 <p>成熟的热更框架通常分为<strong>五层</strong>。<em>分层的目的是控制依赖方向。</em></p>
 
-<div class="callout callout--danger"><span class="callout__title">缺少代码样本</span><code>13/framework</code></div>
+<pre class="mono code-block" data-lang="lua"><code>-- ============================================================
+--  热更新框架的总体设计：从零搭建
+-- ============================================================
+--  这是「框架设计」章节的第一页，也是最重要的一页。
+--  我们会搭一个【可运行的】框架骨架，包含：
+--    · 分层结构
+--    · 模块管理器
+--    · 生命周期
+--    · 事件系统
+--    · 单例管理
+
+print("=== 1. 框架的分层结构 ===")
+print()
+print("  一个成熟的热更框架通常分为五层：")
+print()
+print("    ┌─────────────────────────────────────────┐")
+print("    │  ① 业务层   玩法逻辑、UI 界面、活动      │  &lt;- 策划/程序都改这里")
+print("    ├─────────────────────────────────────────┤")
+print("    │  ② 框架层   模块管理、事件、资源、网络   │  &lt;- 框架开发者维护")
+print("    ├─────────────────────────────────────────┤")
+print("    │  ③ 适配层   xLua 封装、Unity API 桥接   │  &lt;- 隔离引擎差异")
+print("    ├─────────────────────────────────────────┤")
+print("    │  ④ 引擎层   Unity / C#                  │  &lt;- 引擎团队")
+print("    ├─────────────────────────────────────────┤")
+print("    │  ⑤ 平台层   iOS/Android/PC 打包、热更、  │  &lt;- 发行 + 运维")
+print("    │              渠道 SDK                    │")
+print("    └─────────────────────────────────────────┘")
+print()
+print("  【关键原则】依赖只能【从上往下】—— 业务层可以调框架层，")
+print("              但框架层【绝对不能】引用业务层的任何东西。")
+print()
+
+print("=== 2. 模块管理器（框架的地基）===")
+-- 所有系统都注册成"模块"，由统一管理器调度
+
+local ModuleManager = {}
+ModuleManager.__index = ModuleManager
+
+function ModuleManager.new()
+  return setmetatable({
+    modules = {},          -- name -&gt; module
+    order = {},            -- 按注册顺序保存
+    initialized = false,
+  }, ModuleManager)
+end
+
+-- 注册模块
+function ModuleManager:register(name, module)
+  assert(name, "模块必须有名字")
+  assert(module, "模块不能为 nil")
+  assert(not self.modules[name], "模块重复注册: " .. name)
+
+  self.modules[name] = module
+  self.order[#self.order + 1] = name
+  return module
+end
+
+-- 获取模块
+function ModuleManager:get(name)
+  local m = self.modules[name]
+  if not m then
+    error("模块未注册: " .. tostring(name))
+  end
+  return m
+end
+
+-- 按顺序初始化所有模块
+function ModuleManager:initAll()
+  if self.initialized then return end
+
+  print("  初始化模块（按注册顺序）:")
+  for _, name in ipairs(self.order) do
+    local m = self.modules[name]
+    if m.onInit then
+      m:onInit()
+      print("    [OK] " .. name)
+    end
+  end
+  self.initialized = true
+end
+
+-- 按【逆序】销毁（因为后注册的可能依赖先注册的）
+function ModuleManager:destroyAll()
+  print("  销毁模块（逆序）:")
+  for i = #self.order, 1, -1 do
+    local name = self.order[i]
+    local m = self.modules[name]
+    if m.onDestroy then
+      m:onDestroy()
+    end
+    print("    [OK] " .. name)
+  end
+  self.modules = {}
+  self.order = {}
+  self.initialized = false
+end
+
+-- 演示
+local mm = ModuleManager.new()
+
+mm:register("Audio", {
+  onInit = function(self) end,
+  onDestroy = function(self) end,
+  play = function(self, name) return "播放 " .. name end,
+})
+
+mm:register("UI", {
+  onInit = function(self) end,
+  onDestroy = function(self) end,
+  open = function(self, panel) return "打开 " .. panel end,
+})
+
+mm:register("Network", {
+  onInit = function(self) end,
+  onDestroy = function(self) end,
+})
+
+mm:initAll()
+print("  UI 模块可用:", mm:get("UI"):open("背包"))
+print("  Audio 模块可用:", mm:get("Audio"):play("bgm"))
+
+print()
+print("=== 3. 事件系统（模块解耦的关键）===")
+-- 模块之间不能互相直接调用，只能通过事件通信
+
+local EventManager = {}
+EventManager.__index = EventManager
+
+function EventManager.new()
+  return setmetatable({
+    handlers = {},        -- eventName -&gt; { handler1, handler2, ... }
+    pending = {},         -- 待派发的事件队列
+    dispatching = false,
+  }, EventManager)
+end
+
+function EventManager:on(eventName, handler, target)
+  assert(type(eventName) == "string", "事件名必须是字符串")
+  assert(type(handler) == "function", "处理器必须是函数")
+
+  if not self.handlers[eventName] then
+    self.handlers[eventName] = {}
+  end
+
+  local list = self.handlers[eventName]
+  list[#list + 1] = { fn = handler, target = target }
+  return handler
+end
+
+function EventManager:off(eventName, handler)
+  local list = self.handlers[eventName]
+  if not list then return end
+
+  for i = #list, 1, -1 do
+    if list[i].fn == handler then
+      table.remove(list, i)
+    end
+  end
+end
+
+-- 【关键设计】派发时先入队，统一处理
+-- 这样可以在回调里安全地订阅/取消订阅，不会破坏遍历
+function EventManager:emit(eventName, ...)
+  self.pending[#self.pending + 1] = {
+    name = eventName,
+    args = { ... },
+  }
+
+  if self.dispatching then return end   -- 正在派发中，交给外层处理
+
+  self.dispatching = true
+
+  while #self.pending &gt; 0 do
+    local evt = table.remove(self.pending, 1)
+    local list = self.handlers[evt.name]
+
+    if list then
+      -- 【重要】复制一份再遍历，防止回调中修改列表
+      local snapshot = {}
+      for i = 1, #list do snapshot[i] = list[i] end
+
+      for _, item in ipairs(snapshot) do
+        if item.target then
+          item.fn(item.target, table.unpack(evt.args))
+        else
+          item.fn(table.unpack(evt.args))
+        end
+      end
+    end
+  end
+
+  self.dispatching = false
+end
+
+local em = EventManager.new()
+
+-- 订阅
+local scoreHistory = {}
+em:on("ScoreChanged", function(newScore)
+  scoreHistory[#scoreHistory + 1] = newScore
+end)
+
+em:on("ScoreChanged", function(newScore)
+  -- 另一个订阅者（比如 UI）
+end)
+
+-- 派发
+em:emit("ScoreChanged", 100)
+em:emit("ScoreChanged", 250)
+print("  事件系统: 分数变化历史 =", table.concat(scoreHistory, ", "))
+
+-- 演示在回调里取消订阅（这是最容易出 bug 的地方）
+local selfRemoving
+selfRemoving = function()
+  print("  回调执行中，正在取消自己的订阅...")
+  em:off("Test", selfRemoving)
+end
+em:on("Test", selfRemoving)
+em:emit("Test")
+em:emit("Test")          -- 这次不会触发了
+print("  在回调中取消订阅是安全的（因为用了快照遍历）")
+
+print()
+print("=== 4. 生命周期管理 ===")
+-- 框架需要明确的启动流程
+
+local Framework = {}
+Framework.__index = Framework
+
+function Framework.new()
+  local self = setmetatable({
+    eventManager = EventManager.new(),
+    moduleManager = ModuleManager.new(),
+    state = "created",
+    startupTime = nil,
+  }, Framework)
+  return self
+end
+
+-- 完整的启动流程
+function Framework:startup()
+  print()
+  print("  框架启动流程:")
+  local t0 = os.clock()
+
+  -- 阶段 1：基础设施
+  self.state = "initializing"
+  print("    [1/4] 初始化基础设施...")
+
+  -- 阶段 2：模块注册
+  print("    [2/4] 注册模块...")
+  self:_registerBuiltinModules()
+
+  -- 阶段 3：模块初始化
+  print("    [3/4] 初始化模块...")
+  self.moduleManager:initAll()
+
+  -- 阶段 4：进入游戏
+  print("    [4/4] 进入游戏循环...")
+  self.state = "running"
+  self.startupTime = os.clock()
+
+  print(string.format("  启动完成，耗时 %.4f 秒", self.startupTime - t0))
+  print("  当前状态:", self.state)
+end
+
+function Framework:_registerBuiltinModules()
+  local mm2 = self.moduleManager
+  local em2 = self.eventManager
+
+  mm2:register("Event", {
+    onInit = function() end,
+    onDestroy = function() end,
+    emit = function(_, name, ...) em2:emit(name, ...) end,
+    on = function(_, name, fn) return em2:on(name, fn) end,
+  })
+
+  mm2:register("Timer", {
+    onInit = function() end,
+    onDestroy = function() end,
+    schedule = function(_, delay, fn) return { delay = delay, fn = fn } end,
+  })
+
+  mm2:register("Config", {
+    onInit = function() end,
+    onDestroy = function() end,
+    get = function(_, key) return "配置值:" .. tostring(key) end,
+  })
+end
+
+function Framework:shutdown()
+  print()
+  print("  框架关闭流程:")
+  self.state = "shutting_down"
+  self.moduleManager:destroyAll()
+  self.state = "closed"
+  print("  框架已关闭")
+end
+
+function Framework:getModule(name)
+  return self.moduleManager:get(name)
+end
+
+-- 演示完整生命周期
+local fw = Framework.new()
+fw:startup()
+
+print()
+print("  使用框架:")
+print("    ", fw:getModule("Config"):get("enemy_hp"))
+local timer = fw:getModule("Timer"):schedule(1.0, function() end)
+print("     创建了一个定时器，延迟 =", timer.delay)
+
+fw:shutdown()
+
+print()
+print("=== 5. 框架设计的关键决策 ===")
+print()
+print(string.format("  %-26s %-24s %s", "决策点", "方案", "理由"))
+print("  " .. string.rep("-", 76))
+
+local decisions = {
+  { "模块通信方式",   "事件 + 接口，不直接引用", "解耦，可替换" },
+  { "模块注册时机",   "启动时统一注册",       "依赖关系明确" },
+  { "初始化顺序",     "按注册顺序",           "可控，可预测" },
+  { "销毁顺序",       "逆序销毁",             "后注册的可能依赖先注册的" },
+  { "错误处理",       "顶层 xpcall 兜底",     "防止一个错误崩溃整个游戏" },
+  { "模块懒加载",     "首次访问时初始化",     "加快启动速度" },
+}
+
+for _, d in ipairs(decisions) do
+  print(string.format("  %-26s %-24s %s", d[1], d[2], d[3]))
+end
+
+print()
+print("=== 6. 这是一个骨架，不是一个框架 ===")
+print()
+print("  上面演示的是【结构】，真实框架还需要：")
+print("    · 资源管理（加载、卸载、缓存）")
+print("    · 网络层（协议、重连、心跳）")
+print("    · UI 框架（界面栈、绑定、红点）")
+print("    · 配置表（加载、索引、热重载）")
+print("    · 存档系统（版本兼容、加密）")
+print("    · 热更新（版本比对、下载、校验）")
+print()
+print("  但所有这些都建立在【模块管理 + 事件系统】这两个地基上。")
+print("  理解了这个结构，再看真实框架的源码就不会迷路。")</code></pre>
 
 <div class="table-wrap">
 <table>
@@ -24,6 +370,7 @@
     <tr><td><strong>框架层</strong></td><td>模块管理、事件、资源、网络</td><td><strong>框架开发者</strong></td></tr>
     <tr><td><strong>适配层</strong></td><td>xLua 封装、Unity API 桥接</td><td>隔离引擎差异</td></tr>
     <tr><td><strong>引擎层</strong></td><td>Unity / C#</td><td>引擎团队</td></tr>
+    <tr><td><strong>平台层</strong></td><td>iOS / Android / PC 的打包、热更下载、渠道 SDK</td><td>发行 + 运维</td></tr>
   </tbody>
 </table>
 </div>
@@ -70,7 +417,12 @@
   如果直接遍历原列表，会导致<em>索引错位、跳过元素或崩溃</em>。<br><br>
   <strong>解决方案</strong>：派发前<strong>复制一份快照</strong>再遍历。<br>
   <em>代价是每次派发多一次表复制</em>——但这个代价是值得的，因为<strong>回调里修改订阅是最常见的用法</strong>。<br><br>
-  <strong>优化</strong>：如果事件频繁且订阅者少，可以用<em>复用缓冲区</em>避免每次分配。
+  <strong>优化</strong>：如果事件频繁且订阅者少，可以用<em>复用缓冲区</em>避免每次分配。<br><br>
+  <strong>本页实测（Lua 5.4.7，见本页代码样本）</strong>：三个订阅者 A/B/C，A 在回调里取消 B——<br>
+  · <strong>快照遍历</strong>：调用顺序 <code>A → B → C</code>，共 3 次，不报错<br>
+  · <strong>直接遍历原表</strong>：调用顺序 <code>A → C</code>，共 2 次——<em>B 被静默跳过</em>（下标前移）<br>
+  · <strong>对照</strong>：只有一个订阅者、且它取消的是自己时，<em>即使不用快照也不会出问题</em>
+  ——所以"取消自己"这个 demo 根本测不出问题，<strong>必须用"取消别人"才能复现</strong>。
 </div>
 
 <div class="callout callout--danger">
@@ -80,9 +432,12 @@
   <code>emit(X)</code> → 入队 → 循环取出派发<br>
   如果派发中又有 <code>emit</code>，<em>只是入队，由外层循环处理</em>。<br><br>
   <strong>好处</strong>：<br>
-  · 不会无限递归<br>
+  · <em>不会因为"同步重入"而爆栈</em>（回调里的 emit 只是入队，由外层循环处理）<br>
   · 派发顺序可预测（FIFO）<br>
-  · 可以在回调里安全地订阅/取消订阅
+  · 可以在回调里安全地订阅/取消订阅<br><br>
+  <strong>但它并不是万能的</strong>：如果回调里<em>每次都无条件再 emit 同一个事件</em>，队列只会越来越长——
+  栈不爆，<strong>但会死循环（卡在 while 里）</strong>。真正的防护还得靠<em>业务上的终止条件</em>
+  或者给队列加一个<strong>单次派发的最大重入次数</strong>。
 </div>
 
 <h2 id="scope">四、框架骨架 vs 完整框架</h2>

@@ -4,7 +4,10 @@
 
 <div class="callout callout--note">
   <span class="callout__title">这一页在路线中的位置</span>
-  [object Object]
+  <strong>上一页</strong>（24）的掉落、这一页的冷却，都依赖"过一会儿执行"。这可能是<em>游戏里被调用次数最多的基础设施</em>。<br>
+  <strong>关键衔接</strong>：堆的实现见<em>页 07</em>，Buff 到期复用同一套机制（23）；"标记删除"解决的是<em>遍历中修改集合</em>这个通病（与页 04、24 同源）。<br>
+  <strong>下一页</strong>（26）性能模式库。<em>从具体系统上升到可复用的优化手段。</em><br>
+  <strong>验证方式</strong>：本页五个实战问题都能用最小用例复现——尤其是"回调里取消其他定时器"。
 </div>
 
 <h2 id="implementations">一、三种定时器实现</h2>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>游戏开发知识站 · 五条学习路线</title>
+<style>
+  :root {
+    --bg: #f6f4fb;
+    --card: #ffffff;
+    --text: #1f1b2e;
+    --muted: #6b6480;
+    --border: #e4dff0;
+    --accent: #7c3aed;
+    --accent2: #a855f7;
+    --ok: #16a34a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 48px 24px 80px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  h1 {
+    font-size: 40px;
+    line-height: 1.25;
+    margin: 0 0 12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .lead { font-size: 17px; color: var(--muted); margin: 0 0 8px; }
+  .meta { font-size: 14px; color: var(--muted); margin: 0 0 40px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+  }
+  .card {
+    display: block;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px 24px 20px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color .18s, transform .18s, box-shadow .18s;
+  }
+  .card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(124, 58, 237, .12);
+  }
+  .card__num {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    color: var(--accent);
+    background: #f3ecff;
+    border-radius: 6px;
+    padding: 3px 9px;
+    margin-bottom: 12px;
+  }
+  .card__title { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
+  .card__desc { font-size: 14px; color: var(--muted); margin: 0 0 16px; min-height: 44px; }
+  .card__foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+  .card__go { color: var(--accent); font-weight: 600; }
+  footer {
+    margin-top: 56px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--muted);
+  }
+  footer code {
+    background: #efeaf9;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>游戏开发知识站</h1>
+  <p class="lead">五条学习路线，<strong>154 页</strong>内容，全部代码经过真实编译/运行验证。</p>
+  <p class="meta">纯静态站点 · 无需服务器 · 直接打开即可阅读</p>
+
+  <div class="grid">
+
+    <a class="card" href="unity/index.html">
+      <span class="card__num">01</span>
+      <div class="card__title">C# + Unity</div>
+      <div class="card__desc">从零基础到独立完成商业级项目。C# 语言线 + Unity 引擎线 + API 速查。</div>
+      <div class="card__foot"><span>30 页</span><span class="card__go">进入 →</span></div>
+    </a>
+
+    <a class="card" href="unreal/index.html">
+      <span class="card__num">02</span>
+      <div class="card__title">C++ + Unreal</div>
+      <div class="card__desc">从 C++ 内存模型到 Unreal 引擎开发。编译模型、指针、RAII、蓝图与 C++ 协作。</div>
+      <div class="card__foot"><span>29 页</span><span class="card__go">进入 →</span></div>
+    </a>
+
+    <a class="card" href="lua/index.html">
+      <span class="card__num">03</span>
+      <div class="card__title">Lua 热更新</div>
+      <div class="card__desc">热更新原理与框架设计。Lua 语言线 + xLua 集成 + 可运行的热更框架。</div>
+      <div class="card__foot"><span>26 页</span><span class="card__go">进入 →</span></div>
+    </a>
+
+    <a class="card" href="algorithms/index.html">
+      <span class="card__num">04</span>
+      <div class="card__title">游戏算法</div>
+      <div class="card__desc">游戏开发中的数据结构与算法。寻路、空间划分、行为树、性能优化实测。</div>
+      <div class="card__foot"><span>35 页</span><span class="card__go">进入 →</span></div>
+    </a>
+
+    <a class="card" href="backend/index.html">
+      <span class="card__num">05</span>
+      <div class="card__title">游戏后端 + 全栈</div>
+      <div class="card__desc">客户端主程转向服务端全栈。ASP.NET Core + 游戏后端（同步/战斗/匹配）+ 部署运维。</div>
+      <div class="card__foot"><span>34 页</span><span class="card__go">进入 →</span></div>
+    </a>
+
+  </div>
+
+  <footer>
+    <p><strong>关于这些内容</strong></p>
+    <p>所有代码示例都经过真实验证：C# 用 Unity Roslyn 或 .NET 8 编译，Lua 用 Lua 5.4.7 实际执行，C++ 用 MSVC 编译。页面里的「实测输出」都是从真实运行结果中摘录的。</p>
+    <p>五个站点共享 <strong>242 个知识点</strong>索引，支持跨站跳转。每页底部有导航，侧栏可切换章节。</p>
+    <p style="margin-top:16px">快捷键：<code>/</code> 聚焦搜索 · <code>Esc</code> 清除 · 点击右上角可切换深色模式</p>
+  </footer>
+
+</div>
+</body>
+</html>

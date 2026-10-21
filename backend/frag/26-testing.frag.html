@@ -1,0 +1,426 @@
+<h1>26 · 测试与质量 ★</h1>
+
+<p class="lead">后端测试和客户端不同：<em>客户端崩了玩家重进，后端崩了所有人掉线</em>。这一页讲<strong>三层测试</strong>和<strong>怎么让代码可测</strong>。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（25）后端性能优化 —— 压测、性能剖析、连接池、异步陷阱、GC 调优。<br>
+  <strong>这一页</strong>（26）测试与质量 —— 单元测试、集成测试、契约测试、压测脚本。<br>
+  <strong>下一页</strong>（27）架构与设计模式 —— 分层、领域模型、微服务与单体取舍、事件驱动。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+<h2 id="pyramid">一、三层测试金字塔 ★★</h2>
+
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace BackendSamples.Testing
+{
+    // ============================================================
+    // 1. 三层测试：单元 / 集成 / 端到端
+    // ============================================================
+
+    public static class TestLayers
+    {
+        public static readonly (string Layer, string Scope, string Speed, string Stability, string Ratio)[] All =
+        {
+            ("单元测试",   "一个函数/类",       "毫秒",   "稳定",  "70%"),
+            ("集成测试",   "多组件+真实依赖",   "秒",     "偶发失败", "20%"),
+            ("端到端",     "完整链路",          "十秒+",  "易碎",  "10%"),
+        };
+
+        // 【测试金字塔】底层多、上层少
+        public static string ExplainPyramid() =&gt;
+            "单元 70% + 集成 20% + 端到端 10%（倒金字塔是反模式）";
+    }
+
+    // ============================================================
+    // 2. 一个可测试的类：依赖注入是关键
+    // ============================================================
+
+    public interface IClock
+    {
+        DateTime Now { get; }
+    }
+
+    public class SystemClock : IClock
+    {
+        public DateTime Now =&gt; DateTime.UtcNow;
+    }
+
+    // 【可测试】时间从外部注入
+    public class FakeClock : IClock
+    {
+        public DateTime Now { get; set; } = new DateTime(2026, 10, 21, 12, 0, 0, DateTimeKind.Utc);
+        public void Advance(TimeSpan t) =&gt; Now += t;
+    }
+
+    public interface IPlayerRepo
+    {
+        int? GetGold(long playerId);
+        void SetGold(long playerId, int gold);
+    }
+
+    public class FakePlayerRepo : IPlayerRepo
+    {
+        private readonly Dictionary&lt;long, int&gt; _data = new();
+        public void Seed(long id, int gold) =&gt; _data[id] = gold;
+        public int? GetGold(long id) =&gt; _data.TryGetValue(id, out int g) ? g : null;
+        public void SetGold(long id, int g) =&gt; _data[id] = g;
+    }
+
+    // 【核心】业务类只依赖接口
+    public class DailyRewardService
+    {
+        private readonly IPlayerRepo _repo;
+        private readonly IClock _clock;
+        private readonly Dictionary&lt;long, DateTime&gt; _lastClaim = new();
+
+        public DailyRewardService(IPlayerRepo repo, IClock clock)
+        {
+            _repo = repo;
+            _clock = clock;
+        }
+
+        public (bool Ok, string Msg) ClaimDaily(long playerId, int amount)
+        {
+            var gold = _repo.GetGold(playerId);
+            if (gold == null) return (false, "玩家不存在");
+
+            // 【可测】用注入的 clock，而不是 DateTime.Now
+            var today = _clock.Now.Date;
+
+            if (_lastClaim.TryGetValue(playerId, out var last) &amp;&amp; last.Date == today)
+                return (false, "今天已经领过了");
+
+            _repo.SetGold(playerId, gold.Value + amount);
+            _lastClaim[playerId] = _clock.Now;
+
+            return (true, $"领取成功，当前金币 {gold.Value + amount}");
+        }
+    }
+
+    // ============================================================
+    // 3. 一个极简的测试框架
+    // ============================================================
+
+    public class MiniTest
+    {
+        private int _passed;
+        private int _failed;
+        private readonly List&lt;string&gt; _failures = new();
+
+        public void Assert(bool condition, string name)
+        {
+            if (condition) { _passed++; Console.WriteLine($"    PASS  {name}"); }
+            else { _failed++; _failures.Add(name); Console.WriteLine($"    FAIL  {name}"); }
+        }
+
+        public void AssertEqual&lt;T&gt;(T expected, T actual, string name)
+        {
+            bool ok = EqualityComparer&lt;T&gt;.Default.Equals(expected, actual);
+            Assert(ok, ok ? name : $"{name}（期望 {expected}，实际 {actual}）");
+        }
+
+        public void Report()
+        {
+            Console.WriteLine();
+            Console.WriteLine($"  结果: 通过 {_passed}，失败 {_failed}");
+            if (_failed &gt; 0)
+            {
+                Console.WriteLine("  失败清单:");
+                foreach (var f in _failures) Console.WriteLine($"    - {f}");
+            }
+        }
+    }
+
+    // ============================================================
+    // 4. 编写测试：好的测试长什么样
+    // ============================================================
+
+    public static class TestExamples
+    {
+        public static void Run()
+        {
+            var t = new MiniTest();
+
+            // ---- 正常路径 ----
+            {
+                var repo = new FakePlayerRepo();
+                var clock = new FakeClock();
+                repo.Seed(1001, 500);
+
+                var svc = new DailyRewardService(repo, clock);
+                var (ok, msg) = svc.ClaimDaily(1001, 100);
+
+                t.Assert(ok, "正常领取：成功");
+                t.AssertEqual(600, repo.GetGold(1001), "正常领取：金币加了 100");
+            }
+
+            // ---- 重复领取 ----
+            {
+                var repo = new FakePlayerRepo();
+                var clock = new FakeClock();
+                repo.Seed(1001, 500);
+
+                var svc = new DailyRewardService(repo, clock);
+                svc.ClaimDaily(1001, 100);
+                var (ok, msg) = svc.ClaimDaily(1001, 100);
+
+                t.Assert(!ok, "重复领取：被拒绝");
+                t.AssertEqual(600, repo.GetGold(1001), "重复领取：金币没变");
+            }
+
+            // ---- 跨天可以再领 ----
+            {
+                var repo = new FakePlayerRepo();
+                var clock = new FakeClock();
+                repo.Seed(1001, 500);
+
+                var svc = new DailyRewardService(repo, clock);
+                svc.ClaimDaily(1001, 100);
+                clock.Advance(TimeSpan.FromDays(1));
+                var (ok, msg) = svc.ClaimDaily(1001, 100);
+
+                t.Assert(ok, "跨天领取：成功");
+                t.AssertEqual(700, repo.GetGold(1001), "跨天领取：金币累计 200");
+            }
+
+            // ---- 边界：玩家不存在 ----
+            {
+                var repo = new FakePlayerRepo();
+                var clock = new FakeClock();
+                var svc = new DailyRewardService(repo, clock);
+
+                var (ok, msg) = svc.ClaimDaily(9999, 100);
+                t.Assert(!ok, "玩家不存在：拒绝");
+            }
+
+            // ---- 边界：金额为 0 ----
+            {
+                var repo = new FakePlayerRepo();
+                var clock = new FakeClock();
+                repo.Seed(1001, 500);
+                var svc = new DailyRewardService(repo, clock);
+
+                var (ok, _) = svc.ClaimDaily(1001, 0);
+                t.Assert(ok, "金额 0：允许（业务上可能不需要，但代码不崩）");
+                t.AssertEqual(500, repo.GetGold(1001), "金额 0：金币没变");
+            }
+
+            t.Report();
+        }
+    }
+
+    // ============================================================
+    // 5. 测试的四个好习惯
+    // ============================================================
+
+    public static class GoodPractices
+    {
+        public static readonly (string Practice, string Why, string Bad)[] All =
+        {
+            ("一个测试只测一件事", "失败时能定位",        "一个测试断言 20 个"),
+            ("测试名说清场景",     "看名字知道测什么",    "Test1, Test2"),
+            ("覆盖边界条件",       "bug 都在边界",        "只测正常路径"),
+            ("测试之间不依赖",     "可单独运行、可乱序",  "依赖前一个测试的数据"),
+            ("用假时钟不用 Now",   "结果可重复",          "测试里有 DateTime.Now"),
+        };
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 三层测试 ===");
+            Console.WriteLine($"    {"层次",-10} {"范围",-16} {"速度",-8} {"稳定性",-10} 占比");
+            foreach (var (layer, scope, speed, stability, ratio) in TestLayers.All)
+            {
+                Console.WriteLine($"    {layer,-10} {scope,-16} {speed,-8} {stability,-10} {ratio}");
+            }
+            Console.WriteLine();
+            Console.WriteLine($"  【测试金字塔】{TestLayers.ExplainPyramid()}");
+
+            Console.WriteLine();
+            Console.WriteLine("  为什么倒金字塔是反模式:");
+            Console.WriteLine("    · 端到端测试慢（十秒级）-&gt; 不敢频繁跑");
+            Console.WriteLine("    · 端到端易碎（网络、时序）-&gt; 假失败多，没人看");
+            Console.WriteLine("    · 一旦挂了不知道是哪里坏了");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 跑一组测试 ===");
+            TestExamples.Run();
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 测试的四个好习惯 ===");
+            foreach (var (p, why, bad) in GoodPractices.All)
+            {
+                Console.WriteLine($"    {p,-20} 为什么: {why,-18} 反例: {bad}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】可测试性来自设计");
+            Console.WriteLine("    · 依赖注入 -&gt; 能替换成 Fake");
+            Console.WriteLine("    · 时间从外部传入 -&gt; 测试可重复");
+            Console.WriteLine("    · 不要 new 依赖 -&gt; 否则测不了");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 后端测试的重点 ===");
+            var focus = new[]
+            {
+                ("金额计算",     "错了会赔钱"),
+                ("权限判断",     "错了会越权"),
+                ("幂等逻辑",     "错了会重复发奖"),
+                ("状态机转移",   "错了会卡死"),
+                ("边界值",       "负数、0、超大值"),
+                ("并发",         "同时请求是否正确"),
+            };
+            foreach (var (item, why) in focus)
+            {
+                Console.WriteLine($"    {item,-12} {why}");
+            }
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Testing.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>层次</th><th>范围</th><th>速度</th><th>占比</th></tr></thead>
+  <tbody>
+    <tr><td><strong>单元测试</strong></td><td>一个函数</td><td>毫秒</td><td><strong>70%</strong></td></tr>
+    <tr><td><strong>集成测试</strong></td><td>多组件</td><td>秒</td><td>20%</td></tr>
+    <tr><td><strong>端到端</strong></td><td>完整链路</td><td>十秒+</td><td>10%</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="testability">二、可测试性来自设计 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">三个让代码「测不了」的设计</span>
+  <strong>① 内部 new 依赖</strong><br>
+  <code>var repo = new SqlRepo();  // 测试时要连真数据库</code><br>
+  <strong>解决</strong>：依赖注入<br><br>
+  <strong>② 直接用 DateTime.Now</strong><br>
+  <code>var today = DateTime.Now.Date;  // 测试结果不可重复</code><br>
+  <strong>解决</strong>：注入 <code>IClock</code><br><br>
+  <strong>③ 静态方法/单例</strong><br>
+  <code>Database.Instance.Query(...)  // 换不掉</code><br>
+  <strong>解决</strong>：改成实例 + 接口<br><br>
+  <strong>本页实现的</strong>：<br>
+  <code>DailyRewardService(IPlayerRepo repo, IClock clock)</code><br>
+  <em>两个依赖都是接口，测试时换成 Fake</em>。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">假时钟的价值</span>
+  <strong>本页实现的 FakeClock</strong>：<br>
+  <code>public DateTime Now { get; set; }</code><br>
+  <code>public void Advance(TimeSpan t) =&gt; Now += t;</code><br><br>
+  <strong>能测什么</strong>：<br>
+  · <code>ClaimDaily(1001, 100)</code> → 成功<br>
+  · 立即再领 → <strong>被拒绝</strong><br>
+  · <code>clock.Advance(1天)</code> → 再领<strong>成功</strong><br><br>
+  <em>如果直接用 DateTime.Now，这个测试根本没法写</em>。
+</div>
+
+<h2 id="examples">三、本页跑的 9 个断言 ★★</h2>
+
+<div class="callout callout--note">
+  <span class="callout__title">实测结果</span>
+  <strong>五组场景，9 个断言全部通过</strong>：<br><br>
+  <code>PASS  正常领取：成功</code><br>
+  <code>PASS  正常领取：金币加了 100</code><br>
+  <code>PASS  重复领取：被拒绝</code><br>
+  <code>PASS  重复领取：金币没变</code><br>
+  <code>PASS  跨天领取：成功</code><br>
+  <code>PASS  跨天领取：金币累计 200</code><br>
+  <code>PASS  玩家不存在：拒绝</code><br>
+  <code>PASS  金额 0：允许</code><br>
+  <code>PASS  金额 0：金币没变</code><br><br>
+  <strong>覆盖了</strong>：<br>
+  · 正常路径<br>
+  · <strong>重复调用</strong>（<em>幂等</em>）<br>
+  · <strong>时间边界</strong>（<em>跨天</em>）<br>
+  · <strong>异常输入</strong>（<em>玩家不存在</em>）<br>
+  · 边界值（<em>金额 0</em>）
+</div>
+
+<h2 id="focus">四、后端测试的重点</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>测什么</th><th>为什么重要</th></tr></thead>
+  <tbody>
+    <tr><td><strong>金额计算</strong></td><td>错了会赔钱</td></tr>
+    <tr><td><strong>权限判断</strong></td><td>错了会越权</td></tr>
+    <tr><td><strong>幂等逻辑</strong></td><td><em>错了会重复发奖</em></td></tr>
+    <tr><td><strong>状态机转移</strong></td><td>错了会卡死</td></tr>
+    <tr><td><strong>边界值</strong></td><td><em>负数、0、超大值</em></td></tr>
+    <tr><td><strong>并发</strong></td><td>同时请求是否正确</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">五个测试好习惯</span>
+  <div class="table-wrap">
+  <table>
+  <thead><tr><th>习惯</th><th>为什么</th></tr></thead>
+  <tbody>
+    <tr><td>一个测试只测一件事</td><td>失败时能定位</td></tr>
+    <tr><td>测试名说清场景</td><td>看名字知道测什么</td></tr>
+    <tr><td><strong>覆盖边界条件</strong></td><td><em>bug 都在边界</em></td></tr>
+    <tr><td>测试之间不依赖</td><td>可单独运行、可乱序</td></tr>
+    <tr><td><strong>用假时钟不用 Now</strong></td><td>结果可重复</td></tr>
+  </tbody>
+  </table>
+  </div>
+  <strong>反例</strong>：<code>Test1</code>、<code>Test2</code> 这种命名 —— <em>三个月后你不知道它们在测什么</em>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="26">
+  <div class="task"><input type="checkbox" id="t-26-1"><label for="t-26-1"><strong>给一个类写测试</strong>：覆盖正常、重复、边界三种情况。</label></div>
+  <div class="task"><input type="checkbox" id="t-26-2"><label for="t-26-2"><strong>改造不可测的代码</strong>：把内部 new 改成注入。</label></div>
+  <div class="task"><input type="checkbox" id="t-26-3"><label for="t-26-3"><strong>用假时钟</strong>：把 DateTime.Now 换成 IClock。</label></div>
+  <div class="task"><input type="checkbox" id="t-26-4"><label for="t-26-4"><strong>测幂等</strong>：同一请求调 3 次，验证只生效 1 次。</label></div>
+  <div class="task"><input type="checkbox" id="t-26-5"><label for="t-26-5"><strong>测并发</strong>：多线程同时扣金币，验证余额正确。</label></div>
+  <div class="task"><input type="checkbox" id="t-26-6"><label for="t-26-6"><strong>回答面试题</strong>：① 三层测试的占比？② 怎么让代码可测？③ 为什么不能用 DateTime.Now？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道测试金字塔的比例</strong>；<br>
+    ② <strong>能说出三个让代码「测不了」的设计</strong>；<br>
+    ③ <strong>会用依赖注入和假时钟让代码可测</strong>；<br>
+    ④ 能写出覆盖正常/重复/边界三种情况的测试；<br>
+    ⑤ <strong>知道后端测试的重点是金额、权限、幂等</strong>。<br>
+    <br>
+    <em>第 ② 和 第 ⑤ 条最关键——**前者是设计能力，后者是风险意识**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="25-perf.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">25 后端性能优化 ★★</div>
+  </a>
+  <a class="next" href="27-architecture.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">27 架构与设计模式 ★★</div>
+  </a>
+</nav>

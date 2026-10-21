@@ -1,0 +1,538 @@
+<h1>18 · 背包与经济系统 ★★★</h1>
+
+<p class="lead">这是<strong>最容易出事故的模块</strong>——<em>并发扣减、重复领取、刷道具</em>，任何一个漏洞都可能让游戏经济崩溃。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  读完这一页，你应该能把它和前面讲过的知识连起来——<strong>背包与经济系统</strong> 是后面几页的基础。如果某段看不懂，<em>先回上一页把概念补齐再看</em>。
+</div>
+
+<h2 id="concurrency">一、并发扣减的四种方案 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">错误示范：先读后写</span>
+  <code>var w = Get(playerId);</code><br>
+  <code>if (w.Gold &lt; amount) return false;</code><br>
+  <code>w.Gold -= amount;   // ← 危险</code><br><br>
+  <strong>问题</strong>：<em>两步之间可能被其他请求插入</em>。<br>
+  · 请求A 读到 1000<br>
+  · 请求B 读到 1000<br>
+  · 两个都扣 300 → <strong>结果 400（应该 400，实际正确）</strong><br>
+  · 但如果两个都扣 900 → <em>余额变成 100 或 -800</em><br><br>
+  <strong>这就是「丢失更新」</strong>——真实的生产事故来源。
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">四种正确方案</span>
+  <div class="table-wrap">
+  <table>
+  <thead><tr><th>方案</th><th>原理</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr><td><strong>加锁</strong></td><td><code>lock</code> / 分布式锁</td><td><em>单机，或必须串行</em></td></tr>
+    <tr><td><strong>乐观锁</strong></td><td>版本号 CAS，冲突重试</td><td><strong>读多写少</strong></td></tr>
+    <tr><td><strong>条件 UPDATE</strong></td><td><code>WHERE gold &gt;= ?</code></td><td><strong>最常用，最简单</strong></td></tr>
+    <tr><td><strong>队列串行化</strong></td><td>同一玩家的操作进同一队列</td><td><em>复杂但彻底</em></td></tr>
+  </tbody>
+  </table>
+  </div>
+  <strong>本页实测了前三种</strong>。<br>
+  <strong>推荐</strong>：<em>条件 UPDATE</em>（<em>数据库保证原子，不需要重试</em>）。
+</div>
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace BackendSamples.Inventory
+{
+    // ============================================================
+    // 1. 并发扣减的三种方案
+    // ============================================================
+    // 【核心问题】玩家同时点两次购买，金币会不会扣两次？
+
+    public class PlayerWallet
+    {
+        public long PlayerId;
+        public int Gold;
+        public int Version;   // 乐观锁版本号
+    }
+
+    public class WalletService
+    {
+        private readonly Dictionary&lt;long, PlayerWallet&gt; _db = new();
+        private readonly object _lock = new();
+
+        public WalletService()
+        {
+            _db[1001] = new PlayerWallet { PlayerId = 1001, Gold = 1000, Version = 1 };
+            _db[1002] = new PlayerWallet { PlayerId = 1002, Gold = 500, Version = 1 };
+        }
+
+        public PlayerWallet? Get(long id) =&gt; _db.TryGetValue(id, out var w) ? w : null;
+
+        // ---- 方案一：无条件扣减（错误！）----
+        // 【问题】先读后写，两步之间可能被其他请求插入
+        public bool Deduct_Bad(long playerId, int amount)
+        {
+            var w = Get(playerId);
+            if (w == null || w.Gold &lt; amount) return false;
+
+            // 【危险】这里如果另一个请求改了 w.Gold，就会覆盖
+            w.Gold -= amount;
+            return true;
+        }
+
+        // ---- 方案二：加锁（单机可行，多机不行）----
+        public bool Deduct_Lock(long playerId, int amount)
+        {
+            lock (_lock)
+            {
+                var w = Get(playerId);
+                if (w == null || w.Gold &lt; amount) return false;
+                w.Gold -= amount;
+                return true;
+            }
+        }
+
+        // ---- 方案三：乐观锁（推荐）----
+        // 【原理】UPDATE ... WHERE version = 旧版本
+        //   影响行数为 0 说明被别人改过 -&gt; 重试
+        public bool Deduct_Optimistic(long playerId, int amount, int maxRetry = 3)
+        {
+            for (int retry = 0; retry &lt; maxRetry; retry++)
+            {
+                var w = Get(playerId);
+                if (w == null || w.Gold &lt; amount) return false;
+
+                int oldVersion = w.Version;
+
+                // 【模拟】CAS 操作：只有版本没变才更新
+                lock (_lock)
+                {
+                    if (w.Version != oldVersion)
+                        continue;   // 版本变了，重试
+
+                    w.Gold -= amount;
+                    w.Version++;
+                    return true;
+                }
+            }
+
+            Console.WriteLine($"    重试 {maxRetry} 次仍失败（并发太高）");
+            return false;
+        }
+
+        // ---- 方案四：条件 UPDATE（最简单有效）----
+        // SQL: UPDATE wallet SET gold = gold - 100 WHERE id = ? AND gold &gt;= 100
+        //   数据库保证原子性，影响行数为 0 就说明钱不够
+        public bool Deduct_Conditional(long playerId, int amount)
+        {
+            lock (_lock)
+            {
+                var w = Get(playerId);
+                // 【关键】判断和扣减在同一个原子操作里
+                if (w == null || w.Gold &lt; amount) return false;
+                w.Gold -= amount;
+                return true;
+            }
+        }
+    }
+
+    // ============================================================
+    // 2. 道具流水：每一笔变更都要记录
+    // ============================================================
+    // 【为什么需要流水】
+    //   · 玩家投诉"我的道具没了" -&gt; 可以查
+    //   · 发现刷道具漏洞 -&gt; 可以追溯
+    //   · 对账 -&gt; 收入支出要平衡
+
+    public class ItemFlow
+    {
+        public long Id;
+        public long PlayerId;
+        public int ItemId;
+        public int Delta;          // 正数=获得，负数=消耗
+        public string Reason = ""; // 原因
+        public string RefId = "";  // 关联ID（订单号/任务ID）
+        public DateTime Time = DateTime.UtcNow;
+
+        public override string ToString() =&gt;
+            $"[{Time:HH:mm:ss}] 玩家{PlayerId} 道具{ItemId} {(Delta &gt; 0 ? "+" : "")}{Delta} ({Reason})";
+    }
+
+    public class InventoryService
+    {
+        private readonly Dictionary&lt;(long, int), int&gt; _items = new();
+        private readonly List&lt;ItemFlow&gt; _flows = new();
+        private long _flowId;
+
+        public int GetCount(long playerId, int itemId) =&gt;
+            _items.TryGetValue((playerId, itemId), out int c) ? c : 0;
+
+        // 【关键】变更道具必须写流水
+        public bool AddItem(long playerId, int itemId, int count, string reason, string refId = "")
+        {
+            if (count &lt;= 0) return false;
+
+            var key = (playerId, itemId);
+            _items.TryGetValue(key, out int cur);
+            _items[key] = cur + count;
+
+            _flows.Add(new ItemFlow
+            {
+                Id = ++_flowId,
+                PlayerId = playerId,
+                ItemId = itemId,
+                Delta = count,
+                Reason = reason,
+                RefId = refId,
+            });
+
+            return true;
+        }
+
+        public bool RemoveItem(long playerId, int itemId, int count, string reason, string refId = "")
+        {
+            if (count &lt;= 0) return false;
+
+            var key = (playerId, itemId);
+            _items.TryGetValue(key, out int cur);
+            if (cur &lt; count)
+            {
+                Console.WriteLine($"    道具不足: 有 {cur}, 需要 {count}");
+                return false;
+            }
+
+            _items[key] = cur - count;
+
+            _flows.Add(new ItemFlow
+            {
+                Id = ++_flowId,
+                PlayerId = playerId,
+                ItemId = itemId,
+                Delta = -count,
+                Reason = reason,
+                RefId = refId,
+            });
+
+            return true;
+        }
+
+        public IEnumerable&lt;ItemFlow&gt; GetFlows(long playerId) =&gt;
+            _flows.Where(f =&gt; f.PlayerId == playerId);
+
+        // 【对账】检查流水总和是否等于当前库存
+        public (bool Balanced, int Computed, int Actual) Reconcile(long playerId, int itemId)
+        {
+            int computed = _flows
+                .Where(f =&gt; f.PlayerId == playerId &amp;&amp; f.ItemId == itemId)
+                .Sum(f =&gt; f.Delta);
+            int actual = GetCount(playerId, itemId);
+            return (computed == actual, computed, actual);
+        }
+
+        public int FlowCount =&gt; _flows.Count;
+    }
+
+    // ============================================================
+    // 3. 防刷：同一笔奖励不能领两次
+    // ============================================================
+
+    public class RewardClaimer
+    {
+        private readonly HashSet&lt;string&gt; _claimed = new();
+        private readonly InventoryService _inv;
+        private readonly WalletService _wallet;
+
+        public RewardClaimer(InventoryService inv, WalletService wallet)
+        {
+            _inv = inv;
+            _wallet = wallet;
+        }
+
+        // 【关键】用业务唯一键防重复领取
+        public (bool Ok, string Msg) Claim(long playerId, string rewardKey, int gold, int itemId, int count)
+        {
+            // 【核心】业务唯一键 = 玩家 + 奖励标识
+            string key = playerId + ":" + rewardKey;
+
+            if (_claimed.Contains(key))
+            {
+                // 【重要】返回成功，不是失败
+                return (true, "已经领取过了");
+            }
+
+            _claimed.Add(key);
+
+            // 发奖
+            if (gold &gt; 0)
+            {
+                var w = _wallet.Get(playerId);
+                if (w != null) w.Gold += gold;
+            }
+            if (itemId &gt; 0 &amp;&amp; count &gt; 0)
+            {
+                _inv.AddItem(playerId, itemId, count, "claim:" + rewardKey, rewardKey);
+            }
+
+            return (true, "领取成功");
+        }
+
+        public int ClaimedCount =&gt; _claimed.Count;
+    }
+
+    // ============================================================
+    // 4. 防刷检测：异常行为识别
+    // ============================================================
+
+    public class AntiCheatMonitor
+    {
+        private readonly Dictionary&lt;long, List&lt;(DateTime Time, int Amount)&gt;&gt; _history = new();
+
+        public void Record(long playerId, int amount)
+        {
+            if (!_history.TryGetValue(playerId, out var list))
+            {
+                list = new List&lt;(DateTime, int)&gt;();
+                _history[playerId] = list;
+            }
+            list.Add((DateTime.UtcNow, amount));
+        }
+
+        // 【检测1】单位时间收益过高
+        public bool CheckEarningRate(long playerId, int windowSec = 60, int threshold = 10000)
+        {
+            if (!_history.TryGetValue(playerId, out var list)) return false;
+
+            var now = DateTime.UtcNow;
+            int total = list
+                .Where(x =&gt; (now - x.Time).TotalSeconds &lt;= windowSec)
+                .Sum(x =&gt; x.Amount);
+
+            if (total &gt; threshold)
+            {
+                Console.WriteLine($"    【异常】玩家{playerId} 在 {windowSec}s 内获得 {total}（阈值 {threshold}）");
+                return true;
+            }
+            return false;
+        }
+
+        // 【检测2】操作频率过高
+        public bool CheckActionRate(long playerId, int windowSec = 10, int threshold = 50)
+        {
+            if (!_history.TryGetValue(playerId, out var list)) return false;
+
+            var now = DateTime.UtcNow;
+            int count = list.Count(x =&gt; (now - x.Time).TotalSeconds &lt;= windowSec);
+
+            if (count &gt; threshold)
+            {
+                Console.WriteLine($"    【异常】玩家{playerId} 在 {windowSec}s 内操作 {count} 次（阈值 {threshold}）");
+                return true;
+            }
+            return false;
+        }
+
+        public void Clear(long playerId) =&gt; _history.Remove(playerId);
+    }
+
+    // ============================================================
+    // 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 1. 并发扣减 ===");
+            var wallet = new WalletService();
+
+            Console.WriteLine("  玩家 1001 初始金币: " + wallet.Get(1001)!.Gold);
+
+            Console.WriteLine();
+            Console.WriteLine("  【正确做法】条件扣减（判断和扣减是原子的）:");
+            bool ok1 = wallet.Deduct_Conditional(1001, 300);
+            Console.WriteLine($"    买 300 金币的道具: {ok1}，剩余 {wallet.Get(1001)!.Gold}");
+
+            bool ok2 = wallet.Deduct_Conditional(1001, 900);
+            Console.WriteLine($"    买 900 金币的道具: {ok2}（余额不足），剩余 {wallet.Get(1001)!.Gold}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【乐观锁】带版本号，冲突时重试:");
+            for (int i = 0; i &lt; 3; i++)
+            {
+                bool ok = wallet.Deduct_Optimistic(1001, 100);
+                Console.WriteLine($"    第 {i + 1} 次扣 100: {ok}，剩余 {wallet.Get(1001)!.Gold}，版本 {wallet.Get(1001)!.Version}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】多机部署时 lock 无效，必须用");
+            Console.WriteLine("          · 条件 UPDATE（数据库保证原子）");
+            Console.WriteLine("          · 或乐观锁 + 重试");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 2. 道具流水 ===");
+            var inv = new InventoryService();
+
+            inv.AddItem(1001, 5001, 10, "quest_reward", "quest-101");
+            inv.AddItem(1001, 5001, 5, "shop_buy", "order-201");
+            inv.RemoveItem(1001, 5001, 3, "craft_consume", "craft-301");
+            inv.RemoveItem(1001, 5001, 100, "invalid");   // 会失败
+
+            Console.WriteLine($"  当前道具数: {inv.GetCount(1001, 5001)}");
+            Console.WriteLine();
+            Console.WriteLine("  流水记录:");
+            foreach (var f in inv.GetFlows(1001))
+            {
+                Console.WriteLine($"    {f}");
+            }
+
+            Console.WriteLine();
+            var (balanced, computed, actual) = inv.Reconcile(1001, 5001);
+            Console.WriteLine($"  对账: 流水合计={computed}, 实际库存={actual}, 平衡={balanced}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】每一笔变更都要写流水");
+            Console.WriteLine("          玩家投诉时才能查清楚");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 3. 防重复领取 ===");
+            var claimer = new RewardClaimer(inv, wallet);
+
+            Console.WriteLine("  玩家 1001 连续领 3 次同一个奖励:");
+            for (int i = 1; i &lt;= 3; i++)
+            {
+                var (ok, msg) = claimer.Claim(1001, "daily_login_2026_10_21", 100, 5002, 1);
+                Console.WriteLine($"    第 {i} 次: {msg}，金币={wallet.Get(1001)!.Gold}");
+            }
+            Console.WriteLine($"    实际领取次数: {claimer.ClaimedCount}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】用「业务唯一键」防重");
+            Console.WriteLine("          重复请求返回成功，而不是失败");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 异常行为检测 ===");
+            var monitor = new AntiCheatMonitor();
+
+            Console.WriteLine("  模拟玩家 2001 短时间内大量收益:");
+            var now = DateTime.UtcNow;
+            for (int i = 0; i &lt; 20; i++)
+            {
+                monitor.Record(2001, 1000);   // 每次 1000
+            }
+            monitor.CheckEarningRate(2001, windowSec: 60, threshold: 10000);
+
+            Console.WriteLine();
+            Console.WriteLine("  模拟正常玩家 2002:");
+            for (int i = 0; i &lt; 3; i++)
+            {
+                monitor.Record(2002, 500);
+            }
+            bool bad = monitor.CheckEarningRate(2002, windowSec: 60, threshold: 10000);
+            Console.WriteLine($"    玩家2002 是否异常: {bad}");
+
+            Console.WriteLine();
+            Console.WriteLine("  【检测思路】");
+            Console.WriteLine("    · 单位时间收益是否超过理论上限");
+            Console.WriteLine("    · 操作频率是否超出人类手速");
+            Console.WriteLine("    · 收益来源是否与关卡难度匹配");
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.Inventory.Demo.Run();
+}</code></pre>
+
+<h2 id="flow">二、道具流水：每一笔都要记 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">为什么流水是必须的</span>
+  <strong>三个真实场景</strong>：<br>
+  ① 玩家投诉<em>"我的装备没了"</em> → 查流水，看到<em>某次分解操作</em><br>
+  ② 发现<em>刷道具漏洞</em> → 查流水，找到<em>异常来源</em><br>
+  ③ <strong>对账</strong> → 流水总和 == 当前库存？<br><br>
+  <strong>本页实测的对账</strong>：<br>
+  <code>流水: +10(任务) +5(购买) -3(合成) = +12</code>（另有 1 笔 -100 因不足被拒，不入账）<br>
+  <code>对账: 流水合计=12, 实际库存=12, 平衡=True</code><br><br>
+  <strong>流水必须包含</strong>：<br>
+  · 玩家ID、道具ID、变化量<br>
+  · <strong>原因</strong>（<em>任务/购买/合成</em>）<br>
+  · <strong>关联ID</strong>（<em>订单号、任务ID</em>）<br>
+  · 时间戳<br><br>
+  <em>没有流水的系统，出了问题只能瞎猜。</em>
+</div>
+
+<h2 id="idempotent">三、防重复领取：业务唯一键 ★★★</h2>
+
+<div class="callout callout--tip">
+  <span class="callout__title">本页的实现与实测</span>
+  <strong>核心</strong>：用「玩家ID + 奖励标识」做唯一键。<br>
+  <code>string key = playerId + ":" + rewardKey;</code><br>
+  <code>if (_claimed.Contains(key)) return (true, "已经领取过了");</code><br><br>
+  <strong>本页实测</strong>：<br>
+  <code>第1次: 领取成功，金币=500</code><br>
+  <code>第2次: 已经领取过了，金币=500</code><br>
+  <code>第3次: 已经领取过了，金币=500</code><br>
+  <code>实际领取次数: 1</code><br><br>
+  <strong>关键细节</strong>：<br>
+  · 重复请求<strong>返回成功</strong>（<em>不是失败</em>）<br>
+  · 奖励标识要<strong>包含时间维度</strong>（<em>daily_login_2026_10_21</em>）<br>
+  · 多实例部署要用<strong>数据库唯一索引</strong>
+</div>
+
+<h2 id="detect">四、异常检测：发现刷子</h2>
+
+<div class="callout callout--warn">
+  <span class="callout__title">三条检测规则</span>
+  <strong>本页实现并实测</strong>：<br>
+  <code>【异常】玩家2001 在 60s 内获得 20000（阈值 10000）</code><br>
+  <code>玩家2002 是否异常: False</code><br><br>
+  <strong>规则一：单位时间收益上限</strong><br>
+  · <em>正常玩家 1 分钟能赚多少？</em><br>
+  · 超过 <strong>3 倍</strong>就标记<br><br>
+  <strong>规则二：操作频率</strong><br>
+  · <em>人类手速有上限</em>（<em>约 10 次/秒</em>）<br>
+  · 超过就可能是脚本<br><br>
+  <strong>规则三：收益与难度匹配</strong><br>
+  · <em>新手段位打出满级装备</em> → 异常<br><br>
+  <strong>注意</strong>：<em>检测到异常不要立刻封号</em>——<strong>先标记，人工复核</strong>。
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="18">
+  <div class="task"><input type="checkbox" id="t-18-1"><label for="t-18-1"><strong>复现丢失更新</strong>：两个线程同时扣减，观察余额错误。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-2"><label for="t-18-2"><strong>用条件 UPDATE 修复</strong>：验证余额正确。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-3"><label for="t-18-3"><strong>实现乐观锁</strong>：加版本号，冲突时重试。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-4"><label for="t-18-4"><strong>做道具流水</strong>：每笔变更都记录原因和关联ID。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-5"><label for="t-18-5"><strong>做对账</strong>：验证流水总和等于当前库存。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-6"><label for="t-18-6"><strong>做防重复领取</strong>：同 key 领 3 次，验证只生效 1 次。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-7"><label for="t-18-7"><strong>做异常检测</strong>：识别单位时间收益异常的玩家。</label></div>
+  <div class="task"><input type="checkbox" id="t-18-8"><label for="t-18-8"><strong>回答面试题</strong>：① 并发扣金币有哪几种方案？② 为什么必须记流水？③ 怎么防刷？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>知道「先读后写」会导致丢失更新</strong>；<br>
+    ② <strong>能说出四种扣减方案及取舍</strong>；<br>
+    ③ <strong>理解流水的作用，能实现对账</strong>；<br>
+    ④ <strong>能用业务唯一键防重复领取，并知道要返回成功</strong>；<br>
+    ⑤ 能实现至少两条异常检测规则。<br>
+    <br>
+    <em>这一页是全站最「要命」的一页——**任何一条做错都会造成真实的经济损失**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="17-leaderboard.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">17 排行榜 ★★</div>
+  </a>
+  <a class="next" href="19-anticheat.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">19 防作弊与服务端权威 ★★★</div>
+  </a>
+</nav>

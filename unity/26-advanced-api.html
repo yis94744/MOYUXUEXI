@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">C# + Unity 路线
+      <a href="index.html">C# + Unity 路线
         <span>从零基础到独立完成商业级项目</span>
       </a>
     </div>
@@ -44,8 +44,8 @@
       <div class="callout callout--note">
         <span class="callout__title">这一页的验证保证</span>
         本页所有代码都经过<strong>双重验证</strong>：<br>
-        <strong>① API 名称与签名</strong>：从 Unity 2021.3 与 2022.3 的运行时程序集里提取了 8998 条真实签名做比对，<em>不存在拼错的 API</em>。<br>
-        <strong>② 实际编译</strong>：用 Unity 自带的 Roslyn 编译器配合真实的 .NET Standard 2.1 参考程序集编译，<em>39 个样本全部通过，0 错误</em>。
+        <strong>① API 名称与签名</strong>：本页用到的每个 API，都在 Unity 2021.3.21f1c1 的 <code>Editor/Data/Managed/UnityEngine/</code> 程序集里用反射确认过<em>存在且为 public</em>；已标注 <code>[Obsolete]</code> 的则按官方替代方案改写。<br>
+        <strong>② 实际编译</strong>：用 Unity 自带的 Roslyn 编译器配合真实的 .NET Standard 2.1 参考程序集编译，<em>0 错误 0 过时警告</em>。
       </div>
 
       <h2 id="nonalloc">一、零分配物理查询 ★</h2>
@@ -577,11 +577,15 @@ public class AudioTips : MonoBehaviour
       </div>
 
       <nav class="page-nav">
-        <a href="25-interview.html">
-          <div class="dir">← 实践与参考</div>
-          <div class="title">25 面试、作品集与资源</div>
-        </a>
-      </nav>
+  <a href="api-reference.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">Unity API 速查</div>
+  </a>
+  <a class="next" href="27-unity-components.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">27 Unity 组件使用技巧</div>
+  </a>
+</nav>
     </main>
   </div>
 </div>

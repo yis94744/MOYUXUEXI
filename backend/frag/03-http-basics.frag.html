@@ -1,0 +1,390 @@
+<h1>03 · HTTP、REST 与 API 设计 ★</h1>
+
+<p class="lead">这一页讲<strong>后端的「门面」</strong>——接口怎么设计，决定了<em>客户端用起来顺不顺、以后改起来痛不痛</em>。<strong>幂等</strong>是这一页的核心。</p>
+
+<div class="callout callout--note">
+  <span class="callout__title">这一页在路线中的位置</span>
+  <strong>上一页</strong>（02）环境搭建与第一个 API —— 装 .NET SDK、跑起第一个 Web API、理解请求响应。<br>
+  <strong>这一页</strong>（03）HTTP、REST 与 API 设计 —— 请求方法、状态码、幂等、版本化、错误码规范。<br>
+  <strong>下一页</strong>（04）ASP.NET Core 框架 —— 中间件、依赖注入、配置系统、生命周期。<br>
+  <strong>怎么用</strong>：先看正文的对比表和<strong>本页实测输出</strong>，再动手做本章任务；<em>遇到不熟的概念，点页首的「前置知识」跳回去复习</em>。
+</div>
+
+<h2 id="response">一、统一响应格式</h2>
+
+<p>所有接口返回<strong>同一种结构</strong>——客户端才能用一套逻辑处理。</p>
+
+<pre class="mono code-block" data-lang="csharp"><code>using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace BackendSamples.ApiDesign
+{
+    // ============================================================
+    // 1. 统一响应格式
+    // ============================================================
+    // 【为什么需要】客户端要能用一套逻辑处理所有接口
+    //   成功：{ code: 0, data: {...}, msg: "" }
+    //   失败：{ code: 1001, data: null, msg: "余额不足" }
+
+    public class ApiResponse&lt;T&gt;
+    {
+        public int Code { get; set; }
+        public string Msg { get; set; } = "";
+        public T Data { get; set; }
+
+        public static ApiResponse&lt;T&gt; Ok(T data) =&gt;
+            new ApiResponse&lt;T&gt; { Code = 0, Msg = "", Data = data };
+
+        public static ApiResponse&lt;T&gt; Fail(int code, string msg) =&gt;
+            new ApiResponse&lt;T&gt; { Code = code, Msg = msg, Data = default };
+    }
+
+    // ============================================================
+    // 2. 错误码设计
+    // ============================================================
+    // 【关键】错误码要分段，一眼能看出问题类别
+    //   0        成功
+    //   1xxx     参数/客户端错误（重试无用）
+    //   2xxx     权限/认证错误
+    //   3xxx     业务错误（余额不足、道具不足）
+    //   4xxx     系统错误（重试可能有用）
+    //   5xxx     第三方服务错误
+
+    public static class ErrorCode
+    {
+        public const int Success = 0;
+
+        // 1xxx 参数错误
+        public const int InvalidParam = 1001;
+        public const int MissingParam = 1002;
+
+        // 2xxx 权限
+        public const int Unauthorized = 2001;
+        public const int TokenExpired = 2002;
+        public const int Forbidden = 2003;
+
+        // 3xxx 业务
+        public const int InsufficientGold = 3001;
+        public const int ItemNotFound = 3002;
+        public const int InventoryFull = 3003;
+        public const int AlreadyClaimed = 3004;
+
+        // 4xxx 系统
+        public const int InternalError = 4001;
+        public const int ServiceBusy = 4002;
+    }
+
+    // ============================================================
+    // 3. HTTP 状态码 vs 业务错误码
+    // ============================================================
+    // 【重要】两者是不同层的东西，都要用
+    //
+    //   HTTP 状态码：传输层语义（200/400/401/404/500）
+    //     给「网关、负载均衡、监控」看
+    //     401 会自动触发某些客户端的重新登录
+    //
+    //   业务错误码：业务层语义（3001 金币不足）
+    //     给「客户端业务逻辑」看
+    //
+    // 【常见错误】全部返回 200，用 code 区分
+    //   → 问题：监控看不到错误率、网关无法做熔断
+    //
+    // 【推荐做法】
+    //   客户端参数错误 → 400 + code 1001
+    //   未登录         → 401 + code 2001
+    //   余额不足       → 200 + code 3001（业务失败不是协议错误）
+    //   服务器异常     → 500 + code 4001
+
+    public static class HttpStatusGuide
+    {
+        public static string Explain(int statusCode)
+        {
+            return statusCode switch
+            {
+                200 =&gt; "成功",
+                201 =&gt; "已创建",
+                204 =&gt; "成功但无内容",
+                400 =&gt; "请求参数错误",
+                401 =&gt; "未认证",
+                403 =&gt; "已认证但无权限",
+                404 =&gt; "资源不存在",
+                409 =&gt; "冲突（重复提交）",
+                422 =&gt; "语义错误（能解析但不合法）",
+                429 =&gt; "请求过于频繁",
+                500 =&gt; "服务器内部错误",
+                502 =&gt; "上游服务错误",
+                503 =&gt; "服务不可用",
+                _ =&gt; "其他"
+            };
+        }
+    }
+
+    // ============================================================
+    // 4. 幂等：后端最重要的一条设计
+    // ============================================================
+    // 【问题】客户端网络抖动，同一个「领奖」请求发了 3 次
+    //   → 如果不做幂等，玩家领了 3 份奖励
+    //
+    // 【为什么客户端改不了】
+    //   客户端重试是「必要行为」——不能要求玩家网络永不抖动
+
+    public class IdempotencyService
+    {
+        // 【方案一】唯一键去重
+        //   客户端每次请求带一个 requestId
+        //   服务端记录已处理的 requestId
+        private readonly Dictionary&lt;string, string&gt; _processed = new();
+
+        public string Handle(string requestId, Func&lt;string&gt; action)
+        {
+            // 已经处理过，直接返回上次的结果
+            if (_processed.TryGetValue(requestId, out var cached))
+                return cached;
+
+            var result = action();
+            _processed[requestId] = result;
+            return result;
+        }
+
+        // 【方案二】数据库唯一索引
+        //   CREATE UNIQUE INDEX uk_order ON orders(user_id, order_id)
+        //   重复插入会抛异常，捕获后当作成功
+        //
+        // 【方案三】状态机 + 版本号
+        //   UPDATE orders SET status = 2 WHERE id = 1 AND status = 1
+        //   影响行数为 0 说明已经被处理过
+
+        public int ProcessedCount =&gt; _processed.Count;
+    }
+
+    // ============================================================
+    // 5. 实战：一个完整的领奖接口
+    // ============================================================
+
+    public class RewardService
+    {
+        private readonly HashSet&lt;string&gt; _claimed = new();
+        private int _gold;
+
+        // 领取任务奖励
+        // 返回: (成功?, 错误码, 提示, 当前金币)
+        public (bool ok, int code, string msg, int gold) ClaimReward(
+            long userId, long questId, string requestId)
+        {
+            // ① 参数校验
+            if (userId &lt;= 0) return (false, ErrorCode.InvalidParam, "用户ID非法", _gold);
+            if (questId &lt;= 0) return (false, ErrorCode.InvalidParam, "任务ID非法", _gold);
+
+            // ② 幂等检查（关键！）
+            //   同一个 requestId 重复请求，直接返回当前状态
+            string key = userId + ":" + questId;
+            if (_claimed.Contains(key))
+            {
+                // 【注意】这里返回 ok=true，因为「已经领过」对客户端来说是成功
+                //   如果返回失败，客户端会以为自己没领到，一直重试
+                return (true, ErrorCode.AlreadyClaimed, "已经领取过了", _gold);
+            }
+
+            // ③ 业务逻辑
+            _gold += 100;
+            _claimed.Add(key);
+
+            // ④ 返回结果
+            return (true, ErrorCode.Success, "领取成功", _gold);
+        }
+
+        public int Gold =&gt; _gold;
+    }
+
+    // ============================================================
+    // 6. 演示
+    // ============================================================
+    public static class Demo
+    {
+        public static void Run()
+        {
+            Console.WriteLine("=== 3. HTTP 状态码说明 ===");
+            foreach (int code in new[] { 200, 400, 401, 403, 409, 429, 500 })
+            {
+                Console.WriteLine($"  {code}: {HttpStatusGuide.Explain(code)}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("=== 4. 幂等演示 ===");
+            var svc = new RewardService();
+
+            // 模拟客户端重试 3 次
+            Console.WriteLine("  客户端连续发送 3 次领奖请求（同一 requestId）:");
+            for (int i = 1; i &lt;= 3; i++)
+            {
+                var (ok, code, msg, gold) = svc.ClaimReward(1001, 2001, "req-abc");
+                Console.WriteLine($"    第 {i} 次: ok={ok}, code={code}, msg={msg}, 金币={gold}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  【关键】金币只涨了 100，不是 300");
+            Console.WriteLine("          这就是幂等的价值");
+
+            Console.WriteLine();
+            Console.WriteLine("=== 5. 统一响应演示 ===");
+            var okResp = ApiResponse&lt;string&gt;.Ok("数据内容");
+            Console.WriteLine($"  成功: code={okResp.Code}, data={okResp.Data}");
+
+            var failResp = ApiResponse&lt;string&gt;.Fail(ErrorCode.InsufficientGold, "金币不足");
+            Console.WriteLine($"  失败: code={failResp.Code}, msg={failResp.Msg}");
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main() =&gt; BackendSamples.ApiDesign.Demo.Run();
+}</code></pre>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>字段</th><th>作用</th><th>示例</th></tr></thead>
+  <tbody>
+    <tr><td><code>code</code></td><td><strong>业务错误码</strong>（0 = 成功）</td><td><code>0</code> / <code>3001</code></td></tr>
+    <tr><td><code>msg</code></td><td>给用户看的提示</td><td><em>"金币不足"</em></td></tr>
+    <tr><td><code>data</code></td><td>业务数据</td><td><code>{...}</code> 或 <code>null</code></td></tr>
+    <tr><td><em>可选</em> <code>requestId</code></td><td><strong>链路追踪</strong></td><td><em>出问题时定位日志</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="errorcode">二、错误码分段设计 ★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">错误码不带分段 = 后期灾难</span>
+  <strong>反例</strong>：错误码从 1 开始随意追加<br>
+  · 1 = 参数错误、2 = 未登录、3 = 金币不足、4 = 系统错误……<br>
+  · <em>加到 200 个之后，没人记得 137 是什么</em><br><br>
+  <strong>正确做法：分段</strong><br>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>段</th><th>含义</th><th>客户端行为</th></tr></thead>
+    <tbody>
+      <tr><td><code>0</code></td><td>成功</td><td>—</td></tr>
+      <tr><td><code>1xxx</code></td><td>参数/客户端错误</td><td><strong>不要重试</strong></td></tr>
+      <tr><td><code>2xxx</code></td><td>权限/认证</td><td>跳登录</td></tr>
+      <tr><td><code>3xxx</code></td><td>业务错误</td><td>提示用户</td></tr>
+      <tr><td><code>4xxx</code></td><td>系统错误</td><td><em>可以重试</em></td></tr>
+      <tr><td><code>5xxx</code></td><td>第三方服务</td><td>稍后重试</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <strong>好处</strong>：<em>客户端可以按段位统一处理</em>——<code>code / 1000 === 2</code> 就跳登录，不需要枚举所有错误码。
+</div>
+
+<h2 id="idempotency">三、幂等：后端最重要的一条设计 ★★★</h2>
+
+<div class="callout callout--danger">
+  <span class="callout__title">先看一个真实的事故场景</span>
+  <strong>场景</strong>：玩家点「领取任务奖励」<br>
+  · 网络抖动，请求超时<br>
+  · 客户端<strong>自动重试</strong>（这是正常行为）<br>
+  · 实际上第一次请求<em>已经成功了</em>，只是响应丢包<br>
+  · <em>玩家领了 2 份奖励</em><br><br>
+  <strong>更糟的情况</strong>：<br>
+  · 弱网下客户端重试 5 次 → <strong>领 5 份</strong><br>
+  · 有人用工具刷接口 → <strong>无限刷</strong><br><br>
+  <strong>本页实测输出验证了正确做法</strong>：<br>
+  <code>第 1 次: ok=True, code=0, msg=领取成功, 金币=100</code><br>
+  <code>第 2 次: ok=True, code=3004, msg=已经领取过了, 金币=100</code><br>
+  <code>第 3 次: ok=True, code=3004, msg=已经领取过了, 金币=100</code><br>
+  <em>金币只涨了 100，不是 300。</em>
+</div>
+
+<div class="callout callout--tip">
+  <span class="callout__title">三种幂等实现方案</span>
+  <strong>方案一：唯一键去重</strong>（本页代码）<br>
+  客户端每次请求带 <code>requestId</code>，服务端记录已处理的 ID<br>
+  <em>简单，但要考虑 requestId 存储的过期清理</em><br><br>
+  <strong>方案二：数据库唯一索引</strong>（最可靠）<br>
+  <code>CREATE UNIQUE INDEX uk_claim ON claims(user_id, quest_id)</code><br>
+  <em>重复插入直接抛异常，捕获后当作「已领过」</em><br>
+  <strong>优点</strong>：数据库保证，<em>多实例部署也不会重复</em><br><br>
+  <strong>方案三：状态机 + 版本号</strong><br>
+  <code>UPDATE orders SET status = 2 WHERE id = 1 AND status = 1</code><br>
+  <em>影响行数为 0 == 已经被处理过</em><br>
+  <strong>优点</strong>：不需要额外存储，<em>天然支持并发</em>
+</div>
+
+<div class="callout callout--warn">
+  <span class="callout__title">一个容易做错的细节</span>
+  <strong>「已经领过」应该返回成功还是失败？</strong><br><br>
+  <em>本页代码返回了 <code>ok=True</code></em>——<strong>这是对的</strong>。<br><br>
+  <strong>为什么</strong>：<br>
+  · 如果返回失败，客户端会以为「没领到」→ <em>继续重试</em><br>
+  · 重试又失败 → <em>死循环</em><br>
+  · 玩家看到「领取失败」但实际上已领 → <em>客服投诉</em><br><br>
+  <strong>正确语义</strong>：<em>「这个操作的目标状态已经达成了」= 成功</em>。<br>
+  用一个单独的 <code>code</code> 告诉客户端「是重复请求」，但 <code>ok</code> 是 <code>true</code>。
+</div>
+
+<h2 id="status">四、HTTP 状态码怎么用</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>场景</th><th>HTTP 状态码</th><th>业务码</th></tr></thead>
+  <tbody>
+    <tr><td>正常成功</td><td><code>200</code></td><td><code>0</code></td></tr>
+    <tr><td>参数格式错误</td><td><code>400</code></td><td><code>1001</code></td></tr>
+    <tr><td>未登录/Token 失效</td><td><strong><code>401</code></strong></td><td><code>2001</code></td></tr>
+    <tr><td>已登录但无权限</td><td><code>403</code></td><td><code>2003</code></td></tr>
+    <tr><td><strong>金币不足</strong></td><td><strong><code>200</code></strong></td><td><code>3001</code></td></tr>
+    <tr><td>服务器异常</td><td><code>500</code></td><td><code>4001</code></td></tr>
+    <tr><td>请求过频</td><td><code>429</code></td><td><code>4002</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout callout--note">
+  <span class="callout__title">业务失败用 200 还是 4xx</span>
+  <strong>这是一个有争议的话题</strong>，两种做法都有实践：<br><br>
+  <strong>做法 A：全部 200，用 code 区分</strong>（<em>本页推荐</em>）<br>
+  · 优点：客户端只处理一种响应形态<br>
+  · 缺点：<em>监控看不到错误率，网关无法基于状态码熔断</em><br><br>
+  <strong>做法 B：区分传输错误与业务错误</strong><br>
+  · 4xx 只用于<em>协议层错误</em>（参数、认证）<br>
+  · 业务失败（金币不足）用 <strong>200 + code</strong><br>
+  · <strong>推荐这个</strong>——因为「金币不足」<em>不是接口出了问题，是正常业务结果</em><br><br>
+  <em>关键不是选哪个，而是<strong>团队统一</strong>。</em>
+</div>
+
+<h2 id="tasks">本章动手任务</h2>
+
+<div class="tasks" data-page="03">
+  <div class="task"><input type="checkbox" id="t-03-1"><label for="t-03-1"><strong>设计统一响应</strong>：写一个 <code>ApiResponse&lt;T&gt;</code>，包含 code/msg/data。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-2"><label for="t-03-2"><strong>设计错误码</strong>：按 1xxx/2xxx/3xxx/4xxx 分段，列出你项目的 10 个错误码。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-3"><label for="t-03-3"><strong>复现幂等问题</strong>：写一个不幂等的领奖接口，连续调用 3 次，观察金币变成 300。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-4"><label for="t-03-4"><strong>实现幂等</strong>：加上 requestId 去重，验证金币只涨 100。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-5"><label for="t-03-5"><strong>用数据库唯一索引</strong>：把幂等改成数据库方案，体会两者的差异。</label></div>
+  <div class="task"><input type="checkbox" id="t-03-6"><label for="t-03-6"><strong>回答面试题</strong>：① 什么是幂等？② 为什么「已领过」要返回成功？③ 业务失败该用 200 还是 4xx？</label></div>
+</div>
+
+<div class="milestone">
+  <p class="mb0">
+    <strong>本章过关标准</strong>：<br>
+    ① <strong>能设计出统一的响应格式</strong>；<br>
+    ② <strong>能按分段设计错误码，并说明每段客户端该怎么处理</strong>；<br>
+    ③ <strong>能解释幂等是什么、为什么必需</strong>；<br>
+    ④ <strong>能实现至少一种幂等方案，并实测验证</strong>；<br>
+    ⑤ 知道「已处理」应返回成功而非失败。<br>
+    <br>
+    <em>第 ③ 和 第 ④ 条是这一页的核心——**幂等是后端与客户端最大的思维差异之一**。</em>
+  </p>
+</div>
+
+<nav class="page-nav">
+  <a href="02-setup.html">
+    <div class="dir">← 上一页</div>
+    <div class="title">02 环境搭建与第一个 API</div>
+  </a>
+  <a class="next" href="04-aspnet-core.html">
+    <div class="dir">下一页 →</div>
+    <div class="title">04 ASP.NET Core 框架 ★★</div>
+  </a>
+</nav>

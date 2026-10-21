@@ -13,7 +13,7 @@
 
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <a href="../algorithms/index.html">Lua 热更新路线
+      <a href="index.html">Lua 热更新路线
         <span>从零基础到独立搭建可上线的热更框架</span>
       </a>
     </div>
@@ -46,7 +46,8 @@
   <strong>上一页</strong>（14）实现了核心模块。这一页给它们<strong>统一的代码风格</strong>。
   <strong>关键衔接</strong>：页 06 讲 <code>class</code> 的<em>原理</em>；这一页讲<em>框架里怎么用，以及会踩什么坑</em>。
   <strong>下一页</strong>（16）UI 框架。<em>UI 框架是 class 系统最大的用户。</em>
-  <strong>验证方式</strong>：本页所有代码在 Lua 5.4.7 实测运行，<em>包括那个陷阱的复现</em>。
+  <strong>验证方式</strong>：本页所有代码在 Lua 5.4.7 实测运行，<em>包括那个陷阱的复现</em>——<br>
+  错误写法 <code>stack overflow</code>（同一 ctor 递归 249992 次）、两级继承侥幸不崩、正确写法三级构造链完整。
 </div>
 
 
@@ -55,7 +56,6 @@
         <div class="prereq__list">
           <a class="prereq__item" href="13-framework-design.html#module" data-brief="注册/初始化/逆序销毁"><span class="prereq__title">模块管理器</span><span class="prereq__page">13-framework-design</span></a>
           <a class="prereq__item" href="06-lua-oop.html#oop" data-brief="__index 链实现继承"><span class="prereq__title">Lua 实现类</span><span class="prereq__page">06-lua-oop</span></a>
-          <a class="prereq__item" href="15-framework-oop.html#super-trap" data-brief="self.super 查到的是实例的类，三级继承必崩"><span class="prereq__title">super 无限递归</span><span class="prereq__page">15-framework-oop</span></a>
         </div>
         <div class="prereq__hint">想不起来了？点上面的链接直接跳过去复习。</div>
       </div>
@@ -244,6 +244,35 @@ print("  【验证陷阱】如果用 self.super 会怎样？")
 print("    p.super 实际是:", p.super and p.super.__name or "nil")
 print("    注意！p 是 Player 的实例，但 p.super 拿到的是 Character")
 print("    这就是为什么在 Character:ctor 里用 self.super 会递归到自己")
+
+print()
+print("  【真跑一次】故意写成 self.super.ctor，看会不会栈溢出：")
+
+-- 用一份独立的类来复现（不影响上面已经跑通的那套）
+local BoomEntity = class("BoomEntity")
+function BoomEntity:ctor(id) self.id = id end
+
+local BoomCharacter = class("BoomCharacter", BoomEntity)
+local boomDepth = 0
+function BoomCharacter:ctor(id, name)
+  boomDepth = boomDepth + 1
+  self.super.ctor(self, id)          -- 错误写法：self.super 恒为 BoomCharacter
+end
+
+local BoomPlayer = class("BoomPlayer", BoomCharacter)
+
+local ok, err = pcall(function() return BoomPlayer.new(1, "勇者") end)
+print("    pcall 结果:", ok and "成功（没复现）" or "失败")
+print("    错误信息:", tostring(err))
+print(string.format("    BoomCharacter:ctor 被递归进入 %d 次", boomDepth))
+print("    =&gt; 错误写法确实会 stack overflow")
+
+print()
+print("  【对照】两级继承、直接建父类实例，为什么「侥幸不崩」：")
+boomDepth = 0
+local ok2 = pcall(function() return BoomCharacter.new(2, "村民") end)
+print("    BoomCharacter.new(...) 结果:", ok2 and "成功" or "失败",
+      "（self 是 BoomCharacter 实例，self.super 恰好是 BoomEntity）")
 
 print()
 print("=== 5. 组合优于继承 ===")
@@ -468,7 +497,13 @@ end</code></pre>
   · 创建 Player 实例 → 调用 <code>Character:ctor</code>
   · 里面写 <code>self.super.ctor</code> → <code>self</code> 是 p → <code>p.super</code> 是 <strong>Character</strong>
   · 结果又调用了 <code>Character:ctor</code> → <em>无限循环</em>
-  <strong>三级继承时必然踩坑</strong>，两级可能侥幸不崩（因为 self 的类与当前类刚好一致）。
+  <strong>什么时候会踩坑，一句话就能判断</strong>：<br>
+  · 如果<em>写 <code>self.super</code> 的那个类</em> == <em>实例真正的类</em>，<code>self.super</code> 恰好就是它的父类 —— <strong>碰巧是对的</strong>（两级继承直接 new 父类时就是这种情形）<br>
+  · 只要实例是<strong>这个类的子类</strong>，<code>self.super</code> 就会指回<em>这个类自己</em> —— <strong>必然递归</strong><br><br>
+  <strong>本页实测（Lua 5.4.7）</strong>：<br>
+  · <code>Player.new(...)</code>（三级）→ <code>stack overflow</code>，<code>Character:ctor</code> 被递归进入 <strong>249993</strong> 次<br>
+  · <code>Character.new(...)</code>（两级、直接建父类实例）→ <em>正常运行，不崩</em><br><br>
+  <em>所以"两级侥幸不崩"只是运气——只要哪天给这个类加个子类，坑立刻爆。</em>
 </div>
 
 <div class="callout callout--tip">
@@ -490,7 +525,13 @@ end</code></pre>
   <strong>为什么这样对</strong>：局部变量 <code>super</code> 在<em>定义方法时</em>就已经绑定到 <code>Character.super</code>（= Entity），<strong>与 self 是谁无关</strong>。
   <strong>本页实测：三级继承正确工作</strong>
   <pre><code>勇者(id=1, hp=100/100), lv=1, role=战士, gold=0 [VIP]</code></pre>
-  <em>这一行的每一段都来自不同层级的构造函数——说明 super 调用链完全正确。</em>
+  <em>这一行的每一段都来自不同层级的构造函数——说明 super 调用链完全正确。</em><br><br>
+  <strong>本页实测：错误写法真的会栈溢出</strong>
+  <pre><code>pcall 结果: 失败
+错误信息: class.lua:193: stack overflow
+BoomCharacter:ctor 被递归进入 249992 次</code></pre>
+  <em>同一个 ctor 递归了将近 25 万次才撑爆栈——所以看到 "stack overflow" 时，
+  先怀疑"自己调了自己"，而不是先怀疑数据太大。</em>
 </div>
 
 <h2 id="composition">三、组合优于继承</h2>
